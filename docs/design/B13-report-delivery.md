@@ -33,7 +33,8 @@ Where the host (B14's, not built) binds the envelope, and which engine, page siz
 | piece | package | role |
 |---|---|---|
 | `isGeneratedReportPdf`, `reportPdfProblems`; `ReportPdf` and its identity frozen, bytes copied from the engine | `@kauro/reports` | a publisher accepts only a PDF `generateReportPdf` returned, and only while its bytes still hash to its identity |
-| `ReportInputsPort`, `AuthorizedReportInputs`, `assembleReportFacts`, terms snapshot (`termsSnapshotBytesOf`, `readTermsSnapshot`) | `@kauro/data-plane` `report/facts.ts` | the platform's facts for one report, checked (§3) |
+| `ReportInputsPort`, `AuthorizedReportInputs` (each fact in its binding), `assembleReportFacts`; the simulator's terms snapshot (`termsSnapshotBytesOf`, `readTermsSnapshot`) | `@kauro/data-plane` `report/facts.ts` | the platform's facts for one report, verified (§3; order 6: `B13-report-inputs.md`) |
+| `PlatformReportInputs` | `@kauro/control` `execution/report-inputs.ts` | the platform's port: the records of `@kauro/persistence` `reportSourcesOf`, in the control plane's bound SYSTEM unit (order 6) |
 | `StagedReportPdfPublisher` (implements `ReportPdfPublisher`), `reportPdfObjectNameOf` | `report/publisher.ts` | stores the PDF through the attempt's writer, reads it back, then records it (§4) |
 | `ReportPdfRecord`, `readReportPdfRecord`, `reportRecordProblems` | `report/record.ts` | the canonical document that says which PDF a package carries and whose it is |
 | `readStagedPackage`, `produceStagedReport`, `ReportingExecutionEnvelope` | `report/stage.ts` | the chain, and its join with the attempt |
@@ -55,14 +56,16 @@ for the attempt's scope (agency, project, job, attempt), only what the platform 
 | expected manifest hash | the validation receipt the job is bound to (`artifactEvidenceHash`) | the package's manifest differs (`PACKAGE_BINDING_MISMATCH`) |
 | `declaredCounts` → `countsBinding: BOUND` | `deliveryRowCountsOf` over the sealed revision's populations and the receipt's counts — the rule the publication itself applies | no counts (`COUNTS_UNAVAILABLE`), populations and receipt disagree (`COUNTS_MISMATCH`), unresolved decisions (`COUNTS_UNRESOLVED`), or the package's bytes do not prove them (`DECLARED_COUNTS_MISMATCH`). **A delivered report is never UNBOUND.** |
 | billable units, quote id | the frozen quote | differ from the sealed populations (`DECLARED_COUNTS_MISMATCH`) |
-| terms version and hash | the frozen quote (`terms_version`, `terms_hash`) | — |
-| issuer | the terms snapshot only: a canonical document whose SHA-256 must equal the recorded terms hash and which states the recorded version | absent, altered, another version, another spelling, or another hash (`TERMS_UNAVAILABLE`, `TERMS_UNVERIFIABLE`); unsafe text (`FACTS_MALFORMED`) |
+| terms version and hash | the frozen quote (`terms_version`, `terms_hash` = KAURO_QUOTE_TERMS_V1 of its preimage, recomputed; order 6) | altered, another version, not accepted by the agency, the quote not in force (`TERMS_UNVERIFIABLE`, `TERMS_UNAVAILABLE`, `QUOTE_NOT_IN_FORCE`) |
+| issuer | order 6: the KAURO_LEGAL_IDENTITY_V1 document whose SHA-256 is the `legal_identity_hash` of the fiscal issuer the quote's preimage names (`B13-report-inputs.md` §3). The order-5 terms snapshot is the simulator's binding only: its raw hash can never be a quote's terms hash | absent or unverifiable (`ISSUER_UNAVAILABLE`, `ISSUER_UNVERIFIABLE`); unsafe text (`FACTS_MALFORMED`) |
+| branding, privacy class, finding and decision ids | order 6: the agency's branding version in force when the job was queued, the audience of a B08 package (SECURE_DETAIL), the subject's audit findings, the approval's disclosure set held to its hash | `BRANDING_*`, `PRIVACY_UNAUTHORIZED`, `FINDINGS_*`, `DECISIONS_*` |
 | `reportId`, `packageId` | `rpt-<jobId>`, `pkg-<attemptId>` (the package version row is minted after the worker ran) | — |
 | scope | the inputs name the scope they were read for | any of the four ids differs (`FACTS_FOREIGN_SCOPE`) |
 
 Neither a brand nor an appearance fixture supplies the issuer or the terms: `Branding` has no field for them and the assembler reads
-them from the snapshot. This closes R2-070's missing binding of the issuer to the terms document **for this path**: the terms hash IS the
-snapshot's hash, so the issuer cannot differ from the terms the report names.
+them from the issuer's legal identity document the quote's terms name (order 6). This closes R2-070's missing binding of the issuer to
+the terms **for this path**: the terms hash binds `issuerRef`, the issuer's recorded hash binds the document, so the issuer cannot differ
+from the one the accepted terms name.
 
 ## 4. Generated, stored, verified, published
 
@@ -120,20 +123,18 @@ granting the delivered PDF to its agency only and refusing every unpublished pac
 |---|---|
 | chain, storage, read-back, record, B08 steps | EXECUTED_LOCAL (Windows; PostgreSQL 17; Edge 155 sandboxed); CI on the exact commit |
 | object storage, worker host, Migration core staging | SIMULATED — contract fakes of their owners; the packages themselves are the core's own acceptance packages (EXECUTED_LOCAL bytes) |
-| terms snapshot, branding, privacy class, finding ids | SIMULATED — no platform record holds them |
+| terms, issuer, branding, privacy class, finding and decision ids | order 6: the platform's records through `PlatformReportInputs` (EXECUTED_LOCAL); the legal identity used in tests is the labelled synthetic TEST identity |
 
 ## 7. Not connected, and what is left
 
-- **The issuer's legal identity**: the shipped operator facts are all null (the owner has not provided them) and no store holds a terms
-  snapshot. No real `ReportInputsPort` can answer for the issuer today; the port, the snapshot contract and the checks exist and a
-  platform record is the only thing missing. Until then the worker would refuse every report (`TERMS_UNAVAILABLE`).
+- **The issuer's legal identity**: order 6 added its store (migration 0095) and the platform's port; no document is recorded (the owner
+  has not provided the facts: `docs/owner/LEGAL_IDENTITY_SNAPSHOT.md`), so every report is refused `ISSUER_UNAVAILABLE` until one is.
 - **A composition root** that binds `ReportingExecutionEnvelope` in a worker (B14) and a deployment-pinned browser; the cloud storage and
   host remain B14/B15.
-- **A database-backed `ReportInputsPort` outside tests**: the test one reads the receipt, the quote and the store's `deliveryCountFacts`;
-  production wiring is a read in the control plane.
+- **The database-backed `ReportInputsPort`** exists (order 6, `PlatformReportInputs`); binding it for a deployed worker is B14's.
 - **Replacement of a delivered package** (`AVAILABLE → RETIRED`, "LATER B13" in the B08 machine) is not performed; a corrected report is
   another job's package and the first delivery stays AVAILABLE. Deciding which one supersedes the other is a product decision.
-- Branding versions, privacy class and finding/decision ids are not recorded by the platform yet; the stage takes them from the port.
+- Branding versions have a store (0095) but no writer route yet (CMD008); privacy class, findings and decisions come from records (order 6).
 - A transient storage outage while a report artifact is being written fails the job as it does for any staged artifact (B08 S035); a retryable class for writer failures would be a B08 change.
 - The report is read in memory (`readMigrationPackage`); a package larger than `DEFAULT_MAX_PACKAGE_BYTES` (256 MiB) is refused
   (`PACKAGE_TOO_LARGE`), not truncated.

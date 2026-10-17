@@ -98,6 +98,8 @@ export { nestedAsSuperuser, nestedAsInvoker, slowCheckHook } from "./depth-probe
 export type { DepthProbe } from "./depth-probe.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT): the owner's funding act of the platform's model pool (Q8-1)
 export { fundPlatformPool } from "./audit-fixtures.js";
+// order 6: a B13 report's sources (a synthetic legal identity, its issuer, accepted terms, a branding version)
+export { TEST_LEGAL_IDENTITY, REPORT_TERMS_VERSION, REPORT_PRIVACY_VERSION, recordLegalIdentity, recordIssuerOfIdentity, publishReportAgreements, acceptReportAgreements, recordBranding } from "./report-sources.js";
 export type { FundedPoolOptions } from "./audit-fixtures.js";
 // the common fault harness (docs/design/FAULT-HARNESS.md): controlled clock, crash and pause points, interleavings, matrix cells
 export * from "./faults/index.js";

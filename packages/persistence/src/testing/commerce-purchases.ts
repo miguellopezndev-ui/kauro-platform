@@ -14,7 +14,9 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   baseServiceCents,
   quoteAmounts,
+  quoteTermsHash,
   registryPricePolicy,
+  termsMoney,
   toUtcInstant,
   type AgencyId,
   type ApprovalId,
@@ -118,7 +120,10 @@ export interface QuoteInput {
   readonly profileId: FiscalProfileId;
   readonly treatment?: ReviewedTreatment;
   readonly billableUnits?: number;
-  /** The hash of the terms the quote is accepted under (default: a fixture digest no document has); a test that binds a terms document names its own. */
+  /**
+   * The hash of the terms the quote is accepted under. Default: KAURO_QUOTE_TERMS_V1 over the quote's own preimage, as CMD027 records it
+   * (instants exact to the microsecond, as the database renders them); a test that records other terms names its own.
+   */
   readonly termsHash?: Sha256Hex;
   /** The founding reservation the quote's eligibility snapshot names (B10; reserveFoundingSlot records it): absent, the snapshot names an unbacked reference. */
   readonly foundingReservationId?: string;
@@ -218,9 +223,37 @@ export async function issueQuote(h: Harness, input: QuoteInput): Promise<IssuedQ
     const snapshotId = uow.ids.next() as EligibilitySnapshotId;
     const issuedAt = clock.now();
     const issuedMs = Date.parse(issuedAt);
-    const termsHash = input.termsHash ?? sha(`terms-${quoteId}`);
     const expiresAt = toUtcInstant(issuedMs + 336 * HOUR_MS);
     const sourceAvailableUntil = toUtcInstant(issuedMs + 168 * HOUR_MS);
+    const exactOf = (i: UtcInstant): UtcInstant => i.replace(/\.(\d{3})Z$/, ".$1000Z") as UtcInstant;
+    const termsHash =
+      input.termsHash ??
+      quoteTermsHash({
+        quoteId,
+        agencyId: agency.agencyId,
+        projectId: plan.projectId,
+        planId: plan.planId,
+        approvalId: approval.approvalId,
+        planHash: plan.bodyHash,
+        revisionHash: plan.revisionHash,
+        targetContractHash: plan.targetContractHash,
+        mode: project.mode,
+        billableUnits: units,
+        pricePolicyVersion: "R2-INITIAL",
+        discountPolicyVersion: "R2-INITIAL",
+        eligibilitySnapshotId: snapshotId,
+        ...termsMoney(amounts),
+        fiscalProfileId: input.profileId,
+        issuerRef: input.issuerRef,
+        taxTreatment: tax.treatment,
+        taxRule: tax.rule,
+        taxRateBps: tax.rateBps,
+        currency: "USD",
+        issuedAt: exactOf(issuedAt),
+        expiresAt: exactOf(expiresAt),
+        sourceAvailableUntil: exactOf(sourceAvailableUntil),
+        termsVersion: "TERMS-2026-01",
+      });
     await uow.commerce.quotes.issue(
       {
         quoteId,

@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { readStagedManifest, type ObjectStoragePort, type StagedArtifact } from "@kauro/application";
-import { generateReportPdf, buildReportModel, readMigrationPackage, type PdfEngine, type ReportPdf } from "@kauro/reports";
+import { generateReportPdf, buildReportModel, readMigrationPackage, type Branding, type PdfEngine, type ReportPdf } from "@kauro/reports";
 import {
   AttemptEnvelopeFailure,
   ChromiumPdfEngine,
@@ -30,6 +30,7 @@ import {
   reportPdfRecordBytesOf,
   reportRecordProblems,
   termsSnapshotBytesOf,
+  type AuthorizedReportInputs,
   type ReportRenderConfig,
 } from "../src/index.js";
 import { SIMULATED_ISSUER, SimulatedReportInputs, simulatedReportInputsOf, simulatedTermsOf } from "../src/testing/index.js";
@@ -68,7 +69,14 @@ const engineForFlows = (): PdfEngine => {
 };
 
 const envelopeOf = (r: Rig, name: CaseName, inputs: SimulatedReportInputs, engine: PdfEngine, inner = acceptanceCore(name)): ReportingExecutionEnvelope =>
-  new ReportingExecutionEnvelope({ inner, storage: r.storage, inputs, engine, render });
+  new ReportingExecutionEnvelope({ inner, storage: r.storage, inputs, engine, render, admitSimulatedInputs: true });
+
+/** The branding the simulator's inputs carry (always its own binding). */
+const simulatedBranding = (inputs: AuthorizedReportInputs | null): Branding => {
+  const b = inputs?.branding;
+  assert.ok(b?.binding === "SIMULATED", "the simulator answers in its own branding binding");
+  return b.branding;
+};
 
 const objectsOf = async (r: Rig): Promise<string[]> => (await r.fake.list(r.fake.location("STAGING"), r.fixture.prefix)).objects.map((o) => o.objectName);
 const bytesOf = (r: Rig, a: StagedArtifact): Promise<Buffer> => collect(r.fake.read(r.fake.location("STAGING"), a.objectName, a.generation));
@@ -161,7 +169,7 @@ describe("B13xB08 the report joins the attempt: positive flows over the acceptan
     // a staged package the chain reads, without going through the envelope
     const core = await acceptanceCore(CLEAN).execute(r.fixture.subject, r.io);
     const files = await readStagedPackage(r.storage, core.stagedArtifacts);
-    const produced = await produceStagedReport({ files, scope: r.scope, writer: r.writer, storage: r.storage, inputs, engine: scriptedEngine(), render, cancellation: r.channel });
+    const produced = await produceStagedReport({ files, scope: r.scope, writer: r.writer, storage: r.storage, inputs, engine: scriptedEngine(), render, cancellation: r.channel, admitSimulatedInputs: true });
     const model = produced.report.model;
     assert.equal(produced.report.countsBinding, "BOUND");
     assert.equal(model.countsBinding, "BOUND");
@@ -226,11 +234,11 @@ describe("B13xB08 the platform's facts: nothing is invented, nothing unbound is 
     const respelled = new TextEncoder().encode(`${Buffer.from(good).toString("utf8").replace('"version":1', '"version": 1')}`);
     const cases: ReadonlyArray<readonly [string, Parameters<typeof simulatedReportInputsOf>[2], string]> = [
       ["no terms snapshot", { terms: null }, "TERMS_UNAVAILABLE"],
-      ["a snapshot altered after it was made", { terms: { termsVersion: "terms-simulated-1", termsSha256: sha(good), snapshot: flipped } }, "TERMS_UNVERIFIABLE"],
-      ["a snapshot of another terms version than the platform names", { terms: { termsVersion: "terms-simulated-2", termsSha256: sha(good), snapshot: good } }, "TERMS_UNVERIFIABLE"],
-      ["a snapshot spelled differently from its canonical form", { terms: { termsVersion: "terms-simulated-1", termsSha256: sha(respelled), snapshot: respelled } }, "TERMS_UNVERIFIABLE"],
-      ["a recorded hash that is not the snapshot's (the platform recorded other terms)", { terms: { termsVersion: "terms-simulated-1", termsSha256: "5".repeat(64), snapshot: good } }, "TERMS_UNVERIFIABLE"],
-      ["bytes that are no snapshot", { terms: { termsVersion: "terms-simulated-1", termsSha256: sha("Kauro Data S.A.S."), snapshot: new TextEncoder().encode("Kauro Data S.A.S.") } }, "TERMS_UNVERIFIABLE"],
+      ["a snapshot altered after it was made", { terms: { binding: "REPORT_TERMS_SNAPSHOT_V1", termsVersion: "terms-simulated-1", termsSha256: sha(good), snapshot: flipped } }, "TERMS_UNVERIFIABLE"],
+      ["a snapshot of another terms version than the platform names", { terms: { binding: "REPORT_TERMS_SNAPSHOT_V1", termsVersion: "terms-simulated-2", termsSha256: sha(good), snapshot: good } }, "TERMS_UNVERIFIABLE"],
+      ["a snapshot spelled differently from its canonical form", { terms: { binding: "REPORT_TERMS_SNAPSHOT_V1", termsVersion: "terms-simulated-1", termsSha256: sha(respelled), snapshot: respelled } }, "TERMS_UNVERIFIABLE"],
+      ["a recorded hash that is not the snapshot's (the platform recorded other terms)", { terms: { binding: "REPORT_TERMS_SNAPSHOT_V1", termsVersion: "terms-simulated-1", termsSha256: "5".repeat(64), snapshot: good } }, "TERMS_UNVERIFIABLE"],
+      ["bytes that are no snapshot", { terms: { binding: "REPORT_TERMS_SNAPSHOT_V1", termsVersion: "terms-simulated-1", termsSha256: sha("Kauro Data S.A.S."), snapshot: new TextEncoder().encode("Kauro Data S.A.S.") } }, "TERMS_UNVERIFIABLE"],
       ["an issuer whose name carries markup", { terms: simulatedTermsOf("terms-simulated-1", { ...SIMULATED_ISSUER, legalName: "<b>Issuer</b>" }) }, "MODEL_REFUSED"],
     ];
     for (const [label, overrides, code] of cases) {
@@ -302,9 +310,9 @@ describe("B13xB08 the PDF: a failed or invalid generation stages nothing", () =>
       packageId: reportPackageIdOf(r.scope),
       expectedManifestSha256: facts.expectedManifestSha256,
       privacyClass: "SECURE_DETAIL",
-      billableSourceUnits: facts.quote.billableSourceUnits,
-      quoteId: facts.quote.quoteId,
-      branding: facts.branding,
+      billableSourceUnits: facts.quote?.billableSourceUnits ?? assert.fail("the simulator names its quote"),
+      quoteId: facts.quote?.quoteId ?? assert.fail("the simulator names its quote"),
+      branding: simulatedBranding(facts),
       termsVersion: "terms-simulated-1",
       termsSha256: sha(termsSnapshotBytesOf("terms-simulated-1", SIMULATED_ISSUER)),
       issuer: SIMULATED_ISSUER,
@@ -384,7 +392,7 @@ async function afterCore(r: Rig, name: CaseName = CLEAN): Promise<{ files: Map<s
 }
 
 const chain = (r: Rig, files: Map<string, Uint8Array>, engine: PdfEngine, storage: ObjectStoragePort = r.storage, inputs = inputsFor(CLEAN)) =>
-  produceStagedReport({ files, scope: r.scope, writer: r.writer, storage, inputs, engine, render, cancellation: r.channel });
+  produceStagedReport({ files, scope: r.scope, writer: r.writer, storage, inputs, engine, render, cancellation: r.channel, admitSimulatedInputs: true });
 
 describe("B13xB08 stored bytes: what is recorded was read back from the storage and is the generated PDF", () => {
   const isPdf = (name: string) => name.length > 0;
@@ -454,7 +462,7 @@ describe("B13xB08 stored bytes: what is recorded was read back from the storage 
     const r = nextRig({ wrap: (fake) => readsAltered(fake, () => false, (b) => b) });
     // the report's own storage view fails to read the PDF back; the writer's is the rig's
     const failing = readsAltered(r.fake, (name) => r.writer.artifacts().some((a) => a.role === REPORT_PDF_ROLE && a.objectName === name), () => Object.assign(new Error("socket closed"), { transient: true }));
-    const envelope = new ReportingExecutionEnvelope({ inner: acceptanceCore(CLEAN), storage: failing, inputs: inputsFor(CLEAN), engine: scriptedEngine(), render });
+    const envelope = new ReportingExecutionEnvelope({ inner: acceptanceCore(CLEAN), storage: failing, inputs: inputsFor(CLEAN), engine: scriptedEngine(), render, admitSimulatedInputs: true });
     await assert.rejects(envelope.execute(r.fixture.subject, r.io), (e: unknown) => e instanceof ReportStageError && e.code === "VERIFICATION_UNCERTAIN");
     assert.equal(r.writer.artifacts().filter((a) => a.role === REPORT_RECORD_ROLE).length, 0);
   });
@@ -486,9 +494,9 @@ describe("B13xB08 duplicates and retries are idempotent", () => {
       packageId: reportPackageIdOf(r.scope),
       expectedManifestSha256: facts.expectedManifestSha256,
       privacyClass: "SECURE_DETAIL",
-      billableSourceUnits: facts.quote.billableSourceUnits,
-      quoteId: facts.quote.quoteId,
-      branding: facts.branding,
+      billableSourceUnits: facts.quote?.billableSourceUnits ?? assert.fail("the simulator names its quote"),
+      quoteId: facts.quote?.quoteId ?? assert.fail("the simulator names its quote"),
+      branding: simulatedBranding(facts),
       termsVersion: "terms-simulated-1",
       termsSha256: sha(termsSnapshotBytesOf("terms-simulated-1", SIMULATED_ISSUER)),
       issuer: SIMULATED_ISSUER,
@@ -579,9 +587,9 @@ async function modelFor(r: Rig, scope = r.scope, overrides: { rendererVersion?: 
     packageId: reportPackageIdOf(scope),
     expectedManifestSha256: facts.expectedManifestSha256,
     privacyClass: "SECURE_DETAIL",
-    billableSourceUnits: facts.quote.billableSourceUnits,
-    quoteId: facts.quote.quoteId,
-    branding: facts.branding,
+    billableSourceUnits: facts.quote?.billableSourceUnits ?? assert.fail("the simulator names its quote"),
+    quoteId: facts.quote?.quoteId ?? assert.fail("the simulator names its quote"),
+    branding: simulatedBranding(facts),
     termsVersion: "terms-simulated-1",
     termsSha256: sha(termsSnapshotBytesOf("terms-simulated-1", SIMULATED_ISSUER)),
     issuer: SIMULATED_ISSUER,
@@ -607,7 +615,7 @@ describe("B13xB08 the report is this agency's, this project's, this job's and th
       );
     }
     await assert.rejects(
-      produceStagedReport({ files, scope: foreign, writer: r.writer, storage: r.storage, inputs: inputsFor(CLEAN), engine: scriptedEngine(), render, cancellation: r.channel }),
+      produceStagedReport({ files, scope: foreign, writer: r.writer, storage: r.storage, inputs: inputsFor(CLEAN), engine: scriptedEngine(), render, cancellation: r.channel, admitSimulatedInputs: true }),
       (e: unknown) => e instanceof ReportStageError && e.code === "SCOPE_FOREIGN",
     );
     assert.deepEqual(reportObjects(r.writer.artifacts()), []);
@@ -708,7 +716,7 @@ describe("B13xB08 a corrected report is another artifact: the delivered one is k
     const first = rig(7001, { fake, job: 7001 });
     const second = rig(7002, { fake, job: 7002 });
     const make = async (r: Rig, rendererVersion: string) => {
-      const env = new ReportingExecutionEnvelope({ inner: acceptanceCore(CLEAN), storage: r.storage, inputs: inputsFor(CLEAN), engine: engineForFlows(), render: { ...render, rendererVersion } });
+      const env = new ReportingExecutionEnvelope({ inner: acceptanceCore(CLEAN), storage: r.storage, inputs: inputsFor(CLEAN), engine: engineForFlows(), render: { ...render, rendererVersion }, admitSimulatedInputs: true });
       const outcome = await env.execute(r.fixture.subject, r.io);
       assert.equal(outcome.terminalCause, "COMPLETED");
       const pdf = outcome.stagedArtifacts.find((a) => a.role === REPORT_PDF_ROLE) as StagedArtifact;
