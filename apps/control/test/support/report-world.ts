@@ -102,7 +102,7 @@ export function defaultEngine(): Engine {
   if (required) throw new Error("KAURO_REQUIRE_PDF_ENGINE=1 but no Chromium-family browser was found (set KAURO_PDF_BROWSER)");
   return {
     engineId: "scripted/1",
-    print: async () => new TextEncoder().encode(`%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n${"% filler\n".repeat(40)}trailer\n<< /Root 1 0 R >>\nstartxref\n0\n%%EOF\n`),
+    print: async (request) => new TextEncoder().encode(`%PDF-1.7\n% ${sha256(request.html)}\n1 0 obj\n<< /Type /Catalog >>\nendobj\n${"% filler\n".repeat(40)}trailer\n<< /Root 1 0 R >>\nstartxref\n0\n%%EOF\n`),
   };
 }
 

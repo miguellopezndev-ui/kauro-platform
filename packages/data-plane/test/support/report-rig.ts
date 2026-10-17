@@ -52,7 +52,7 @@ export function scriptedPdf(salt = "a"): Uint8Array {
   return new TextEncoder().encode(body);
 }
 
-export function scriptedEngine(output: (request: PdfPrintRequest, call: number) => Uint8Array | Promise<Uint8Array> = () => scriptedPdf()): PdfEngine & { calls: number } {
+export function scriptedEngine(output: (request: PdfPrintRequest, call: number) => Uint8Array | Promise<Uint8Array> = (request) => scriptedPdf(sha(request.html))): PdfEngine & { calls: number } {
   const engine = {
     engineId: "scripted/1",
     calls: 0,
