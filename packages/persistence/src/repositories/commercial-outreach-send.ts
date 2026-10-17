@@ -180,10 +180,13 @@ export class PgOutreachSend {
       await execute<{
         prospect_id: string; sender_id: string; author_user_id: string; purpose: OutreachPurpose; contact_key: string; content_hash: string; version: string; sender_user_id: string;
         route: SenderRoute; sender_address: string; owner_seller_id: string | null; organization_key: string; policy_jurisdiction: string; subject: string; body: string; to_address: string | null;
+        reached: boolean;
       }>(
         this.db,
         `SELECT d.prospect_id, d.sender_id, d.author_user_id, d.purpose, d.contact_key, d.content_hash, d.version, si.user_id AS sender_user_id, si.route, si.address AS sender_address,
-                p.owner_seller_id, p.organization_key, kauro.outreach_jurisdiction(p.jurisdiction) AS policy_jurisdiction, ct.subject, ct.body, a.address AS to_address
+                p.owner_seller_id, p.organization_key, kauro.outreach_jurisdiction(p.jurisdiction) AS policy_jurisdiction, ct.subject, ct.body, a.address AS to_address,
+                (p.state = 'SUPPRESSED' OR EXISTS (SELECT 1 FROM kauro.prospect_suppressions x
+                   WHERE (x.key_kind = 'ORGANIZATION' AND x.suppression_key = p.organization_key) OR (x.key_kind = 'CONTACT' AND x.suppression_key IN (d.contact_key, p.business_contact_key)))) AS reached
            FROM kauro.outreach_drafts d
            JOIN kauro.sender_identities si ON si.sender_id = d.sender_id
            JOIN kauro.prospects p ON p.prospect_id = d.prospect_id
@@ -199,7 +202,13 @@ export class PgOutreachSend {
     if (d === undefined || d.sender_user_id !== i.actor.userId) return notAssigned();
     if (i.actor.kind === "SELLER" && d.owner_seller_id !== i.actor.sellerId) return notAssigned();
     if ((await execute(this.db, "SELECT 1 FROM kauro.outreach_authorizations WHERE authorization_id = $1", [i.authorizationId])).rowCount !== 1) throw new NotFoundFailure("authorization");
-    if (d.to_address === null) throw new NotFoundFailure("contact_address");
+    if (d.to_address === null) {
+      // an address the caller cannot read (the owner's contact on a prospect assigned to a seller) sends nothing, and an exclusion the registry already
+      // holds answers first (R2-130, review finding F2: the prospect's own key, migration 0094); the registry is append-only, so this unlocked positive
+      // read can only be confirmed by the judgment
+      if (d.reached) throw new OutreachRefusal("PRECONDITION_FAILED", "the send was refused: PROSPECT_SUPPRESSED", "PROSPECT_SUPPRESSED", null);
+      throw new NotFoundFailure("contact_address");
+    }
     const cited = await execute<{ family_id: string; subject: string | null }>(
       this.db,
       `SELECT r.family_id, coalesce(k.mode, k.capability_id::text) AS subject
