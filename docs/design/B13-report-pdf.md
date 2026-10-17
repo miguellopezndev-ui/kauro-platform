@@ -58,8 +58,10 @@ asserts the footer holds the package digest, manifest SHA-256 and model hash and
 
 ## 7. Interface left for delivery
 
-`ReportPdfPublisher.publish(pdf: ReportPdf) -> { identity, location }` (declared in `@kauro/reports`, not implemented). The
-publication phase must store `pdf.bytes`, re-hash what it stored, require equality with `identity.pdfSha256`, and only then record
-`location` with `pdfSha256` and `modelHash` in the package delivery record. Until then `storage` is `NOT_PERSISTED`.
-The worker that composes `readMigrationPackage` → `buildReportModel` → `generateReportPdf(…, new ChromiumPdfEngine(…))` →
-publisher does not exist yet (no worker app in the repository); it is the next phase.
+`ReportPdfPublisher.publish(pdf: ReportPdf) -> { identity, location }` (declared in `@kauro/reports`) must store `pdf.bytes`, re-hash
+what it stored, require equality with `identity.pdfSha256`, and only then return the location. It is implemented, and joined to B08's
+attempt, publication and download, in `B13-report-delivery.md` (`StagedReportPdfPublisher` over the attempt's writer;
+`ReportingExecutionEnvelope` composing `readMigrationPackage` → `buildReportModel` → `generateReportPdf` → publisher). `storage`
+stays `NOT_PERSISTED` on the generated object: staging and delivery are facts of the stored artifacts, not of this module. A `ReportPdf`
+is now frozen and registered when `generateReportPdf` returns it (the engine's bytes are copied), so a publisher accepts only a PDF this
+module made (`isGeneratedReportPdf`) whose bytes still hash to its identity (`reportPdfProblems`).

@@ -53,3 +53,11 @@ Tests (`test/`): `container-inspection.test.ts` (S024 corpus, D-ISO-1 negative c
 `scan-coverage.test.ts` (S054 with the fake, on a real PostgreSQL 17 clock), `selection-evaluation.test.ts` (exact counts against
 an independent counter; hidden worksheets; inert formulas), `attempt-scratch.test.ts` and `fenced-artifact-writer.test.ts`
 (S035), `worker-host-fake.test.ts` (S056, S075).
+
+The report stage (B13 x B08; `docs/design/B13-report-delivery.md`, `src/report/`): `ReportingExecutionEnvelope` wraps the core's
+`ExecutionEnvelopePort` and, when the core completed, produces the PDF report of the package it staged and stages the PDF and its record
+(`report-pdf`, `report-record`) through the attempt's own `FencedArtifactWriter` before the host writes the staged manifest, so B08's
+read-back, verification, delivery copies and publication carry the report with the package and refuse it for the same reasons. The
+platform's facts come from a `ReportInputsPort` (the issuer only from a terms snapshot whose hash the platform recorded; counts must be
+BOUND); `@kauro/data-plane/testing` has its labelled simulator (`SimulatedReportInputs`, SIMULATED). `report-delivery.test.ts` covers the
+chain and its failures (a real sandboxed Chromium where a browser exists; CI requires it).

@@ -158,6 +158,8 @@ export interface SealSourceOptions {
   readonly base?: Date;
   /** The billable source units the evaluation freezes (default 120): what CMD027 prices the sealed revision by. */
   readonly billableSourceUnits?: number;
+  /** The other populations the evaluation freezes (default 120 physical rows, 120 logical records or the billable units if more, no edges). */
+  readonly populations?: Partial<Omit<SourceCounts, "billableSourceUnits">>;
 }
 
 /** The fixture's service identity on control-plane events and objects (a SERVICE actor, never a person). */
@@ -498,11 +500,16 @@ export async function bindSourceSelection(sessions: SourceFixtureSessions, scope
  * SELECTION_EVALUATION's counting pass as statements inside the caller's open control-plane transaction bound to the scope's
  * agency: the complete evaluation of the bound selection is recorded; the revision is not moved.
  */
-export async function countSourceSelection(c: SqlSession, scope: SourceFixtureScope, bound: BoundSourceFixture, options: { readonly billableSourceUnits?: number } = {}): Promise<CountedSourceSelection> {
+export async function countSourceSelection(c: SqlSession, scope: SourceFixtureScope, bound: BoundSourceFixture, options: { readonly billableSourceUnits?: number; readonly populations?: SealSourceOptions["populations"] } = {}): Promise<CountedSourceSelection> {
   // the fixture's population is 120 records; a test that prices a bigger or an empty source names the billable units it froze (the
   // logical records are never fewer than the billable ones: selection_evaluations_complete)
   const billable = options.billableSourceUnits ?? 120;
-  const counts: SourceCounts = { physicalSourceRows: 120, logicalSourceRecords: Math.max(120, billable), billableSourceUnits: billable, associationEdges: 0 };
+  const counts: SourceCounts = {
+    physicalSourceRows: options.populations?.physicalSourceRows ?? 120,
+    logicalSourceRecords: options.populations?.logicalSourceRecords ?? Math.max(120, billable),
+    billableSourceUnits: billable,
+    associationEdges: options.populations?.associationEdges ?? 0,
+  };
   const evaluationId = ids.next();
   const evaluationHash = textDigest(`evaluation-${evaluationId}`);
   await c.query(
@@ -521,7 +528,7 @@ export async function countSourceSelection(c: SqlSession, scope: SourceFixtureSc
 }
 
 /** The selection manifest intake and CMD016 (request handler), then SELECTION_EVALUATION (control plane): READY_TO_SEAL. */
-export async function readySourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, admitted: AdmittedSourceFixture, options: { readonly billableSourceUnits?: number } = {}): Promise<ReadySourceFixture> {
+export async function readySourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, admitted: AdmittedSourceFixture, options: { readonly billableSourceUnits?: number; readonly populations?: SealSourceOptions["populations"] } = {}): Promise<ReadySourceFixture> {
   const bound = await bindSourceSelection(sessions, scope, admitted);
   const { counted, revisionVersion } = await sessions.control(async (c) => {
     await clockAt(c, at(admitted.initiatedAt, 6 * 60_000));
@@ -647,7 +654,10 @@ export async function sealReadyRevision(sessions: SourceFixtureSessions, scope: 
  */
 export async function sealSourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, options: SealSourceOptions): Promise<SealedSourceFixture> {
   const admitted = await admitSourceFile(sessions, scope, { seed: options.seed, ...(options.base !== undefined ? { base: options.base } : {}) });
-  const ready = await readySourceRevision(sessions, scope, admitted, options.billableSourceUnits === undefined ? {} : { billableSourceUnits: options.billableSourceUnits });
+  const ready = await readySourceRevision(sessions, scope, admitted, {
+    ...(options.billableSourceUnits === undefined ? {} : { billableSourceUnits: options.billableSourceUnits }),
+    ...(options.populations === undefined ? {} : { populations: options.populations }),
+  });
   const sealed = await sealReadyRevision(sessions, scope, ready);
   if (options.state !== "EXPIRED") return sealed;
   const version = await sessions.control((c) => expireSealedRevision(c, scope, sealed.revisionId));

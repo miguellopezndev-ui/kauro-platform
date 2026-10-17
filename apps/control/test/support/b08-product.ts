@@ -62,6 +62,7 @@ import {
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import { textDigest, type AgencyId, type CorrelationId, type UserId } from "@kauro/domain";
 import { commercialAuthorizationsOf, commercialInspectionsOf, decisionArtifactResolver, executionReadsOf, sourceStoreOf } from "@kauro/persistence";
+import { ContractFakeReadSigner } from "@kauro/application/testing";
 import { clock, ids, type ExecutionWorld } from "./execution-world.js";
 
 /** The application origin every resumable session is bound to (09 "Resumable session security"). */
@@ -74,10 +75,12 @@ export interface Actor {
 }
 
 /** The commands of this run: B06's project and approval, B07's source lifecycle, the audit commands and the job commands. */
-export type B08CommandId = "CMD011" | "CMD013" | "CMD014" | "CMD016" | "CMD017" | "CMD020" | "CMD021" | "CMD022" | "CMD024" | "CMD025" | "CMD036" | "CMD037";
+export type B08CommandId = "CMD011" | "CMD013" | "CMD014" | "CMD016" | "CMD017" | "CMD020" | "CMD021" | "CMD022" | "CMD024" | "CMD025" | "CMD036" | "CMD037" | "CMD038";
 export type B08ReadId = "GetAudit" | "GetJob";
 
 export interface B08Product {
+  /** The labelled read signer CMD038 signs with (SIMULATED; the S3 presign provider is B15's). */
+  readonly signer: ContractFakeReadSigner;
   /** The closed validator of the contract bundle, as the api loads it (apps/api schemas.ts). */
   readonly validator: SchemaValidator;
   /** A command of `actor` through its handler: admitted as the transport admits it, its answer checked against the route's contract. */
@@ -133,7 +136,8 @@ export function b08Product(w: ExecutionWorld): B08Product {
   };
   const sources: B07Collaborators = { providers: { storage: w.storage, vault: w.vault, origin: ORIGIN }, preview: null, commercialScope };
   const runtime = { unitOfWork, authorizer, clock, ids };
-  const handlers = { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources), ...createAuditHandlers(runtime, cores), ...createExecutionHandlers(runtime) };
+  const signer = new ContractFakeReadSigner();
+  const handlers = { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources), ...createAuditHandlers(runtime, cores), ...createExecutionHandlers(runtime, { signer }) };
   const readRuntime = { unitOfWork, authorizer, clock, cursorKey: new Uint8Array(randomBytes(32)) };
   const reads = { ...createAuditReadHandlers(readRuntime), ...createExecutionReadHandlers(readRuntime) };
   const intakes = { ...createSourceIntakeHandlers(readRuntime), ...createAuditIntakeHandlers(readRuntime) };
@@ -145,6 +149,7 @@ export function b08Product(w: ExecutionWorld): B08Product {
   };
 
   return {
+    signer,
     validator,
 
     async command<View>(actor: Actor, command: B08CommandId, path: Readonly<Record<string, string>>, body: unknown, key?: string): Promise<CommandResult<View>> {

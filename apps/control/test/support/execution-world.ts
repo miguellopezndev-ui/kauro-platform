@@ -31,10 +31,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
+import type { RowCounts, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { DOMAINS, structuredDigest } from "@kauro/contracts";
 import type {
   ConsumerOutcome,
+  ExecutionEnvelopePort,
   ExecutionLimits,
   InterpretPort,
   OutboxConsumer,
@@ -262,6 +263,17 @@ export interface AuditSubject {
   readonly capabilityId: string;
 }
 
+/**
+ * The package a purchase is to deliver, when a test runs a real Migration Core package through the job (B13 x B08): the sealed revision
+ * freezes its populations, the validation receipt carries its counts and binds its manifest hash, and the quote is accepted under the
+ * hash of its terms document. Without it the purchase is the world's default 120-record fixture.
+ */
+export interface ReportFixture {
+  readonly counts: RowCounts;
+  readonly expectedManifestSha256: Sha256Hex;
+  readonly termsHash: Sha256Hex;
+}
+
 /** What a second control-plane process may bind instead of the world's own units, providers and cores (each a test decorator). */
 export interface PlaneOverrides {
   readonly units?: AuditUnits;
@@ -349,7 +361,7 @@ export interface ExecutionWorld {
   /** A fresh project of the agency (HUBSPOT, or SALESFORCE), its revision sealed recently through B07's lifecycle and its target confirmed. */
   subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE"; readonly target?: TargetShape }): Promise<AuditSubject>;
   /** A paid purchase of a fresh project of the agency (HUBSPOT, or SALESFORCE under that mode's own offered capability). */
-  paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<Purchase>;
+  paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE"; readonly report?: ReportFixture }): Promise<Purchase>;
   /**
    * B09's paidPurchase of a plan the agency already APPROVED through CMD025 (the end-to-end run): the quote, the order and the completed
    * capture over the world's qualified route, fiscal issuer and the agency's reviewed profile — an ACTIVE CommercialAuthorization.
@@ -528,7 +540,12 @@ function hostClockOf(): Clock & { advance(ms: number): void } {
 
 let seq = 0;
 
-export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> {
+export interface ExecutionWorldOptions {
+  /** The worker's execution envelope instead of the Migration core fake (built over the world's storage and units once they exist). */
+  readonly envelope?: (parts: { readonly storage: ContractFakeObjectStorage; readonly units: TestClockExecutionUnits; readonly oracle: Harness["oracle"] }) => ExecutionEnvelopePort;
+}
+
+export async function startExecutionWorld(tag: string, worldOptions: ExecutionWorldOptions = {}): Promise<ExecutionWorld> {
   const h = await startHarness();
   const scratch = mkdtempSync(join(tmpdir(), `kauro-exec-${tag}-`));
   const scratchRoot = join(scratch, "workers");
@@ -547,8 +564,8 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   });
   const intelligence = new ContractFakeIntelligenceCore();
   const receipts: ValidationReceipts = new PgValidationReceiptRecorder(h.validatorPool);
-  const host = new ContractFakeWorkerHost({ core, storage, uploads: holderOf(storage), scratchRoot, clock: hostClock, creationHorizonSeconds: 300 });
   const units = new TestClockExecutionUnits({ app: h.appPool, payment: h.paymentPool, control: h.controlPool }, { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs() });
+  const host = new ContractFakeWorkerHost({ core: worldOptions.envelope?.({ storage, units, oracle: h.oracle }) ?? core, storage, uploads: holderOf(storage), scratchRoot, clock: hostClock, creationHorizonSeconds: 300 });
   const vault = new ContractFakeSessionVault();
   const journal = new ContractFakeAuthorityJournal({ path: join(scratch, "authority-journal.jsonl") });
   const scanner = new ContractFakeMalwareScanner({ databaseClock: () => Promise.resolve(clock.now()), read: (location, objectName, generation) => storage.read(location, objectName, generation) });
@@ -630,7 +647,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   };
 
   /** A fresh project of the agency, its revision sealed recently through B07's lifecycle, and a confirmed, current target contract. */
-  async function subjectOf(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE", shape: TargetShape = {}): Promise<AuditSubject> {
+  async function subjectOf(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE", shape: TargetShape = {}, report?: ReportFixture): Promise<AuditSubject> {
     const withCapability = await capabilityOf(mode);
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
@@ -659,7 +676,10 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
       return pid;
     });
     // B07: the source sealed recently through the lifecycle fixture (a quote promises no more source than its seal left)
-    const source = await h.sealedRevision(ag, projectId, "SEALED", { base: new Date(Date.now() - RECENT_SEAL_MS) });
+    const source = await h.sealedRevision(ag, projectId, "SEALED", {
+      base: new Date(Date.now() - RECENT_SEAL_MS),
+      ...(report === undefined ? {} : { billableSourceUnits: report.counts.billableSourceUnits, populations: { physicalSourceRows: report.counts.physicalSourceRows, logicalSourceRecords: report.counts.logicalSourceRecords, associationEdges: report.counts.associationEdges } }),
+    });
     const { contractId, targetContractHash } = await confirmedTarget(ag, projectId, label, mode, shape);
     return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId, targetContractHash, capabilityId: withCapability };
   }
@@ -689,8 +709,8 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     return { contractId, targetContractHash };
   }
 
-  async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
-    const { projectId, revisionId, revisionHash, contractId, targetContractHash, capabilityId: withCapability } = await subjectOf(ag, label, mode);
+  async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE", report?: ReportFixture): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
+    const { projectId, revisionId, revisionHash, contractId, targetContractHash, capabilityId: withCapability } = await subjectOf(ag, label, mode, {}, report);
     const source = { revisionId, revisionHash };
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
@@ -721,11 +741,11 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
       corePackageHash: sha(`core-package-${CONTRACT_FAKE_MIGRATION_CORE_VERSION}`),
       profileEvidenceHash: sha(`profile-${planId}`),
       dispositionEvidenceHash: sha(`disposition-${planId}`),
-      artifactEvidenceHash: sha(`artifact-${planId}`),
+      artifactEvidenceHash: report?.expectedManifestSha256 ?? sha(`artifact-${planId}`),
       startedAt: toUtcInstant(Date.now() - 60_000),
       completedAt: clock.now(),
       result: "VALID",
-      counts: { physicalSourceRows: units120, logicalSourceRecords: units120, billableSourceUnits: units120, associationEdges: 0, emittedRepresentatives: units120, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: units120 },
+      counts: report?.counts ?? { physicalSourceRows: units120, logicalSourceRecords: units120, billableSourceUnits: units120, associationEdges: 0, emittedRepresentatives: units120, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: units120 },
       blockingIssueCodes: [],
     } as never);
     const proof = await h.recordStepUp(ag.ownerUserId);
@@ -832,8 +852,16 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     },
 
     async paid(ag, label, options = {}) {
-      const subject = await approved(ag, label, options.mode ?? "HUBSPOT");
-      const paid = await paidPurchase(h, { agency: ag, planId: subject.planId, issuerRef, profileId: profiles.get(ag.agencyId) as FiscalProfileId, treatment: "EXEMPT_EXPORT", route });
+      const subject = await approved(ag, label, options.mode ?? "HUBSPOT", options.report);
+      const paid = await paidPurchase(h, {
+        agency: ag,
+        planId: subject.planId,
+        issuerRef,
+        profileId: profiles.get(ag.agencyId) as FiscalProfileId,
+        treatment: "EXEMPT_EXPORT",
+        route,
+        ...(options.report === undefined ? {} : { billableUnits: options.report.counts.billableSourceUnits, termsHash: options.report.termsHash }),
+      });
       return { ...subject, authorizationId: paid.authorizationId, orderId: paid.orderId, captureId: paid.captureId };
     },
 

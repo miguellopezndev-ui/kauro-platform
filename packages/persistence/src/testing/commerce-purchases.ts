@@ -118,6 +118,8 @@ export interface QuoteInput {
   readonly profileId: FiscalProfileId;
   readonly treatment?: ReviewedTreatment;
   readonly billableUnits?: number;
+  /** The hash of the terms the quote is accepted under (default: a fixture digest no document has); a test that binds a terms document names its own. */
+  readonly termsHash?: Sha256Hex;
   /** The founding reservation the quote's eligibility snapshot names (B10; reserveFoundingSlot records it): absent, the snapshot names an unbacked reference. */
   readonly foundingReservationId?: string;
 }
@@ -216,7 +218,7 @@ export async function issueQuote(h: Harness, input: QuoteInput): Promise<IssuedQ
     const snapshotId = uow.ids.next() as EligibilitySnapshotId;
     const issuedAt = clock.now();
     const issuedMs = Date.parse(issuedAt);
-    const termsHash = sha(`terms-${quoteId}`);
+    const termsHash = input.termsHash ?? sha(`terms-${quoteId}`);
     const expiresAt = toUtcInstant(issuedMs + 336 * HOUR_MS);
     const sourceAvailableUntil = toUtcInstant(issuedMs + 168 * HOUR_MS);
     await uow.commerce.quotes.issue(
