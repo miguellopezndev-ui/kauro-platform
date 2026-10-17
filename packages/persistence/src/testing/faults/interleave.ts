@@ -167,8 +167,15 @@ export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (
   const internals = raw as unknown as DriverInternals;
   const busy = () => internals._activeQuery != null || (internals._queryQueue?.length ?? 0) > 0;
   if (busy()) throw new InterleavingNotObserved(`${what}: the connection is busy with an earlier statement before the operation started: a wait seen there is not the operation's`);
-  const idle = await oracle.query<{ state: string | null }>("SELECT state FROM pg_stat_activity WHERE pid = $1", [waiterPid]);
-  const state = idle.rows[0]?.state;
+  // the server reports a backend idle a moment after it sent ReadyForQuery, so a connection that was just used (or just opened) can read 'active' for a few
+  // milliseconds although nothing runs on it (the client side is checked idle above and again below): look again before calling it busy
+  let state: string | null | undefined;
+  for (let look = 0; look < 40; look++) {
+    const idle = await oracle.query<{ state: string | null }>("SELECT state FROM pg_stat_activity WHERE pid = $1", [waiterPid]);
+    state = idle.rows[0]?.state;
+    if (state === "idle" || state === "idle in transaction") break;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
   if (state !== "idle" && state !== "idle in transaction") throw new InterleavingNotObserved(`${what}: the connection's backend is busy (${state ?? "gone"}) before the operation started: a wait seen there is not the operation's`);
   if (busy()) throw new InterleavingNotObserved(`${what}: a statement was issued on the connection while the harness checked it was idle: a wait seen there is not the operation's`);
 

@@ -3,12 +3,12 @@
  * (plan docs/design/B12-outreach-plan.md §0 A16, §2 CMD062; GAP-AU-1..5, M31..M34).
  *
  * Trace (§L): L1 owner S (access) -> L2 (journal) -> the step-up proof read -> the review row by its digest (plain; consumption is U1) ->
- * L5 S (capabilities of the cited resources) -> L6 S (resource families) -> L7 S (the sender) -> L10 S of the drafts ascending -> ONE judging
+ * L5 S (capabilities of the cited resources) -> L6 S (resource families) -> L7 S (the sender) -> L8 S (the drafts' suppression keys) -> L10 S of the drafts ascending -> ONE judging
  * statement at kauro.effect_now() (review live and unconsumed, window) -> the locked facts -> INSERT grant (review_id UNIQUE) and one sealed hash
  * per draft; the step-up is judged again at COMMIT (assureStepUpAtCommit registers it). The permission evidence is the digest of a server-issued
  * review: a client-computed digest, another proof's review, an earlier draft version or a consumed or expired review is OUTREACH_REVIEW_INVALID
  * (KC035) with nothing written. The grant seals the review's drafts exactly: the allowed hashes are the review's, no more, no fewer. A draft
- * moved since the review (CMD063 held it first), a sender revoked or unverified, a superseded resource or a suspended capability (R2-135),
+ * moved since the review (CMD063 held it first), an excluded prospect (KC016: the registry reaches its organization or contact key), a sender revoked or unverified, a superseded resource or a suspended capability (R2-135),
  * an unreviewed jurisdiction or an unconfigured postal address refuses the grant. Two grants of one review: U1 gives one, the other KC035 (M34).
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
@@ -25,7 +25,7 @@ import type { OutreachAuthorizationView } from "../views.js";
 import type { AuthGrantRecord, OutreachAuthCollaborators } from "./auth-store.js";
 import { OUTREACH_POLICY_VERSION } from "./runtime.js";
 
-const refuse = (reason: "OUTREACH_REVIEW_INVALID" | "OUTREACH_GRANT_INVALID" | "SENDER_REVOKED" | "SENDER_NOT_VERIFIED" | "OUTREACH_ROUTE_FORBIDDEN" | "RESOURCE_NOT_CURRENT" | "OUTREACH_JURISDICTION_UNREVIEWED" | "OUTREACH_COMPLIANCE_UNCONFIGURED", why: string): DomainFailure =>
+const refuse = (reason: "OUTREACH_REVIEW_INVALID" | "OUTREACH_GRANT_INVALID" | "PROSPECT_SUPPRESSED" | "SENDER_REVOKED" | "SENDER_NOT_VERIFIED" | "OUTREACH_ROUTE_FORBIDDEN" | "RESOURCE_NOT_CURRENT" | "OUTREACH_JURISDICTION_UNREVIEWED" | "OUTREACH_COMPLIANCE_UNCONFIGURED", why: string): DomainFailure =>
   new DomainFailure("PRECONDITION_FAILED", why, { reason });
 
 export function grantView(g: AuthGrantRecord): OutreachAuthorizationView {
@@ -93,6 +93,9 @@ export function authorizeHandler(runtime: CommerceRequestRuntime, co: OutreachAu
               throw refuse("OUTREACH_REVIEW_INVALID", "a draft of the review moved since it was reviewed");
             }
           }
+          // an excluded prospect takes no new authorization: the registry reaches its organization or contact key (the prospect's own, migration 0094), read
+          // under L8 S of those keys, so an opt-out in flight is ordered before (refused here) or after (CMD063 and D2 refuse the send) — R2-130, finding F2
+          if (facts.drafts.some((d) => d.suppressed)) throw refuse("PROSPECT_SUPPRESSED", "the organization or the contact of a draft is suppressed");
           if (facts.resourcesNotCurrent > 0 || facts.capabilitiesRestricted > 0) throw refuse("RESOURCE_NOT_CURRENT", "a cited resource is superseded or a claimed capability is no longer offered");
           for (const d of facts.drafts) {
             if (!d.policyInForce) throw refuse("OUTREACH_JURISDICTION_UNREVIEWED", "the jurisdiction of a draft has no channel policy in force");

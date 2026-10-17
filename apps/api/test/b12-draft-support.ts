@@ -58,7 +58,7 @@ export const OUTCOME = {
   JURISDICTION: "409 PRECONDITION_FAILED OUTREACH_JURISDICTION_UNREVIEWED",
   /** plan §M M13 order 1 ("409 SENDER_REVOKED"); L-SEND asserts the same reason (it is not yet in K1's OUTREACH_FAILURE_REASONS). */
   SENDER_REVOKED: "409 PRECONDITION_FAILED SENDER_REVOKED",
-  KEY_REUSED: "409 IDEMPOTENCY_CONFLICT -",
+  KEY_REUSED: "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS",
   TIMEOUT: "503 CAPACITY_UNAVAILABLE -",
 } as const;
 /** "<status> <code>" of a problem reply (the reason left out: a refusal whose reason the plan does not name). */
@@ -268,7 +268,7 @@ export const W = {
   senderUpdate: { label: "sender_update", match: /UPDATE kauro\.sender_identities\b/ },
   suppressionInsert: { label: "suppression_insert", match: /INSERT INTO kauro\.prospect_suppressions\b/ },
   /** CMD061's wait at the resource family subject L6 (GAP-DR-3). */
-  resourceLock: { label: "resource_lock", match: /kauro\.sales_resources'/ },
+  resourceLock: { label: "resource_lock", match: /pg_advisory_xact_lock(_shared)?\(kauro\.transition_key\(\$1, \$2\)\)/, when: (params) => params[0] === "kauro.sales_resources" },
 } as const satisfies Record<string, SqlStep>;
 
 // --- the race harness (§M; K1 raceAtWrite + ctx.mustWait) ---------------------------------------------------------------------------
@@ -321,22 +321,15 @@ export async function raceAtWrite<A, B>(ctx: FaultContext, controlId: string, fi
     const runFirst = (): Promise<A> =>
       ctx.operation(`${first.name} (first)`, () => ("raw" in first ? first.raw(fc, () => ctx.points.pass(point)) : w.on(fc, first.role, ctx, [first.at], first.run)));
     const runSecondOn = (client: HarnessConnection): Promise<B> => ("raw" in second ? second.raw(client, async () => undefined) : w.on(client, second.role, ctx, [], second.run));
-    const runSecond = async (): Promise<B> => {
-      let started: Promise<B> | undefined;
-      try {
-        const waiting = await ctx.mustWait(w.oracle, { waiter: sc, holder: connectionPid(fc) }, (client) => (started = runSecondOn(client)), `${second.name} waits on ${first.name}`);
-        return settledValue(await waiting.pending);
-      } catch (e) {
-        // the second settled without waiting (a control): its own answer is the outcome, never the harness's InterleavingNotObserved
-        if (e instanceof InterleavingNotObserved && started !== undefined) return await started;
-        throw e;
-      }
-    };
+    // the second runs THROUGH ctx.mustWait (K1 `credit`): the harness observes its wait on the first's backend and credits it, and the first is held until
+    // it has; without it the oracle may release the first before mustWait's own look, and the cell ends FaultNotInjected although the race happened
     const order = () =>
       k1RaceAtWrite<A, B>({
         oracle: w.oracle,
         first: { run: runFirst, reached: pause.reached, release: () => pause.release(), pid: () => connectionPid(fc) },
-        second: { run: runSecond, pid: () => connectionPid(sc) },
+        second: { run: () => Promise.reject(new Error("credit uses runOn")), runOn: runSecondOn, waiter: sc, pid: () => connectionPid(sc) },
+        credit: ctx,
+        what: `${second.name} waits on ${first.name}`,
       });
     const r = control === null ? await order() : await w.withoutSerializers(control, order);
     return { first: settledOf(r.first), second: settledOf(r.second), secondBlocked: r.outcome === "blocked" };

@@ -9,7 +9,7 @@
  * - One fresh browser and context per print, closed in `finally`; a time limit bounds each print.
  * - The PDF is tagged (selectable text, structure for assistive technology) and sized by the document's own `@page` (Letter / A4).
  */
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { chromium } from "playwright-core";
 import type { PdfEngine, PdfPrintRequest } from "@kauro/reports";
 import { ReportPdfError } from "@kauro/reports";
@@ -22,6 +22,47 @@ export interface ChromiumPdfEngineOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+
+/** The one way the engine starts a browser: headless, with the browser's own sandbox (no `--no-sandbox`, never retried without it). */
+const launchOptionsOf = (executablePath: string, timeout: number) => ({ executablePath, headless: true, chromiumSandbox: true, timeout }) as const;
+
+/** What a sandbox self-check observed in the running browser's process tree (Linux only; see `ChromiumPdfEngine.probe`). */
+export interface ChromiumProbe {
+  readonly version: string;
+  readonly platform: string;
+  /** Linux: the browser's descendants as the kernel reports them; null elsewhere. */
+  readonly processes: ReadonlyArray<{ readonly pid: number; readonly ppid: number; readonly comm: string; readonly seccomp: number | null; readonly noNewPrivs: number | null }> | null;
+  /** Linux: whether any process of the tree carries a flag that turns a sandbox layer off. */
+  readonly sandboxDisabledFlag: boolean | null;
+}
+
+const SANDBOX_OFF_FLAGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-seccomp-filter-sandbox", "--disable-gpu-sandbox", "--disable-namespace-sandbox"];
+
+/** The Linux process tree below the browser Playwright started (found by its `--remote-debugging-pipe` and temporary profile). */
+function browserTreeOf(): Array<{ pid: number; ppid: number; comm: string; args: string[]; status: string }> {
+  const all = new Map<number, { ppid: number; comm: string; args: string[]; status: string }>();
+  for (const name of readdirSync("/proc")) {
+    if (!/^\d+$/.test(name)) continue;
+    try {
+      const status = readFileSync(`/proc/${name}/status`, "utf8");
+      const ppid = Number(/^PPid:\s+(\d+)/m.exec(status)?.[1] ?? "0");
+      const args = readFileSync(`/proc/${name}/cmdline`, "utf8").split("\0").filter((a) => a !== "");
+      all.set(Number(name), { ppid, comm: readFileSync(`/proc/${name}/comm`, "utf8").trim(), args, status });
+    } catch {
+      // the process ended while it was read
+    }
+  }
+  const roots = [...all.entries()].filter(([, v]) => v.args.includes("--remote-debugging-pipe") && !v.args.some((a) => a.startsWith("--type=")));
+  const tree = new Map<number, { pid: number; ppid: number; comm: string; args: string[]; status: string }>();
+  const visit = (pid: number): void => {
+    const entry = all.get(pid);
+    if (entry === undefined || tree.has(pid)) return;
+    tree.set(pid, { pid, ppid: entry.ppid, comm: entry.comm, args: entry.args, status: entry.status });
+    for (const [child, v] of all) if (v.ppid === pid) visit(child);
+  };
+  for (const [pid] of roots) visit(pid);
+  return [...tree.values()];
+}
 /** Largest HTML document handed to the browser: a report is a few hundred KiB; this refuses a runaway input before launching. */
 export const PDF_HTML_MAX_BYTES = 8 * 1024 * 1024;
 
@@ -56,7 +97,7 @@ export class ChromiumPdfEngine implements PdfEngine {
   async print(request: PdfPrintRequest): Promise<Uint8Array> {
     if (Buffer.byteLength(request.html, "utf8") > PDF_HTML_MAX_BYTES) throw new ReportPdfError("ENGINE_FAILED", "the document is larger than the print limit");
     if (!existsSync(this.#executablePath)) throw new ReportPdfError("ENGINE_FAILED", "the PDF browser executable was not found");
-    const browser = await chromium.launch({ executablePath: this.#executablePath, headless: true, chromiumSandbox: true, timeout: this.#timeoutMs });
+    const browser = await chromium.launch(launchOptionsOf(this.#executablePath, this.#timeoutMs));
     try {
       const context = await browser.newContext({ javaScriptEnabled: false, offline: true, serviceWorkers: "block", acceptDownloads: false, bypassCSP: false });
       context.setDefaultTimeout(this.#timeoutMs);
@@ -92,9 +133,41 @@ export class ChromiumPdfEngine implements PdfEngine {
 
   /** Engine identity with the browser's real version, e.g. `chromium/155.0.7000.0`. */
   static async identify(executablePath: string): Promise<string> {
-    const browser = await chromium.launch({ executablePath, headless: true, chromiumSandbox: true });
+    const browser = await chromium.launch(launchOptionsOf(executablePath, DEFAULT_TIMEOUT_MS));
     try {
       return `chromium/${browser.version()}`;
+    } finally {
+      await browser.close().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Starts the browser exactly as `print` does, opens a page, and (on Linux) reads back from the kernel what the sandbox really did:
+   * the process tree's `Seccomp` and `NoNewPrivs`, and whether any process carries a flag that disables a sandbox layer.
+   * A sandboxed renderer reports `Seccomp: 2` and `NoNewPrivs: 1`. It prints nothing and keeps nothing.
+   */
+  static async probe(executablePath: string): Promise<ChromiumProbe> {
+    const browser = await chromium.launch(launchOptionsOf(executablePath, DEFAULT_TIMEOUT_MS));
+    try {
+      const context = await browser.newContext({ javaScriptEnabled: false, offline: true, serviceWorkers: "block" });
+      const page = await context.newPage();
+      await page.setContent("<!DOCTYPE html><html><body><p>probe</p></body></html>", { waitUntil: "load" });
+      const version = `chromium/${browser.version()}`;
+      if (process.platform !== "linux") return { version, platform: process.platform, processes: null, sandboxDisabledFlag: null };
+      const tree = browserTreeOf();
+      const processes = tree.map((p) => ({
+        pid: p.pid,
+        ppid: p.ppid,
+        comm: p.comm,
+        seccomp: Number(/^Seccomp:\s+(\d+)/m.exec(p.status)?.[1] ?? Number.NaN),
+        noNewPrivs: Number(/^NoNewPrivs:\s+(\d+)/m.exec(p.status)?.[1] ?? Number.NaN),
+      }));
+      return {
+        version,
+        platform: process.platform,
+        processes: processes.map((p) => ({ pid: p.pid, ppid: p.ppid, comm: p.comm, seccomp: Number.isNaN(p.seccomp) ? null : p.seccomp, noNewPrivs: Number.isNaN(p.noNewPrivs) ? null : p.noNewPrivs })),
+        sandboxDisabledFlag: tree.some((p) => p.args.some((a) => SANDBOX_OFF_FLAGS.some((f) => a === f || a.startsWith(`${f}=`)))),
+      };
     } finally {
       await browser.close().catch(() => undefined);
     }

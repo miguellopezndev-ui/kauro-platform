@@ -93,6 +93,7 @@ import {
   openDatabase,
   subjectOf,
   type ApiLogger,
+  type ApiAssembly,
   type CommissionRoutesBinding,
   type DatabaseHandle,
   type PaymentService,
@@ -105,16 +106,23 @@ export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => 
 /** A process clock a test can move forward (never backwards): the api's business clock; the database keeps its own. */
 export interface MovableClock extends Clock {
   advance(ms: number): void;
+  /** Holds the clock still at the instant (a world that stands every unit there), or releases it (null): the process clock again. */
+  standAt?(instant: string | null): void;
 }
 
 export function movableClock(): MovableClock {
   let offsetMs = 0;
+  let stoodAt: number | null = null;
   return {
-    now: () => toUtcInstant(Date.now() + offsetMs),
-    nowMs: () => Date.now() + offsetMs,
+    now: () => toUtcInstant(stoodAt ?? Date.now() + offsetMs),
+    nowMs: () => stoodAt ?? Date.now() + offsetMs,
     advance(ms: number) {
       if (!(ms > 0)) throw new RangeError("the clock moves forward");
       offsetMs += ms;
+      if (stoodAt !== null) stoodAt += ms;
+    },
+    standAt(instant) {
+      stoodAt = instant === null ? null : Date.parse(instant);
     },
   };
 }
@@ -571,6 +579,8 @@ export interface WorldOptions {
   readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
   /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader; test/sales-support.ts). */
   readonly commercial?: { readonly outreachSealer?: OutreachSealer; readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; readonly providerTimer?: ProviderCallTimer; readonly onLateFailure?: LateFailureSink };
+  /** B12 lane L-ACT: the public opt-out routes the api binds (ApiAssembly.optOut: the keys and the units of the outreach service). */
+  readonly optOut?: ApiAssembly["optOut"];
   /** Package B10 (CMD027 CreateQuote): the collaborators the api binds beyond the edition's (the buyer type fake, the replacement hold, a re-binder). */
   readonly quotes?: (h: Harness) => Partial<QuoteCollaborators>;
   /**
@@ -699,6 +709,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     sources,
     ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+    ...(options.optOut !== undefined ? { optOut: options.optOut } : {}),
     ...(options.quotes !== undefined ? { quotes: options.quotes(h) } : {}),
     ...(payments !== null ? { payments: payments.service } : {}),
     ...(commissions !== null ? { commissions: commissions.binding } : {}),

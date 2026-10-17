@@ -253,7 +253,7 @@ control("KA095 (e)", "a review citing the step-up proof of another person", { co
   };
 });
 control("KA095 (f)", "a contact address whose digest is not the contact's key", { code: "KA095" }, G.addressKey, async () => {
-  const p = await prospectIn(w, w.s, freshDomain("ka095f"));
+  const p = await prospectIn(w, w.s, freshDomain("ka095f"), "United States", { address: false });
   return { as: "app", ctx: personOf(w.s.userId), at: w.base, run: (c) => c.query("INSERT INTO kauro.prospect_contact_addresses (contact_id, recorded_by_user_id, address) VALUES ($1, $2, 'someone.else@company.example')", [p.contactId, w.s.userId]) };
 });
 control("KA095 (g)", "a sender's address changed (the table's own refusal: no role holds the column grant)", { code: "KA095" }, G.senderImmutable, async () => {

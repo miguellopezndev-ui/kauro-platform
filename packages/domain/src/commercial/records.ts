@@ -507,10 +507,16 @@ export interface ProspectRecord {
   readonly businessContactRef?: ProspectContactRef;
   readonly sourceEvidenceHash: Sha256Hex;
   readonly jurisdiction: string;
+  /**
+   * The EFFECTIVE state (R2-130, D-B12O-12): SUPPRESSED when the stored row is, or when the suppression registry reaches the prospect (its organization
+   * key, or its business contact's key, e.g. a public opt-out, which never moves a prospect). The stored row may still read its earlier state.
+   */
   readonly state: ProspectState;
+  /** Effective, as `state`: the stored flag, or a registry row reaching the prospect. */
   readonly suppressed: boolean;
   readonly ownerSellerId?: SellerId;
   readonly registeredByUserId: UserId;
+  /** The stored row's version: an effective SUPPRESSED derived from the registry is no transition and steps nothing. */
   readonly version: number;
   readonly createdAt: UtcInstant;
 }

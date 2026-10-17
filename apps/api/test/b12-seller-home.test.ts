@@ -4,7 +4,7 @@ import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { SellerHomeView } from "@kauro/application";
-import { asOperator, recordSourceEvidence, salesWorld, type SalesWorld } from "./sales-support.js";
+import { asOperator, recordSourceEvidence, salesWorld, terminateSeller, type SalesWorld } from "./sales-support.js";
 import { call, completed, freshKey, outcome, type Person } from "./support.js";
 
 let sw: SalesWorld;
@@ -56,9 +56,7 @@ test("R2-066: a TERMINATED seller reads its home (state, no prospect actions, su
   const before = await visibleRows(seller.userId);
   assert.ok((before["prospects"] ?? 0) >= 1 && (before["prospect_contacts"] ?? 0) >= 1 && (before["prospect_source_evidence"] ?? 0) >= 1, `an ACTIVE seller sees its rows: ${JSON.stringify(before)}`);
 
-  await asOperator(w().h, sw.owner.userId, (c) =>
-    c.query("UPDATE kauro.sellers SET state = 'TERMINATED', terminated_at = kauro.server_now(), version = version + 1 WHERE user_id = $1", [seller.userId]),
-  );
+  await terminateSeller(sw, seller);
 
   const gone = await readHome(seller.person);
   assert.equal(gone.sellerState, "TERMINATED");

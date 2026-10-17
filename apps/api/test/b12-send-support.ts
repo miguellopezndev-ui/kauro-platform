@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import type { Client } from "pg";
+import { isOutreachBusinessInstant } from "@kauro/application";
 import { connectionPid, runCell, type FaultContext, type FaultKind, type HarnessConnection, type StepClock } from "@kauro/persistence/testing";
 import type { SqlStep } from "./fault-support.js";
 import type { Reply } from "./support.js";
@@ -49,8 +50,30 @@ export const UNCERTAIN_AFTER_MS = START_GATE_MS + CALL_BOUND_MS + MARGIN_MS;
 export const DAY_MS = 86_400_000;
 export const US = 0.001; // one microsecond in ms (instants are microsecond-exact on the server; the adapter formats them with 6 digits)
 
-/** A Thursday that is a business instant in America/Bogota and America/New_York (A10). */
-export const T0 = "2026-10-15T15:00:00.000000Z";
+/**
+ * The base instant of the send cells: a Thursday 15:00Z (10:00 in Bogota and in New York) whose following fourteen days are business days in both
+ * calendars (A10, outreach calendar of the application), the first such Thursday at least nine days after the real clock. The cells place the
+ * labelled TEST CLOCK and the controlled clock at instants around it, and both only move forward from the real clock: a literal calendar
+ * instant is a time bomb (the one this replaces was overtaken on 2026-10-16), so the base is computed from the clock the run starts at.
+ */
+export const T0 = ((): string => {
+  const DAY = 86_400_000;
+  const from = Date.now() + 9 * DAY;
+  const d = new Date(from);
+  d.setUTCHours(15, 0, 0, 0);
+  for (let n = 0; n < 800; n++, d.setTime(d.getTime() + DAY)) {
+    if (d.getTime() < from || d.getUTCDay() !== 4) continue;
+    let clean = true;
+    for (let k = 0; k <= 14 && clean; k++) {
+      const day = new Date(d.getTime() + k * DAY);
+      const weekday = day.getUTCDay() !== 0 && day.getUTCDay() !== 6;
+      if (weekday && isOutreachBusinessInstant(day) !== true) clean = false;
+    }
+    // GAP-SE-19 places a new sequence at T0 + 90 days (a Wednesday): a business instant in both zones too
+    if (clean && isOutreachBusinessInstant(new Date(d.getTime() + 90 * DAY)) === true) return `${d.toISOString().slice(0, 19)}.000000Z`;
+  }
+  throw new Error("no clean business Thursday in the outreach calendar's years: the calendar needs its next edition");
+})();
 
 export const plusMs = (at: string, ms: number): string => usInstant(epochUs(at) + Math.round(ms * 1000));
 export const plusUs = (at: string, us: number): string => usInstant(epochUs(at) + us);
@@ -91,7 +114,7 @@ export const OUTCOME = {
   JURISDICTION: "409 PRECONDITION_FAILED OUTREACH_JURISDICTION_UNREVIEWED",
   COMPLIANCE: "503 CAPACITY_UNAVAILABLE OUTREACH_COMPLIANCE_UNCONFIGURED",
   STALE: "409 STALE_VERSION -",
-  KEY_REUSED: "409 IDEMPOTENCY_CONFLICT -",
+  KEY_REUSED: "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS",
   FORBIDDEN: "403 FORBIDDEN NOT_AUTHORIZED",
   TIMEOUT: "503 CAPACITY_UNAVAILABLE -",
 } as const;
@@ -222,6 +245,8 @@ export interface SendWorld {
   standAt(at: string | null): void;
   /** The cell operation's step clock: every unit positions its transaction on it while set (fault-support FaultRouting.clock). */
   bindClock(clock: StepClock | null): void;
+  /** The dispatcher that holds the lease claims it again at the instant the bound clock stands on (see the world). */
+  renewLease(): Promise<void>;
   /** Sets or removes the deployment compliance configuration (postal address, opt-out origin); returns the restore. */
   setCompliance(config: ComplianceConfig | null): () => void;
   /** An ACTIVE seller with its verified GMAIL_API identity (owner routes RegisterSenderIdentity + VerifySenderIdentity). */
@@ -229,6 +254,15 @@ export interface SendWorld {
   agencyMember(label: string): Promise<Person>;
   /** A US prospect registered by (and assigned to) the seller, with one recorded contact and its source evidence. */
   prospect(seller: SellerP, options?: { readonly contact?: string; readonly organization?: string; readonly jurisdiction?: string }): Promise<ProspectP>;
+  /**
+   * A US prospect the OWNER registered (CMD045's writer in the owner's session: the owner's source evidence and business contact, owned by nobody), then
+   * assigned to the seller: the seller owns it but cannot read its contact (prospect_contacts_self_read), the case of review finding F2.
+   */
+  assignedProspect(seller: SellerP, options?: { readonly contact?: string; readonly organization?: string }): Promise<ProspectP & { readonly registration: string }>;
+  /** Rows of a read in the person's own session (kauro_app, OPERATOR context, no agency), under its RLS: what that person can see. */
+  readAs<T extends object>(person: Person, sql: string, params?: ReadonlyArray<unknown>): Promise<T[]>;
+  /** The owner's (re)assignment of the prospect to the seller, or to nobody (prospects_owner_update; one version step). */
+  reassign(prospectId: string, seller: SellerP | null): Promise<void>;
   /** A further identity of the person (route default GMAIL_API), registered and (unless pending) verified. */
   sender(person: Person, options?: { readonly route?: SenderRoute; readonly pending?: true }): Promise<SenderP>;
   /** The CURRENT resource every default draft cites, its family and the capability it claims. */
@@ -258,11 +292,20 @@ export interface SendWorld {
   contentOf(d: DraftP): Promise<{ readonly subject: string; readonly body: string }>;
   /** The ContractFakeGmailSend instance (K1) behind `gmail` (tokenOf reads its recorded MIME). */
   readonly gmailContract: ContractFakeGmailSend;
+  /** The start of a cell: no dispatcher of an earlier cell stays known and the dispatch lease row is free (a second owner would find it HELD). */
+  beginCell(): Promise<void>;
+  /** The internal errors the api recorded (a routed unit that failed at a fault point answers 500; ctx.partial needs the error itself). */
+  readonly internalErrors: ReadonlyArray<{ readonly error: unknown }>;
   /**
    * The §M control (rule 24a/24c): fn with the cell's WHOLE serializer set removed from both actors (each lock's acquisition and its T2
    * assertion) and every listed co-guard dropped (K1 withoutGuards, b12-outreach-support.ts:421), everything else unchanged.
    */
   withoutSerializers<T>(control: Control, fn: () => Promise<T>): Promise<T>;
+  /**
+   * The prospect as the person is shown it: the product's reader (PgSalesRepository.getProspect) in the person's own session, under its RLS (null: the
+   * person may not read it). `state` and `suppressed` are effective (R2-130): the stored row, or SUPPRESSED when the suppression registry reaches it.
+   */
+  prospectAs(person: Person, prospectId: string): Promise<{ readonly state: string; readonly suppressed: boolean; readonly version: number; readonly ownerSellerId: string | null } | null>;
   /** The routes of the other lanes a race actor or a precondition needs (through their real handlers). */
   readonly routes: {
     revokeGrant(g: GrantP, key?: string): Promise<Reply>;
@@ -277,8 +320,11 @@ export interface SendWorld {
     optOut(token: string): Promise<Reply>;
     diagnose(personUserId: string, key?: string): Promise<Reply>;
     review(drafts: ReadonlyArray<DraftP>, key?: string): Promise<Reply>;
+    /** PrepareOutreachReview (201 asserted) under a fresh step-up, and CMD062 through its route under the same proof, to call when the cell chooses. */
+    reviewed(drafts: ReadonlyArray<DraftP>): Promise<{ readonly review: Reply; authorize(options?: { readonly validFrom?: string; readonly expiresAt?: string; readonly maximumSends?: number }): Promise<Reply> }>;
     suppress(target: { readonly contactKey: string } | { readonly domain: string }): Promise<void>;
-    reinstatePolicy(jurisdiction: string, purpose: Purpose): Promise<Reply>;
+    /** The next reviewed version of the withdrawn policy, IN_FORCE (a fixture: no route names it); throws unless the latest version reads IN_FORCE. */
+    reinstatePolicy(jurisdiction: string, purpose: Purpose): Promise<void>;
   };
 }
 
@@ -354,7 +400,15 @@ export async function holdLease(w: SendWorld): Promise<Hold> {
 export async function waitingBehind<T>(ctx: FaultContext, w: SendWorld, holder: Hold, role: "kauro_app" | "kauro_outreach", what: string, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = []): Promise<{ readonly pending: Promise<T> }> {
   const conn = await w.open(role === "kauro_app" ? "kauro_app_test" : "kauro_outreach_test");
   const waiting = await ctx.mustWait(w.oracle, { waiter: conn, holder: connectionPid(holder.conn) }, () => w.on(conn, role, ctx, steps, fn), what);
-  return { pending: (waiting.pending as Promise<T>).finally(() => conn.end()) };
+  // mustWait settles to a PromiseSettledResult: the operation's own answer (or its failure) is what the cell awaits
+  return {
+    pending: (waiting.pending as Promise<PromiseSettledResult<T>>)
+      .then((r) => {
+        if (r.status === "rejected") throw r.reason;
+        return r.value;
+      })
+      .finally(() => conn.end()),
+  };
 }
 
 // --- locks and co-guards (§L) -----------------------------------------------------------------------------------------------------------
@@ -389,6 +443,8 @@ export const CELL_CONTROLS: Readonly<Record<string, Control>> = {
   M21: { locks: ["L8"], coGuards: [] },
   M22: { locks: ["L8"], coGuards: [] },
   M23: { locks: ["L8"], coGuards: [] },
+  // R2-130 / review finding F2: the opt-out against CMD062 (L8 S of the drafts' keys)
+  "F2-AU": { locks: ["L8"], coGuards: [] },
   M26: { locks: ["L10"], coGuards: ["T1"] },
   M27: { locks: ["L10"], coGuards: ["T1"] },
   M30: { locks: ["L13"], coGuards: [] },
@@ -407,6 +463,11 @@ export function controlOf(cell: string): Control | null {
 }
 /** M14 (i): the rev-2 lock order (D4 AUTH_REVOKED taking L7 before L4) instead of removing a lock; KAURO_B12_CONTROL=M14-order. */
 export const rev2OrderControl = (): boolean => process.env["KAURO_B12_CONTROL"] === "M14-order";
+
+/** An advisory subject of §L (OutreachLocks.take): the statement carries its kind as a parameter, so the step names the kind through `when`. */
+function lockStep(label: string, kind: string): SqlStep {
+  return { label, match: /pg_advisory_xact_lock(_shared)?\(kauro\.transition_key\(\$1, \$2\)\)/, when: (params) => params[0] === kind };
+}
 
 // --- first writes of each actor (the `.before` points raceAtWrite pauses at; §M harness) ---------------------------------------------
 export const W = {
@@ -429,13 +490,14 @@ export const W = {
   activityAfterIntent: { label: "activity_after", match: /INSERT INTO kauro\.sales_activities\b/ },
   leaseShare: { label: "lease_share", match: /FROM kauro\.leases\b[\s\S]*FOR SHARE/ },
   leaseClaim: { label: "lease_claim", match: /kauro\.claim_lease\(/ },
-  personLock: { label: "person_lock", match: /kauro\.outreach_person_caps/ },
-  senderLock: { label: "sender_lock", match: /kauro\.sender_identities'/ },
+  personLock: lockStep("person_lock", "kauro.outreach_person_caps"),
+  senderLock: lockStep("sender_lock", "kauro.sender_identities"),
+  grantLock: lockStep("grant_lock", "kauro.outreach_authorizations"),
   /** D4 on AUTH_REVOKED: its first write is the sender UPDATE (REVOKED) or the intent UPDATE, whichever the unit issues first. */
   d4Revoked: { label: "d4_revoked", match: /UPDATE kauro\.(sender_identities|outreach_send_intents)\b/ },
   /** RegisterSenderIdentity's row INSERT (GAP-RS-1 / GAP-RS-3 pauses). */
   senderInsert: { label: "sender_insert", match: /INSERT INTO kauro\.sender_identities\b/ },
-  draftLock: { label: "draft_lock", match: /kauro\.outreach_drafts'/ },
+  draftLock: lockStep("draft_lock", "kauro.outreach_drafts"),
 } as const satisfies Record<string, SqlStep>;
 
 // --- the race harness (§M; K1 raceAtWrite) ----------------------------------------------------------------------------------------------
@@ -479,10 +541,16 @@ export async function raceAtWrite<A, B>(ctx: FaultContext, cell: string, first: 
           release: () => pause.release(),
           pid: () => connectionPid(fc),
         },
+        // the second runs THROUGH ctx.mustWait (K1 `credit`): the harness observes its wait on the first's backend and credits it, and the first is
+        // held until it has (a race cell built on the bare raceAtWrite ends FaultNotInjected even when the race happened)
         second: {
-          run: () => ctx.operation(`${second.name} (second)`, () => w.on(sc, second.role, ctx, [], second.run)),
+          run: () => Promise.reject(new Error("credit uses runOn")),
+          runOn: (client: HarnessConnection) => ctx.operation(`${second.name} (second)`, () => w.on(client, second.role, ctx, [], second.run)),
+          waiter: sc,
           pid: () => connectionPid(sc),
         },
+        credit: ctx,
+        what: `${second.name} waits on ${first.name}`,
       });
     const r = control === null ? await order() : await w.withoutSerializers(control, order);
     return { first: settledOf(r.first), second: settledOf(r.second), secondBlocked: r.outcome === "blocked" };
@@ -502,7 +570,8 @@ export const answerOf = <T>(s: Settled<T>, what: string): T => {
 export function cell(title: string, fault: FaultKind, body: (ctx: FaultContext) => Promise<void>, at?: string): void {
   const id = /^([A-Z0-9-]+[a-z]?)/.exec(title)?.[1] ?? title.slice(0, 16);
   test(title, async () => {
-    await runCell({ id, step: title.slice(0, 160), fault, ...(at === undefined ? {} : { at }), expect: title }, body);
+    // the cell's controlled clock starts two days before T0 (default: the real now, which a cell must not be set behind)
+    await runCell({ id, step: title.slice(0, 160), fault, ...(at === undefined ? {} : { at }), expect: title }, body, { clockStart: plusMs(T0, -2 * DAY_MS) });
   });
 }
 
@@ -514,6 +583,7 @@ export async function onEffectClock<T>(ctx: FaultContext, w: SendWorld, what: st
   return ctx.operation(what, async (op) => {
     w.bindClock(op.clock);
     try {
+      await w.renewLease();
       return await fn();
     } finally {
       w.bindClock(null);
@@ -633,6 +703,19 @@ export async function senderState(w: SendWorld, senderId: string): Promise<strin
 }
 export async function sendersAt(w: SendWorld, address: string): Promise<number> {
   return (await w.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM kauro.sender_identities WHERE lower(address) = lower($1)", [address])).rows[0]!.n;
+}
+/** The prospect row as stored (superuser oracle): what no reader shows, the proof that an effective exclusion moved nothing stored. */
+export async function storedProspect(w: SendWorld, p: ProspectP): Promise<{ readonly state: string; readonly suppressed: boolean; readonly version: number }> {
+  return (await w.oracle.query<{ state: string; suppressed: boolean; version: number }>("SELECT state, suppressed, version::int AS version FROM kauro.prospects WHERE prospect_id = $1", [p.prospectId])).rows[0]!;
+}
+/** The suppression registry rows of a contact key (the authority of an opt-out): reason and principal. */
+export async function contactSuppressions(w: SendWorld, contactKey: string): Promise<Array<{ readonly reason: string; readonly recordedByService: string | null; readonly recordedByUserId: string | null }>> {
+  return (
+    await w.oracle.query<{ reason: string; recordedByService: string | null; recordedByUserId: string | null }>(
+      `SELECT reason, recorded_by_service AS "recordedByService", recorded_by_user_id::text AS "recordedByUserId" FROM kauro.prospect_suppressions WHERE key_kind = 'CONTACT' AND suppression_key = $1`,
+      [contactKey],
+    )
+  ).rows;
 }
 export async function prospectState(w: SendWorld, p: ProspectP): Promise<string> {
   return (await w.oracle.query<{ state: string }>("SELECT state FROM kauro.prospects WHERE prospect_id = $1", [p.prospectId])).rows[0]!.state;

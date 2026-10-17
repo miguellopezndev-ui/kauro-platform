@@ -15312,7 +15312,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 9 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -15364,6 +15364,12 @@
                 "reason": "OUTREACH_ROUTE_FORBIDDEN",
                 "layer": "COMMAND",
                 "meaning": "the sender route may not carry the purpose (KC028)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PROSPECT_SUPPRESSED",
+                "layer": "COMMAND",
+                "meaning": "the organization key or the contact key of a draft is suppressed (KC016; R2-130, review finding F2)"
               },
               {
                 "code": "PRECONDITION_FAILED",
@@ -18998,7 +19004,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -19032,6 +19038,18 @@
                 "reason": "OUTREACH_ROUTE_FORBIDDEN",
                 "layer": "COMMAND",
                 "meaning": "the route needs the person consent evidence it lacks, or may not be registered for this person (KC028)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "SELLER_NOT_ACTIVE",
+                "layer": "COMMAND",
+                "meaning": "the person's seller is terminated: a terminated seller gets no sender identity"
+              },
+              {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "a sender identity of this address and route is already recorded (the second of two registrations answers like the replay of the first)"
               }
             ]
           },
@@ -19842,7 +19860,6 @@
               {
                 "code": "PRECONDITION_FAILED",
                 "reason": "SENDER_REVOKED",
-                "current": "ALWAYS",
                 "layer": "COMMAND",
                 "meaning": "the sender identity was revoked and cannot be verified"
               }
@@ -20148,7 +20165,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -20194,6 +20211,12 @@
                 "reason": "CORPORATE_ROLE_MISSING",
                 "layer": "ACCESS",
                 "meaning": "the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the draft is not the caller's to send: another seller's draft, or a draft the caller is not assigned (403, no reason)"
               }
             ]
           },
@@ -20224,7 +20247,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 20 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 18 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -20342,21 +20365,9 @@
               },
               {
                 "code": "PRECONDITION_FAILED",
-                "reason": "OUTREACH_CALENDAR_UNAVAILABLE",
-                "layer": "COMMAND",
-                "meaning": "the date is not covered by the business calendar (KC037)"
-              },
-              {
-                "code": "PRECONDITION_FAILED",
                 "reason": "OUTREACH_JURISDICTION_UNREVIEWED",
                 "layer": "COMMAND",
                 "meaning": "the channel policy was withdrawn or never reviewed (A13)"
-              },
-              {
-                "code": "PRECONDITION_FAILED",
-                "reason": "OUTREACH_COMPLIANCE_UNCONFIGURED",
-                "layer": "COMMAND",
-                "meaning": "the postal address or the opt-out origin is not configured (A15)"
               },
               {
                 "code": "PRECONDITION_FAILED",
@@ -20425,7 +20436,7 @@
             ]
           },
           "503": {
-            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -20447,6 +20458,18 @@
                 "reason": null,
                 "layer": "PLATFORM",
                 "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              },
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": "OUTREACH_CALENDAR_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "the date is not covered by the business calendar (KC037): the calendar needs its next edition"
+              },
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": "OUTREACH_COMPLIANCE_UNCONFIGURED",
+                "layer": "COMMAND",
+                "meaning": "the postal address or the opt-out origin is not configured (A15): the deployment cannot send until the owner configures it"
               }
             ]
           }

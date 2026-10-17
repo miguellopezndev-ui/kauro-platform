@@ -302,7 +302,10 @@ test("DENY SEC-HARDENING-2 (release): a pre-existing kauro_route_registrar that 
     // ... and with the registrar pre-created in exactly the B14 shape (NOLOGIN, the migrator its only INHERIT+SET member) it applies
     await p.su.query(`CREATE ROLE ${REGISTRAR} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB NOREPLICATION NOINHERIT`);
     await p.su.query(`GRANT ${REGISTRAR} TO kauro_owner WITH INHERIT TRUE, SET TRUE`);
-    await appliedNow(p, "the B14 pre-created registrar, migrator without CREATEROLE");
+    // ... and the runtime group created after the hardening (0088's kauro_outreach) is pre-created as B14 provisions every runtime group:
+    // 0088 creates it only when missing, and a migrator without CREATEROLE cannot
+    await p.su.query("CREATE ROLE kauro_outreach NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION");
+    await appliedNow(p, "the B14 pre-created registrar and kauro_outreach, migrator without CREATEROLE");
   } finally {
     await p.stop();
   }

@@ -267,6 +267,10 @@ export class PgRefundRepository implements RefundRepository {
   async request(refund: NewRefundRequest): Promise<RefundRecord> {
     // the agency's shared half first: a closure holding the exclusive half reads its inventory with this request in it or ahead of it
     await awaitCommerceTransition(this.ctx.db, "kauro.agencies", refund.agencyId);
+    // the capture's refund booking lock, after the capture's shared half (the order of the completions and of the re-binding guard, 0015:742): a request
+    // that meets a repair in flight waits for it and lands on the repaired capture, or the repair that meets the request is refused PURCHASE_NOT_INTACT
+    await awaitCommerceTransition(this.ctx.db, "kauro.capture_facts", refund.captureId);
+    await execute(this.ctx.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.capture_refunds', $1::text))", [refund.captureId]);
     const r = await execute<RefundRow>(this.ctx.db, `${REQUEST_INSERT} RETURNING ${REFUND_COLUMNS}`, requestParams(refund));
     const row = r.rows[0];
     if (!row) throw new DomainFailure("NOT_FOUND", "the order of the refund is not visible in this context");

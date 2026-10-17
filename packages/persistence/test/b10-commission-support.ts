@@ -66,8 +66,8 @@ export interface World {
   readonly hubspot: string;
 }
 
-export async function openWorld(label: string): Promise<World> {
-  const h = await start();
+export async function openWorld(label: string, options: { readonly migrationsDir?: string } = {}): Promise<World> {
+  const h = await start(options);
   const app = await h.pg.connect("kauro_app_test");
   const control = await h.pg.connect("kauro_control_test");
   const assurance = await h.pg.connect("kauro_assurance_test");

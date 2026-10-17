@@ -107,6 +107,23 @@ jobs:
           Expand-Archive -Path $env:RUNNER_TEMP\pg17.zip -DestinationPath C:\pgsql17
           & "$env:PGBIN/postgres.exe" --version
 
+      # The report PDF tests (packages/data-plane/test/report-pdf.test.ts) run a real, SANDBOXED Chromium; with
+      # KAURO_REQUIRE_PDF_ENGINE=1 a missing browser fails the suite instead of skipping it. The sandbox is never turned off: the script
+      # records what the host does (Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor), proves the sandboxed browser
+      # starts as the runner user, and stops the job with the evidence if it does not.
+      - name: Chromium for the PDF tests (Linux)
+        if: runner.os == 'Linux'
+        run: bash tools/ci/prepare-chromium.sh
+
+      - name: Chromium for the PDF tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          set -eu
+          chrome="C:/Program Files/Google/Chrome/Application/chrome.exe"
+          [ -f "$chrome" ] || { echo "::error::no Google Chrome on the runner"; exit 1; }
+          echo "version: $(powershell -NoProfile -Command "(Get-Item '$chrome').VersionInfo.ProductVersion")"
+          { echo "KAURO_PDF_BROWSER=$chrome"; echo "KAURO_REQUIRE_PDF_ENGINE=1"; echo "KAURO_PDF_EVIDENCE_DIR=$GITHUB_WORKSPACE/pdf-evidence"; } >> "$GITHUB_ENV"
+
       - name: Install from the lockfile
         run: pnpm install --frozen-lockfile
 
@@ -123,6 +140,7 @@ jobs:
           path: |
             verify.log
             apps/api/openapi.json
+            pdf-evidence/
             apps/web/src/api/generated.ts
             docs/design/B06-state-command-event-matrix.md
           if-no-files-found: warn

@@ -237,7 +237,8 @@ export class PgActivityStore {
       case "HUMAN_SEND_OBSERVED": {
         const moved = await writers.observeUncertain(locks, keys!, req.observation!);
         if (!moved) throw closed("the intent is no longer an uncertain send", "DRAFT_CLOSED");
-        if (req.observation === "NOT_SENT") await writers.moveDraft(locks, req.draftId!, "DRAFT");
+        // the plan: SENT shows the draft sent (PROVIDER_ACCEPTED, never sent again: KC036), NOT_SENT returns it to DRAFT
+        await writers.moveDraft(locks, req.draftId!, req.observation === "NOT_SENT" ? "DRAFT" : "PROVIDER_ACCEPTED");
         await writers.recordPersonActivity(locks, { ...activity, observation: req.observation! });
         break;
       }

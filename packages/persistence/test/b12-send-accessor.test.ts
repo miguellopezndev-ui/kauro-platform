@@ -124,7 +124,9 @@ describe("B12 L-SEND accessor: queueSend (CMD063)", () => {
     const slot = await nextSlot(w);
     const p = await prospectIn(w, w.s, freshDomain("resend"));
     const d = await draft(w, resend, p);
-    const f: Fixture = { draft: d, authorizationId: ids.next(), slot };
+    // the grant exists (the accessor reads it before it judges); the route is what refuses
+    const g = await grant(w, resend, [d], slot);
+    const f: Fixture = { draft: d, authorizationId: g.authorizationId, slot };
     await assert.rejects(refused(f, plus(slot, 2)), failure("OUTREACH_ROUTE_FORBIDDEN"));
     assert.equal(await intentRows(d.draftId), 0);
   });
@@ -254,36 +256,39 @@ describe("B12 L-SEND accessor: gate (D3) and record (D4)", () => {
     assert.deepEqual(await states(q.intentId), { intent: "SEND_UNCERTAIN", draft: "SEND_UNCERTAIN", fence: String(lease.fence) });
   });
 
-  test("a definitive 429 is NOT_SENT, the draft returns to DRAFT and a provider warning is written", async () => {
-    const f = await fixture();
-    const { q, lease, claimedAt } = await submitting(f);
-    const state = await outreach(plus(claimedAt, 3), (o) => o.record(q.intentId, lease, { kind: "REJECTED_DEFINITIVE", status: 429 }));
-    assert.equal(state, "NOT_SENT");
-    assert.deepEqual(await states(q.intentId), { intent: "NOT_SENT", draft: "DRAFT", fence: String(lease.fence) });
-    const warn = await w.h.oracle.query("SELECT 1 FROM kauro.outreach_provider_warnings WHERE sender_id = $1", [snd.senderId]);
-    assert.ok((warn.rowCount ?? 0) >= 1);
-  });
-
   test("a definitive 400 is NOT_SENT without a warning for this intent's draft", async () => {
     const f = await fixture();
     const { q, lease, claimedAt } = await submitting(f);
     const answer: OutcomeAnswer = { kind: "REJECTED_DEFINITIVE", status: 400 };
-    assert.equal(await outreach(plus(claimedAt, 3), (o) => o.record(q.intentId, lease, answer)), "NOT_SENT");
+    assert.equal(await outreach(plus(claimedAt, 3), (o) => o.record(q.intentId, lease, answer)), "NOT_SENT(PROVIDER_REJECTED:400)");
     assert.deepEqual(await states(q.intentId), { intent: "NOT_SENT", draft: "DRAFT", fence: String(lease.fence) });
   });
 
-  test("D4b: an ACCEPTED answer after D5 made the intent SEND_UNCERTAIN is evidence and moves it to PROVIDER_ACCEPTED, once per fence", async () => {
+  test("GAP-DI-7b: the same owner's ACCEPTED after D5 (fence unchanged) is the edge SEND_UNCERTAIN -> PROVIDER_ACCEPTED with its reference; the replay is a no-op and writes no evidence", async () => {
     const f = await fixture();
     const { q, lease, claimedAt } = await submitting(f);
     const recoveredAt = plus(claimedAt, 40);
-    const staleLease = await leaseAt(recoveredAt);
-    assert.equal(await outreach(recoveredAt, (o) => o.recover(q.intentId, staleLease)), "SEND_UNCERTAIN");
+    assert.equal(await outreach(recoveredAt, async (o) => o.recover(q.intentId, await leaseAt(recoveredAt))), "SEND_UNCERTAIN");
     const late = await outreach(plus(recoveredAt, 2), (o) => o.record(q.intentId, lease, { kind: "ACCEPTED", ref: "gmail-late" }));
     assert.equal(late, "PROVIDER_ACCEPTED");
     assert.deepEqual(await states(q.intentId), { intent: "PROVIDER_ACCEPTED", draft: "PROVIDER_ACCEPTED", fence: String(lease.fence) });
     const again = await outreach(plus(recoveredAt, 3), (o) => o.record(q.intentId, lease, { kind: "ACCEPTED", ref: "gmail-late" }));
-    assert.equal(again, "PROVIDER_ACCEPTED");
-    const ev = await w.h.oracle.query("SELECT 1 FROM kauro.outreach_send_evidence WHERE intent_id = $1 AND fence = $2", [q.intentId, lease.fence]);
+    assert.equal(again, "NOOP");
+    const ev = await w.h.oracle.query("SELECT 1 FROM kauro.outreach_send_evidence WHERE intent_id = $1", [q.intentId]);
+    assert.equal(ev.rowCount, 0);
+  });
+
+  test("D4b: an ACCEPTED answer of a fenced-out unit is evidence (one row per fence) and moves SEND_UNCERTAIN to PROVIDER_ACCEPTED; its replay is a no-op", async () => {
+    const f = await fixture();
+    const { q, lease, claimedAt } = await submitting(f);
+    const recoveredAt = plus(claimedAt, 40);
+    assert.equal(await outreach(recoveredAt, async (o) => o.recover(q.intentId, await leaseAt(recoveredAt))), "SEND_UNCERTAIN");
+    const fenced = { ...lease, fence: lease.fence + 5 };
+    const late = await outreach(plus(recoveredAt, 2), (o) => o.record(q.intentId, fenced, { kind: "ACCEPTED", ref: "gmail-late" }));
+    assert.equal(late, "PROVIDER_ACCEPTED");
+    assert.deepEqual((await states(q.intentId)).intent, "PROVIDER_ACCEPTED");
+    assert.equal(await outreach(plus(recoveredAt, 3), (o) => o.record(q.intentId, fenced, { kind: "ACCEPTED", ref: "gmail-late" })), "NOOP");
+    const ev = await w.h.oracle.query("SELECT 1 FROM kauro.outreach_send_evidence WHERE intent_id = $1 AND fence = $2", [q.intentId, fenced.fence]);
     assert.equal(ev.rowCount, 1);
   });
 });
@@ -308,11 +313,28 @@ describe("B12 L-SEND accessor: recovery (D5)", () => {
     assert.equal((await states(q.intentId)).intent, "PROVIDER_ACCEPTED");
   });
 
-  test("the event of an intent resolves to the intent", async () => {
+  test("the event of an intent is not the outreach service's to read: it takes the intent from the outbox delivery it claimed (kauro_outreach holds no privilege on domain_events)", async () => {
     const f = await fixture();
     const q = await queueAt(f, plus(f.slot, 2));
     const ev = await w.h.oracle.query<{ event_id: string }>("SELECT event_id FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'outreach.send_intended.v1'", [q.intentId]);
-    assert.equal(await outreach(plus(f.slot, 3), (o) => o.intentOfEvent(ev.rows[0]!.event_id)), q.intentId);
+    assert.equal(ev.rowCount, 1);
+    await assert.rejects(
+      outreach(plus(f.slot, 3), (_o, c) => c.query("SELECT aggregate_id FROM kauro.domain_events WHERE event_id = $1", [ev.rows[0]!.event_id])),
+      (e: unknown) => (e as { code?: string }).code === "42501",
+    );
   });
 });
 
+// A provider warning (403/429) pauses the person's outreach pending diagnosis (KC034), for every later test of the world: this one runs last.
+describe("B12 L-SEND accessor: provider warning", () => {
+  test("a definitive 429 is NOT_SENT, the draft returns to DRAFT and a provider warning is written", async () => {
+    const f = await fixture();
+    const { q, lease, claimedAt } = await submitting(f);
+    const state = await outreach(plus(claimedAt, 3), (o) => o.record(q.intentId, lease, { kind: "REJECTED_DEFINITIVE", status: 429 }));
+    // the recorded state carries its outcome reason, as the dispatcher and the api cells read it (state(reason))
+    assert.equal(state, "NOT_SENT(PROVIDER_REJECTED:429)");
+    assert.deepEqual(await states(q.intentId), { intent: "NOT_SENT", draft: "DRAFT", fence: String(lease.fence) });
+    const warn = await w.h.oracle.query("SELECT 1 FROM kauro.outreach_provider_warnings WHERE intent_id = $1", [q.intentId]);
+    assert.ok((warn.rowCount ?? 0) >= 1);
+  });
+});

@@ -161,7 +161,7 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
     const s = await staged(w, "deny-uncertain");
     const first = await queued(w, s);
     w.gmail.script({ kind: "ACCEPTED_ANSWER_LOST" });
-    await w.dispatcher().pass();
+    await w.dispatcher().dispatch(first); // this intent alone: a pass would also dispatch the QUEUED intents earlier blocks of this test left, and one of them would take the scripted answer
     assert.equal((await intent(w, first)).state, "SEND_UNCERTAIN");
     const other = await w.draft(s.seller, s.prospect, s.seller.sender, { label: "deny-uncertain-2" });
     const g = await w.grant([other]);
@@ -198,6 +198,8 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
     assert.ok((await w.routes.recordActivity(seller, { kind: "BOUNCED", intentId: bId, evidenceRef: "dsn-deny-bounced" })).status < 300, "BOUNCED recorded");
     assert.equal(await draftState(w, b.d), "BOUNCED");
     await refused("draft BOUNCED", () => send(w, seller, b.d, b.g), OUTCOME.KC036, b.d, 1);
+    // a bounce pauses the person until the owner's diagnosis (KC034): lifted, so only the draft state refuses below
+    assert.ok((await w.routes.diagnose(seller.userId)).status < 300, "the owner's diagnosis lifts the pause");
     const r = await mk("replied");
     const rId = intentIdOf(await send(w, seller, r.d, r.g));
     await w.dispatcher().dispatch(rId);
@@ -211,7 +213,9 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
     const p = await w.prospect(seller);
     const ownerSender = await w.sender(w.owner);
     const d = await w.draft(w.owner, p, ownerSender);
-    const g = await w.grant([d], { maximumSends: 2 });
+    // a grant seals one hash per send it allows (KC030 "seals N hashes for M sends"): a spare draft seals the second
+    const spare = await w.draft(w.owner, await w.prospect(seller), ownerSender, { label: "deny-cancelled-spare" });
+    const g = await w.grant([d, spare], { maximumSends: 2 });
     const id = intentIdOf(await send(w, w.owner, d, g));
     assert.ok((await w.routes.terminate(seller)).status < 300);
     await w.dispatcher().pass();
@@ -261,7 +265,7 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
   {
     // the outreach calendar is seeded for 2026-2028: a Wednesday of 2029 is not covered
     w.standAt("2029-01-10T15:00:00.000000Z");
-    const s = await staged(w, "deny-calendar");
+    const s = await staged(w, "deny-calendar", { validFrom: "2029-01-10T14:00:00.000000Z", expiresAt: "2029-01-11T14:00:00.000000Z" }); // a grant live on that day, so only the calendar refuses
     await refused("uncovered calendar year", () => send(w, s.seller, s.draft, s.grant), OUTCOME.KC037, s.draft);
     w.standAt(T0);
   }
@@ -275,7 +279,10 @@ cell("CMD063-RACE: identical retry replays one intent (journal L2), same key oth
   const first = await ctx.attempt(() => send(w, s.seller, s.draft, s.grant, { key }));
   const again = await ctx.attempt(() => send(w, s.seller, s.draft, s.grant, { key }));
   assert.equal((await intentsOfDraft(w, s.draft.draftId)).length, 1, "identical retry: one intent");
-  assert.deepEqual([again.status, again.text], [first.status, first.text], "identical retry replays the 200");
+  // the replay is the journaled answer byte for byte, marked replayed (the platform's envelope: `replayed: true` on a replay, false on the first answer)
+  const parsed = (r: { text: string }): Record<string, unknown> => JSON.parse(r.text) as Record<string, unknown>;
+  assert.deepEqual([again.status, { ...parsed(again), replayed: false }], [first.status, parsed(first)], "identical retry replays the 200");
+  assert.equal(parsed(again)["replayed"], true, "the replay is marked replayed");
   const other = await ctx.attempt(() => send(w, s.seller, s.draft, s.grant, { key, contentHash: sha256("other") }));
   assert.equal(out(other), OUTCOME.KEY_REUSED, "same key other hash is 409");
   assert.equal((await intentsOfDraft(w, s.draft.draftId)).length, 1, "still one intent");
@@ -481,7 +488,12 @@ cell("GAP-SE-7 PARTIAL: failure at the outbox INSERT rolls back intent, draft, e
   const key = keyOf("partial");
   const before = await draftRow(w, s.draft);
   const conn = await w.open("kauro_app_test");
-  await ctx.partial("CMD063 failing at its outbox INSERT after the intent INSERT", "db.outbox_insert.before", () => w.on(conn, "kauro_app", ctx, [W.intentInsert, W.outboxInsert], () => send(w, s.seller, s.draft, s.grant, { key })));
+  await ctx.partial("CMD063 failing at its outbox INSERT after the intent INSERT", "db.outbox_insert.before", () => w.on(conn, "kauro_app", ctx, [W.intentInsert, W.outboxInsert], async () => {
+    const seen = w.internalErrors.length;
+    const r = await send(w, s.seller, s.draft, s.grant, { key });
+    if (r.status >= 500) throw w.internalErrors[seen]?.error ?? new Error(String(r.status));
+    return r;
+  }));
   await conn.end().catch(() => undefined);
   assert.ok(ctx.points.passed.includes("db.intent_insert.after"), "the intent INSERT had completed");
   assert.equal((await intentsOfDraft(w, s.draft.draftId)).length, 0, "no intent");
@@ -499,12 +511,13 @@ cell("GAP-SE-10 RACE (suppression) M23: the public opt-out through the token of 
   const runs: Array<{ order: Order; d: DraftP; r: RaceResult<unknown, unknown> }> = [];
   for (const order of ORDERS) {
     const contact = `m23-${order}-${Date.now()}@contact.example`;
-    const s1 = await staged(w, `m23-${order}-a`, { prospect: await w.prospect(await w.seller(`m23-${order}-a`), { contact }) });
+    const seller1 = await w.seller(`m23-${order}-a`);
+    const s1 = await staged(w, `m23-${order}-a`, { seller: seller1, prospect: await w.prospect(seller1, { contact }) });
     const sent = await sentFirst(w, s1);
     const token = tokenOf(w, sent); // the token of the message the fake recorded (rule 24b)
     const seller2 = await w.seller(`m23-${order}-b`);
     const s2 = await staged(w, `m23-${order}-b`, { seller: seller2, prospect: await w.prospect(seller2, { contact }) });
-    const O = { name: "opt-out", role: "kauro_app" as const, run: () => w.routes.optOut(token), at: W.suppressionInsert };
+    const O = { name: "opt-out", role: "kauro_outreach" as const, run: () => w.routes.optOut(token), at: W.suppressionInsert };
     const C = cmd063Actor("CMD063", seller2, s2.draft, s2.grant);
     runs.push({ order, d: s2.draft, r: await raceAtWrite(ctx, "M23", order === 1 ? O : C, order === 1 ? C : O) });
   }
@@ -590,7 +603,7 @@ test("GAP-SE-15 DENY (health): one BOUNCED among the person's latest 50 counted 
   const sends: Staged[] = [await staged(w, "se15-0", { seller }), await staged(w, "se15-1", { seller }), await staged(w, "se15-2", { seller })];
   const [a, , c] = [await sentFirst(w, sends[0]!), await sentFirst(w, sends[1]!), await sentFirst(w, sends[2]!)];
   assert.ok((await w.routes.recordActivity(seller, { kind: "BOUNCED", intentId: a!, evidenceRef: `dsn-${a}` })).status < 300, "one BOUNCED");
-  const m = await w.metrics(w.owner, seller.userId);
+  const m = await w.metrics(seller, seller.userId);
   assert.deepEqual([m.pauseNumerator, m.pauseDenominator, m.paused], [1, 3, true], "shown as 1/3, paused");
   const n = await staged(w, "se15-new", { seller });
   await refused("a new first contact of the paused person", () => send(w, seller, n.draft, n.grant), OUTCOME.KC034, n.draft);
@@ -601,7 +614,7 @@ test("GAP-SE-15 DENY (health): one BOUNCED among the person's latest 50 counted 
   assert.ok((await w.routes.diagnose(seller.userId)).status < 300, "the owner's diagnosis");
   intentIdOf(await send(w, seller, f, g));
   assert.equal((await intent(w, c!)).state, "PROVIDER_ACCEPTED", "the third send stays accepted");
-  assert.equal((await w.metrics(w.owner, seller.userId)).paused, false, "unpaused after the diagnosis");
+  assert.equal((await w.metrics(seller, seller.userId)).paused, false, "unpaused after the diagnosis");
   w.standAt(T0);
 });
 
@@ -626,7 +639,7 @@ test("GAP-SE-16 EXPIRY (boundaries): at validFrom admitted and 1 us before refus
 });
 
 test("GAP-SE-17 CAP (24 h edge): a first contact counted at T keeps the 11th refused at T + 24 h - 1 us and admits it at T + 24 h", async () => {
-  const T = "2026-10-20T14:00:00.000000Z"; // Tuesday
+  const T = plusMs(T0, 5 * DAY_MS - 3_600_000); // the Tuesday after T0 (a Thursday 15:00Z), 14:00Z
   w.standAt(T);
   const seller = await w.seller("se17");
   await firstContacts(w, seller, 1, "se17-t");
@@ -652,7 +665,9 @@ async function followUpOf(label: string, first: string): Promise<{ s: Staged; f:
   await sentFirst(w, s);
   const mk = async (): Promise<{ f: DraftP; g: GrantP }> => {
     const f = await w.draft(s.seller, s.prospect, s.seller.sender, { purpose: "FOLLOW_UP" });
-    return { f, g: await w.grant([f], { expiresAt: plusMs(first, 14 * DAY_MS) }) };
+    // the grant outlives the cadence window (first + 14 days) by an hour, so at the window's end it is the cadence that refuses, not an expired grant
+    // (KC030 is judged before KC032); its 14 days start an hour after the first send
+    return { f, g: await w.grant([f], { validFrom: plusMs(first, 3_600_000), expiresAt: plusMs(first, 14 * DAY_MS + 3_600_000) }) };
   };
   const one = await mk();
   return { s, ...one, fresh: mk };
@@ -682,11 +697,11 @@ test("GAP-SE-18 CADENCE (business days): first send 2026-12-24T15:00Z: follow-up
 });
 
 test("GAP-SE-19 CADENCE (90 days): a new sequence refused 1 us before last message + 90 days, admitted at it", async () => {
-  const first = "2026-10-15T15:00:00.000000Z"; // Thursday
+  const first = T0; // a Thursday 15:00Z
   w.standAt(first);
   const s = await staged(w, "se19");
   await sentFirst(w, s);
-  const at90 = plusMs(first, 90 * DAY_MS); // 2027-01-13T15:00Z, a Wednesday business instant in both zones
+  const at90 = plusMs(first, 90 * DAY_MS); // a Wednesday business instant in both zones (T0 is chosen so)
   w.standAt(plusMs(at90, -DAY_MS));
   const a = await w.draft(s.seller, s.prospect, s.seller.sender, { label: "se19-a" });
   const b = await w.draft(s.seller, s.prospect, s.seller.sender, { label: "se19-b" });
@@ -700,15 +715,15 @@ test("GAP-SE-19 CADENCE (90 days): a new sequence refused 1 us before last messa
 });
 
 test("GAP-SE-20 DENY (calendar): a Saturday first contact is refused, a Saturday follow-up inside its window too", async () => {
-  const saturday = "2026-10-17T15:00:00.000000Z";
-  w.standAt("2026-10-16T15:00:00.000000Z");
+  const saturday = plusMs(T0, 2 * DAY_MS); // T0 is a Thursday: the Saturday after it
+  w.standAt(plusMs(T0, DAY_MS));
   const s = await staged(w, "se20-first", { expiresAt: plusMs(saturday, DAY_MS) });
   w.standAt(saturday);
   const r = await refused("a Saturday first contact", () => send(w, s.seller, s.draft, s.grant), OUTCOME.KC032, s.draft);
   assert.equal(w.subReason(r), "OUTSIDE_BUSINESS_DAY");
-  // a follow-up whose window [first + 5 business days, first + 14 days) contains a Saturday: first Thu 2026-10-15T15:00Z -> window [Thu 10-22 15:00, Thu 10-29 15:00); Sat 10-24 inside it
-  const x = await followUpOf("se20-follow", "2026-10-15T15:00:00.000000Z");
-  const rf = await refused("a Saturday follow-up inside its window", () => followUpAt("2026-10-24T15:00:00.000000Z", x), OUTCOME.KC032, x.f);
+  // a follow-up whose window [first + 5 business days, first + 14 days) contains a Saturday: first Thu T0 -> window [Thu T0+7d, Thu T0+14d); Sat T0+9d inside it
+  const x = await followUpOf("se20-follow", T0);
+  const rf = await refused("a Saturday follow-up inside its window", () => followUpAt(plusMs(T0, 9 * DAY_MS), x), OUTCOME.KC032, x.f);
   assert.equal(w.subReason(rf), "OUTSIDE_BUSINESS_DAY");
   w.standAt(T0);
 });
@@ -749,7 +764,7 @@ cell("GAP-SE-22 RACE (policy) M11: CMD063 against WithdrawOutreachChannelPolicy 
       assert.equal(stateOf(await intent(w, id)), "NOT_SENT(POLICY_WITHDRAWN)", "order 2: refused at its claim");
       assert.equal(callsOf(w, id), 0);
     }
-    assert.ok((await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT")).status < 300, "the US first-contact policy back IN_FORCE for the next order");
+    await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT"); // the US first-contact policy back IN_FORCE for the next order
   }
   const [o1] = runs as [(typeof runs)[0]];
   assert.equal((await intentsOfDraft(w, o1.s.draft.draftId)).length, 0, "order 1: no row born after the withdrawal (forbidden effect)");

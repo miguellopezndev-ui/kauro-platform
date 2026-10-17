@@ -684,7 +684,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     await oracle.query(
         `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, now(), $12, $13, now())`,
-        [contractId, ag.agencyId, projectId, mode, body.instanceId, body.importerProfileId, body.importerVersion, JSON.stringify(body.objects), sha("bundle"), targetContractHash, body.observedAt, body.authorityEvidenceHash, capabilityVersion],
+        [contractId, ag.agencyId, projectId, body.mode, body.instanceId, body.importerProfileId, body.importerVersion, JSON.stringify(body.objects), sha("bundle"), targetContractHash, body.observedAt, body.authorityEvidenceHash, capabilityVersion],
     );
     return { contractId, targetContractHash };
   }

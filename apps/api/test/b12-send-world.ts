@@ -12,18 +12,19 @@ import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
 import { ContractFakeGmailSend, ContractFakeResend } from "@kauro/application/testing";
 import type { OutreachPorts, OutreachSendPort, OutreachSubmission, OutreachSubmitAnswer } from "@kauro/application";
-import type { CorrelationId, ExecutionContext, UserId } from "@kauro/domain";
-import { PgCommercialUnitOfWorkFactory, type PgCommercialUnitOfWork } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
+import { toUtcInstant, type CommerceUnitOfWorkFactory, type CorrelationId, type ExecutionContext, type UserId } from "@kauro/domain";
+import { PgCommercialUnitOfWorkFactory, PgSalesRepository, type PgCommercialUnitOfWork } from "@kauro/persistence";
+import { ROLES, TEST_EFFECT_FROZEN_SETTING, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
 import { createOutreachDispatcher, outreachLeaseResource, type OutreachDispatcher, type OutreachLeaseRef } from "../src/outreach/dispatcher.js";
 import { outreachSealerOf } from "../src/outreach/routes.js";
 import type { OptOutKey, OutreachCompliance } from "../src/outreach/mime.js";
-import type { SqlStep } from "./fault-support.js";
+import type { SqlStep, StepClockOf } from "./fault-support.js";
 import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { statementsWorld } from "./statements-support.js";
 import { call as callApi, clock, completed, freshKey, ids, outcome as outcomeOf, type Reply } from "./support.js";
 import {
   CELL_CONTROLS,
+  SUBJECT,
   T0,
   plusMs,
   type ClassifiedAnswer,
@@ -185,7 +186,7 @@ class OutreachUnits extends PgCommercialUnitOfWorkFactory {
       async (uow) => {
         const at = this.#position();
         if (context.kind === "SERVICE" && at !== null) {
-          await (uow as unknown as { client: Client }).client.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true)`, [at]);
+          await (uow as unknown as { client: Client }).client.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true), set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`, [at]);
         }
         return work(uow);
       },
@@ -197,7 +198,18 @@ class OutreachUnits extends PgCommercialUnitOfWorkFactory {
 // --- the world --------------------------------------------------------------------------------------------------------------------------
 
 export async function sendWorldOf(_label: string): Promise<SendWorld> {
+  // the public opt-out runs its SERVICE units on the same (routed) outreach units as the dispatcher; they exist once the world's pools do
+  let optOutUnits: CommerceUnitOfWorkFactory | null = null;
   const sw = await statementsWorld({
+    optOut: {
+      keys: [OPT_OUT_KEY],
+      units: {
+        run: (context: ExecutionContext, work: never, options?: never) => {
+          if (optOutUnits === null) throw new Error("the opt-out units are used before the world was built");
+          return (optOutUnits as { run(...a: unknown[]): Promise<never> }).run(context, work, options);
+        },
+      } as unknown as CommerceUnitOfWorkFactory,
+    },
     commercial: {
       outreachSealer: {
         seal: (facts) => outreachSealerOf({ compliance: state.compliance, optOutKey: OPT_OUT_KEY }).seal(facts),
@@ -205,11 +217,35 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     },
   });
   const { w, h } = sw;
+  // the cells judge the user commands (CMD063, the owner's and seller's routes) at stated instants: every unit's transaction stands on the clock
+  sw.faults.positionEveryUnit = true;
   const state: { compliance: OutreachCompliance | null; standing: string | null } = { compliance: { ...DEFAULT_COMPLIANCE }, standing: null };
+  /** Fixtures stand an hour before the instant the world stands at (so their rows precede the instants the cells judge at), else before T0. */
+  const fixtureAt = (): string => (state.standing === null ? FIXTURE_AT : plusMs(state.standing, -3_600_000));
+  let standClock: StepClockOf | null = null;
+  let boundClock: StepClock | null = null;
+  /** The clock the units are positioned on, with the effect clock frozen on it: kauro.effect_now() reads the controlled instant exactly (the test cluster's TEST_EFFECT_FUNCTION). */
+  const frozenOf = (c: StepClock): StepClockOf => ({
+    async onServer(session) {
+      const placed = await c.onServer(session);
+      await session.query(`SELECT set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`);
+      return placed;
+    },
+  });
+  /** The clock a unit stands on while the world stands at `at`: the instant to the microsecond (the cells judge boundaries 1 us apart), the effect clock frozen on it. */
+  const stoodAt = (at: string): StepClockOf => ({
+    async onServer(session) {
+      await session.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', extract(epoch FROM ($1::timestamptz - transaction_timestamp()))::text, true), set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`, [at]);
+    },
+  });
+  /** A fresh step-up of the person at the instant the world stands at (a proof minted at the real clock is stale for a unit standing days ahead). */
+  const stepUp = (person: Parameters<typeof w.stepUp>[0]): Promise<string> =>
+    state.standing === null ? w.stepUp(person) : h.recordStepUp(person.userId as UserId, { issuedAt: toUtcInstant(Date.parse(state.standing) - 1000) });
   const gmail = new WorldGmail();
   const resend = new WorldResend();
   const ports: OutreachPorts = { gmail, resend };
   const units = sw.faults.wrap(new OutreachUnits({ app: h.appPool, outreach: h.outreachPool, control: h.controlPool }, () => state.standing));
+  optOutUnits = units as unknown as CommerceUnitOfWorkFactory;
   const background: Array<{ correlationId: string; error: unknown }> = [];
   const runtime = {
     units,
@@ -225,6 +261,8 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   };
   let statementTimeout: number | null = null;
   const dispatchers = new Map<string, Dispatcher>();
+  let leaseHolder: string | null = null;
+  const renewers = new Map<string, () => Promise<number>>();
 
   /** One transaction of a runtime role under a person's OPERATOR context on the TEST CLOCK at `at` (a fixture standing in for a lane's route). */
   const within = async <T>(userId: string, at: string, fn: (c: Client) => Promise<T>): Promise<T> => {
@@ -248,22 +286,29 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   const lock = (c: Client, kind: string, subject: string, mode: "X" | "S" = "X"): Promise<unknown> =>
     c.query(`SELECT ${mode === "X" ? "pg_advisory_xact_lock" : "pg_advisory_xact_lock_shared"}(kauro.transition_key($1, $2))`, [kind, subject]);
 
-  const owner = w.owner;
+  const owner = sw.owner; // the corporate KAURO_OWNER (statements world), not the agency owner of w
   const recorded = new Map<string, RecordedSeller>();
   let seq = 0;
+  /** The owner's (re)assignment of a prospect (prospects_owner_update: owner_seller_id and one version step; no command of these lanes names it). */
+  const reassign = async (prospectId: string, seller: { readonly sellerId: string } | null): Promise<void> => {
+    await within(owner.userId, fixtureAt(), async (c) => {
+      const r = await c.query("UPDATE kauro.prospects SET owner_seller_id = $2, version = version + 1 WHERE prospect_id = $1", [prospectId, seller?.sellerId ?? null]);
+      if (r.rowCount !== 1) throw new Error(`the owner could not assign prospect ${prospectId}`);
+    });
+  };
 
   const content = async (userId: string, label: string): Promise<{ id: string; subject: string; body: string }> => {
     const subject = `Data migration help ${label}`;
     const body = `Hello, we move CRM data safely. ${label}`;
     const id = createHash("sha256").update(`KAURO_OUTREACH_CONTENT_V1\n${subject}\n${body}`, "utf8").digest("hex");
-    await within(userId, FIXTURE_AT, (c) => c.query("INSERT INTO kauro.outreach_contents (content_id, subject, body, recorded_by_user_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", [id, subject, body, userId]));
+    await within(userId, fixtureAt(), (c) => c.query("INSERT INTO kauro.outreach_contents (content_id, subject, body, recorded_by_user_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", [id, subject, body, userId]));
     return { id, subject, body };
   };
 
   const publish = async (family: string, capabilityId: string, label: string): Promise<ResourceP> => {
     const resourceId = ids.next();
     const cref = await content(owner.userId, `resource-${label}`);
-    await within(owner.userId, FIXTURE_AT, async (c) => {
+    await within(owner.userId, fixtureAt(), async (c) => {
       await lock(c, "kauro.sales_resources", family);
       await c.query("INSERT INTO kauro.sales_resources (resource_id, family_id, version, content_id, published_by_user_id) VALUES ($1, $2, 1, $3, $4)", [resourceId, family, cref.id, owner.userId]);
       await c.query("INSERT INTO kauro.sales_resource_capabilities (resource_id, capability_id) VALUES ($1, $2)", [resourceId, capabilityId]);
@@ -275,8 +320,30 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   const api = (c: { readonly method?: "POST" | "GET"; readonly url: string; readonly token: string | null; readonly key?: string | null; readonly body?: unknown }): Promise<Reply> =>
     callApi(w, { ...(c.method !== undefined ? { method: c.method } : {}), url: c.url, agency: null, token: c.token, key: c.key === undefined ? (c.method === "GET" ? null : freshKey("b12")) : c.key, ...(c.body !== undefined ? { body: c.body } : {}) });
 
+  /**
+   * The wire activity of CMD064 for the cells' compact one: `{ kind, intentId, evidenceRef | inboundRef, observation?, reason? }` names the intent and what the
+   * evidence is; the prospect and the draft are the intent's, the instant the one the world stands at, the evidence digest that of the reference. An activity
+   * that already names its prospect (a forged one) goes on as given, with the members it omits filled.
+   */
+  const wireActivity = async (a: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const at = toUtcInstant(state.standing !== null ? Date.parse(state.standing) : Date.now());
+    if (typeof a["prospectId"] === "string") return { occurredAt: at, evidenceHash: sha(`evidence-${String(a["providerMessageRef"] ?? "")}`), ...a };
+    const intentId = String(a["intentId"]);
+    const row = (await h.oracle.query<{ prospect_id: string; draft_id: string }>("SELECT prospect_id, draft_id FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId])).rows[0];
+    if (row === undefined) throw new Error(`no intent ${intentId} for the activity`);
+    const kind = String(a["kind"]);
+    const evidenceRef = String(a["evidenceRef"] ?? a["inboundRef"] ?? `${kind}-${intentId}`);
+    const out: Record<string, unknown> = { prospectId: row.prospect_id, draftId: row.draft_id, kind, occurredAt: at, evidenceHash: sha(evidenceRef), providerMessageRef: kind === "REPLIED" || kind === "BOUNCED" ? evidenceRef : "NONE" };
+    if (kind === "HUMAN_SEND_OBSERVED") out["observation"] = a["observation"];
+    if (kind === "SUPPRESSED") {
+      out["suppressionKeyKind"] = a["keyKind"] ?? "CONTACT";
+      out["suppressionReason"] = a["reason"];
+    }
+    return out;
+  };
+
   const registerSender: SendWorld["routes"]["registerSender"] = async (body, options = {}) =>
-    api({ url: "/api/v1/ops/outreach/senders", token: options.token ?? owner.token, ...(options.key !== undefined ? { key: options.key } : {}), body: { ...body, assuranceProofRef: await w.stepUp(owner) } });
+    api({ url: "/api/v1/ops/outreach/senders", token: options.token ?? owner.token, ...(options.key !== undefined ? { key: options.key } : {}), body: { ...body, assuranceProofRef: await stepUp(owner) } });
   const verifySender: SendWorld["routes"]["verifySender"] = (senderId, key) =>
     api({ url: `/api/v1/ops/outreach/senders/${senderId}/verify`, token: owner.token, ...(key !== undefined ? { key } : {}), body: { verificationEvidenceHash: sha(`verified-${senderId}`) } });
   const revokeSender: SendWorld["routes"]["revokeSender"] = (senderId, key) =>
@@ -297,6 +364,26 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     gmail,
     resend,
     gmailContract: gmail.contract,
+    async renewLease() {
+      // the lease of the dispatcher that holds it, claimed again at the instant the bound clock stands on (a dispatcher heartbeats; a cell that moves the
+      // effect clock days ahead of the lease would otherwise judge it expired before the interleaving it stages)
+      const renew = leaseHolder === null ? undefined : renewers.get(leaseHolder);
+      if (renew === undefined || boundClock === null) return;
+      sw.clock.standAt?.(boundClock.now());
+      try {
+        await renew();
+      } finally {
+        sw.clock.standAt?.(null);
+      }
+    },
+    async beginCell() {
+      dispatchers.clear();
+      leaseHolder = null;
+      await h.oracle.query("DELETE FROM kauro.leases WHERE resource_kind = 'OUTBOX_DISPATCH' AND resource_id = $1", [outreachLeaseResource()]);
+    },
+    get internalErrors() {
+      return sw.w.internalErrors;
+    },
     get compliance(): ComplianceConfig {
       return state.compliance ?? DEFAULT_COMPLIANCE;
     },
@@ -306,9 +393,15 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     standAt(at) {
       state.standing = at;
       sw.standAt(at);
+      sw.clock.standAt?.(at);
+      // "every unit's effect clock stands at the instant": the commission and outreach services' units stand through `standing`; the api's own
+      // units (CMD063 and the owner and seller routes) are positioned on a clock held still at the instant, unless a cell's step clock is bound
+      standClock = at === null ? null : stoodAt(at);
+      sw.faults.clock = boundClock !== null ? frozenOf(boundClock) : standClock;
     },
     bindClock(c: StepClock | null) {
-      sw.faults.clock = c;
+      boundClock = c;
+      sw.faults.clock = boundClock !== null ? frozenOf(boundClock) : standClock;
     },
     setCompliance(config) {
       const before = state.compliance;
@@ -338,7 +431,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const contactKey = sha(`KAURO_PROSPECT_CONTACT_V1\n${address}`);
       const organizationKey = sha(`organization:${domain}`);
       const evidenceHash = sha(`source-evidence-${prospectId}`);
-      await within(seller.userId, FIXTURE_AT, async (c) => {
+      await within(seller.userId, fixtureAt(), async (c) => {
         await c.query(
           "INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at) VALUES ($1, $2, $3, $4, $5, current_date, 'LEGITIMATE_INTEREST', 'AGENCY', now())",
           [ids.next(), seller.userId, seller.sellerId, evidenceHash, sha(`https://${domain}/`)],
@@ -353,6 +446,33 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       });
       return { prospectId, contactKey, organizationKey, sellerId: seller.sellerId } satisfies ProspectP;
     },
+    async assignedProspect(seller, options = {}) {
+      const domain = options.organization ?? `owner-org-${++seq}-${ids.next().slice(-6)}.example`;
+      const contactId = ids.next();
+      const address = options.contact ?? `lead-${seq}-${contactId.slice(-6)}@${domain}`;
+      const contactKey = sha(`KAURO_PROSPECT_CONTACT_V1\n${address}`);
+      const evidenceHash = sha(`source-evidence-${contactId}`);
+      // the owner's own evidence and contact (fixtures standing in for RecordProspectSource), then CMD045 through its route by the owner: registered by
+      // the owner, owned by nobody, the business contact's key copied by the database (migration 0094), never sent by the client
+      await within(owner.userId, fixtureAt(), async (c) => {
+        await c.query(
+          "INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at) VALUES ($1, $2, NULL, $3, $4, current_date, 'LEGITIMATE_INTEREST', 'AGENCY', now())",
+          [ids.next(), owner.userId, evidenceHash, sha(`https://${domain}/`)],
+        );
+        await c.query("INSERT INTO kauro.prospect_contacts (contact_id, recorded_by_user_id, contact_key, contact_label, role_label, channel, created_at) VALUES ($1, $2, $3, 'Operations lead', 'Head of operations', 'EMAIL', now())", [contactId, owner.userId, contactKey]);
+        await c.query("INSERT INTO kauro.prospect_contact_addresses (contact_id, recorded_by_user_id, address) VALUES ($1, $2, $3)", [contactId, owner.userId, address]);
+      });
+      const registration = await api({ url: "/api/v1/sales/prospects", token: owner.token, body: { organizationLabel: domain, businessContactRef: contactId, sourceEvidenceHash: evidenceHash, jurisdiction: "United States" } });
+      if (registration.status !== 201) throw new Error(`the owner's CMD045 answered ${registration.status}: ${registration.text}`);
+      const body = registration.json<{ data?: { prospectId?: string }; prospectId?: string }>();
+      const prospectId = body.data?.prospectId ?? body.prospectId;
+      if (typeof prospectId !== "string") throw new Error(`the owner's CMD045 names no prospect: ${registration.text}`);
+      const organizationKey = (await h.oracle.query<{ k: string }>("SELECT organization_key AS k FROM kauro.prospects WHERE prospect_id = $1", [prospectId])).rows[0]!.k;
+      await reassign(prospectId, seller);
+      return { prospectId, contactKey, organizationKey, sellerId: seller.sellerId, registration: registration.text };
+    },
+    reassign,
+    readAs: (person, sql, params = []) => within(person.userId, fixtureAt(), async (c) => (await c.query(sql, [...params])).rows),
     sender,
     resource: defaultResource,
     async draft(author, prospect, snd, options = {}) {
@@ -361,7 +481,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const draftId = ids.next();
       const contentHash = createHash("sha256").update(["KAURO_OUTREACH_BINDING_V1", prospect.prospectId, prospect.contactKey, snd.senderId, purpose, cref].join("\n"), "utf8").digest("hex");
       const resource = options.resource ?? defaultResource;
-      await within(author.userId, FIXTURE_AT, async (c) => {
+      await within(author.userId, fixtureAt(), async (c) => {
         await c.query(
           "INSERT INTO kauro.outreach_drafts (draft_id, prospect_id, sender_id, author_user_id, purpose, content_ref, contact_key, content_hash, provenance_evidence_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
           [draftId, prospect.prospectId, snd.senderId, author.userId, purpose, cref, prospect.contactKey, contentHash, sha(`provenance-${prospect.prospectId}`)],
@@ -374,29 +494,39 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const capabilityId = ids.next();
       await h.oracle.query(
         `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-         VALUES ($1, $2, 'TOOL', NULL, 'AVAILABLE', $3, $4::jsonb, 'b12-send-world', now(), now())`,
-        [capabilityId, `b12-${capabilityId.slice(-8)}`, sha(`capability-${capabilityId}`), JSON.stringify([sha(`qualification-${capabilityId}`)])],
+         VALUES ($1, $2, 'OPERATION', NULL, 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+        [capabilityId, `b12-${capabilityId.slice(-8)}`, sha(`capability-${capabilityId}`)],
       );
+      // a capability is born DESIGN and reaches AVAILABLE along the listed edges, as the control plane walks it
+      await h.publishCapability(capabilityId as never, "AVAILABLE");
       return publish(ids.next(), capabilityId, label);
     },
-    async metrics() {
-      return notBuilt("world.metrics", "GetOutreachMetrics is an L-ACT route: not merged (use the route at batch)");
+    async metrics(actor, personUserId) {
+      // GetOutreachMetrics answers the caller's own policies: the person asks for itself; the pause rule is a bounce among its counted sends
+      const r = await api({ method: "GET", url: "/api/v1/ops/outreach/metrics", token: actor.token, key: null });
+      if (r.status !== 200) throw new Error(`GetOutreachMetrics answered ${r.status}: ${r.text}`);
+      const v = r.json<{ data: Record<string, number> }>();
+      const m = v.data;
+      // the pause rule (0088 KC034): a bounce among the latest counted sends, or a provider warning after the person's latest diagnosis
+      const warned = (await h.oracle.query<{ warned: boolean }>("SELECT EXISTS (SELECT 1 FROM kauro.outreach_provider_warnings w WHERE w.person_user_id = $1 AND w.recorded_at > coalesce((SELECT max(recorded_at) FROM kauro.outreach_diagnoses WHERE person_user_id = $1), '-infinity'::timestamptz)) AS warned", [personUserId])).rows[0]!.warned;
+      return { accepted: m["accepted"]!, uncertain: m["uncertain"]!, bounced: m["bounced"]!, pauseNumerator: m["pauseNumerator"]!, pauseDenominator: m["pauseDenominator"]!, paused: m["pauseNumerator"]! > 0 || warned };
     },
     async grant(drafts, options = {}) {
       const first = drafts[0];
       if (first === undefined) throw new Error("a grant needs at least one draft");
       const reviewId = ids.next();
-      const proofId = await w.stepUp(owner);
+      const proofId = await stepUp(owner);
       const authorizationId = ids.next();
-      const validFrom = options.validFrom ?? FIXTURE_AT;
-      const expiresAt = options.expiresAt ?? plusMs(FIXTURE_AT, 13 * 86_400_000);
+      const expiresAt = options.expiresAt ?? plusMs(fixtureAt(), 13 * 86_400_000);
+      // a grant lives at most 14 days from its start (KC030): a window that ends later than that from the fixture instant starts 14 days before its end
+      const validFrom = options.validFrom ?? (Date.parse(expiresAt) - Date.parse(fixtureAt()) > 14 * 86_400_000 ? plusMs(expiresAt, -14 * 86_400_000) : fixtureAt());
       // PrepareOutreachReview and CMD062 are L-AUTH routes: the same rows by SQL under the owner's own context until they merge
-      await within(owner.userId, FIXTURE_AT, async (c) => {
+      await within(owner.userId, fixtureAt(), async (c) => {
         await c.query("INSERT INTO kauro.outreach_reviews (review_id, owner_user_id, proof_id, sender_id, digest, issued_at, expires_at) VALUES ($1, $2, $3, $4, $5, now(), now() + interval '15 minutes')", [reviewId, owner.userId, proofId, first.sender.senderId, sha(`review-${reviewId}`)]);
         for (const d of drafts) await c.query("INSERT INTO kauro.outreach_review_items (review_id, draft_id, draft_version, content_hash, contact_label) VALUES ($1, $2, 1, $3, 'Operations lead')", [reviewId, d.draftId, d.contentHash]);
       });
       const maximumSends = options.maximumSends ?? drafts.length;
-      await within(owner.userId, plusMs(FIXTURE_AT, 1000), async (c) => {
+      await within(owner.userId, plusMs(fixtureAt(), 1000), async (c) => {
         await c.query(
           "INSERT INTO kauro.outreach_authorizations (authorization_id, review_id, granting_user_id, sender_id, proof_id, valid_from, expires_at, maximum_sends, permission_evidence_hash, policy_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'outreach-v1')",
           [authorizationId, reviewId, owner.userId, first.sender.senderId, proofId, validFrom, expiresAt, maximumSends, sha(`permission-${authorizationId}`)],
@@ -406,10 +536,13 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return { authorizationId, senderId: first.sender.senderId, maximumSends, validFrom, expiresAt } satisfies GrantP;
     },
     call: api,
-    outcome: (reply) => outcomeOf(w, reply),
+    // KC032 is one family on the wire: the cap itself (OUTREACH_CAP_REACHED) and the reasons it names beside it (CADENCE_CLOSED, OUTSIDE_BUSINESS_DAY,
+    // FIRST_NOT_SENT); the cells state the family by its code and the member by `subReason`
+    outcome: (reply) => outcomeOf(w, reply).replace(/^(409 PRECONDITION_FAILED) (CADENCE_CLOSED|OUTSIDE_BUSINESS_DAY|FIRST_NOT_SENT)$/, "$1 OUTREACH_CAP_REACHED"),
     subReason(reply) {
-      const body = reply.json<{ subReason?: string; details?: { subReason?: string } }>();
-      return body.subReason ?? body.details?.subReason ?? null;
+      const reason = reply.json<{ reason?: string }>().reason;
+      if (reason === "OUTREACH_CAP_REACHED") return "CAP_REACHED";
+      return reason === "CADENCE_CLOSED" || reason === "OUTSIDE_BUSINESS_DAY" || reason === "FIRST_NOT_SENT" ? reason : null;
     },
     dispatcher(name = "dispatcher") {
       // one dispatcher (one lease owner) per name: a second owner would find the lease HELD until it expires
@@ -418,22 +551,40 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const d: OutreachDispatcher = createOutreachDispatcher(runtime);
       let fence: number | null = null;
       const admitted = new Map<string, Parameters<OutreachDispatcher["submit"]>[0]>();
+      let leasedAt: string | null = null;
+      let explicit = false;
+      // the lease is claimed again only once it ran out on the clock the world stands at (a lease still valid keeps its fence: the old owner of a
+      // takeover cell must not renew the lease the new owner is about to claim)
+      const leaseExpiredAt = (standing: string | null, since: string | null): boolean => standing !== null && since !== null && Date.parse(standing) >= Date.parse(since) + 120_000;
       const takeOver = async (): Promise<number> => {
         const r = await d.takeOver();
         if (r.kind === "HELD") throw new Error(`${name}: another dispatcher holds the OUTBOX_DISPATCH lease`);
         fence = r.fence;
+        leasedAt = state.standing;
+        leaseHolder = name;
         return r.fence;
       };
       const lease = async (): Promise<OutreachLeaseRef> => {
-        if (fence === null) await takeOver();
+        // a lease lives 120 s on the clock the world stands at: standing somewhere else, the dispatcher's own lease is claimed again
+        // an owner another dispatcher took the lease from keeps its stale fence (its late answers are fenced, never re-leased)
+        // a dispatcher the cell took over explicitly keeps its fence until the lease ran out; one that leases implicitly claims again wherever the world stands
+        const again = explicit ? leaseExpiredAt(state.standing, leasedAt) : state.standing !== leasedAt;
+        if (fence === null || (boundClock === null && (leaseHolder === null || leaseHolder === name) && again)) await takeOver();
         return { resourceId: d.resourceId, ownerId: d.ownerId, fence: fence as number };
       };
       const adapter: Dispatcher = {
         name,
         async pass() {
-          const r = await d.pass();
-          if (r.fence !== null) fence = r.fence;
-          return r.deliveries.map((x): DispatchReport => ({ intentId: x.intentId, outcome: x.intentState ?? x.outcome }));
+          // "every due record": the dispatcher claims 25 per pass, so a world holding more due records than that (the QUEUED intents earlier cells of a
+          // file leave) is passed again until a pass fills less than its batch
+          const reports: DispatchReport[] = [];
+          for (let round = 0; round < 40; round++) {
+            const r = await d.pass();
+            if (r.fence !== null) fence = r.fence;
+            reports.push(...r.deliveries.map((x): DispatchReport => ({ intentId: x.intentId, outcome: x.intentState ?? x.outcome })));
+            if (r.deliveries.length < 25) break;
+          }
+          return reports;
         },
         async dispatch(intentId) {
           const r = await d.dispatch(intentId, await lease());
@@ -452,7 +603,8 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         async submit(intentId): Promise<ClassifiedAnswer> {
           const claimed = admitted.get(intentId);
           if (claimed === undefined) throw new Error(`${name}: intent ${intentId} was not admitted by this dispatcher's claim`);
-          return d.call(claimed, await lease());
+          // D3 follows its own D2 under the lease reference that claim used (dispatch passes one reference through claim and submit)
+          return d.call(claimed, { resourceId: d.resourceId, ownerId: d.ownerId, fence: claimed.fence });
         },
         async record(intentId, answer) {
           return d.record(intentId, await lease(), answer);
@@ -463,16 +615,36 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         get fence() {
           return fence;
         },
-        takeOver,
+        takeOver: async () => {
+          explicit = true;
+          return takeOver();
+        },
       };
       dispatchers.set(name, adapter);
+      renewers.set(name, takeOver);
       return adapter;
     },
     async open(login) {
       return openConnection(h.pg.clientConfig(login === "superuser" ? "postgres" : login));
     },
     on<T>(conn: HarnessConnection, role: "kauro_app" | "kauro_outreach" | "kauro_control", ctx: FaultContext, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing?: { readonly target?: number }): Promise<T> {
-      return sw.faults.on(conn, role, ctx.points, steps, fn, routing ?? {});
+      // a command crosses roles (the dispatcher takes its lease as kauro_control, then claims as kauro_outreach; an api route may read as
+      // kauro_app): every other role of the world gets its own connection, as in production, and only `role` is the cell's
+      return (async () => {
+        const extras: Partial<Record<"kauro_app" | "kauro_outreach" | "kauro_control", HarnessConnection>> = {};
+        const opened: HarnessConnection[] = [];
+        try {
+          for (const other of ["kauro_app", "kauro_outreach", "kauro_control"] as const) {
+            if (other === role) continue;
+            const c = await world.open(`${other}_test`);
+            opened.push(c);
+            extras[other] = c;
+          }
+          return await sw.faults.onRoles({ [role]: conn, ...extras }, ctx.points, steps, fn, routing ?? {});
+        } finally {
+          for (const c of opened) await c.end().catch(() => undefined);
+        }
+      })();
     },
     setStatementTimeout(ms) {
       statementTimeout = ms;
@@ -486,13 +658,45 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return { subject: row.subject, body: row.body };
     },
     async withoutSerializers<T>(control: Control, fn: () => Promise<T>): Promise<T> {
-      void control;
       void CELL_CONTROLS;
       void statementTimeout;
-      return notBuilt("world.withoutSerializers", "removing a lock's acquisition needs a statement-rewrite seam in FaultRouting (the production OutreachLocks stays untouched); red-proof leg, built at batch");
+      // built for the controls whose set is advisory subjects of §L only and that drop no co-guard (M21, M22, M23...: L8); a control naming a row lock,
+      // a lease or a co-guard is not removed here and says so instead of running half-removed
+      const kinds = control.locks.map((l) => SUBJECT[l]);
+      if (control.coGuards.length > 0 || kinds.some((k) => k === undefined)) {
+        return notBuilt("world.withoutSerializers", `a control with co-guards or non-advisory locks (${control.locks.join(", ")}; ${control.coGuards.join(", ") || "no co-guard"})`);
+      }
+      const dropped = kinds as string[];
+      // the database's half: kauro.outreach_require_lock (T2) asserts the dropped kinds no more while the control runs; restored verbatim after
+      const original = (await h.oracle.query<{ def: string }>("SELECT pg_get_functiondef('kauro.outreach_require_lock(text,text,text,text)'::regprocedure) AS def")).rows[0]!.def;
+      await h.oracle.query(
+        `CREATE OR REPLACE FUNCTION kauro.outreach_require_lock(kind text, subject text, mode text, what text) RETURNS void
+           LANGUAGE plpgsql STABLE SET search_path = pg_catalog AS
+         $control$
+         BEGIN
+           IF kind = ANY (ARRAY[${dropped.map((k) => `'${k.replace(/'/g, "''")}'`).join(", ")}]::text[]) THEN RETURN; END IF;
+           IF subject IS NULL OR NOT kauro.outreach_lock_held(kind, subject, mode) THEN
+             RAISE EXCEPTION 'LOCK_NOT_HELD: % requires % % of %', what, kind, mode, coalesce(subject, '(none)') USING ERRCODE = 'KA096';
+           END IF;
+         END
+         $control$`,
+      );
+      try {
+        // the units' half: every routed acquisition of the dropped kinds takes nothing
+        return await sw.faults.droppingLocks(dropped, fn);
+      } finally {
+        await h.oracle.query(original);
+      }
+    },
+    async prospectAs(person, prospectId) {
+      // the product's own reader (PgSalesRepository.getProspect) in the person's own session: what the seller or the owner is shown, under its RLS
+      return within(person.userId, state.standing ?? FIXTURE_AT, async (c) => {
+        const p = await new PgSalesRepository(c, ids).getProspect(prospectId as never);
+        return p === null ? null : { state: p.state, suppressed: p.suppressed, version: p.version, ownerSellerId: p.ownerSellerId ?? null };
+      });
     },
     routes: {
-      revokeGrant: () => notBuilt("routes.revokeGrant", "RevokeOutreachAuthorization is an L-AUTH route: not merged"),
+      revokeGrant: (g, key) => api({ url: `/api/v1/ops/outreach/authorizations/${g.authorizationId}/revoke`, token: owner.token, ...(key !== undefined ? { key } : {}), body: {} }),
       async terminate(seller, key) {
         // CMD050 TerminateSeller by the corporate owner (the shape of integration-support terminationBody with nothing handed over)
         const row = await h.oracle.query<{ version: string }>("SELECT version::text FROM kauro.sellers WHERE seller_id = $1", [seller.sellerId]);
@@ -514,15 +718,62 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         if (row.rows[0] === undefined) throw new Error(`no capability ${capabilityId}`);
         return api({ url: `/api/v1/operations/capabilities/${capabilityId}/restrict`, token: owner.token, ...(key !== undefined ? { key } : {}), body: { expectedVersion: row.rows[0].revision, incidentRef: ids.next() } });
       },
-      publishResource: () => notBuilt("routes.publishResource", "PublishSalesResource is an L-OWNER route: not merged"),
-      withdrawPolicy: () => notBuilt("routes.withdrawPolicy", "WithdrawOutreachPolicy is an L-OWNER route: not merged"),
+      async publishResource(familyId, key) {
+        // the next version of the family, claiming what the current one claims, under a fresh step-up of the owner
+        const cur = (await h.oracle.query<{ resource_id: string; version: number }>("SELECT resource_id, version::int AS version FROM kauro.sales_resources WHERE family_id = $1 AND state = 'CURRENT'", [familyId])).rows[0];
+        if (cur === undefined) throw new Error(`no CURRENT resource in family ${familyId}`);
+        const claims = (await h.oracle.query<{ capability_id: string }>("SELECT capability_id FROM kauro.sales_resource_capabilities WHERE resource_id = $1 ORDER BY capability_id", [cur.resource_id])).rows.map((r) => r.capability_id);
+        const next = await content(owner.userId, `family-${familyId.slice(-6)}-v${cur.version + 1}`);
+        return api({ url: "/api/v1/ops/sales/resources", token: owner.token, ...(key !== undefined ? { key } : {}), body: { familyId, expectedVersion: cur.version, contentRef: next.id, capabilityIds: claims, assuranceProofRef: await stepUp(owner) } });
+      },
+      async withdrawPolicy(jurisdiction, purpose, key) {
+        const cur = (await h.oracle.query<{ version: number }>("SELECT max(version)::int AS version FROM kauro.outreach_channel_policies WHERE jurisdiction = $1 AND purpose = $2", [jurisdiction, purpose])).rows[0];
+        if (cur?.version == null) throw new Error(`no channel policy for ${jurisdiction} ${purpose}`);
+        return api({ url: "/api/v1/ops/outreach/policy-withdrawals", token: owner.token, ...(key !== undefined ? { key } : {}), body: { jurisdiction, purpose, expectedVersion: cur.version, assuranceProofRef: await stepUp(owner) } });
+      },
       registerSender,
       verifySender,
       revokeSender,
-      recordActivity: () => notBuilt("routes.recordActivity", "CMD064 RecordSalesActivity is an L-ACT route: not merged"),
-      optOut: () => notBuilt("routes.optOut", "the public opt-out route is L-ACT's (apps/api/src/outreach/opt-out-route.ts is the kit's stub): not merged"),
-      diagnose: () => notBuilt("routes.diagnose", "RecordOutreachDiagnosis is an L-ACT route: not merged"),
-      review: () => notBuilt("routes.review", "PrepareOutreachReview is an L-AUTH route: not merged"),
+      async recordActivity(actor, activity, key) {
+        return api({ url: "/api/v1/ops/sales/activities", token: actor.token, ...(key !== undefined ? { key } : {}), body: { activity: await wireActivity(activity) } });
+      },
+      // RFC 8058: the one-click POST of the mail client, no credential, no key, no agency
+      optOut: (token) => callApi(w, { url: `/api/v1/public/outreach/opt-out/${token}`, token: null, key: null, agency: null, contentType: "application/x-www-form-urlencoded", rawBody: "List-Unsubscribe=One-Click" }),
+      async diagnose(personUserId, key) {
+        return api({ url: "/api/v1/ops/outreach/diagnoses", token: owner.token, ...(key !== undefined ? { key } : {}), body: { personUserId, evidenceHash: sha(`diagnosis-${personUserId}-${ids.next()}`), assuranceProofRef: await stepUp(owner) } });
+      },
+      async review(drafts, key) {
+        const first = drafts[0];
+        if (first === undefined) throw new Error("a review needs at least one draft");
+        return api({ url: "/api/v1/ops/outreach/reviews", token: owner.token, ...(key !== undefined ? { key } : {}), body: { senderIdentityRef: first.sender.senderId, draftIds: drafts.map((d) => d.draftId), assuranceProofRef: await stepUp(owner) } });
+      },
+      async reviewed(drafts) {
+        const first = drafts[0];
+        if (first === undefined) throw new Error("a review needs at least one draft");
+        // PrepareOutreachReview and CMD062 under ONE step-up proof (CMD062 admits only the review issued under its own proof)
+        const proof = await stepUp(owner);
+        const review = await api({ url: "/api/v1/ops/outreach/reviews", token: owner.token, body: { senderIdentityRef: first.sender.senderId, draftIds: drafts.map((d) => d.draftId), assuranceProofRef: proof } });
+        const digest = completed<{ digest: string }>(review, 201).data.digest;
+        return {
+          review,
+          authorize: (options = {}) => {
+            const from = options.validFrom ?? state.standing ?? FIXTURE_AT;
+            return api({
+              url: "/api/v1/ops/outreach/authorizations",
+              token: owner.token,
+              body: {
+                senderIdentityRef: first.sender.senderId,
+                allowedContentHashes: drafts.map((d) => d.contentHash),
+                validFrom: from,
+                expiresAt: options.expiresAt ?? plusMs(from, 86_400_000),
+                maximumSends: options.maximumSends ?? drafts.length,
+                permissionEvidenceHash: digest,
+                assuranceProofRef: proof,
+              },
+            });
+          },
+        };
+      },
       async suppress(target) {
         // the registry row of the 0029 writer under L8 X of its key (the L-ACT route writes the same row; ON CONFLICT DO NOTHING as every writer)
         const keyKind = "contactKey" in target ? "CONTACT" : "ORGANIZATION";
@@ -535,7 +786,16 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
           );
         });
       },
-      reinstatePolicy: () => notBuilt("routes.reinstatePolicy", "ReinstateOutreachPolicy is an L-OWNER route: not merged"),
+      // a re-review of the withdrawn policy: the owner's reviewed next version, IN_FORCE (no route names it; the policy table is append-only).
+      // It throws unless the latest version reads IN_FORCE afterwards.
+      async reinstatePolicy(jurisdiction, purpose) {
+        await h.oracle.query(
+          "INSERT INTO kauro.outreach_channel_policies (jurisdiction, purpose, version) SELECT $1, $2, coalesce(max(version), 0) + 1 FROM kauro.outreach_channel_policies WHERE jurisdiction = $1 AND purpose = $2",
+          [jurisdiction, purpose],
+        );
+        const latest = (await h.oracle.query<{ state: string }>("SELECT state FROM kauro.outreach_channel_policies WHERE jurisdiction = $1 AND purpose = $2 ORDER BY version DESC LIMIT 1", [jurisdiction, purpose])).rows[0];
+        if (latest?.state !== "IN_FORCE") throw new Error(`the ${jurisdiction} ${purpose} policy is not IN_FORCE after its re-review`);
+      },
     },
   };
   void T0;

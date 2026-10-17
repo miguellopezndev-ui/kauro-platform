@@ -143,9 +143,12 @@ test("R23: a problem its contract refuses is never sent — a collaborator failu
   assert.deepEqual(await w.row<{ state: string; version: string }>("plans", "plan_id = $1", [plan.planId]).then((r) => r && [r.state, r.version]), ["APPROVED", "5"]);
 });
 
+const byRoute = (a: ReadonlyArray<unknown>, b: ReadonlyArray<unknown>): number => (`${String(a[0])} ${String(a[1])}` < `${String(b[0])} ${String(b[1])}` ? -1 : 1);
+
 test("R23: every served route declares its replies (the route inventory the OpenAPI checker reads); a route that declares none refuses to register; a reply whose declared schema the validator never compiled, or whose body is sent as text instead of a checked object, is refused like any other violation", async () => {
   assert.deepEqual(
-    routeInventoryOf(w.app).map((r) => [r.method, r.url, r.responses.operationId, r.responses.declared, r.responses.problem]),
+    // the set of routes with their declared replies is the contract; the order they register in (commands, then reads, lane by lane) is the composition's
+    routeInventoryOf(w.app).map((r) => [r.method, r.url, r.responses.operationId, r.responses.declared, r.responses.problem]).sort(byRoute),
     [
       // the probes are the operational routes of the response contract (OPERATIONAL_ROUTES; review R42 connected to R23)
       ["GET", "/livez", "getLiveness", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getLiveness:200" } }],
@@ -242,6 +245,22 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/sales/agencies/:agencyId/assignment", "AssignAccount", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD048" } }],
       ["POST", "/api/v1/sales/sellers/:sellerId/activate", "ActivateSeller", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD049" } }],
       ["POST", "/api/v1/sales/sellers/:sellerId/terminate", "TerminateSeller", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD050" } }],
+      // package B12 L-OWNER (companion §P): the fifteen owner tools, each answering its closed view (201 a record, 200 a signature or a verification)
+      ["POST", "/api/v1/ops/sales/sellers", "RegisterSellerCandidate", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RegisterSellerCandidate" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/legal-reviews", "RecordSellerLegalReview", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordSellerLegalReview" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/agreements", "PrepareSellerAgreement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareSellerAgreement" } }],
+      ["POST", "/api/v1/ops/sales/agreements/:agreementId/signature", "RecordAgreementSignature", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordAgreementSignature" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/assessments", "RecordSellerAssessment", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordSellerAssessment" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/confidentiality-acceptances", "RecordConfidentialityAcceptance", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordConfidentialityAcceptance" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/tax-documents", "RecordSellerTaxDocument", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordSellerTaxDocument" } }],
+      ["POST", "/api/v1/ops/sales/payout-destinations", "ChangePayoutDestination", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:ChangePayoutDestination" } }],
+      ["POST", "/api/v1/ops/sales/payout-destinations/:destinationId/verify", "VerifyPayoutDestination", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:VerifyPayoutDestination" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/service-assignments", "PrepareServiceAssignment", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareServiceAssignment" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/assistance-agreements", "RecordAssistanceAgreement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordAssistanceAgreement" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/termination-terms", "PrepareTerminationTerms", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareTerminationTerms" } }],
+      ["POST", "/api/v1/ops/sales/sellers/:sellerId/termination-manifests", "PrepareTerminationManifest", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareTerminationManifest" } }],
+      ["POST", "/api/v1/ops/sales/prospects/:prospectId/claim-evidence", "RecordClaimEvidence", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordClaimEvidence" } }],
+      ["POST", "/api/v1/ops/sales/prospects/:prospectId/allocations", "PrepareAttributionAllocation", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareAttributionAllocation" } }],
       // package B18's capability governance (CMD058, CMD059): the corporate owner's, synchronous
       ["POST", "/api/v1/operations/capabilities/:capabilityId/versions", "ChangeCapability", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD058" } }],
       ["POST", "/api/v1/operations/capabilities/:capabilityId/restrict", "RestrictCapability", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD059" } }],
@@ -319,7 +338,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/sales/statements/:statementId/reconcile-payout", "ReconcileCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD053" } }],
       // the agency app's operational command (B11 lane A1): CMD101 SetBuyerType, 201 recorded, 200 the same value again
       ["POST", "/api/v1/agencies/:agencyId/buyer-type", "setBuyerType", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:setBuyerType:200" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:setBuyerType:201" } }],
-    ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
+    ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]).sort(byRoute),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request
   const sink: Array<{ correlationId: string; error: unknown }> = [];

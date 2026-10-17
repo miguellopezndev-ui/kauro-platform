@@ -49,6 +49,7 @@ interface ProspectFacts {
   organization_key: string;
   policy_jurisdiction: string;
   contact_key: string | null;
+  reached: boolean;
 }
 
 interface Verdict {
@@ -59,7 +60,7 @@ interface Verdict {
   offered_resources: string;
 }
 
-const ISO = `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+const ISO = `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 const unique = (ids: ReadonlyArray<string>): string[] => [...new Set(ids)];
 
 export class PgOutreachDrafts {
@@ -72,15 +73,24 @@ export class PgOutreachDrafts {
     const prospect = (
       await execute<ProspectFacts>(
         this.db,
-        `SELECT p.prospect_id, p.owner_seller_id, p.source_evidence_hash, p.organization_key, kauro.outreach_jurisdiction(p.jurisdiction) AS policy_jurisdiction, c.contact_key
+        `SELECT p.prospect_id, p.owner_seller_id, p.source_evidence_hash, p.organization_key, kauro.outreach_jurisdiction(p.jurisdiction) AS policy_jurisdiction, c.contact_key,
+                (p.state = 'SUPPRESSED' OR EXISTS (SELECT 1 FROM kauro.prospect_suppressions x
+                   WHERE (x.key_kind = 'ORGANIZATION' AND x.suppression_key = p.organization_key) OR (x.key_kind = 'CONTACT' AND x.suppression_key = p.business_contact_key))) AS reached
            FROM kauro.prospects p
            LEFT JOIN kauro.prospect_contacts c ON c.recorded_by_user_id = p.registered_by_user_id AND c.contact_id = p.business_contact_id
           WHERE p.prospect_id = $1`,
         [i.prospectId],
       )
     ).rows[0];
-    if (prospect === undefined || prospect.contact_key === null) throw new NotFoundFailure("prospect");
+    if (prospect === undefined) throw new NotFoundFailure("prospect");
     if (i.actor.kind === "SELLER" && prospect.owner_seller_id !== i.actor.sellerId) throw new NotFoundFailure("prospect");
+    if (prospect.contact_key === null) {
+      // a contact the caller cannot read (the owner registered the prospect and assigned it to the seller; or no contact at all) takes no draft, and an
+      // exclusion the registry already holds answers first (R2-130, review finding F2: the prospect's own key, migration 0094); the registry is
+      // append-only, so this unlocked positive read can only be confirmed by a later one
+      if (prospect.reached) throw new DomainFailure("PRECONDITION_FAILED", "the contact or the organization is suppressed", { reason: "PROSPECT_SUPPRESSED" });
+      throw new NotFoundFailure("prospect");
+    }
     if (prospect.source_evidence_hash !== i.provenanceEvidenceHash) throw new NotFoundFailure("provenance");
     const sender = (await execute<{ user_id: string }>(this.db, "SELECT user_id FROM kauro.sender_identities WHERE sender_id = $1", [i.senderId])).rows[0];
     if (sender === undefined || (i.actor.kind === "SELLER" && sender.user_id !== i.actor.userId)) throw new NotFoundFailure("sender");
@@ -265,7 +275,7 @@ export class PgOutreachDrafts {
     const r = (
       await execute<{ resource_id: string; family_id: string; version: number; state: "CURRENT" | "SUPERSEDED"; content_id: string; current_resource_id: string | null; created_at: string }>(
         this.db,
-        `SELECT r.resource_id, r.family_id, r.version, r.state, r.content_id, to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+        `SELECT r.resource_id, r.family_id, r.version, r.state, r.content_id, to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
                 (SELECT c.resource_id FROM kauro.sales_resources c WHERE c.family_id = r.family_id AND c.state = 'CURRENT') AS current_resource_id
            FROM kauro.sales_resources r WHERE r.resource_id = $1`,
         [resourceId],

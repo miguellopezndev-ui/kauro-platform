@@ -3186,13 +3186,29 @@
       ],
       "using": null
     },
-    "command_journal/command_journal_bank_owner": {
-      "check": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND (EXISTS ( SELECT 1\n   FROM kauro.bank_owner_acts a\n  WHERE ((a.txid = txid_current()) AND ((a.user_id)::text = command_journal.actor_id)))))",
-      "command": "ALL",
+    "command_journal/command_journal_bank_owner_amend": {
+      "check": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND kauro.bank_owner_acting(actor_id))",
+      "command": "UPDATE",
       "roles": [
         "kauro_payment"
       ],
-      "using": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND (EXISTS ( SELECT 1\n   FROM kauro.bank_owner_acts a\n  WHERE ((a.txid = txid_current()) AND ((a.user_id)::text = command_journal.actor_id)))))"
+      "using": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND kauro.bank_owner_acting(actor_id))"
+    },
+    "command_journal/command_journal_bank_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND kauro.bank_owner_acting(actor_id))"
+    },
+    "command_journal/command_journal_bank_owner_record": {
+      "check": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND kauro.bank_owner_acting(actor_id))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null
     },
     "command_journal/command_journal_commission_amend": {
       "check": "((agency_id IS NULL) AND (actor_kind = 'SERVICE'::text) AND (actor_id = ANY (ARRAY['commission-service'::text, 'finance-service'::text])))",
@@ -3964,6 +3980,14 @@
       ],
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))"
     },
+    "corporate_roles/corporate_roles_bank_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
+    },
     "corporate_roles/corporate_roles_control_amend": {
       "check": "true",
       "command": "UPDATE",
@@ -4436,13 +4460,21 @@
       ],
       "using": null
     },
-    "domain_events/domain_events_payment_outbound": {
-      "check": "((aggregate_kind = 'outbound_execution_attempt'::text) AND ((agency_id IS NULL) OR (agency_id = kauro.current_agency_id())) AND (split_part(event_type, '.'::text, 1) = 'outbound'::text))",
-      "command": "ALL",
+    "domain_events/domain_events_payment_outbound_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_payment"
       ],
       "using": "((aggregate_kind = 'outbound_execution_attempt'::text) AND ((agency_id IS NULL) OR (agency_id = kauro.current_agency_id())))"
+    },
+    "domain_events/domain_events_payment_outbound_record": {
+      "check": "((aggregate_kind = 'outbound_execution_attempt'::text) AND ((agency_id IS NULL) OR (agency_id = kauro.current_agency_id())) AND (split_part(event_type, '.'::text, 1) = 'outbound'::text))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null
     },
     "domain_events/domain_events_payment_read": {
       "check": null,
@@ -4476,13 +4508,21 @@
       ],
       "using": "((agency_id IS NULL) AND (aggregate_kind = 'settlement_request'::text))"
     },
-    "domain_events/domain_events_payment_treasury": {
-      "check": "((agency_id IS NULL) AND (aggregate_kind = 'treasury_refund'::text) AND (split_part(event_type, '.'::text, 1) = 'treasury_refund'::text))",
-      "command": "ALL",
+    "domain_events/domain_events_payment_treasury_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_payment"
       ],
       "using": "((agency_id IS NULL) AND (aggregate_kind = 'treasury_refund'::text))"
+    },
+    "domain_events/domain_events_payment_treasury_record": {
+      "check": "((agency_id IS NULL) AND (aggregate_kind = 'treasury_refund'::text) AND (split_part(event_type, '.'::text, 1) = 'treasury_refund'::text))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null
     },
     "domain_events/domain_events_tenant_not_audit_control": {
       "check": "(NOT (event_type = ANY (kauro.audit_control_event_types())))",
@@ -5464,13 +5504,21 @@
       ],
       "using": null
     },
-    "outbound_return_bounces/outbound_return_bounces_service": {
-      "check": "true",
-      "command": "ALL",
+    "outbound_return_bounces/outbound_return_bounces_service_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_payment"
       ],
       "using": "true"
+    },
+    "outbound_return_bounces/outbound_return_bounces_service_record": {
+      "check": "true",
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null
     },
     "outbox_records/outbox_records_commerce_subscribers": {
       "check": "((NOT (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_bindings b ON ((b.event_type = e.event_type)))\n  WHERE (e.event_id = outbox_records.event_id)))) OR (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_subscriptions s ON ((s.event_type = e.event_type)))\n  WHERE ((e.event_id = outbox_records.event_id) AND (s.consumer = outbox_records.consumer)))))",
@@ -5609,13 +5657,21 @@
       ],
       "using": null
     },
-    "outbox_records/outbox_records_payment_outbound": {
-      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.aggregate_kind = 'outbound_execution_attempt'::text) AND ((e.agency_id IS NULL) OR (e.agency_id = kauro.current_agency_id())))))",
-      "command": "ALL",
+    "outbox_records/outbox_records_payment_outbound_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_payment"
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.aggregate_kind = 'outbound_execution_attempt'::text) AND ((e.agency_id IS NULL) OR (e.agency_id = kauro.current_agency_id())))))"
+    },
+    "outbox_records/outbox_records_payment_outbound_record": {
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.aggregate_kind = 'outbound_execution_attempt'::text) AND ((e.agency_id IS NULL) OR (e.agency_id = kauro.current_agency_id())))))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null
     },
     "outbox_records/outbox_records_payment_read": {
       "check": null,
@@ -5649,13 +5705,21 @@
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'settlement_request'::text) AND (e.event_type = ANY (ARRAY['settlement_request.applied.v1'::text, 'settlement_request.refused.v1'::text])))))"
     },
-    "outbox_records/outbox_records_payment_treasury": {
-      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'treasury_refund'::text))))",
-      "command": "ALL",
+    "outbox_records/outbox_records_payment_treasury_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_payment"
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'treasury_refund'::text))))"
+    },
+    "outbox_records/outbox_records_payment_treasury_record": {
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'treasury_refund'::text))))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null
     },
     "outbox_records/outbox_records_tenant_read": {
       "check": null,
@@ -8432,7 +8496,7 @@
       "using": "(agency_id = kauro.current_agency_id())"
     },
     "stage_receipt_reconciliations/stage_receipt_reconciliations_tenant_open": {
-      "check": "((agency_id = kauro.current_agency_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = stage_receipt_reconciliations.agency_id) AND (m.membership_id = stage_receipt_reconciliations.opened_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'OPERATOR'::text]))))))",
+      "check": "((agency_id = kauro.current_agency_id()) AND kauro.acting_operator_membership(agency_id, opened_by_membership_id))",
       "command": "INSERT",
       "roles": [
         "kauro_app"

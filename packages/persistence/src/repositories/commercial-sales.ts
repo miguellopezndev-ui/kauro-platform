@@ -186,7 +186,25 @@ function destinationRecord(r: DestinationRow): PayoutDestinationRecord {
   );
 }
 
-const PROSPECT = `prospect_id, organization_label, organization_key, business_contact_id, source_evidence_hash, jurisdiction, state, suppressed, owner_seller_id, registered_by_user_id, version, ${canonical("created_at")}`;
+/**
+ * Whether the suppression registry reaches the prospect row `p` (D-B12O-12 as decided for R2-130): its organization key, or its business contact's key.
+ * kauro.prospect_suppressions is the authority of an opt-out; the public opt-out records the registry row only and never moves a prospect (KA098:
+ * kauro_outreach holds no UPDATE on prospects, A17), so the readers derive the exclusion instead of waiting for a transition nobody performs. The contact's
+ * key is the prospect's own column (migration 0094: copied from the contact at birth, held to it by a foreign key, immutable), so every session that reads
+ * the prospect — its registrar, the seller it is assigned to, the owner — reaches the same answer without reading the contact itself (a seller reads only
+ * the contacts it recorded, prospect_contacts_self_read). The registry is read by every ACTIVE seller and the owner (prospect_suppressions_read); the view
+ * carries the outcome only, never the key, the suppression's reason or its recorder.
+ */
+const REGISTRY_REACHES = `EXISTS (SELECT 1 FROM kauro.prospect_suppressions s
+   WHERE (s.key_kind = 'ORGANIZATION' AND s.suppression_key = p.organization_key)
+      OR (s.key_kind = 'CONTACT' AND s.suppression_key = p.business_contact_key))`;
+/**
+ * A prospect as its readers present it: `state` and `suppressed` are EFFECTIVE (the stored row, or SUPPRESSED when the registry reaches it), every other
+ * column is the stored one — `version` included, so an effective SUPPRESSED is never a transition: no history row, no version step, nothing stored moves.
+ */
+const PROSPECT = `p.prospect_id, p.organization_label, p.organization_key, p.business_contact_id, p.source_evidence_hash, p.jurisdiction,
+  CASE WHEN p.state = 'SUPPRESSED' OR ${REGISTRY_REACHES} THEN 'SUPPRESSED' ELSE p.state END AS state, (p.suppressed OR ${REGISTRY_REACHES}) AS suppressed,
+  p.owner_seller_id, p.registered_by_user_id, p.version, ${canonical("p.created_at", "created_at")}`;
 interface ProspectRow {
   prospect_id: string;
   organization_label: string;
@@ -613,7 +631,7 @@ export class PgSalesRepository implements SalesRepository {
 
   /** The live prospect of an organization key the session may read (a seller's own; the unique index answers for the others). */
   async liveProspectOf(organizationKey: Sha256Hex): Promise<ProspectRecord | null> {
-    const r = await execute<ProspectRow>(this.db, `SELECT ${PROSPECT} FROM kauro.prospects WHERE organization_key = $1 AND state <> 'SUPPRESSED'`, [organizationKey]);
+    const r = await execute<ProspectRow>(this.db, `SELECT ${PROSPECT} FROM kauro.prospects p WHERE p.organization_key = $1 AND p.state <> 'SUPPRESSED'`, [organizationKey]);
     return r.rows[0] ? prospectRecord(r.rows[0]) : null;
   }
 
@@ -625,7 +643,7 @@ export class PgSalesRepository implements SalesRepository {
   async registerProspect(prospect: NewProspect): Promise<ProspectRecord> {
     const r = await execute<ProspectRow>(
       this.db,
-      `INSERT INTO kauro.prospects (prospect_id, organization_label, organization_key, business_contact_id, source_evidence_hash, jurisdiction, registered_by_user_id, registered_by_seller_id, owner_seller_id, created_at, updated_at)
+      `INSERT INTO kauro.prospects AS p (prospect_id, organization_label, organization_key, business_contact_id, source_evidence_hash, jurisdiction, registered_by_user_id, registered_by_seller_id, owner_seller_id, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, kauro.server_now(), kauro.server_now())
        RETURNING ${PROSPECT}`,
       [prospect.prospectId, prospect.organizationLabel, prospect.organizationKey, prospect.businessContactRef ?? null, prospect.sourceEvidenceHash, prospect.jurisdiction, prospect.registeredByUserId, prospect.ownerSellerId ?? null],
@@ -634,7 +652,7 @@ export class PgSalesRepository implements SalesRepository {
   }
 
   async getProspect(prospectId: ProspectId): Promise<ProspectRecord | null> {
-    const r = await execute<ProspectRow>(this.db, `SELECT ${PROSPECT} FROM kauro.prospects WHERE prospect_id = $1`, [prospectId]);
+    const r = await execute<ProspectRow>(this.db, `SELECT ${PROSPECT} FROM kauro.prospects p WHERE p.prospect_id = $1`, [prospectId]);
     return r.rows[0] ? prospectRecord(r.rows[0]) : null;
   }
 
@@ -650,7 +668,7 @@ export class PgSalesRepository implements SalesRepository {
   }
 
   async prospectsOwnedBy(sellerId: SellerId): Promise<ReadonlyArray<ProspectRecord>> {
-    const r = await execute<ProspectRow>(this.db, `SELECT ${PROSPECT} FROM kauro.prospects WHERE owner_seller_id = $1 ORDER BY created_at, prospect_id`, [sellerId]);
+    const r = await execute<ProspectRow>(this.db, `SELECT ${PROSPECT} FROM kauro.prospects p WHERE p.owner_seller_id = $1 ORDER BY p.created_at, p.prospect_id`, [sellerId]);
     return r.rows.map(prospectRecord);
   }
 

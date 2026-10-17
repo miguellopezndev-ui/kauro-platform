@@ -4,7 +4,7 @@
 // REVOKED); Revocation (owner) L1 -> L2 -> L7 X -> UPDATE -> REVOKED. Written FIRST: every title fails until the lane builds the sender routes.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { answerOf, cell, plusUs, raceAtWrite, sendersAt, sendWorld, senderState, T0, W, type RaceActor, type RaceResult, type SendWorld } from "./b12-send-support.js";
+import { answerOf, cell, plusUs, raceAtWrite, sendersAt, sendWorld, senderState, sha256, T0, W, type RaceActor, type RaceResult, type SendWorld } from "./b12-send-support.js";
 import type { Reply } from "./support.js";
 
 let w: SendWorld;
@@ -20,7 +20,7 @@ const ORDERS: ReadonlyArray<Order> = [1, 2];
 const replyOf = (s: RaceResult<unknown, unknown>["first"], what: string): Reply => answerOf(s, what) as Reply;
 const address = (label: string): string => `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@sender.example`;
 const register = (userId: string, addr: string, extra: { readonly consentValidUntil?: string } = {}): Promise<Reply> =>
-  w.routes.registerSender({ userId, address: addr, route: "GMAIL_API", consentEvidenceRef: `consent-${addr}`, ...extra });
+  w.routes.registerSender({ userId, address: addr, route: "GMAIL_API", consentEvidenceRef: sha256(`consent-${addr}`), ...extra });
 
 cell("GAP-RS-1 RACE (registration): two registrations of one address: one row, one 409", "race", async (ctx) => {
   // both: L1 (owner, the seller) -> L2 -> INSERT sender_identities; the second INSERT waits on the first's uncommitted unique key, in both orders
@@ -56,7 +56,7 @@ test("GAP-RS-2 EXPIRY (consent): consent evidence older than its stated validity
   assert.equal(ok.status, 201, `consent valid 1 us after effect_now is admitted: ${ok.text}`);
   assert.equal(await sendersAt(w, fresh), 1);
   const id = ok.json<{ data: { senderId: string } }>().data.senderId;
-  assert.equal(await senderState(w, id), "PENDING", "admitted PENDING (verification is a separate step)");
+  assert.equal(await senderState(w, id), "PENDING_VERIFICATION", "admitted PENDING (verification is a separate step)");
 });
 
 cell("GAP-RS-3 RACE (seller): RegisterSenderIdentity for a seller against CMD050 terminating it, held at the seller subject L1 in both orders: order 1 (CMD050 holds) refused and no row; order 2 (registration holds) one PENDING row, then TERMINATED; red with L1 removed from both (a sender row of a TERMINATED seller born after the termination committed)", "race", async (ctx) => {
@@ -84,7 +84,7 @@ cell("GAP-VS-1 RACE (verify vs revoke) M38: verify vs revoke held at L7: one ter
   for (const order of ORDERS) {
     const seller = await w.seller(`vs1-${order}`);
     const pending = await w.sender(seller, { pending: true });
-    assert.equal(await senderState(w, pending.senderId), "PENDING");
+    assert.equal(await senderState(w, pending.senderId), "PENDING_VERIFICATION");
     const V: RaceActor<unknown> = { name: "VerifySenderIdentity", role: "kauro_app", run: () => w.routes.verifySender(pending.senderId), at: W.senderUpdate };
     const R: RaceActor<unknown> = { name: "RecordSenderRevocation", role: "kauro_app", run: () => w.routes.revokeSender(pending.senderId), at: W.senderUpdate };
     runs.push({ order, senderId: pending.senderId, r: await raceAtWrite(ctx, "M38", order === 1 ? V : R, order === 1 ? R : V) });

@@ -859,6 +859,24 @@ for (const id of ["CMD061", "CMD062", "CMD063", "CMD064", "PutOutreachContent", 
   };
 }
 
+// package B12 owner tools (lane L-OWNER, companion §P): the fifteen producer operations are built and served, their database cells are
+// `test.todo` in apps/api/test/b12-owner-tools.test.ts until migration 0087 is contiguous, so the cells that need a handler and a
+// database read as a labelled placeholder (never as proven); the wire, step-up, view and migration cells that do run are in that file.
+const B12_OWNER_PLACEHOLDER = "NOT_APPLICABLE: PLACEHOLDER-B12-OWNER-PG-CELLS: the handler is built (L-OWNER) and its database cells are test.todo in b12-owner-tools.test.ts until migration 0087 is contiguous; the lane replaces this cell with its cited tests";
+for (const id of ["RegisterSellerCandidate", "RecordSellerLegalReview", "PrepareSellerAgreement", "RecordAgreementSignature", "RecordSellerAssessment", "RecordConfidentialityAcceptance", "RecordSellerTaxDocument", "ChangePayoutDestination", "VerifyPayoutDestination", "PrepareServiceAssignment", "RecordAssistanceAgreement", "PrepareTerminationTerms", "PrepareTerminationManifest", "RecordClaimEvidence", "PrepareAttributionAllocation"]) {
+  APPLICABILITY[id] = {
+    "legitimate state": B12_OWNER_PLACEHOLDER,
+    "wrong role": B12_OWNER_PLACEHOLDER,
+    "wrong agency": B12_OWNER_PLACEHOLDER,
+    "stale version": B12_OWNER_PLACEHOLDER,
+    "duplicate request": common["duplicate request"],
+    "changed-body same key": common["changed-body same key"],
+    "invalid schema": common["invalid schema"],
+    "lost response": common["lost response"],
+    "external uncertainty": B12_OWNER_PLACEHOLDER,
+  };
+}
+
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
 const WEBHOOK = "cmd030-payment-webhook.test.ts";
 const EXECUTE = "cmd033-execute-refund.test.ts";

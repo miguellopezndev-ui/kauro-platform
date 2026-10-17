@@ -158,7 +158,8 @@ cell(
       const r = await w.freshResource("pub-crash-after");
       const key = keyOf("pub-cra");
       const contentRef = await contentIdOf(w, w.owner, safeContent("pub-cra-v2"));
-      const body = { familyId: r.familyId, expectedVersion: 1, contentRef, capabilityIds: [r.capabilityId] };
+      // one step-up proof for the first call and its replay: a fresh proof is another request, which the journal refuses under the same key
+      const body = { familyId: r.familyId, expectedVersion: 1, contentRef, capabilityIds: [r.capabilityId], assuranceProofRef: await w.stepUp(w.owner) };
       ctx.points.crash("target.after-commit");
       const conn = await w.open("kauro_app_test");
       let lost: Reply;

@@ -21,8 +21,10 @@ import { PgOutreachWriters, requireHeld, type Need, type OutreachIntentKeys } fr
 
 /** A send refusal; KC032 names its sub-reason (CAP_REACHED, CADENCE_CLOSED, FIRST_NOT_SENT, OUTSIDE_BUSINESS_DAY) beside the reason (plan A10/A11). */
 export class OutreachRefusal extends DomainFailure {
-  constructor(code: "PRECONDITION_FAILED" | "CAPACITY_UNAVAILABLE", message: string, reason: FailureReason, readonly subReason: string | null) {
-    super(code, message, { reason });
+  constructor(code: "PRECONDITION_FAILED" | "CAPACITY_UNAVAILABLE", message: string, reason: FailureReason, readonly subReason: string | null, current?: { readonly version: number; readonly state: string }) {
+    // the reasons KC032 names beside the cap (A10, A11) are reasons of the problem themselves: its catalogue lists them, the client branches on them
+    const named = subReason === "CADENCE_CLOSED" || subReason === "OUTSIDE_BUSINESS_DAY" || subReason === "FIRST_NOT_SENT" ? subReason : reason;
+    super(code, message, { reason: named, ...(current !== undefined ? { currentVersion: current.version, currentState: current.state } : {}) });
     this.name = "OutreachRefusal";
   }
 }
@@ -150,7 +152,7 @@ function claimRefusalOf(code: string, message: string): { state: "NOT_SENT" | "C
       const sub = capSubReason(message);
       return { state: "NOT_SENT", reason: sub === "OUTSIDE_BUSINESS_DAY" || sub === "CAP_REACHED" ? sub : "CADENCE_CLOSED" };
     }
-    case "KC033": return { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };
+    case "KC033": return { state: "NOT_SENT", reason: /capability that is not offered/.test(message) ? "CAPABILITY_RESTRICTED" : "RESOURCE_NOT_CURRENT" };
     case "KC034": return { state: "NOT_SENT", reason: "PAUSED" };
     case "KC036": return { state: "NOT_SENT", reason: "ALREADY_SENT" };
     default: return null;
@@ -178,10 +180,13 @@ export class PgOutreachSend {
       await execute<{
         prospect_id: string; sender_id: string; author_user_id: string; purpose: OutreachPurpose; contact_key: string; content_hash: string; version: string; sender_user_id: string;
         route: SenderRoute; sender_address: string; owner_seller_id: string | null; organization_key: string; policy_jurisdiction: string; subject: string; body: string; to_address: string | null;
+        reached: boolean;
       }>(
         this.db,
         `SELECT d.prospect_id, d.sender_id, d.author_user_id, d.purpose, d.contact_key, d.content_hash, d.version, si.user_id AS sender_user_id, si.route, si.address AS sender_address,
-                p.owner_seller_id, p.organization_key, kauro.outreach_jurisdiction(p.jurisdiction) AS policy_jurisdiction, ct.subject, ct.body, a.address AS to_address
+                p.owner_seller_id, p.organization_key, kauro.outreach_jurisdiction(p.jurisdiction) AS policy_jurisdiction, ct.subject, ct.body, a.address AS to_address,
+                (p.state = 'SUPPRESSED' OR EXISTS (SELECT 1 FROM kauro.prospect_suppressions x
+                   WHERE (x.key_kind = 'ORGANIZATION' AND x.suppression_key = p.organization_key) OR (x.key_kind = 'CONTACT' AND x.suppression_key IN (d.contact_key, p.business_contact_key)))) AS reached
            FROM kauro.outreach_drafts d
            JOIN kauro.sender_identities si ON si.sender_id = d.sender_id
            JOIN kauro.prospects p ON p.prospect_id = d.prospect_id
@@ -197,7 +202,13 @@ export class PgOutreachSend {
     if (d === undefined || d.sender_user_id !== i.actor.userId) return notAssigned();
     if (i.actor.kind === "SELLER" && d.owner_seller_id !== i.actor.sellerId) return notAssigned();
     if ((await execute(this.db, "SELECT 1 FROM kauro.outreach_authorizations WHERE authorization_id = $1", [i.authorizationId])).rowCount !== 1) throw new NotFoundFailure("authorization");
-    if (d.to_address === null) throw new NotFoundFailure("contact_address");
+    if (d.to_address === null) {
+      // an address the caller cannot read (the owner's contact on a prospect assigned to a seller) sends nothing, and an exclusion the registry already
+      // holds answers first (R2-130, review finding F2: the prospect's own key, migration 0094); the registry is append-only, so this unlocked positive
+      // read can only be confirmed by the judgment
+      if (d.reached) throw new OutreachRefusal("PRECONDITION_FAILED", "the send was refused: PROSPECT_SUPPRESSED", "PROSPECT_SUPPRESSED", null);
+      throw new NotFoundFailure("contact_address");
+    }
     const cited = await execute<{ family_id: string; subject: string | null }>(
       this.db,
       `SELECT r.family_id, coalesce(k.mode, k.capability_id::text) AS subject
@@ -251,8 +262,10 @@ export class PgOutreachSend {
       )
     ).rows[0];
     if (v === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the send judgment answered no row");
+    // DRAFT_CLOSED and OUTREACH_ALREADY_SENT always carry the draft's current safe version and state (their catalogue entries: current ALWAYS)
     const refuse = (code: "PRECONDITION_FAILED" | "CAPACITY_UNAVAILABLE", reason: FailureReason, subReason?: string): never => {
-      throw new OutreachRefusal(code, `the send was refused: ${reason}`, reason, subReason ?? null);
+      const current = reason === "DRAFT_CLOSED" || reason === "OUTREACH_ALREADY_SENT" ? { version: Number(v.draft_version), state: v.draft_state } : undefined;
+      throw new OutreachRefusal(code, `the send was refused: ${reason}`, reason, subReason ?? null, current);
     };
     if (Number(v.draft_version) !== i.expectedVersion) throw new StaleVersionFailure(Number(v.draft_version), v.draft_state);
     if (v.draft_hash !== i.contentHash) refuse("PRECONDITION_FAILED", "OUTREACH_GRANT_INVALID");
@@ -355,7 +368,7 @@ export class PgOutreachSend {
     const v = (
       await execute<{
         judged_at: Date; state: string; revoked: boolean; valid_from: Date; expires_at: Date; grant_ok: boolean; sender_state: string; policy_state: string | null; suppressed: boolean; owner_seller_id: string | null;
-        seller_state: string | null; offered: string; cited: string; uncertain_open: boolean; already_sent: boolean; retry_at: Date | null; to_address: string | null; subject: string; body: string; sender_address: string; claim_ready: boolean;
+        seller_state: string | null; current_n: string; offered: string; cited: string; uncertain_open: boolean; already_sent: boolean; retry_at: Date | null; to_address: string | null; subject: string; body: string; sender_address: string; claim_ready: boolean;
       }>(
         this.db,
         `/* b12:judge */ SELECT kauro.effect_now() AS judged_at, i.state, g.revoked, g.valid_from, g.expires_at, (g.expires_at > kauro.effect_now() + interval '37 seconds') AS grant_ok,
@@ -365,6 +378,8 @@ export class PgOutreachSend {
                  OR EXISTS (SELECT 1 FROM kauro.prospects p WHERE p.prospect_id = i.prospect_id AND p.state = 'SUPPRESSED')) AS suppressed,
                 (SELECT p.owner_seller_id FROM kauro.prospects p WHERE p.prospect_id = i.prospect_id) AS owner_seller_id,
                 (SELECT s.state FROM kauro.sellers s WHERE s.user_id = i.person_user_id) AS seller_state,
+                (SELECT count(*) FROM kauro.outreach_draft_resources dr JOIN kauro.sales_resources r ON r.resource_id = dr.resource_id
+                  WHERE dr.draft_id = i.draft_id AND r.state = 'CURRENT') AS current_n,
                 (SELECT count(*) FROM kauro.outreach_draft_resources dr JOIN kauro.sales_resources r ON r.resource_id = dr.resource_id
                   WHERE dr.draft_id = i.draft_id AND r.state = 'CURRENT'
                     AND NOT EXISTS (SELECT 1 FROM kauro.sales_resource_capabilities rc JOIN kauro.capabilities k ON k.capability_id = rc.capability_id
@@ -384,16 +399,21 @@ export class PgOutreachSend {
     const judged = v.judged_at.getTime();
     let refusal: { state: "NOT_SENT" | "CANCELLED"; reason: string } | null = null;
     const facts: SealFacts = { intentId, from: f.sender_address, to: f.to_address ?? "", subject: f.subject, body: f.body };
-    // TODO(D2, migration >= 0086 deferred): the dispatcher records this refusal but the kauro_outreach role has no prospects grant, so the prospect row is not moved to SUPPRESSED here; needs a narrowly granted policy or function in a new migration.
+    // the refusal is recorded on the intent only: the dispatcher never moves the prospect (kauro_outreach holds no UPDATE on prospects, KA098, A17); the
+    // prospect reads SUPPRESSED through the registry row its readers derive from (R2-130, D-B12O-12 as decided: commercial-sales.ts REGISTRY_REACHES)
     if (v.suppressed) refusal = { state: "NOT_SENT", reason: "SUPPRESSED" };
     else if (v.revoked) refusal = { state: "NOT_SENT", reason: "GRANT_REVOKED" };
     else if (judged < v.valid_from.getTime()) refusal = { state: "NOT_SENT", reason: "GRANT_NOT_YET_VALID" };
     else if (!v.grant_ok) refusal = { state: "NOT_SENT", reason: "GRANT_EXPIRED" };
     else if (v.seller_state !== null && v.seller_state !== "ACTIVE") refusal = { state: "CANCELLED", reason: "SELLER_NOT_ACTIVE" };
     else if (f.person_seller_id !== null && v.owner_seller_id !== f.person_seller_id) refusal = { state: "CANCELLED", reason: "RECIPIENT_CHANGED" };
+    // an owner-sent intent to a prospect nobody is assigned any more (CMD050 unassigned a terminated seller's prospects after CMD063 queued it): the
+    // call to an unassigned prospect is the forbidden effect of GAP-DI-1b
+    else if (f.person_seller_id === null && v.owner_seller_id === null) refusal = { state: "CANCELLED", reason: "RECIPIENT_CHANGED" };
     else if (v.sender_state !== "VERIFIED") refusal = { state: "CANCELLED", reason: "SENDER_REVOKED" };
     else if (v.policy_state !== "IN_FORCE") refusal = { state: "NOT_SENT", reason: "POLICY_WITHDRAWN" };
-    else if (Number(v.offered) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };
+    else if (Number(v.current_n) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };
+    else if (Number(v.offered) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "CAPABILITY_RESTRICTED" };
     else if (v.already_sent) refusal = { state: "NOT_SENT", reason: "ALREADY_SENT" };
     else if (v.uncertain_open) refusal = { state: "NOT_SENT", reason: "UNCERTAIN_OPEN" };
     else {
@@ -436,7 +456,7 @@ export class PgOutreachSend {
     const r = (
       await execute<{ state: string; claim_fence: string | null; open: boolean }>(
         this.db,
-        "SELECT state, claim_fence, (kauro.effect_now() <= submitted_at + interval '5 seconds') AS open FROM kauro.outreach_send_intents WHERE intent_id = $1",
+        "/* b12:judge */ SELECT state, claim_fence, (kauro.effect_now() <= submitted_at + interval '5 seconds') AS open FROM kauro.outreach_send_intents WHERE intent_id = $1",
         [intentId],
       )
     ).rows[0];
@@ -524,6 +544,9 @@ ${seed}`, "utf8").digest("hex");
   async #evidence(intentId: string, fence: number, answer: OutcomeAnswer, at: string, locks: OutreachLocks, f: Facts): Promise<string> {
     const status = answer.kind === "UNCERTAIN" ? "UNKNOWN" : answer.kind === "REJECTED_DEFINITIVE" ? "REJECTED_DEFINITIVE" : answer.kind;
     requireHeld(locks, "D4b evidence", [["L10", f.draft_id, "X"]]);
+    // a late 403/429 writes its warning in the same unit, ahead of the evidence row (one per intent, ON CONFLICT DO NOTHING: a replay adds nothing): a
+    // failure at the evidence INSERT rolls the warning back with it (GAP-DI-22)
+    if (answer.kind === "REJECTED_DEFINITIVE" && (answer.status === 403 || answer.status === 429)) await this.#warning(f, answer.status, at);
     const inserted = await execute(
       this.db,
       `/* b12:write */ INSERT INTO kauro.outreach_send_evidence (evidence_id, intent_id, fence, status, provider_ref, http_status, recorded_by_service, received_at)
@@ -531,7 +554,6 @@ ${seed}`, "utf8").digest("hex");
       [this.#id(), intentId, fence, status, answer.kind === "ACCEPTED" ? answer.ref : "NONE", answer.kind === "REJECTED_DEFINITIVE" ? answer.status : null, at],
     );
     if (inserted.rowCount !== 1) return "NOOP";
-    if (answer.kind === "REJECTED_DEFINITIVE" && (answer.status === 403 || answer.status === 429)) await this.#warning(f, answer.status, at);
     if (answer.kind !== "ACCEPTED") return `EVIDENCE(${status})`;
     const state = (await execute<{ state: string }>(this.db, "SELECT state FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId])).rows[0]?.state;
     const keys = keysOf(f);
@@ -563,6 +585,20 @@ ${seed}`, "utf8").digest("hex");
     return r.rows.map((x) => x.intent_id);
   }
 
+  /**
+   * The intents D5 visits: every SUBMITTING one that carries its uncertain_after, earliest first (no lock). Whether one is due is judged by its own unit,
+   * after its lease statement and at that statement's instant (plan section W: D5's last await before its judgment is the L13 FOR SHARE); a listing that
+   * filtered on the instant it ran at (dueForRecovery) would miss an intent whose uncertain_after the effect clock crosses while the unit waits at the lease.
+   */
+  async submittingForRecovery(limit: number): Promise<ReadonlyArray<string>> {
+    const r = await execute<{ intent_id: string }>(
+      this.db,
+      "SELECT intent_id FROM kauro.outreach_send_intents WHERE state = 'SUBMITTING' AND uncertain_after IS NOT NULL ORDER BY uncertain_after, intent_id LIMIT $1",
+      [limit],
+    );
+    return r.rows.map((x) => x.intent_id);
+  }
+
   /** D5: SUBMITTING -> SEND_UNCERTAIN with its activity, no call; idempotent (a state guard). */
   async recover(intentId: string, lease: { readonly resourceId: string; readonly ownerId: string; readonly fence: number }): Promise<"SEND_UNCERTAIN" | "UNTOUCHED"> {
     const f = await this.#factsOf(intentId);
@@ -587,10 +623,20 @@ ${seed}`, "utf8").digest("hex");
     return "SEND_UNCERTAIN";
   }
 
-  /** The outbox record of an intent's event (the dispatcher settles it); null when none. */
-  async intentOfEvent(eventId: string): Promise<string | null> {
-    const r = await execute<{ aggregate_id: string }>(this.db, "SELECT aggregate_id FROM kauro.domain_events WHERE event_id = $1 AND event_type = 'outreach.send_intended.v1'", [eventId]);
-    return r.rows[0]?.aggregate_id ?? null;
+  /**
+   * D4's retry window at the database's instant: the milliseconds left before uncertain_after + d4Grace (60 s, the instant a repeat's claim waits for,
+   * GAP-DI-25); null once it closed, or for an intent that carries no uncertain_after.
+   */
+  async d4WindowRemainingMs(intentId: string): Promise<number | null> {
+    const r = await execute<{ ms: string | null }>(
+      this.db,
+      "SELECT CASE WHEN uncertain_after IS NULL THEN NULL ELSE extract(epoch FROM (uncertain_after + interval '60 seconds' - kauro.effect_now())) * 1000 END AS ms FROM kauro.outreach_send_intents WHERE intent_id = $1",
+      [intentId],
+    );
+    const ms = r.rows[0]?.ms;
+    if (ms === undefined || ms === null) return null;
+    const left = Number(ms);
+    return left > 0 ? left : null;
   }
 
   /** The state of an intent (D6 settles the outbox record by it); null when none. */

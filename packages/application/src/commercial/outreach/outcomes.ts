@@ -44,12 +44,14 @@ export const AUTHORIZE_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object
   PRE("SENDER_NOT_VERIFIED", "the sender identity is not VERIFIED (KC031)"),
   PRE("SENDER_REVOKED", "the sender identity was revoked"),
   PRE("OUTREACH_ROUTE_FORBIDDEN", "the sender route may not carry the purpose (KC028)"),
+  PRE("PROSPECT_SUPPRESSED", "the organization key or the contact key of a draft is suppressed (KC016; R2-130, review finding F2)"),
   PRE("OUTREACH_JURISDICTION_UNREVIEWED", "the jurisdiction of the purpose has no reviewed channel policy, or it was withdrawn (A13)"),
   PRE("OUTREACH_COMPLIANCE_UNCONFIGURED", "the postal address or the opt-out origin is not configured (A15)"),
 ]);
 
 /** CMD063 SendAuthorizedOutreach: the draft, its version, the grant and the content binding, judged again at commit. */
 export const SEND_AUTHORIZED_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("COMMAND", "NOT_AUTHORIZED", null, "the draft is not the caller's to send: another seller's draft, or a draft the caller is not assigned (403, no reason)"),
   NOT_FOUND("the draft or the authorization"),
   STALE("draft"),
   PRE("DRAFT_CLOSED", "the draft is CANCELLED or otherwise closed", "ALWAYS"),
@@ -65,9 +67,10 @@ export const SEND_AUTHORIZED_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = 
   PRE("CADENCE_CLOSED", "the cadence window is closed or a stop fact exists (KC032)"),
   PRE("FIRST_NOT_SENT", "a follow-up has no sent first contact (KC032)"),
   PRE("OUTREACH_PAUSED", "the sending person is paused until the owner records a diagnosis (KC034)"),
-  PRE("OUTREACH_CALENDAR_UNAVAILABLE", "the date is not covered by the business calendar (KC037)"),
+  outcome("COMMAND", "CAPACITY_UNAVAILABLE", "OUTREACH_CALENDAR_UNAVAILABLE", "the date is not covered by the business calendar (KC037): the calendar needs its next edition"),
   PRE("OUTREACH_JURISDICTION_UNREVIEWED", "the channel policy was withdrawn or never reviewed (A13)"),
-  PRE("OUTREACH_COMPLIANCE_UNCONFIGURED", "the postal address or the opt-out origin is not configured (A15)"),
+  // a deployment that has not configured its postal address and opt-out origin cannot send at all: 503, retried once the owner configures it (D-16)
+  outcome("COMMAND", "CAPACITY_UNAVAILABLE", "OUTREACH_COMPLIANCE_UNCONFIGURED", "the postal address or the opt-out origin is not configured (A15): the deployment cannot send until the owner configures it"),
   PRE("RESOURCE_NOT_CURRENT", "a cited sales resource is no longer current (KC033)"),
 ]);
 
@@ -96,12 +99,14 @@ export const REGISTER_SENDER_IDENTITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = 
   ...STEP_UP,
   NOT_FOUND("the person"),
   PRE("OUTREACH_ROUTE_FORBIDDEN", "the route needs the person consent evidence it lacks, or may not be registered for this person (KC028)"),
+  PRE("SELLER_NOT_ACTIVE", "the person's seller is terminated: a terminated seller gets no sender identity"),
+  outcome("COMMAND", "IDEMPOTENCY_CONFLICT", null, "a sender identity of this address and route is already recorded (the second of two registrations answers like the replay of the first)"),
 ]);
 
 /** VerifySenderIdentity: the sender. */
 export const VERIFY_SENDER_IDENTITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
   NOT_FOUND("the sender identity"),
-  PRE("SENDER_REVOKED", "the sender identity was revoked and cannot be verified", "ALWAYS"),
+  PRE("SENDER_REVOKED", "the sender identity was revoked and cannot be verified"),
 ]);
 
 /** RecordSenderRevocation: the sender; revoking a revoked sender is a replay. */

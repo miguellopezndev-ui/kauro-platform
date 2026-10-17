@@ -139,7 +139,7 @@ export interface StatementsWorld extends CommissionWorld {
   periods(seconds?: number): ReturnType<typeof createPeriodsSweep>;
 }
 
-export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"]; readonly sessions?: boolean } = {}): Promise<StatementsWorld> {
+export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"]; readonly optOut?: WorldOptions["optOut"]; readonly sessions?: boolean } = {}): Promise<StatementsWorld> {
   const calendar = new ContractFakeBankingCalendar({ clock });
   const now = clock.now();
   calendar.serve({ calendarVersion: FIXTURE_CALENDAR.calendarVersion, jurisdiction: "CO", source: "TEST_FIXTURE", nonbankingDates: [...BANKING_CALENDAR_FIXTURE_NONBANKING], coversFrom: FIXTURE_CALENDAR.coversFrom, coversTo: FIXTURE_CALENDAR.coversTo, recordedAt: new Date(Date.parse(now) - 3_600_000).toISOString() as UtcInstant, evidenceHash: sha("fixture") as Sha256Hex });
@@ -153,6 +153,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     wrapUnitOfWork: (inner) => faults.wrap(inner),
     wrapCommerce: (inner) => faults.wrapCommerce(inner),
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+    ...(options.optOut !== undefined ? { optOut: options.optOut } : {}),
     // opt-in (PV1 L-ROUTE r1, RR-4): the B11 session boundary; absent, unchanged
     ...(options.sessions === true ? { sessions: true } : {}),
     commissions: async (h) => {

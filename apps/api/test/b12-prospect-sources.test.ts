@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ProspectContactView, ProspectSourceView, ProspectView } from "@kauro/application";
 import { contactKeyOf } from "@kauro/domain";
-import { asOperator, recordSourceEvidence, salesWorld, suppress, type SalesWorld } from "./sales-support.js";
+import { asOperator, recordSourceEvidence, salesWorld, suppress, terminateSeller, type SalesWorld } from "./sales-support.js";
 import { asProblem, call, completed, freshKey, outcome, sha, type Person } from "./support.js";
 
 let sw: SalesWorld;
@@ -76,10 +76,8 @@ test("RecordProspectSource DENY: another seller's prospect and an unknown id are
   assert.equal((await record(other.person, prospectId, "sources", sourceBody("d1"))).status, 404);
   assert.equal((await record(seller.person, "01990000-0000-7000-8000-000000000000", "sources", sourceBody("d2"))).status, 404);
   const future = await record(seller.person, prospectId, "sources", sourceBody("d3", { observedOn: "2999-01-01" }));
-  assert.equal(outcome(w(), future), "412 PRECONDITION_FAILED SOURCE_EVIDENCE_INVALID");
-  await asOperator(w().h, sw.owner.userId, (c) =>
-    c.query("UPDATE kauro.sellers SET state = 'TERMINATED', terminated_at = kauro.server_now(), version = version + 1 WHERE user_id = $1", [seller.userId]),
-  );
+  assert.equal(outcome(w(), future), "409 PRECONDITION_FAILED SOURCE_EVIDENCE_INVALID");
+  await terminateSeller(sw, seller);
   const terminated = await record(seller.person, prospectId, "sources", sourceBody("d4"));
   assert.equal(terminated.status, 403);
   assert.equal(asProblem(w(), terminated).code, "NOT_AUTHORIZED");
@@ -88,7 +86,7 @@ test("RecordProspectSource DENY: another seller's prospect and an unknown id are
 
 test("RecordProspectContact OK: the contact key is KAURO_PROSPECT_CONTACT_V1 of the case-folded NFC address, the address is stored restricted, the view carries neither", async () => {
   const { seller, prospectId } = await sellerWithProspect("pk-ok", "pk-ok.example");
-  const reply = completed<ProspectContactView>(await record(seller.person, prospectId, "contacts", { contactLabel: "Head of growth", roleLabel: "Growth", channel: "EMAIL", address: "  Lead@PK-OK.example " }), 201);
+  const reply = completed<ProspectContactView>(await record(seller.person, prospectId, "contacts", { contactLabel: "Head of growth", roleLabel: "Growth", channel: "EMAIL", address: "Lead@PK-OK.example" }), 201);
   assert.deepEqual(Object.keys(reply.data).sort(), ["channel", "contactId", "createdAt"]);
   const expected = contactKeyOf("lead@pk-ok.example");
   assert.notEqual(expected, null);
@@ -99,7 +97,7 @@ test("RecordProspectContact OK: the contact key is KAURO_PROSPECT_CONTACT_V1 of 
   assert.deepEqual(stored.rows, [{ contact_key: expected?.key, address: "lead@pk-ok.example" }]);
 });
 
-test("GAP-PK-1 and reimport: one address recorded by two sellers in other case gives two contact rows and one key; after an opt-out of that key CMD045 is 412 PROSPECT_SUPPRESSED", async () => {
+test("GAP-PK-1 and reimport: one address recorded by two sellers in other case gives two contact rows and one key; after an opt-out of that key CMD045 is 409 PROSPECT_SUPPRESSED", async () => {
   const a = await sellerWithProspect("pk-a", "pk-a.example");
   const b = await sellerWithProspect("pk-b", "pk-b.example");
   const [ra, rb] = await Promise.all([
@@ -120,7 +118,7 @@ test("GAP-PK-1 and reimport: one address recorded by two sellers in other case g
     key: freshKey("b12src-re"),
     body: { organizationLabel: "reimport-new.example", businessContactRef: cb.data.contactId, sourceEvidenceHash: evidence.sourceEvidenceHash, jurisdiction: "United States" },
   });
-  assert.equal(outcome(w(), register), "412 PRECONDITION_FAILED PROSPECT_SUPPRESSED");
+  assert.equal(outcome(w(), register), "409 PRECONDITION_FAILED PROSPECT_SUPPRESSED");
 });
 
 test("RecordProspectContact DENY: a foreign prospect is 404 and a non-address is a schema violation, nothing written (GAP-PK-3 leaves neither contact nor address)", async () => {

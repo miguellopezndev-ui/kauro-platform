@@ -20,6 +20,9 @@ export class PgQuoteReads {
 
   /** The shared half of an approval's transition lock, held to COMMIT (a withdrawal in flight is ordered before or after this unit of work). */
   async awaitApproval(approvalId: string): Promise<void> {
+    // the plan row first, as WithdrawApproval takes it (its row, then the approval's exclusive half): a unit that took the approval half first and then
+    // inserted a row that references the plan (FOR KEY SHARE) deadlocked with it (40P01); behind the plan lock it waits, then reads the approval withdrawn
+    await execute(this.db, "SELECT 1 FROM kauro.plans p JOIN kauro.approvals a ON a.plan_id = p.plan_id WHERE a.approval_id = $1 FOR KEY SHARE OF p", [approvalId]);
     await execute(this.db, "SELECT kauro.await_transition('kauro.approvals', $1)", [approvalId]);
   }
 
