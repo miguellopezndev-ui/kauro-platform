@@ -358,3 +358,28 @@ lifecycle("CMD038: only the agency that owns a delivered package can download it
   assert.equal((await w.authorization(p.authorizationId)).state, "DELIVERED");
   await w.quiesce();
 });
+
+lifecycle("a browser that cannot print is temporary: the attempt ends with the worker's error, the lease is taken over and the next attempt delivers the one report; the failed attempt staged none", async () => {
+  const A = await w.agency("engine-down");
+  let engines = 0;
+  w.scenario(A, { packageName: CLEAN, engine: () => (++engines === 1 ? { engineId: "down/1", print: () => Promise.reject(new Error("browser crashed")) } : defaultEngine()) });
+  const p = await w.paid(A, "engine-down", { report: reportFixtureOf(CLEAN) });
+  const { jobId, identity } = await admitted(w, p);
+  await launched(w, jobId);
+  await observedDone(w, identity);
+  const failed = await w.attempt(jobId, 1);
+  assert.equal(failed.state, "ABANDONED", "retryable, not a refusal");
+  assert.equal((await k.stagingObjects(failed.staging_prefix)).length, FILES, "the failed attempt staged its package and no report");
+  w.advance(150);
+  await w.x.sweepers.attemptMonitor.sweep(w.units, 20);
+  await w.x.sweepers.attemptMonitor.sweep(w.units, 20);
+  const second = await w.attempt(jobId, 2);
+  await observedDone(w, second.identity);
+  await w.drain(w.x.consumers.jobExecution);
+  assert.equal((await w.job(jobId)).state, "READY");
+  const [pkg] = await w.packages(jobId);
+  assert.equal(pkg?.attempt_id, second.attempt_id);
+  const copies = await k.deliveredOf(pkg!.package_version_id);
+  assert.equal(copies.filter((c) => c.role === REPORT_PDF_ROLE).length, 1);
+  assert.equal(await k.countOf("SELECT 1 FROM kauro.delivery_artifacts WHERE attempt_id = $1", [failed.attempt_id]), 0);
+});

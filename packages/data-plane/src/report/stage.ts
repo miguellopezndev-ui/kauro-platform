@@ -97,6 +97,9 @@ export async function produceStagedReport(request: ProduceStagedReportRequest): 
   try {
     pdf = await generateReportPdf(report, { pageSize: request.render.pageSize, locale: request.render.locale, logo }, request.engine);
   } catch (error) {
+    // the browser failing to print (a crash, a timeout, no executable) may be temporary: it is the worker's error, retried by a takeover
+    // within B08's attempt budget; an output that is not a PDF is a refusal
+    if (error instanceof ReportPdfError && error.code === "ENGINE_FAILED") throw new ReportStageError("PDF_ENGINE_FAILED", "the PDF engine could not print the report", { problems: [error.code], cause: error });
     if (error instanceof ReportPdfError) throw new ReportStageError("PDF_FAILED", `the PDF could not be produced (${error.code})`, { problems: [error.code], cause: error });
     if (error instanceof ReportModelError) throw new ReportStageError("PDF_FAILED", "the report was refused for printing", { problems: codesOf(error), cause: error });
     throw error;
@@ -207,7 +210,7 @@ export class ReportingExecutionEnvelope implements ExecutionEnvelopePort {
       if (!(error instanceof ReportStageError)) throw error;
       // an uncertain answer from the storage proves nothing about the report: it is the worker's error (WORKER_ERROR), which a takeover
       // retries in a new attempt, not a refusal, which would end a paid job for a storage hiccup
-      if (error.code === "VERIFICATION_UNCERTAIN") throw error;
+      if (error.code === "VERIFICATION_UNCERTAIN" || error.code === "PDF_ENGINE_FAILED") throw error;
       if (error.code === "CANCELLED") return stopped(error.problems[0] === "FENCED" ? "FENCED" : "CANCELLED", error);
       return stopped("REFUSED", error);
     }

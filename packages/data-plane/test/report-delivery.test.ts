@@ -265,11 +265,19 @@ describe("B13xB08 the platform's facts: nothing is invented, nothing unbound is 
 });
 
 describe("B13xB08 the PDF: a failed or invalid generation stages nothing", () => {
-  it("an engine that fails, returns garbage or returns a truncated PDF ends the attempt REFUSED with no report object", async () => {
+  it("an engine that cannot print is the worker's error (retried by a takeover), never a refusal; nothing is staged", async () => {
+    for (const reason of [new Error("browser crashed"), "boom"]) {
+      const r = nextRig();
+      const engine = scriptedEngine(() => Promise.reject(reason));
+      await assert.rejects(envelopeOf(r, CLEAN, inputsFor(CLEAN), engine).execute(r.fixture.subject, r.io), (e: unknown) => e instanceof ReportStageError && e.code === "PDF_ENGINE_FAILED");
+      assert.deepEqual(reportObjects(r.writer.artifacts()), []);
+      assert.equal((await objectsOf(r)).length, ORACLE[CLEAN].files);
+    }
+  });
+
+  it("an engine that returns garbage or a truncated PDF ends the attempt REFUSED with no report object", async () => {
     const truncated = scriptedPdf("t").subarray(0, 120);
     const engines: ReadonlyArray<readonly [string, ReturnType<typeof scriptedEngine>]> = [
-      ["throws", scriptedEngine(() => Promise.reject(new Error("browser crashed")))],
-      ["throws a non-Error", scriptedEngine(() => Promise.reject("boom"))],
       ["html instead of a pdf", scriptedEngine(() => new TextEncoder().encode("<html>not a pdf</html>".repeat(30)))],
       ["a pdf without its trailer", scriptedEngine(() => new TextEncoder().encode(`%PDF-1.7\n${"x".repeat(400)}`))],
       ["a truncated pdf", scriptedEngine(() => truncated)],
@@ -518,6 +526,24 @@ describe("B13xB08 duplicates and retries are idempotent", () => {
     assert.equal(r.fake.generationsOf(staging, a.record.objectName).length, 1);
     assert.equal(reportObjects(r.writer.artifacts()).length, 2);
     assert.equal(r.fake.calls("createResumableSession").filter((c2) => [a.pdf.objectName, a.record.objectName].includes(String(c2.request["objectName"]))).length, 2, "two sessions in all: one per object");
+  });
+
+  it("two publishers over one attempt's writer, called together, still stage one PDF and one record; different PDFs together stage only the first", async () => {
+    const same = nextRig();
+    const a = await ready(same);
+    const pdf = await a.make("one");
+    const results = await Promise.all([a.publisher().publish(pdf), a.publisher().publish(pdf), a.publisher().publish(pdf)]);
+    assert.equal(new Set(results.map((x) => x.location)).size, 1);
+    assert.equal(reportObjects(same.writer.artifacts()).length, 2);
+    assert.equal(same.writer.failure(), null, "the shared writer is not spent");
+
+    const diff = nextRig();
+    const b = await ready(diff);
+    const settled = await Promise.allSettled([b.publisher().publish(await b.make("one")), b.publisher().publish(await b.make("two"))]);
+    assert.deepEqual(settled.map((x) => x.status).sort(), ["fulfilled", "rejected"]);
+    assert.equal(reportObjects(diff.writer.artifacts()).length, 2);
+    assert.equal(diff.writer.failure(), null);
+    assert.equal((await objectsOf(diff)).length, ORACLE[CLEAN].files + 2, "one PDF and one record in the storage");
   });
 
   it("another PDF for an attempt that already staged one is refused: a corrected report is another attempt's artifact", async () => {

@@ -85,9 +85,9 @@ it is (`OBJECT_NOT_THIS_WRITERS`). One PDF per attempt, however many publishers 
 
 Failure classes. *Refusals* about the report's content or the platform's records end the attempt `REFUSED`, which B08 already treats as
 terminal (job FAILED, no manifest, no package); the package files already staged stay in the prefix as evidence for the janitor. *An
-uncertain read-back, or any infrastructure failure,* is thrown: the host reports a retryable error, the lease is taken over and the next
+uncertain read-back, a browser that cannot print (`PDF_ENGINE_FAILED`: it may be temporary; B08's three attempts bound it), or any infrastructure failure,* is thrown: the host reports a retryable error, the lease is taken over and the next
 attempt produces its own report in its own prefix. A stored PDF that does not read back as written (`STORED_BYTES_DIFFER`) is a refusal.
-A cancellation or fence seen between steps ends the attempt `CANCELLED`/`FENCED` before the engine runs or before anything is stored.
+A storage failure while the writer closes the PDF or the record is the writer's latched `ARTIFACT_CLOSE_FAILED`/`READBACK_MISMATCH`, which B08 classifies as terminal for every staged artifact (S035, `TERMINAL_CAUSES`); the report inherits that classification exactly as the package's files have it, and changing it would alter a B08 mechanism, so it is left as it is (residual risk, §7). Publication is serialized per attempt writer, however many publishers share it. A cancellation or fence seen between steps ends the attempt `CANCELLED`/`FENCED` before the engine runs or before anything is stored.
 
 A retry inside one attempt is idempotent only for the same `ReportPdf`: Chromium's output is not deterministic, so regenerating inside
 the same attempt would be another PDF and is refused. B08 never restarts an attempt (a takeover is a new attempt, fence + 1, new prefix),
@@ -102,14 +102,14 @@ job's artifact. `review/visual-v1-prototypes` is not imported.
 
 ## 6. Evidence
 
-Layer 1 — `packages/data-plane/test/report-delivery.test.ts` (28 cases), over the real attempt envelope and B07's storage fake, with
+Layer 1 — `packages/data-plane/test/report-delivery.test.ts` (30 cases), over the real attempt envelope and B07's storage fake, with
 real Chromium where a browser exists (CI requires it): the CLEAN and Salesforce packages end to end; manifest mismatch; a package that does
 not verify; counts missing, inconsistent or unsupported by the bytes; terms and issuer unverifiable; failed or invalid printing; stored
 bytes truncated, altered, another report's, replaced behind the writer, or unreadable; an interrupted upload; duplicate, concurrent and
 retried publication; another agency, project, job or attempt; fence and cancellation at three points; storage failures at each
 object; a corrected report keeping the first; the record read back strictly.
 
-Layer 2 — `apps/control/test/b13-report-delivery.test.ts` and `b13-report-lifecycle.test.ts` (11 cases), on a real PostgreSQL 17 through
+Layer 2 — `apps/control/test/b13-report-delivery.test.ts` and `b13-report-lifecycle.test.ts` (12 cases), on a real PostgreSQL 17 through
 B08's own control plane: both packages delivered by B08's steps with the PDF and record among the delivery copies, each read back; nine
 refusals ending the job FAILED with nothing delivered; the PDF tampered between worker and control plane (S061); reversal (R2-045),
 cancellation (CMD037) and a stale attempt (S056) with the report in the package; the worker killed while printing and while storing; the
@@ -134,5 +134,6 @@ granting the delivered PDF to its agency only and refusing every unpublished pac
 - **Replacement of a delivered package** (`AVAILABLE → RETIRED`, "LATER B13" in the B08 machine) is not performed; a corrected report is
   another job's package and the first delivery stays AVAILABLE. Deciding which one supersedes the other is a product decision.
 - Branding versions, privacy class and finding/decision ids are not recorded by the platform yet; the stage takes them from the port.
+- A transient storage outage while a report artifact is being written fails the job as it does for any staged artifact (B08 S035); a retryable class for writer failures would be a B08 change.
 - The report is read in memory (`readMigrationPackage`); a package larger than `DEFAULT_MAX_PACKAGE_BYTES` (256 MiB) is refused
   (`PACKAGE_TOO_LARGE`), not truncated.

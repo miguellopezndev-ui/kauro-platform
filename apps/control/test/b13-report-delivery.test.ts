@@ -79,7 +79,7 @@ for (const name of [CLEAN, SALESFORCE] as const) {
   });
 }
 
-test("the platform's records decide: a package other than the receipt's, counts the sealed source or the package's bytes do not support, terms nobody recorded, an unreadable issuer or a failed print end the attempt REFUSED with no manifest, no package, no delivery and the package files kept as evidence", async () => {
+test("the platform's records decide: a package other than the receipt's, counts the sealed source or the package's bytes do not support, terms nobody recorded, an unreadable issuer or a print that is not a PDF end the attempt REFUSED with no manifest, no package, no delivery and the package files kept as evidence", async () => {
   const c = PACKAGE_RECORDS[CLEAN].counts;
   type Scenario = Partial<Omit<ReportScenario, "packageName">>;
   const cases: ReadonlyArray<readonly [string, Scenario, Partial<ReportFixture>]> = [
@@ -90,7 +90,6 @@ test("the platform's records decide: a package other than the receipt's, counts 
     ["terms whose document is not the one the quote recorded", {}, { termsHash: "5".repeat(64) }],
     ["no terms snapshot", { inputs: (r) => (r === null ? r : { ...r, terms: null }) }, {}],
     ["no platform record of the report at all", { inputs: () => null }, {}],
-    ["a print that fails", { engine: () => ({ engineId: "boom/1", print: () => Promise.reject(new Error("browser crashed")) }) }, {}],
     ["a print that returns something that is not a PDF", { engine: () => ({ engineId: "junk/1", print: () => Promise.resolve(new TextEncoder().encode("<html>no</html>".repeat(40))) }) }, {}],
   ];
   let n = 0;

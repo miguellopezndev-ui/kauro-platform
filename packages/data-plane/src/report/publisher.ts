@@ -56,6 +56,9 @@ export interface StagedReportPdfPublisherOptions {
   readonly binding: ReportBinding;
 }
 
+/** The turn of each attempt writer: publication is serialized per writer, however many publishers share it. */
+const TURNS = new WeakMap<object, Promise<unknown>>();
+
 const nameHash = (kind: "REPORT_PDF" | "REPORT_RECORD", binding: ReportBinding, pdfSha256: string): string => rawDigest(canonicalBytes({ kind, reportId: binding.reportId, pdfSha256 }));
 
 /** The object a report's PDF is staged under: a function of the attempt's prefix, the report and the PDF's own hash. */
@@ -70,7 +73,6 @@ export class StagedReportPdfPublisher implements ReportPdfPublisher {
   readonly #scope: ReportScope;
   readonly #binding: ReportBinding;
   #staged: StagedReportPdf | null = null;
-  #turn: Promise<unknown> = Promise.resolve();
 
   constructor(options: StagedReportPdfPublisherOptions) {
     const c = options.writer.capability;
@@ -90,12 +92,14 @@ export class StagedReportPdfPublisher implements ReportPdfPublisher {
   }
 
   publish(pdf: ReportPdf): Promise<StagedReportPdf> {
-    // one call at a time: two concurrent calls with one PDF must not both open the same name
-    const run = this.#turn.then(
+    // one publication at a time per attempt writer: the cardinality check and both artifact writes of one call finish before the next
+    // call, from this publisher or any other over the same writer, begins
+    const previous = TURNS.get(this.#writer) ?? Promise.resolve();
+    const run = previous.then(
       () => this.#publish(pdf),
       () => this.#publish(pdf),
     );
-    this.#turn = run.catch(() => undefined);
+    TURNS.set(this.#writer, run.catch(() => undefined));
     return run;
   }
 
