@@ -52,12 +52,14 @@ export async function recordAnswer(rt: OutreachRuntime, intentId: string, lease:
       return await rt.units.run(context(), (uow) => outreachSendOf(uow).record(intentId, lease, answer));
     } catch (e) {
       if (!(e instanceof DomainFailure) || e.code !== "CAPACITY_UNAVAILABLE") throw e;
-      const now = rt.clock.nowMs();
-      bound ??= now + OUTREACH_BOUNDS.uncertainAfterMs + OUTREACH_BOUNDS.d4GraceMs;
+      bound ??= rt.clock.nowMs() + OUTREACH_BOUNDS.uncertainAfterMs + OUTREACH_BOUNDS.d4GraceMs;
       const window = await rt.units.run(context(), (uow) => outreachSendOf(uow).d4WindowRemainingMs(intentId)).then(
         (ms) => ({ ms }),
         () => undefined,
       );
+      // the remaining time is the database's at its read: anchored to the clock read AFTER the unit answered, so the unit's own latency never
+      // shortens the window (anchored before it, a slow read would end the grace early)
+      const now = rt.clock.nowMs();
       if (window !== undefined) {
         if (window.ms === null) throw e;
         bound = now + window.ms;
