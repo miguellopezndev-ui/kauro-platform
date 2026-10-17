@@ -3,8 +3,8 @@
  * ports/report-sources.ts).
  *
  * - `read` is the control plane's: one SYSTEM unit of work bound to the job's agency (kauro_control, D-CTRL-1), every statement keyed by
- *   the scope's agency and the job's own binding, so a record of another agency, project, job or subject is never returned. It reads and
- *   returns; it decides nothing — a missing record is null, never an empty list or a default, and @kauro/data-plane assembleReportFacts
+ *   the scope's agency and the job's own binding, so a record of another agency, project, job or subject is never returned. Its one
+ *   write is the job's branding binding, recorded the first time and never again (migration 0095 2b). It returns records; it decides nothing — a missing record is null, never an empty list or a default, and @kauro/data-plane assembleReportFacts
  *   verifies every binding (the quote's terms preimage against its hash, the legal identity against the issuer's hash, the disclosure set
  *   against the approval's hash) before a report can be made.
  * - `brandingVersions` is the request handlers' (kauro_app): the agency's ACTIVE OWNER or ADMIN records the next version as itself.
@@ -221,12 +221,22 @@ export class PgReportSources implements ReportFactsReader {
       i === null ? null : { issuerRef: str(i["issuer_ref"]), jurisdiction: str(i["jurisdiction"]), legalIdentityHash: str(i["legal_identity_hash"]), legalFactStatus: str(i["legal_fact_status"]) as LegalFactStatus };
     const legalIdentity = issuer === null ? null : await this.legalIdentities.documentOf(issuer.legalIdentityHash);
 
-    // the branding version in force when the job was queued (a later version is for later jobs)
+    // the job's branding version: bound once, the first time its report sources are read, to the version in force when the job was
+    // queued as then committed (report_branding_bindings_in_force); every later read and attempt reads the binding, never the versions
+    // again, so a branding transaction stamped before the queueing and committed after it cannot change the job's reports
+    await execute(
+      this.db,
+      `INSERT INTO kauro.report_branding_bindings (agency_id, job_id, branding_version)
+       SELECT b.agency_id, $2::uuid, b.branding_version FROM kauro.agency_branding_versions b
+        WHERE b.agency_id = $1::uuid AND b.recorded_at <= $3::timestamptz ORDER BY b.branding_version DESC LIMIT 1
+       ON CONFLICT (agency_id, job_id) DO NOTHING`,
+      [agencyId, jobId, job.queuedAt],
+    );
     const b = await this.first(
-      `SELECT agency_id, branding_version, display_name, ${exact("recorded_at")}
-         FROM kauro.agency_branding_versions WHERE agency_id = $1 AND recorded_at <= $2::timestamptz
-        ORDER BY branding_version DESC LIMIT 1`,
-      [agencyId, job.queuedAt],
+      `SELECT v.agency_id, v.branding_version, v.display_name, ${exact("v.recorded_at", "recorded_at")}
+         FROM kauro.report_branding_bindings x JOIN kauro.agency_branding_versions v ON v.agency_id = x.agency_id AND v.branding_version = x.branding_version
+        WHERE x.agency_id = $1 AND x.job_id = $2`,
+      [agencyId, jobId],
     );
     const branding = b === null ? null : brandingOf(b);
 

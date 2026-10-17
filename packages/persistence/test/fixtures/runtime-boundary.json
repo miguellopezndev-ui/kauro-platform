@@ -1435,6 +1435,13 @@
           "gate_id"
         ]
       },
+      "kauro.report_branding_bindings": {
+        "INSERT": [
+          "agency_id",
+          "branding_version",
+          "job_id"
+        ]
+      },
       "kauro.retention_records": {
         "UPDATE": [
           "effective_deadline",
@@ -7491,6 +7498,22 @@
       ],
       "using": null
     },
+    "report_branding_bindings/report_branding_bindings_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "report_branding_bindings/report_branding_bindings_control_record": {
+      "check": "(agency_id = kauro.current_agency_id())",
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null
+    },
     "request_journal/request_journal_control_amend": {
       "check": "true",
       "command": "UPDATE",
@@ -10344,6 +10367,9 @@
         "INSERT",
         "SELECT",
         "UPDATE"
+      ],
+      "kauro.report_branding_bindings": [
+        "SELECT"
       ],
       "kauro.request_journal": [
         "INSERT",

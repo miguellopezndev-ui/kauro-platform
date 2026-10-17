@@ -17,6 +17,12 @@
 --      CMD008's route is not part of this edition); the request handlers and the control plane read their agency's. A display name a report
 --      could not print (markup-significant, control, format or separator characters, padding, not NFC) is refused here, not at the report.
 --      No logo column: the stored-logo pipeline is CMD008's.
+--   2b. kauro.report_branding_bindings: the one branding version of a job's reports, recorded by the control plane the first time it reads
+--      the job's report sources and never again (append-only, one row per job). A version's instant is its transaction's (server_now), not
+--      its commit's, so "the version recorded at or before the job was queued" would otherwise read differently before and after a branding
+--      transaction that began before the queueing commits: the binding fixes the version as committed when the first report was made. Its
+--      guard admits only the agency's latest version recorded at or before the job's queued_at that the binding transaction sees, so the
+--      control plane cannot bind any other.
 --   3. The control plane's read of what the report verifies, column by column, bound to its agency: the quote's terms preimage and state,
 --      the agency's terms acceptances, and the approval's disclosures hash. Nothing else is granted; no write is granted on any of them.
 -- No existing row, column, constraint or hash changes. Idempotent.
@@ -128,6 +134,52 @@ CREATE POLICY agency_branding_versions_tenant_record ON kauro.agency_branding_ve
 CREATE POLICY agency_branding_versions_control_read ON kauro.agency_branding_versions FOR SELECT TO kauro_control USING (agency_id = kauro.current_agency_id());
 GRANT SELECT ON kauro.agency_branding_versions TO kauro_app, kauro_control;
 GRANT INSERT (agency_id, branding_version, display_name, recorded_by_membership_id, recorded_by_user_id) ON kauro.agency_branding_versions TO kauro_app;
+
+-- --- 2b. the branding version of a job's reports ---------------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS kauro.report_branding_bindings (
+  agency_id         uuid NOT NULL,
+  job_id            uuid NOT NULL,
+  branding_version  integer NOT NULL,
+  bound_at          timestamptz NOT NULL,
+  PRIMARY KEY (agency_id, job_id),
+  FOREIGN KEY (agency_id, job_id) REFERENCES kauro.processing_jobs (agency_id, job_id),
+  FOREIGN KEY (agency_id, branding_version) REFERENCES kauro.agency_branding_versions (agency_id, branding_version)
+);
+CREATE OR REPLACE FUNCTION kauro.report_branding_bindings_birth() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  queued timestamptz;
+  latest integer;
+BEGIN
+  SELECT j.queued_at INTO queued FROM kauro.processing_jobs j WHERE j.agency_id = NEW.agency_id AND j.job_id = NEW.job_id;
+  SELECT max(b.branding_version) INTO latest FROM kauro.agency_branding_versions b WHERE b.agency_id = NEW.agency_id AND b.recorded_at <= queued;
+  IF queued IS NULL OR latest IS DISTINCT FROM NEW.branding_version THEN
+    RAISE EXCEPTION 'BRANDING_BINDING_NOT_IN_FORCE: job % binds branding version %, the version in force when it was queued is %', NEW.job_id, NEW.branding_version, coalesce(latest::text, 'none')
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'report_branding_bindings_in_force', SCHEMA = 'kauro', TABLE = 'report_branding_bindings';
+  END IF;
+  NEW.bound_at := kauro.server_now();
+  RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION kauro.report_branding_bindings_birth() FROM PUBLIC;
+DROP TRIGGER IF EXISTS report_branding_bindings_birth ON kauro.report_branding_bindings;
+CREATE TRIGGER report_branding_bindings_birth BEFORE INSERT ON kauro.report_branding_bindings
+  FOR EACH ROW EXECUTE FUNCTION kauro.report_branding_bindings_birth();
+DROP TRIGGER IF EXISTS report_branding_bindings_append_only ON kauro.report_branding_bindings;
+CREATE TRIGGER report_branding_bindings_append_only BEFORE UPDATE OR DELETE ON kauro.report_branding_bindings
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+DROP TRIGGER IF EXISTS report_branding_bindings_no_truncate ON kauro.report_branding_bindings;
+CREATE TRIGGER report_branding_bindings_no_truncate BEFORE TRUNCATE ON kauro.report_branding_bindings
+  FOR EACH STATEMENT EXECUTE FUNCTION kauro.forbid_change();
+ALTER TABLE kauro.report_branding_bindings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.report_branding_bindings FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS report_branding_bindings_control_read ON kauro.report_branding_bindings;
+DROP POLICY IF EXISTS report_branding_bindings_control_record ON kauro.report_branding_bindings;
+CREATE POLICY report_branding_bindings_control_read ON kauro.report_branding_bindings FOR SELECT TO kauro_control USING (agency_id = kauro.current_agency_id());
+CREATE POLICY report_branding_bindings_control_record ON kauro.report_branding_bindings FOR INSERT TO kauro_control WITH CHECK (agency_id = kauro.current_agency_id());
+GRANT SELECT ON kauro.report_branding_bindings TO kauro_control;
+GRANT INSERT (agency_id, job_id, branding_version) ON kauro.report_branding_bindings TO kauro_control;
 
 -- --- 3. the control plane's read of the report's bindings ---------------------------------------------------------------------------------
 -- the quote the job's authorization names: the members of its KAURO_QUOTE_TERMS_V1 preimage, its recorded hash and version, and its state

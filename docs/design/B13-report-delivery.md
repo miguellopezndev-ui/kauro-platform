@@ -58,7 +58,7 @@ for the attempt's scope (agency, project, job, attempt), only what the platform 
 | billable units, quote id | the frozen quote | differ from the sealed populations (`DECLARED_COUNTS_MISMATCH`) |
 | terms version and hash | the frozen quote (`terms_version`, `terms_hash` = KAURO_QUOTE_TERMS_V1 of its preimage, recomputed; order 6) | altered, another version, not accepted by the agency, the quote not in force (`TERMS_UNVERIFIABLE`, `TERMS_UNAVAILABLE`, `QUOTE_NOT_IN_FORCE`) |
 | issuer | order 6: the KAURO_LEGAL_IDENTITY_V1 document whose SHA-256 is the `legal_identity_hash` of the fiscal issuer the quote's preimage names (`B13-report-inputs.md` §3). The order-5 terms snapshot is the simulator's binding only: its raw hash can never be a quote's terms hash | absent or unverifiable (`ISSUER_UNAVAILABLE`, `ISSUER_UNVERIFIABLE`); unsafe text (`FACTS_MALFORMED`) |
-| branding, privacy class, finding and decision ids | order 6: the agency's branding version in force when the job was queued, the audience of a B08 package (SECURE_DETAIL), the subject's audit findings, the approval's disclosure set held to its hash | `BRANDING_*`, `PRIVACY_UNAUTHORIZED`, `FINDINGS_*`, `DECISIONS_*` |
+| branding, privacy class, finding and decision ids | order 6: the agency's branding version in force when the job was queued (bound once per job), the audience of a B08 package (SECURE_DETAIL), the subject's audit findings, the approval's disclosure set held to its hash | `BRANDING_*`, `PRIVACY_UNAUTHORIZED`, `FINDINGS_*`, `DECISIONS_*` |
 | `reportId`, `packageId` | `rpt-<jobId>`, `pkg-<attemptId>` (the package version row is minted after the worker ran) | — |
 | scope | the inputs name the scope they were read for | any of the four ids differs (`FACTS_FOREIGN_SCOPE`) |
 

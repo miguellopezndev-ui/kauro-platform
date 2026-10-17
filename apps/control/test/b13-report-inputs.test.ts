@@ -177,9 +177,10 @@ test("the attempt, job, project and agency are one scope: inputs are read only f
  * One case: a fresh agency's purchase admitted, `mutate` applied to its records, the verdict of the report stage asserted, and the job run to
  * the end of JOB_EXECUTION refused with that code and nothing delivered. Each case ends its job before the next begins (one active slot).
  */
-async function refusedCase(label: string, mutate: (c: Awaited<ReturnType<typeof admittedJob>>) => Promise<void>, code: string): Promise<void> {
+async function refusedCase(label: string, mutate: (c: Awaited<ReturnType<typeof admittedJob>>) => Promise<void>, code: string, options: { readonly readFirst?: boolean } = {}): Promise<void> {
   const c = await admittedJob(label);
-  assert.equal(await verdictOf(c.scope), "OK", `${label}: the records are consistent before the change`);
+  // a first read also binds the job's branding version (0095 2b); a case about the versions themselves changes them before any read
+  if (options.readFirst !== false) assert.equal(await verdictOf(c.scope), "OK", `${label}: the records are consistent before the change`);
   await mutate(c);
   assert.equal(await verdictOf(c.scope), code, label);
   await refusedToTheEnd(c, code);
@@ -249,7 +250,7 @@ test("a branding change after a delivery: the delivered PDF and record stay exac
   assert.notEqual(m1, m2, "a new branding version is a new model, a new PDF");
   assert.notEqual(m1, mPending, "each job is its own report (its own ids), the pending one under the first version");
   // no branding version in force when the job was queued
-  await refusedCase("brand-none-at-queue", (c) => rewrite("UPDATE kauro.agency_branding_versions SET recorded_at = now() + interval '1 day' WHERE agency_id = $1", [c.p.agency.agencyId]), "BRANDING_UNAVAILABLE");
+  await refusedCase("brand-none-at-queue", (c) => rewrite("UPDATE kauro.agency_branding_versions SET recorded_at = now() + interval '1 day' WHERE agency_id = $1", [c.p.agency.agencyId]), "BRANDING_UNAVAILABLE", { readFirst: false });
 });
 
 test("findings and decisions are the job's own subject's: another project's approval disclosures or audit are never taken, an audit missing or ambiguous is refused, and the disclosure set must be the one the approval was granted over", async () => {
@@ -277,6 +278,15 @@ test("counts and receipts the platform does not support are refused, and the rec
 });
 
 test("retries, concurrency and a restarted reader: the same scope reads the same inputs however often and however concurrently, and a second reader over its own units of work reads them too", async () => {
+  // twelve first reads of a fresh job at once: one binding of its branding, one reading
+  const fresh0 = await admittedJob("concurrent-first");
+  const firsts = await Promise.all(Array.from({ length: 12 }, () => port().read(fresh0.scope)));
+  assert.ok(firsts.every((m) => jsonOf(m) === jsonOf(firsts[0] ?? null)), "twelve concurrent first reads are one reading");
+  assert.equal((await w.h.oracle.query("SELECT 1 FROM kauro.report_branding_bindings WHERE job_id = $1", [fresh0.jobId])).rowCount, 1, "one binding");
+  await launched(w, fresh0.jobId);
+  await observedDone(w, fresh0.identity);
+  await w.drain(w.x.consumers.jobExecution);
+  assert.equal((await w.job(fresh0.jobId)).state, "READY");
   const { jobId } = await k.delivered("concurrent", CLEAN);
   const scope = await scopeOf(jobId);
   const once = jsonOf(await port().read(scope));
@@ -291,4 +301,77 @@ test("retries, concurrency and a restarted reader: the same scope reads the same
   // each attempt is its own report: the same records under another attempt of the job name another package, nothing else
   const other = { ...scope, attemptId: ids.next() };
   assert.equal(await port().read(other), null, "an attempt the job does not have reads nothing");
+});
+
+test("review R1: a branding version stamped before a job is queued and committed after the job's first report cannot change its reports — the binding keeps the version the first read saw for every later read and the delivery; the control plane can bind no other version and never rewrite a binding", async () => {
+  const A = await w.agency("brand-race");
+  w.scenario(A, { packageName: CLEAN });
+  const app = await w.h.pg.connect("kauro_app_test");
+  let jobId = "";
+  let identity = "";
+  try {
+    // the owner's branding transaction: version 2 stamped now, left uncommitted while the job is queued and its report first read
+    await app.query("BEGIN");
+    await app.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [A.agencyId, A.ownerUserId]);
+    await app.query(
+      "INSERT INTO kauro.agency_branding_versions (agency_id, branding_version, display_name, recorded_by_membership_id, recorded_by_user_id) VALUES ($1, 2, 'Late Committed Brand', $2, $3)",
+      [A.agencyId, A.ownerMembershipId, A.ownerUserId],
+    );
+    const p = await w.paid(A, "brand-race", { report: reportFixtureOf(CLEAN) });
+    ({ jobId, identity } = await admitted(w, p));
+    const scope = await scopeOf(jobId);
+    const first = await port().read(scope);
+    assert.deepEqual([first?.branding?.binding, (first?.branding as { version: number }).version], ["AGENCY_BRANDING_V1", 1], "the first read sees the committed version 1");
+    await app.query("COMMIT");
+    const stamps = (await w.h.oracle.query<{ before: boolean }>("SELECT (SELECT recorded_at FROM kauro.agency_branding_versions WHERE agency_id = $1 AND branding_version = 2) < j.queued_at AS before FROM kauro.processing_jobs j WHERE j.job_id = $2", [A.agencyId, jobId])).rows[0];
+    assert.equal(stamps?.before, true, "version 2 is stamped before the job was queued: by its instant alone it would be the job's");
+    const after = await port().read(scope);
+    assert.equal((after?.branding as { version: number }).version, 1, "the binding, not the versions, answers every later read");
+    assert.deepEqual((await w.h.oracle.query("SELECT branding_version FROM kauro.report_branding_bindings WHERE job_id = $1", [jobId])).rows, [{ branding_version: 1 }]);
+  } catch (e) {
+    await app.query("ROLLBACK").catch(() => undefined);
+    throw e;
+  } finally {
+    await app.end();
+  }
+  // the delivery is made from the binding
+  await launched(w, jobId);
+  await observedDone(w, identity);
+  await w.drain(w.x.consumers.jobExecution);
+  assert.equal((await w.job(jobId)).state, "READY");
+  assert.equal(assembleReportFacts(await scopeOf(jobId), await port().read(await scopeOf(jobId)), RENDER.rendererVersion).branding.version, "agency-branding-v1");
+
+  // the binding's guard and history: another version, a second binding, a rewrite and a removal are refused
+  const control = await w.h.pg.connect("kauro_control_test");
+  const asControl = async (sql: string, params: unknown[]): Promise<string> => {
+    await control.query("BEGIN");
+    try {
+      await control.query("SELECT set_config('kauro.agency_id', $1, true)", [A.agencyId]);
+      await control.query(sql, params);
+      await control.query("COMMIT");
+      return "OK";
+    } catch (e) {
+      await control.query("ROLLBACK");
+      return (e as { code?: string }).code ?? String(e);
+    }
+  };
+  try {
+    const next = await w.paid(A, "brand-race-guard", { report: reportFixtureOf(CLEAN) });
+    const queued = await admitted(w, next);
+    assert.equal(await asControl("INSERT INTO kauro.report_branding_bindings (agency_id, job_id, branding_version) VALUES ($1, $2, 1)", [A.agencyId, queued.jobId]), "23514", "version 2 is the one in force for a job queued after it");
+    // committed now, version 2 does read as in force for the first job — which is why its binding, made before, is the one that stays
+    assert.equal(await asControl("INSERT INTO kauro.report_branding_bindings (agency_id, job_id, branding_version) VALUES ($1, $2, 2)", [A.agencyId, jobId]), "23505", "a second binding of a job is refused");
+    assert.equal(await asControl("UPDATE kauro.report_branding_bindings SET branding_version = 2 WHERE job_id = $1", [jobId]), "42501");
+    assert.equal(await asControl("DELETE FROM kauro.report_branding_bindings WHERE job_id = $1", [jobId]), "42501");
+    await assert.rejects(w.h.oracle.query("UPDATE kauro.report_branding_bindings SET bound_at = bound_at WHERE job_id = $1", [jobId]), (e: unknown) => (e as { code?: string }).code === "KA004");
+    // the second job: bound to version 2 by its first read, then delivered
+    const scope = await scopeOf(queued.jobId);
+    assert.equal(assembleReportFacts(scope, await port().read(scope), RENDER.rendererVersion).branding.version, "agency-branding-v2");
+    await launched(w, queued.jobId);
+    await observedDone(w, queued.identity);
+    await w.drain(w.x.consumers.jobExecution);
+    assert.equal((await w.job(queued.jobId)).state, "READY");
+  } finally {
+    await control.end();
+  }
 });

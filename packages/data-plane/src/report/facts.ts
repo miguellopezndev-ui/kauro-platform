@@ -99,7 +99,7 @@ export interface QuoteTerms {
 
 export type ReportBrandingInputs =
   | { readonly binding: "SIMULATED"; readonly branding: Branding }
-  /** The agency's branding version in force when the job was queued (migration 0095; no logo: the stored-logo pipeline is CMD008's). */
+  /** The job's branding version, bound once to the version in force when it was queued (migration 0095; no logo: CMD008's pipeline). */
   | { readonly binding: "AGENCY_BRANDING_V1"; readonly agencyId: string; readonly version: number; readonly displayName: string; readonly recordedAt: string };
 
 export type ReportFindingsInputs =

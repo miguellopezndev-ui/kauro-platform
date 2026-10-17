@@ -6,7 +6,7 @@
  *
  * And the agency's branding versions (registry CMD008 "Create a new branding version for future reports while preserving already
  * delivered artifact identity"; migration 0095): append-only, numbered from 1 per agency, a report of a job naming the version in force
- * when the job was queued.
+ * when the job was queued, bound once per job (report_branding_bindings) so that every read and attempt names the same one.
  */
 import type { QuoteTermsPreimage } from "../commerce/pricing.js";
 import type { LegalFactStatus } from "../commerce/records.js";
@@ -45,7 +45,7 @@ export interface RecordedReportFacts {
   readonly issuer: { readonly issuerRef: string; readonly jurisdiction: string; readonly legalIdentityHash: string; readonly legalFactStatus: LegalFactStatus } | null;
   /** The recorded document whose SHA-256 is the issuer's legal identity hash, or null while none is recorded. */
   readonly legalIdentity: Uint8Array | null;
-  /** The agency's branding version in force when the job was queued, or null when it had none. */
+  /** The job's branding version: bound once per job, at its first read, to the version in force when it was queued; null when it had none. */
   readonly branding: BrandingVersionRecord | null;
   /** The one audit of the job's subject (its revision and target contract) and the findings it recorded. */
   readonly audit: { readonly auditId: string; readonly state: string; readonly findingCodes: readonly string[] } | null;

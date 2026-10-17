@@ -38,7 +38,7 @@ worker (B14 host, not built)                                control plane
 | terms version and hash | `quotes.terms_version`, `quotes.terms_hash` | CMD027 | §3 |
 | the agency's acceptance | `agency_agreement_acceptances` (terms version, document hash, `accepted_at`) | CMD002 | §3 |
 | issuer | `fiscal_issuers` (the quote's `issuer_ref`: jurisdiction, `legal_identity_hash`, `legal_fact_status`) and `legal_identity_snapshots.document` (new) | the control plane | §3 |
-| branding | `agency_branding_versions` (new): the version in force when the job was queued | the agency's OWNER or ADMIN | §4.1 |
+| branding | `agency_branding_versions` (new), through `report_branding_bindings` (new): the version in force when the job was queued, bound once per job | the agency's OWNER or ADMIN; the binding, the control plane | §4.1 |
 | findings | `audits.finding_codes` of the one audit of the job's subject (agency, project, revision hash, target contract hash) | AUDIT_ORCHESTRATION | §4.3 |
 | material decisions | `approvals.disclosures_hash` of the job's approval; `plans.body` and the receipt's `physicalSourceRows`, composed again by the edition's composer | CMD025 | §4.4 |
 | privacy class | the audience of a B08 package (policy, §4.2) | — | `PRIVACY_UNAUTHORIZED` |
@@ -103,7 +103,10 @@ order rewrites a term, a hash or an acceptance.
 `kauro.agency_branding_versions` (0095): numbered 1, 2, … per agency by the database (`agency_branding_versions_contiguous`; two
 concurrent recorders of one number: the primary key admits one), the instant the database's, append-only, recorded by the agency's ACTIVE
 OWNER or ADMIN as itself (MANAGE_BRANDING), printable or refused at the source. A job's reports — every attempt of it — name the version
-recorded at or before the job's `queued_at`; a later version is for later jobs (registry CMD008: "a new branding version for future
+recorded at or before the job's `queued_at`, bound once per job in `kauro.report_branding_bindings` the first time the control plane
+reads the job's report sources (the reader's one write; its guard admits only that version). The binding is what pins it: a version's
+instant is its transaction's, not its commit's, so without it a branding transaction stamped before the queueing and committed after a
+first report would change the version later reads and attempts select (independent review round 1, R1). A later version is for later jobs (registry CMD008: "a new branding version for future
 reports while preserving already delivered artifact identity"). The report's `brandingVersion` is `agency-branding-v<n>`. A delivered
 PDF and record never change: they are generation-0 objects of their package, and a new version is a new model hash in another job.
 No logo column: the stored-logo pipeline is CMD008's; an agency branding names no logo (`BRANDING_UNVERIFIABLE` if logo bytes are given).
@@ -138,12 +141,13 @@ it to the approval's `disclosures_hash` (`disclosuresHashOf`) and to the job's a
 |---|---|---|
 | `kauro.legal_identity_snapshots` | `legal_identity_hash` (PK) = SHA-256(`document`) (`legal_identity_snapshots_content_addressed`), `recorded_at` stamped by the database; append-only, no truncate; FORCE RLS | control plane: SELECT, INSERT (two columns); nobody else |
 | `kauro.agency_branding_versions` | (agency, version) PK, display name fenced, recorder's membership and person (FK), instant stamped; contiguity guard; append-only; FORCE RLS | kauro_app: INSERT as OWNER/ADMIN of the bound agency (`kauro.acting_branding_manager`), SELECT bound; control: SELECT bound |
+| `kauro.report_branding_bindings` | (agency, job) PK, the version (FK to the agency's versions), `bound_at` stamped; guard `report_branding_bindings_in_force`; append-only; FORCE RLS | control plane: SELECT and INSERT bound to the agency |
 | `quotes_control_report_read` + column SELECT | the preimage members, `state`, `terms_hash`, `terms_version`, bound to the agency | control plane |
 | `agency_agreement_acceptances_control_read` + column SELECT | terms kind, version, document hash, `accepted_at` — never the person | control plane |
 | `approvals.disclosures_hash` column SELECT | (`approvals_control_execution_read` already binds the agency) | control plane |
 
 Nothing is backfilled: no legal identity and no branding is invented for an existing agency. No existing row, constraint or hash changes.
-The reviewed privilege matrix (`packages/persistence/test/fixtures/runtime-boundary.json`) gains exactly these 126 lines.
+The reviewed privilege matrix (`packages/persistence/test/fixtures/runtime-boundary.json`) gains exactly these 152 lines.
 
 ## 6. Refusal codes added (`REPORT_STAGE_ERROR_CODES`)
 
@@ -159,7 +163,7 @@ infrastructure failure reading the inputs is thrown (retryable), never a refusal
 | assembler, unit (11) | `packages/data-plane/test/report-inputs.test.ts` | every binding verified; every alteration, absence, foreign scope, unconfirmed issuer, placeholder identity and simulated binding refused with its code; KAURO_REPORT_TERMS_SNAPSHOT_V1 vs the quote's hash; the chain to a staged PDF from platform inputs (CLEAN, Salesforce); INPUTS_SIMULATED |
 | order 5's chain (30) | `packages/data-plane/test/report-delivery.test.ts` | unchanged cases, the simulator now admitted explicitly |
 | 0095 on PostgreSQL 17 (4) | `packages/persistence/test/b13-report-sources.test.ts` | from a cluster at 0094 holding a CMD027 quote: no row changes; the control plane recomputes exactly CMD027's terms hash; content addressing, append-only (superuser included), completeness; branding numbering, authority, printability, the concurrent recorder, isolation; column-scoped reads |
-| PlatformReportInputs on PostgreSQL 17 (9) | `apps/control/test/b13-report-inputs.test.ts` | CLEAN and Salesforce: each input equals its record, the delivered report printed from them; scope crossings; quote expired or withdrawn, terms altered, another version, acceptance missing or late; issuer without document, PENDING, OWNER_DECLARED, another jurisdiction; branding change after a delivery, a job queued before it, none at queue time; another project's disclosures and audit; counts and receipt; 12 concurrent reads and a second reader — each refusal followed to the end of its job (FAILED REFUSED, the report's code, nothing delivered) |
+| PlatformReportInputs on PostgreSQL 17 (10) | `apps/control/test/b13-report-inputs.test.ts` | CLEAN and Salesforce: each input equals its record, the delivered report printed from them; scope crossings; quote expired or withdrawn, terms altered, another version, acceptance missing or late; issuer without document, PENDING, OWNER_DECLARED, another jurisdiction; branding change after a delivery, a job queued before it, none at queue time; another project's disclosures and audit; counts and receipt; 12 concurrent first reads (one binding) and reads, a second reader; review R1 — a branding transaction stamped before the queueing and committed after the first report changes nothing — each refusal followed to the end of its job (FAILED REFUSED, the report's code, nothing delivered) |
 | order 5 on PostgreSQL 17 (12) | `apps/control/test/b13-report-delivery.test.ts`, `b13-report-lifecycle.test.ts` | unchanged cases, now through PlatformReportInputs over the platform's records instead of the oracle and the simulated snapshot |
 | boundary, census | `runtime-boundary`, `b16-rls-census`, `sec-forall-policy`, `migrations` | the matrix, FORCE RLS, per-command policies, the migration list |
 

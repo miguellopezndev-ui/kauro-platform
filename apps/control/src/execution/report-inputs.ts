@@ -5,7 +5,8 @@
  * One SYSTEM unit of work of JOB_EXECUTION bound to the job's agency (kauro_control under forced row security, D-CTRL-1) reads, through
  * @kauro/persistence reportSourcesOf, the attempt of the scope's job, the job's subject, its VALID receipt, the quote its commercial
  * authorization names with every member of the quote's terms preimage, the agency's acceptance of that terms version, the fiscal issuer
- * the preimage names and its legal identity document, the agency's branding version in force when the job was queued, the subject's
+ * the preimage names and its legal identity document, the job's branding version (bound once per job, at its first read, to the version in force when it was queued — the reader's
+ * one write), the subject's
  * audit and the job's approval and plan; and, through the execution store, the counts the publication itself reads (`deliveryCountFacts`).
  * The disclosure set is composed again from the plan and the receipt by the edition's own composer (@kauro/application
  * disclosureItemsOf). Nothing is verified or defaulted here: every record is passed in its binding, a missing one as null, and
