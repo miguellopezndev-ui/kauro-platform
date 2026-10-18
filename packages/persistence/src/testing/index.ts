@@ -57,6 +57,7 @@ export type {
   ReadySourceFixture,
   SealedSourceFixture,
   SealSourceOptions,
+  SourceFileContent,
   FixtureEvent,
 } from "./source-lifecycle.js";
 export { recordQualifiedPaymentRoute, recordQualifiedFiscalIssuer, grantCorporateRole, revokeCorporateRole } from "./commerce-fixtures.js";

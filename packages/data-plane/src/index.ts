@@ -42,6 +42,7 @@ export {
   CORE_RUN_DIRECTORY,
   MIGRATION_CORE_VERSION,
   MigrationCoreAdapter,
+  coreConfigHashOf,
   coreInputPathOf,
   coreTargetModeOf,
   platformTargetModeOf,

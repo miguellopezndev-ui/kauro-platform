@@ -87,9 +87,6 @@ importers:
 
   apps/migration-worker:
     dependencies:
-      '@kauro/application':
-        specifier: workspace:*
-        version: link:../../packages/application
       '@kauro/data-plane':
         specifier: workspace:*
         version: link:../../packages/data-plane

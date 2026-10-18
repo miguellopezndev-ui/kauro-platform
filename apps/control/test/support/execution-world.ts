@@ -274,11 +274,35 @@ export interface ReportFixture {
   readonly expectedManifestSha256: Sha256Hex;
   /** A terms hash the quote records instead of KAURO_QUOTE_TERMS_V1 of its own preimage (a test of terms nobody accepted). */
   readonly termsHash?: Sha256Hex;
+  /**
+   * The sealed file's real bytes and the core's binding over them (B14-A, a real Migration Core run): the world's storage holds the
+   * bytes at the accepted name, the plan's core binding is recorded (core_plan_bindings), and the receipt binds the manifest hash
+   * `manifestOf` answers — then `expectedManifestSha256` is not used.
+   */
+  readonly source?: SealedSourceSpec;
+}
+
+/** The one sealed file of a purchase's revision, as the capability names it. */
+export interface SealedFile {
+  readonly objectName: string;
+  readonly generation: string;
+  readonly sha256: Sha256Hex;
+  readonly byteLength: number;
+}
+
+export interface SealedSourceSpec {
+  readonly bytes: Uint8Array;
+  bindingOf(file: SealedFile): { readonly configDocument: unknown; readonly coreConfigHash: Sha256Hex };
+  manifestOf(file: SealedFile, binding: { readonly configDocument: unknown; readonly coreConfigHash: Sha256Hex }): Promise<Sha256Hex>;
 }
 
 /** What a second control-plane process may bind instead of the world's own units, providers and cores (each a test decorator). */
 export interface PlaneOverrides {
   readonly units?: AuditUnits;
+  /** The core version the plane expects of its verifier (a real Migration Core's, B14-A). */
+  readonly coreVersion?: string;
+  /** Where the plane's worker host keeps attempts' scratch (STAGING_JANITOR removes one attempt's directory under it). */
+  readonly workerScratchRoot?: string;
   readonly host?: WorkerHostPort;
   readonly verifier?: PackageVerifierPort;
   readonly profile?: ProfilePort;
@@ -589,9 +613,9 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
         units: overrides.units ?? units,
         host: overrides.host ?? host,
         verifier: overrides.verifier ?? core,
-        coreVersion: CONTRACT_FAKE_MIGRATION_CORE_VERSION,
+        coreVersion: overrides.coreVersion ?? CONTRACT_FAKE_MIGRATION_CORE_VERSION,
         limits: TEST_LIMITS,
-        workerScratchRoot: scratchRoot,
+        workerScratchRoot: overrides.workerScratchRoot ?? scratchRoot,
         retryAfterSeconds: 30,
         profile: overrides.profile ?? core,
         interpret: overrides.interpret ?? intelligence,
@@ -685,8 +709,10 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
       return pid;
     });
     // B07: the source sealed recently through the lifecycle fixture (a quote promises no more source than its seal left)
+    const bytes = report?.source?.bytes;
     const source = await h.sealedRevision(ag, projectId, "SEALED", {
       base: new Date(Date.now() - RECENT_SEAL_MS),
+      ...(bytes === undefined ? {} : { content: { bytes, plant: (objectName: string) => storage.plantObject(storage.location("ACCEPTED"), objectName, bytes).generation } }),
       ...(report === undefined ? {} : { billableSourceUnits: report.counts.billableSourceUnits, populations: { physicalSourceRows: report.counts.physicalSourceRows, logicalSourceRecords: report.counts.logicalSourceRecords, associationEdges: report.counts.associationEdges } }),
     });
     const { contractId, targetContractHash } = await confirmedTarget(ag, projectId, label, mode, shape);
@@ -740,6 +766,24 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
       await uow.events.publish({ aggregateKind: "plan", aggregateId: planId, aggregateVersion: validating.version, agencyId: ag.agencyId, eventType: "plan.validating.v1", actor, causationId, correlationId, payload: { planId, agencyId: ag.agencyId, bodyHash: plan.bodyHash } });
     });
     const receiptHash = sha(`receipt-${planId}`);
+    // B14-A: a real core's run — the plan's core binding over the sealed file, and the manifest hash its validation produced
+    let realManifest: Sha256Hex | null = null;
+    if (report?.source !== undefined) {
+      const file = (
+        await oracle.query<{ object_name: string; generation: string; sha256: string; bytes: string }>(
+          `SELECT o.object_name, s.provider_generation AS generation, s.sha256, s.bytes::text AS bytes
+             FROM kauro.sealed_revision_files s JOIN kauro.source_files f ON f.agency_id = s.agency_id AND f.file_id = s.file_id
+             JOIN kauro.stored_objects o ON o.agency_id = f.agency_id AND o.object_id = f.accepted_object_id
+            WHERE s.revision_id = $1 AND s.disposition = 'INCLUDED'`,
+          [source.revisionId],
+        )
+      ).rows[0];
+      assert.ok(file, "the sealed file of the revision");
+      const sealedFile: SealedFile = { objectName: file.object_name, generation: file.generation, sha256: file.sha256 as Sha256Hex, byteLength: Number(file.bytes) };
+      const binding = report.source.bindingOf(sealedFile);
+      await units.run({ kind: "SYSTEM", serviceId: "b14a-fixture", correlationId: ids.next() as CorrelationId, agencyId: ag.agencyId }, (uow) => (uow as unknown as PgAuditUnitOfWork).coreDocuments.putPlanBinding(ag.agencyId, bodyHash, binding));
+      realManifest = await report.source.manifestOf(sealedFile, binding);
+    }
     const units120 = 120;
     const receiptCounts = report?.counts ?? { physicalSourceRows: units120, logicalSourceRecords: units120, billableSourceUnits: units120, associationEdges: 0, emittedRepresentatives: units120, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: units120 };
     await h.recordValidationReceipt({
@@ -753,7 +797,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
       corePackageHash: sha(`core-package-${CONTRACT_FAKE_MIGRATION_CORE_VERSION}`),
       profileEvidenceHash: sha(`profile-${planId}`),
       dispositionEvidenceHash: sha(`disposition-${planId}`),
-      artifactEvidenceHash: report?.expectedManifestSha256 ?? sha(`artifact-${planId}`),
+      artifactEvidenceHash: realManifest ?? report?.expectedManifestSha256 ?? sha(`artifact-${planId}`),
       startedAt: toUtcInstant(Date.now() - 60_000),
       completedAt: clock.now(),
       result: "VALID",
