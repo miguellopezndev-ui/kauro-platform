@@ -373,6 +373,7 @@ export const applyService = (creditId: string): Promise<string> => deliverToServ
 // ORDER 8 DIAGNOSTIC (diag branch only): the watched aggregates' FINANCE outbox rows around every pass
 const DIAG_FILE = process.env["KAURO_ORDER8_DIAG_FILE"];
 let diagWatch: ReadonlyArray<string> | null = null;
+let pendingDiag: Record<string, unknown> | null = null;
 function diag(o: Record<string, unknown>): void {
   if (DIAG_FILE !== undefined) appendFileSync(DIAG_FILE, `${JSON.stringify({ pid: process.pid, ...o })}
 `);
@@ -389,11 +390,11 @@ export async function finance(): Promise<ReadonlyArray<{ readonly eventType: str
   const sink = L().iw.pw.backgroundFailures;
   for (let i = 0; i < 5; i++) {
     const before = sink.length;
-    const rowsBefore = DIAG_FILE !== undefined ? await diagRows() : null;
     const tBefore = Date.now();
     const pass = await dispatch(L().iw.pw, "FINANCE");
     const tAfter = Date.now();
-    if (DIAG_FILE !== undefined && diagWatch !== null) diag({ kind: "pass", i, tBeforeMs: tBefore, tAfterMs: tAfter, held: pass.held, deliveries: pass.deliveries.map((d) => `${d.eventType}:${d.outcome}`), rowsBefore, rowsAfter: await diagRows() });
+    if (pendingDiag !== null) { diag(pendingDiag); pendingDiag = null; }
+    if (DIAG_FILE !== undefined && diagWatch !== null) diag({ kind: "pass", i, tBeforeMs: tBefore, tAfterMs: tAfter, held: pass.held, deliveries: pass.deliveries.map((d) => `${d.eventType}:${d.outcome}`), rowsAfter: await diagRows() });
     // the dispatcher records a delivery's failure and goes on: the pass's first failure is the booking's own error
     const failed = sink.slice(before)[0];
     if (failed !== undefined) throw failed.error;
@@ -432,11 +433,12 @@ export async function financeRetryDue(creditId: string): Promise<number> {
   const aggregates = await bookedAggregates(creditId);
   const tBefore = Date.now();
   const r = await L().iw.h.oracle.query(
-    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[]) RETURNING o.outbox_id, (extract(epoch FROM o.next_attempt_at) * 1000000)::bigint::text AS next_us",
+    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[]) RETURNING o.outbox_id, o.state, o.attempts, (extract(epoch FROM o.next_attempt_at) * 1000000)::bigint::text AS next_us, o.next_attempt_at::text AS next_txt",
     [aggregates],
   );
   diagWatch = aggregates;
-  diag({ kind: "retryDue", creditId, tBeforeMs: tBefore, tAfterMs: Date.now(), rows: r.rows });
+  // held in memory until the next pass has claimed: no file write between the UPDATE and the claim
+  pendingDiag = { kind: "retryDue", creditId, tBeforeMs: tBefore, tAfterMs: Date.now(), rows: r.rows };
   return r.rowCount ?? 0;
 }
 /** E1: one pass of the payment service's sweeps (TRANSFER_EXPIRY is a registered bank sweep). */

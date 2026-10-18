@@ -2,12 +2,16 @@
 import { readFileSync } from "node:fs";
 const lines = readFileSync(process.argv[2], "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 let retryDue = null;
+let before = [];
 const out = { retryDues: 0, missedPasses: 0, provenClockMiss: 0, heldPasses: 0, minMarginMs: Infinity, claimedMargins: [], claimedNotDelivered: [], maxMarginMs: -Infinity, misses: [] };
 for (const l of lines) {
-  if (l.kind === "retryDue") { retryDue = l; out.retryDues++; continue; }
+  // the rows the retryDue UPDATE returned are the state the next pass starts from (nothing runs between them and the claim)
+  if (l.kind === "retryDue") { retryDue = l; before = l.rows.map((r) => ({ ...r, state: "RETRYABLE" })); out.retryDues++; continue; }
   if (l.kind !== "pass" || retryDue === null) continue;
   if (l.held) out.heldPasses++;
-  for (const r of l.rowsBefore ?? []) {
+  const rowsBefore = l.rowsBefore ?? before;
+  before = l.rowsAfter ?? [];
+  for (const r of rowsBefore) {
     if (r.state !== "RETRYABLE") continue;
     const dueMs = Number(BigInt(r.next_us)) / 1000;
     const after = (l.rowsAfter ?? []).find((x) => x.outbox_id === r.outbox_id);

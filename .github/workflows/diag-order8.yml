@@ -106,3 +106,69 @@ jobs:
           name: diag-order8-${{ matrix.os }}
           path: diag-out/
           retention-days: 14
+
+  # The cells inside the real test phase of verify (every package's tests, the same concurrency), with the clock probe alongside for the
+  # whole phase: the conditions in which CI runs 38969896015, 39076303262 and 39082375816 failed. The original helper (database now()).
+  fullsuite:
+    name: fullsuite (windows-latest, ${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      PGBIN: 'C:/pgsql17/pgsql/bin'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.16.1
+          run_install: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install PostgreSQL 17 (EDB binaries)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri https://get.enterprisedb.com/postgresql/postgresql-17.6-1-windows-x64-binaries.zip -OutFile $env:RUNNER_TEMP\pg17.zip
+          Expand-Archive -Path $env:RUNNER_TEMP\pg17.zip -DestinationPath C:\pgsql17
+      - name: Chromium for the PDF tests (Windows)
+        run: |
+          set -eu
+          chrome="C:/Program Files/Google/Chrome/Application/chrome.exe"
+          { echo "KAURO_PDF_BROWSER=$chrome"; echo "KAURO_REQUIRE_PDF_ENGINE=1"; echo "KAURO_PDF_EVIDENCE_DIR=$GITHUB_WORKSPACE/pdf-evidence"; } >> "$GITHUB_ENV"
+      - run: pnpm install --frozen-lockfile
+      - run: node tools/build-generated.mjs && pnpm run build
+      - name: Test phase of verify with the probe alongside
+        env:
+          KAURO_ORDER8_DIAG_FILE: ${{ github.workspace }}/diag-out/fullsuite.jsonl
+        run: |
+          mkdir -p diag-out
+          "$PGBIN/initdb" -D "$RUNNER_TEMP/probe" -U postgres -A trust > /dev/null
+          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -o "-p 55432" -l "$RUNNER_TEMP/probe.log" -w start > /dev/null
+          node tools/diag-order8/clock-probe.mjs "$GITHUB_WORKSPACE/packages/persistence/package.json" 55432 5400 > diag-out/probe-fullsuite.txt &
+          probe=$!
+          set +e
+          pnpm -r --no-bail run test > diag-out/fullsuite.log 2>&1
+          echo "test phase exit $?" | tee -a diag-out/fullsuite.log
+          kill "$probe"
+          grep -E "ACH-M-P2" diag-out/fullsuite.log
+          node tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" > diag-out/fullsuite-analysis.json
+          head -c 1500 diag-out/fullsuite-analysis.json
+          exit 0
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diag-order8-fullsuite-${{ matrix.shard }}
+          path: diag-out/
+          retention-days: 14
