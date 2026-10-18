@@ -39,6 +39,7 @@ export const FINANCE_COPY = {
   "screen.finance.credit.fee.unknown": "Unknown",
   "screen.finance.credit.rail.label": "Rail",
   "screen.finance.credit.reference.label": "Reference",
+  "screen.finance.credit.action.label": "Action",
   "screen.finance.credit.reference.none": "None",
   "screen.finance.credit.open.cta": "Open",
   "screen.finance.credit.command.CONFIRM": "Confirm against the bank record",

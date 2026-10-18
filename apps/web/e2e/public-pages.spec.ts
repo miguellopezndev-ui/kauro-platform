@@ -142,12 +142,89 @@ test("keyboard: the skip link is the first stop, visible when focused, and moves
   expect(box).not.toBeNull();
   expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
   expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+  // in front of everything, not merely on the screen: the sticky header must not cover it (independent review R-110-1)
+  expect(await onTop(skip), "the focused skip link is not covered").toBe(true);
   await page.keyboard.press("Enter");
   expect(await page.evaluate(() => document.activeElement?.id)).toBe("kauro-main");
 });
 
+/** Whether the element is what a pointer at its centre would reach: on screen and covered by nothing. */
+async function onTop(locator: ReturnType<Page["locator"]>): Promise<boolean> {
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
+    const hit = document.elementFromPoint(x, y);
+    return hit !== null && (hit === element || element.contains(hit));
+  });
+}
+
+test("navigation: on a short screen (a phone in landscape) every link of the open menu can be reached by keyboard and by pointer (independent review R-110-2)", async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 320 });
+  await page.goto("/pricing");
+  await page.locator(".kauro-site-menu summary").click();
+  const links = page.getByRole("navigation", { name: "Main" }).getByRole("link");
+  const count = await links.count();
+  expect(count).toBeGreaterThan(5);
+  for (let index = 0; index < count; index++) {
+    const link = links.nth(index);
+    await link.focus();
+    expect(await onTop(link), `${await link.textContent()} is reachable`).toBe(true);
+  }
+  await links.last().click();
+  await expect(page).toHaveURL(/\/contact$/);
+});
+
+test("theme preference without JavaScript: the native form stores the choice and returns to the page it came from (independent review R-110-4)", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, ignoreHTTPSErrors: true });
+  const page = await context.newPage();
+  await page.goto("/pricing");
+  const before = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  const answered = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
+  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
+  expect((await answered).status(), "the site's own form is not refused (Origin: null under no-referrer)").toBe(303);
+  await expect(page).toHaveURL(/\/pricing$/);
+  const after = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  expect(after === "light" || after === "dark", "the stored theme is drawn").toBe(true);
+  expect(after).not.toBe(before);
+  expect((await context.cookies()).some((cookie) => cookie.name === "kauro_theme")).toBe(true);
+  await context.close();
+});
+
+test("theme preference with JavaScript: the choice is drawn at once and is still there after a reload (it was stored, not only drawn)", async ({ page }) => {
+  await page.goto("/pricing");
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form[action^='/preferences/theme']");
+    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
+  });
+  const stored = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
+  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
+  expect((await stored).status(), "the background post is accepted").toBe(204);
+  const chosen = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  expect(chosen === "light" || chosen === "dark").toBe(true);
+  await page.reload();
+  expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe(chosen);
+});
+
+test("theme preference: the route stores a choice only for a page of this exact origin, scheme included (independent review R-110-3)", async ({ request, baseURL }) => {
+  const own = new URL(baseURL ?? "https://localhost:44300").origin;
+  const other = own.replace(/^https:/, "http:");
+  const post = (headers: Record<string, string>) => request.post("/preferences/theme", { headers, form: { theme: "dark" }, maxRedirects: 0 });
+  const same = await post({ origin: own, "x-kauro-theme": "1" });
+  expect(same.status()).toBe(204);
+  expect(same.headers()["set-cookie"] ?? "").toContain("kauro_theme=dark");
+  for (const headers of [{ origin: other }, { origin: other, "x-kauro-theme": "1" }, { origin: "null" }, { origin: own, "sec-fetch-site": "cross-site" }]) {
+    const refused = await post(headers);
+    expect(refused.status(), JSON.stringify(headers)).toBe(403);
+    expect(refused.headers()["set-cookie"], JSON.stringify(headers)).toBeUndefined();
+  }
+});
+
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
   await page.goto("/pricing");
+  // the main navigation is folded into the header's menu (amendment A10): open it, as a visitor does
+  await page.locator(".kauro-site-menu summary").click();
   const main = page.getByRole("navigation", { name: "Main" });
   await expect(main.locator('a[aria-current="page"]')).toHaveText("Pricing");
   await expect(main.locator('a[aria-current="page"]')).toHaveCount(1);
@@ -163,7 +240,7 @@ test("navigation: the current page is marked in the main navigation, and every l
 
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => {
-    const form = document.querySelector("form[method='post']");
+    const form = document.querySelector("main form[method='post']");
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
 }
@@ -241,7 +318,8 @@ test("contact: a valid inquiry is sent once, as the api's vocabulary, with no co
   await expect(page.getByRole("heading", { name: "We received your inquiry" })).toBeVisible();
   expect(await focusedGroupLabel(page)).toBe("contact-outcome-heading");
   await expect(page.getByRole("group", { name: "We received your inquiry" })).toContainText(UUID);
-  await expect(page.locator("form[method='post']")).toHaveCount(0);
+  // the inquiry form is gone from the page's main region (the header's theme control is a form of its own and stays)
+  await expect(page.locator("main form[method='post']")).toHaveCount(0);
   expect(bodies, "a second press while sending sends nothing").toHaveLength(1);
   expect(JSON.parse(bodies[0] ?? "null")).toEqual({
     buyerType: "agency",
@@ -376,14 +454,87 @@ test("pricing: a service the publication does not list says it cannot be bought,
 
 // ---- the pages that refuse ------------------------------------------------------------------------------------------------------------
 
-test("unsubscribe: the page changes nothing, never shows the value in its address, and a link in a message reaches it under any value", async ({ page }) => {
+// UI49 as B12 built it (L-ACT, "UI49 form" and "UI49 submit"): one explicit button posts the RFC 8058 one-click body to the api's opt-out
+// route. The unit tests hold the markup and the request contract; this case holds what only a browser shows: opening the link changes
+// nothing, the press sends once, each answer is said, and the essential notices stay apart, in both themes.
+test("unsubscribe (UI49): opening the link sends nothing and never shows the value; one explicit press sends the one-click body once; failure, limit and success are said; essential notices stay apart; accessible in both themes", async ({ page }) => {
   const token = "abc123-not-a-real-token";
-  const response = await page.goto(`/unsubscribe/${token}`);
-  expect(response?.status()).toBe(200);
-  await expect(page.getByRole("heading", { name: "This page cannot stop messages yet" })).toBeVisible();
-  expect(await page.locator("body").innerText(), "the value is not shown").not.toContain(token);
-  expect(await page.title()).not.toContain(token);
-  await expect(page.locator("main form, main input, main button")).toHaveCount(0);
+  const optOut = `/api/v1/public/outreach/opt-out/${token}`;
+  const posts: Array<{ readonly method: string; readonly body: string; readonly type: string | undefined; readonly cookie: string | undefined }> = [];
+  let status = 500;
+  let held: Promise<void> = Promise.resolve();
+  await page.route(`**${optOut}`, async (route) => {
+    const request = route.request();
+    posts.push({ method: request.method(), body: request.postData() ?? "", type: request.headers()["content-type"], cookie: request.headers()["cookie"] });
+    await held;
+    await route.fulfill({ status, contentType: "application/json", body: "{}" });
+  });
+  const theme = async (name: "light" | "dark"): Promise<void> => {
+    await page.evaluate((value) => {
+      const root = document.documentElement;
+      root.setAttribute("data-theme-switching", "");
+      root.setAttribute("data-theme", value);
+      void getComputedStyle(root).color;
+      root.removeAttribute("data-theme-switching");
+    }, name);
+  };
+
+  // opening the page (a GET, as a mail client's prefetch would) changes nothing
+  const seen = watch(page);
+  await assertDocument(page, await page.goto(`/unsubscribe/${token}`), 200);
+  await hydrated(page);
+  expect(posts, "opening the link sends no opt-out").toEqual([]);
+  expect(seen.problems).toEqual([]);
+  expect(await page.locator("body").innerText(), "the value is not page text").not.toContain(token);
+  expect(await page.title(), "nor the title").not.toContain(token);
+
+  // one explicit action, and the essential notices apart from it
+  const form = page.locator("main form[method='post']");
+  await expect(form).toHaveCount(1);
+  await expect(form).toHaveAttribute("action", optOut);
+  const stop = page.getByRole("button", { name: "Stop optional messages" });
+  await expect(stop).toBeVisible();
+  const essential = page.getByRole("region", { name: "Notices you will still receive" });
+  await expect(essential).toContainText("this page never turns them off");
+  await expect(essential.locator("form, button, input")).toHaveCount(0);
+  await assertAccessible(page);
+  await theme("dark");
+  await assertAccessible(page);
+  await theme("light");
+
+  // a failure is said and the press can be repeated; a limit says to wait
+  await stop.click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("it is safe to repeat");
+  await expect(stop).toBeEnabled();
+  status = 429;
+  await stop.click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("Wait a few minutes");
+
+  // success is said only after the api's 200, and a second press while sending sends nothing
+  status = 200;
+  let release!: () => void;
+  held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const before = posts.length;
+  await stop.click();
+  await expect(stop).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Optional messages stopped" })).toHaveCount(0);
+  await stop.click({ force: true });
+  release();
+  await expect(page.getByRole("heading", { name: "Optional messages stopped" })).toBeVisible();
+  expect(posts.length - before, "one press, one request").toBe(1);
+  for (const post of posts) {
+    expect(post.method).toBe("POST");
+    expect(post.body).toBe("List-Unsubscribe=One-Click");
+    expect(post.type).toContain("application/x-www-form-urlencoded");
+    expect(post.cookie, "no credential is sent").toBeUndefined();
+  }
+  await expect(page.locator("main form[method='post']")).toHaveCount(0);
+  await expect(essential).toBeVisible();
+  await assertAccessible(page);
+  await theme("dark");
+  await assertAccessible(page);
 });
 
 for (const document of ["terms", "privacy", "data-processing"]) {

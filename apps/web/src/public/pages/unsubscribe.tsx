@@ -9,13 +9,15 @@ import { PageHead, Section } from "../parts.tsx";
 export function UnsubscribePage({ token }: { readonly token: string }): ReactElement {
   return (
     <>
-      <PageHead title={PUBLIC_COPY["unsubscribe.title"]} />
-      <Section id="unsubscribe-form" heading={PUBLIC_COPY["unsubscribe.form.heading"]}>
-        <p>{PUBLIC_COPY["unsubscribe.form.body"]}</p>
-        <OptOutForm token={token} />
+      <PageHead size="compact" accent={1} eyebrow={PUBLIC_COPY["unsubscribe.meta.title"]} title={PUBLIC_COPY["unsubscribe.title"]} />
+      <Section id="unsubscribe-form" heading={PUBLIC_COPY["unsubscribe.form.heading"]} variant="kauro-site-single">
+        <div className="kauro-site-card kauro-site-card--focus">
+          <p>{PUBLIC_COPY["unsubscribe.form.body"]}</p>
+          <OptOutForm token={token} />
+        </div>
       </Section>
-      <Section id="unsubscribe-essential" heading={PUBLIC_COPY["unsubscribe.essential.heading"]}>
-        <p>{PUBLIC_COPY["unsubscribe.essential.body"]}</p>
+      <Section id="unsubscribe-essential" heading={PUBLIC_COPY["unsubscribe.essential.heading"]} variant="kauro-site-single">
+        <p className="kauro-site-muted">{PUBLIC_COPY["unsubscribe.essential.body"]}</p>
       </Section>
     </>
   );
