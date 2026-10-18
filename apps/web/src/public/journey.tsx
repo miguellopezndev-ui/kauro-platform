@@ -10,7 +10,7 @@ import { PUBLIC_COPY, copy, type PublicCopyId } from "../copy/public.ts";
 import { FileName } from "./parts.tsx";
 import { formatCount } from "./pricing-bands.ts";
 import { JOURNEY_ROWS, MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_COLUMN, SAMPLE_SOURCES, sharePercent, type JourneyRow, type RowFlag } from "./sample-data.ts";
-import { useCountUp } from "./tabs.ts";
+import { useCountUp } from "./count-up.ts";
 
 type ProposalId = "unify" | "normalise" | "map";
 
@@ -209,7 +209,7 @@ export function Journey(): ReactElement {
           </button>
         </div>
       ) : null}
-      <div className="kauro-walk-window">
+      <div className="kauro-walk-window kauro-paper">
         <div className="kauro-walk-bar" aria-hidden="true">
           <span className="kauro-walk-brand">{PUBLIC_COPY["site.name"]}</span>
           <span className="kauro-walk-project">{PUBLIC_COPY["home.app.project.name"]}</span>

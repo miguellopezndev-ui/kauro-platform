@@ -710,33 +710,6 @@ body:has(> .kauro-site-header) {
 }
 
 /* ---- chips, states and badges ----------------------------------------------------------------------------------------------------- */
-
-.kauro-site-chip,
-.kauro-site-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kauro-space-2);
-  padding: 0.25rem 0.75rem;
-  border: 1px solid var(--kauro-color-accent);
-  border-radius: 62.5rem;
-  background: var(--kauro-color-accent-surface);
-  color: var(--kauro-color-accent-text);
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-.kauro-site-main p.kauro-site-badge {
-  margin-block-start: var(--kauro-space-6);
-  font-size: 0.8125rem;
-}
-.kauro-site-badge::before {
-  content: "";
-  inline-size: 0.4375rem;
-  block-size: 0.4375rem;
-  border-radius: 50%;
-  background: currentColor;
-}
 .kauro-site-state {
   display: inline-flex;
   align-items: center;
@@ -933,134 +906,6 @@ body:has(> .kauro-site-header) {
   .kauro-site-fact--quote::after {
     inset-inline-start: calc(var(--kauro-space-5) + 0.6875rem);
   }
-}
-
-.kauro-site-buyers {
-  display: grid;
-  gap: var(--kauro-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-site-buyer {
-  padding: clamp(1.5rem, 2.5vw, 2rem);
-  border: 1px solid var(--kauro-color-border);
-  border-block-start: 3px solid var(--kauro-color-primary);
-  border-radius: var(--kauro-radius);
-  background: var(--kauro-color-raised);
-}
-.kauro-site-buyer + .kauro-site-buyer {
-  border-block-start-color: var(--kauro-color-accent);
-}
-.kauro-site-main .kauro-site-buyer h3 {
-  margin-block-end: var(--kauro-space-3);
-  font-size: 1.375rem;
-}
-.kauro-site-buyer p {
-  color: var(--kauro-color-text-muted);
-}
-@media (min-width: 40rem) {
-  .kauro-site-buyers {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.kauro-site-deliverables {
-  display: grid;
-  gap: var(--kauro-space-6) var(--kauro-space-5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: deliverable;
-}
-.kauro-site-deliverable {
-  padding-block-start: var(--kauro-space-5);
-  border-block-start: 1px solid var(--kauro-color-text);
-  counter-increment: deliverable;
-}
-.kauro-site-deliverable::before {
-  content: counter(deliverable, decimal-leading-zero) / "";
-  display: block;
-  margin-block-end: var(--kauro-space-5);
-  color: var(--kauro-color-primary);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-.kauro-site-main .kauro-site-deliverable h3 {
-  margin-block-end: var(--kauro-space-3);
-  font-size: 1.375rem;
-}
-.kauro-site-deliverable p {
-  color: var(--kauro-color-text-muted);
-}
-@media (min-width: 40rem) {
-  .kauro-site-deliverables {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 68rem) {
-  .kauro-site-deliverables {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.kauro-site-statements {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-site-statements li {
-  position: relative;
-  padding-block: var(--kauro-space-5);
-  padding-inline-start: 2.5rem;
-  border-block-end: 1px solid var(--kauro-color-border);
-  color: var(--kauro-color-text);
-  font-size: clamp(1.125rem, 1rem + 0.55vw, 1.375rem);
-  line-height: 1.45;
-  letter-spacing: -0.01em;
-}
-.kauro-site-statements li:first-child {
-  padding-block-start: 0;
-}
-.kauro-site-statements li::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  inset-block-start: calc(var(--kauro-space-5) + 0.75em);
-  inline-size: 1.25rem;
-  block-size: 2px;
-  background: var(--kauro-color-accent-text);
-}
-.kauro-site-statements li:first-child::before {
-  inset-block-start: 0.75em;
-}
-
-.kauro-site-modes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-  gap: var(--kauro-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-site-mode {
-  display: grid;
-  align-content: start;
-  justify-items: start;
-  gap: var(--kauro-space-4);
-  padding: clamp(1.5rem, 2.5vw, 2rem);
-  border: 1px solid var(--kauro-color-border);
-  border-radius: var(--kauro-radius-large);
-  background: var(--kauro-color-raised);
-}
-.kauro-site-main .kauro-site-mode h3 {
-  font-size: 1.625rem;
-  letter-spacing: -0.025em;
-}
-.kauro-site-main .kauro-site-mode-price {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
 }
 
 .kauro-site-quote .kauro-site-section-inner {
@@ -2011,17 +1856,12 @@ body:has(> .kauro-site-header) {
 
 @media (forced-colors: active) {
   .kauro-site-state,
-  .kauro-site-badge,
-  .kauro-site-chip,
   .kauro-site-panel,
   .kauro-site-card,
   .kauro-site-rung,
-  .kauro-site-mode,
-  .kauro-site-buyer,
   .kauro-site-table-region,
   .kauro-site-sheet,
   .kauro-site-window,
-  .kauro-site-stack-sheet,
   .kauro-site-stamp {
     border-color: CanvasText;
   }
@@ -2453,153 +2293,11 @@ body:has(> .kauro-site-header) {
   background-image: url("./textures/grain.svg");
   background-size: 240px;
 }
-.kauro-site-process-steps {
-  position: relative;
-  display: grid;
-  gap: var(--kauro-space-6);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: process;
-}
-.kauro-site-process-step {
-  position: relative;
-  padding-inline-start: 4rem;
-  counter-increment: process;
-}
-.kauro-site-process-step::before {
-  content: counter(process, decimal-leading-zero) / "";
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  inline-size: 2.75rem;
-  block-size: 2.75rem;
-  border: 1px solid var(--kauro-color-ink-accent);
-  border-radius: 50%;
-  background: var(--kauro-color-background);
-  color: var(--kauro-color-ink-accent);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-.kauro-site-main .kauro-site-process-step h3 {
-  margin-block-end: var(--kauro-space-2);
-  font-size: clamp(1.375rem, 1.2rem + 0.6vw, 1.75rem);
-  letter-spacing: -0.03em;
-}
-.kauro-site-process-step p {
-  color: var(--kauro-color-text-muted);
-}
 @media (min-width: 56rem) {
-  .kauro-site-process-steps {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    column-gap: var(--kauro-space-6);
-  }
   /* The line that joins the four steps. */
-  .kauro-site-process-steps::before {
-    content: "";
-    position: absolute;
-    inset-block-start: 1.375rem;
-    inset-inline: 1.375rem 0;
-    block-size: 1px;
-    background: color-mix(in srgb, var(--kauro-color-ink-accent) 45%, transparent);
-  }
-  .kauro-site-process-step {
-    padding-inline-start: 0;
-    padding-block-start: 4.25rem;
-  }
-}
-.kauro-site-process-step:first-child::before {
-  background: var(--kauro-color-ink-accent);
-  color: var(--kauro-color-ink);
 }
 
 /* ---- the delivery: a stack of sheets on wine rock ----------------------------------------------------------------------------- */
-
-.kauro-site-delivery-grid {
-  display: grid;
-  gap: var(--kauro-space-7);
-  align-items: center;
-}
-.kauro-site-stack {
-  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 2.5rem);
-  border-radius: var(--kauro-radius-large);
-  background: url("./textures/wine-rock.svg") center / cover, var(--kauro-color-wine);
-}
-.kauro-site-stack-sheets {
-  display: grid;
-  gap: 0.625rem;
-  box-sizing: border-box;
-  inline-size: 100%;
-  max-inline-size: 24rem;
-  margin: 0 auto;
-  padding: 0 2.5rem 0 0;
-  list-style: none;
-}
-.kauro-site-stack-sheet {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kauro-space-3);
-  padding: 0.875rem 1.125rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.5rem;
-  background: var(--kauro-color-raised);
-  color: var(--kauro-color-text);
-  font-size: 0.875rem;
-  box-shadow: 0 1rem 2rem -1.25rem color-mix(in srgb, var(--kauro-color-ink) 70%, transparent);
-}
-.kauro-site-stack-sheet:nth-child(2),
-.kauro-site-stack-sheet:nth-child(4) {
-  transform: translateX(1.25rem);
-}
-.kauro-site-stack-sheet:nth-child(3) {
-  transform: translateX(2.5rem);
-}
-.kauro-site-stack-meta {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.kauro-site-stack-sheet--doc {
-  justify-content: flex-start;
-}
-.kauro-site-stack-doc {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-  font-weight: 600;
-}
-.kauro-site-stack-doc::before {
-  content: "";
-  inline-size: 0.75em;
-  block-size: 0.95em;
-  border: 1.5px solid var(--kauro-color-primary);
-  border-radius: 1px 0.25em 1px 1px;
-}
-.kauro-site-delivery .kauro-site-deliverables {
-  grid-template-columns: 1fr;
-}
-@media (min-width: 40rem) {
-  .kauro-site-delivery .kauro-site-deliverables {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 62rem) {
-  .kauro-site-delivery-grid {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    column-gap: clamp(3rem, 6vw, 6rem);
-  }
-  .kauro-site-delivery .kauro-site-stack {
-    align-self: stretch;
-    display: grid;
-    align-content: center;
-  }
-}
 
 /* ---- the bands that carry rock behind a veil of their colour -------------------------------------------------------------------- */
 
@@ -2644,15 +2342,12 @@ body:has(> .kauro-site-header) {
 
 /* ---- services: one colour of the brand for each, never the colour of another company ---------------------------------------- */
 
-.kauro-site-mode,
 .kauro-site-service {
   border-block-start: 4px solid var(--kauro-color-accent);
 }
-.kauro-site-mode--hubspot,
 .kauro-site-cards--three > .kauro-site-service:nth-child(2) {
   border-block-start-color: var(--kauro-color-primary);
 }
-.kauro-site-mode--salesforce,
 .kauro-site-cards--three > .kauro-site-service:nth-child(3) {
   border-block-start-color: var(--kauro-color-text);
 }
@@ -2664,28 +2359,6 @@ body:has(> .kauro-site-header) {
 /* ---- interior pages ------------------------------------------------------------------------------------------------------------ */
 
 /* A big numeral beside a head: how many steps, set light and huge. */
-.kauro-site-main .kauro-site-bignum {
-  margin: 0;
-  color: transparent;
-  -webkit-text-stroke: 1.5px var(--kauro-color-accent-text);
-  font-family: var(--kauro-display-family);
-  font-size: clamp(7rem, 3rem + 14vw, 16rem);
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.06em;
-  line-height: 0.8;
-}
-@media (forced-colors: active) {
-  .kauro-site-main .kauro-site-bignum {
-    color: CanvasText;
-    -webkit-text-stroke: 0;
-  }
-}
-@media (min-width: 62rem) {
-  .kauro-site-main .kauro-site-bignum {
-    text-align: end;
-  }
-}
 
 /* The cover of the sample report, on rock (Sample delivery). */
 .kauro-site-cover {
@@ -2788,13 +2461,6 @@ body:has(> .kauro-site-header) {
 
 .kauro-site-main p.kauro-site-stamp-line {
   margin-block-start: var(--kauro-space-6);
-}
-
-.kauro-site-modes {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-}
-.kauro-site-mode .kauro-site-price {
-  margin-block-start: var(--kauro-space-2);
 }
 /* The lines of the report's text, drawn as rules on the cover. */
 .kauro-site-cover-sheet::after {
@@ -3227,125 +2893,11 @@ body:has(> .kauro-site-header) {
 }
 
 /* An agency's clients, each at its own phase. */
-.kauro-site-frag--clients {
-  gap: 0;
-  padding-block: 0.375rem;
-}
-.kauro-site-frag-client {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-block: 0.5rem;
-}
-.kauro-site-frag-client + .kauro-site-frag-client {
-  border-block-start: 1px solid var(--kauro-color-border);
-}
-.kauro-site-frag-client-name {
-  font-weight: 650;
-}
-.kauro-site-frag-client-phase {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
-}
-.kauro-site-frag-client-phase::before {
-  content: "";
-  inline-size: 0.4375rem;
-  block-size: 0.4375rem;
-  border-radius: 50%;
-  background: var(--kauro-color-accent);
-}
-.kauro-site-frag-client--decide .kauro-site-frag-client-phase {
-  color: var(--kauro-color-primary);
-  font-weight: 600;
-}
-.kauro-site-frag-client--decide .kauro-site-frag-client-phase::before {
-  background: var(--kauro-color-primary);
-}
-.kauro-site-frag-client--ready .kauro-site-frag-client-phase::before {
-  background: var(--kauro-color-success-text);
-}
 
 /* The same price for an agency and a company. */
-.kauro-site-frag--same {
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-}
-.kauro-site-frag-tag {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.625rem 0.75rem;
-  border: 1px dashed var(--kauro-color-control-border);
-  border-radius: 0.375rem;
-}
-.kauro-site-frag-tag .kauro-site-frag-figure {
-  font-size: 1.125rem;
-}
-.kauro-site-frag-equals::before {
-  content: "=";
-  color: var(--kauro-color-primary);
-  font-family: var(--kauro-display-family);
-  font-size: 1.5rem;
-  font-weight: 300;
-}
 
 /* Where the files go: never from Kauro to a CRM; from Kauro to the team, and from the team to its CRM. */
-.kauro-site-frag--route {
-  max-inline-size: 26rem;
-  margin-block-start: var(--kauro-space-6);
-  padding: 1.125rem;
-  gap: 1rem;
-}
-.kauro-site-route-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.kauro-site-route-node {
-  flex: none;
-  padding: 0.3125rem 0.625rem;
-  border: 1px solid var(--kauro-color-text);
-  border-radius: 0.3125rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.kauro-site-route-node--quiet {
-  border-color: var(--kauro-color-control-border);
-  color: var(--kauro-color-text-muted);
-  font-weight: 500;
-}
-.kauro-site-route-line {
-  flex: 1;
-  min-inline-size: 0.75rem;
-  block-size: 1px;
-  background: var(--kauro-color-text-muted);
-}
-.kauro-site-route-cut {
-  position: relative;
-  flex: 1;
-  min-inline-size: 2rem;
-  block-size: 0;
-  border-block-start: 1px dashed var(--kauro-color-danger-text);
-}
 /* The cross on the cut line. */
-.kauro-site-route-cut::before,
-.kauro-site-route-cut::after {
-  content: "";
-  position: absolute;
-  inset-inline-start: calc(50% - 0.4375rem);
-  inset-block-start: -0.5rem;
-  inline-size: 0.875rem;
-  block-size: 1.5px;
-  margin-block-start: 0.4375rem;
-  background: var(--kauro-color-danger-text);
-  transform: rotate(45deg);
-}
-.kauro-site-route-cut::after {
-  transform: rotate(-45deg);
-}
 
 /* Notes in the margin, set in the flow beside a fragment. */
 .kauro-site-margin {
@@ -3388,12 +2940,6 @@ body:has(> .kauro-site-header) {
 }
 
 /* In the process band the fragments sit on carbon. */
-.kauro-site-process-step .kauro-site-frag {
-  max-inline-size: none;
-}
-.kauro-site-buyer .kauro-site-frag {
-  max-inline-size: none;
-}
 
 /* ---- the context band: wine, the sentence large ----------------------------------------------------------------------------- */
 
@@ -3494,37 +3040,6 @@ body:has(> .kauro-site-header) {
 }
 
 /* The fragments of the four steps line up on one baseline. */
-@media (min-width: 56rem) {
-  .kauro-site-process-step {
-    display: flex;
-    flex-direction: column;
-  }
-  .kauro-site-process-step .kauro-site-frag {
-    margin-block-start: auto;
-    transform: translateY(var(--kauro-space-5));
-  }
-  .kauro-site-process-step p {
-    margin-block-end: var(--kauro-space-5);
-  }
-}
-
-.kauro-site-route-line {
-  position: relative;
-}
-.kauro-site-route-line::after {
-  content: "";
-  position: absolute;
-  inset-inline-end: 0;
-  inset-block-start: -0.1875rem;
-  inline-size: 0.375rem;
-  block-size: 0.375rem;
-  border: solid var(--kauro-color-text-muted);
-  border-width: 1px 1px 0 0;
-  transform: rotate(45deg);
-}
-.kauro-site-frag--route {
-  font-size: 0.875rem;
-}
 
 /* ---- fragments of the interior pages ------------------------------------------------------------------------------------------- */
 
@@ -3583,133 +3098,8 @@ body:has(> .kauro-site-header) {
 }
 
 /* Two customers behind their walls; a request across the line is answered as if nothing were there. */
-.kauro-site-frag--walls {
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: stretch;
-  gap: 0.75rem;
-  max-inline-size: 34rem;
-}
-.kauro-site-wall {
-  display: grid;
-  align-content: start;
-  gap: 0.375rem;
-  padding: 0.75rem;
-  border: 1.5px solid var(--kauro-color-text);
-  border-radius: 0.375rem;
-}
-.kauro-site-wall--other {
-  border-color: var(--kauro-color-control-border);
-  border-style: dashed;
-}
-.kauro-site-wall-file {
-  block-size: 0.5rem;
-  border-radius: 0.125rem;
-  background: var(--kauro-color-border);
-}
-.kauro-site-wall-file:nth-child(3) {
-  inline-size: 70%;
-}
-.kauro-site-wall-cross {
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 0.375rem;
-  max-inline-size: 8rem;
-  text-align: center;
-  font-size: 0.75rem;
-}
-.kauro-site-wall-answer {
-  padding: 0.25rem 0.5rem;
-  border: 1.5px solid var(--kauro-color-primary);
-  border-radius: 0.25rem;
-  color: var(--kauro-color-primary);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  transform: rotate(-4deg);
-}
-@media (max-width: 30rem) {
-  .kauro-site-frag--walls {
-    grid-template-columns: 1fr;
-  }
-  .kauro-site-wall-cross {
-    max-inline-size: none;
-  }
-}
 
 /* A file of which a model sees only a small window. */
-.kauro-site-frag--context {
-  max-inline-size: 22rem;
-}
-.kauro-site-context-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 3px;
-}
-.kauro-site-context-cell {
-  block-size: 0.75rem;
-  border-radius: 2px;
-  background: var(--kauro-color-border);
-}
-.kauro-site-context-cell--seen {
-  background: var(--kauro-color-primary);
-}
-.kauro-site-context-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem 1rem;
-  color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
-}
-.kauro-site-context-key > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-.kauro-site-context-key > span::before {
-  content: "";
-  inline-size: 0.625rem;
-  block-size: 0.625rem;
-  border-radius: 2px;
-  background: var(--kauro-color-border);
-}
-.kauro-site-context-key-seen::before {
-  background: var(--kauro-color-primary);
-}
-
-.kauro-site-frag--context .kauro-site-frag-title {
-  font-family: var(--kauro-mono-family);
-  letter-spacing: 0;
-  text-transform: none;
-}
-.kauro-site-context-key > .kauro-site-context-key-seen::before {
-  background: var(--kauro-color-primary);
-}
-
-@media (max-width: 30rem) {
-  .kauro-site-frag--route {
-    padding: 0.875rem;
-  }
-  .kauro-site-route-row {
-    gap: 0.375rem;
-  }
-  .kauro-site-route-node {
-    flex: 0 1 auto;
-    min-inline-size: 0;
-    padding: 0.25rem 0.375rem;
-    font-size: 0.75rem;
-    white-space: normal;
-    text-align: center;
-  }
-  .kauro-site-route-line {
-    min-inline-size: 0.625rem;
-  }
-  .kauro-site-route-cut {
-    min-inline-size: 1.5rem;
-  }
-}
 
 /* =================================================================================================================================== */
 /* Fourth pass: the journey, the audience switch, the package folder, the struck refusals, the offer, and depth for the ticket.         */
@@ -3741,19 +3131,6 @@ body:has(> .kauro-site-header) {
 }
 
 /* The documents: sheets of paper, slightly lifted, the top one tilted a little. */
-.kauro-folder-doc {
-  position: relative;
-  padding: 0.75rem;
-}
-.kauro-folder-doc::before {
-  content: "";
-  position: absolute;
-  inset: 0.75rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.5rem;
-  background: var(--kauro-color-surface);
-  transform: rotate(2.5deg);
-}
 .kauro-doc {
   position: relative;
   display: grid;
@@ -3772,9 +3149,6 @@ body:has(> .kauro-site-header) {
     opacity: 0;
     transform: rotate(-4deg) translateY(1rem);
   }
-}
-.kauro-folder:not(.is-ready) .kauro-doc {
-  animation: none;
 }
 .kauro-site-main p.kauro-doc-title {
   padding-block-end: 0.75rem;
@@ -3935,11 +3309,6 @@ body:has(> .kauro-site-header) {
   transform: rotate(-3deg) translateY(-0.25rem);
 }
 
-/* A panel the script has hidden stays hidden, whatever layout its class gives it. */
-.kauro-site-main [role="tabpanel"][hidden] {
-  display: none;
-}
-
 /* ---- Data handling: the answer to a request across customers, and a file a model sees a line of ------------------------------- */
 
 .kauro-answer {
@@ -4047,7 +3416,6 @@ body:has(> .kauro-site-header) {
 .kauro-site-service--lead .kauro-site-frag {
   background: var(--kauro-color-surface);
 }
-
 
 /* =================================================================================================================================== */
 /* Fifth pass (A10 §8): one file walked through the process, buyers on two cards under one stamp, the delivery as a manifest beside its */
@@ -4222,63 +3590,13 @@ body:has(> .kauro-site-header) {
   min-inline-size: 0;
   border-radius: var(--kauro-radius-large);
   overflow: hidden;
-  color-scheme: light;
-  --kauro-color-text: #242426;
-  --kauro-color-text-muted: #5f5955;
-  --kauro-color-background: #f8f6f3;
-  --kauro-color-surface: #f1ede8;
-  --kauro-color-raised: #ffffff;
-  --kauro-color-border: #e3dcd4;
-  --kauro-color-control-border: #8c837d;
-  --kauro-color-primary: #653a46;
-  --kauro-color-primary-hover: #4f2c37;
-  --kauro-color-on-primary: #f8f6f3;
-  --kauro-color-focus: #653a46;
-  --kauro-color-accent-text: #7a5a45;
-  --kauro-color-accent-surface: #ece2d9;
-  --kauro-color-success-text: #2e5b38;
-  --kauro-color-success-surface: #e3ede2;
-  background: var(--kauro-color-background);
-  color: var(--kauro-color-text);
   box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 70%, transparent), 0 0 0 1px color-mix(in srgb, #000 20%, transparent);
 }
 :root[data-theme="dark"] .kauro-walk-window {
-  color-scheme: dark;
-  --kauro-color-text: #f1ece6;
-  --kauro-color-text-muted: #ada59e;
-  --kauro-color-background: #2d2c2f;
-  --kauro-color-surface: #262528;
-  --kauro-color-raised: #333236;
-  --kauro-color-border: #45434a;
-  --kauro-color-control-border: #857d77;
-  --kauro-color-primary: #c4a693;
-  --kauro-color-primary-hover: #d6bfae;
-  --kauro-color-on-primary: #242426;
-  --kauro-color-focus: #c4a693;
-  --kauro-color-accent-text: #c4a693;
-  --kauro-color-accent-surface: #3d332d;
-  --kauro-color-success-text: #a3cda9;
-  --kauro-color-success-surface: #213026;
   box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 80%, transparent), 0 0 0 1px var(--kauro-color-border);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .kauro-walk-window {
-    color-scheme: dark;
-    --kauro-color-text: #f1ece6;
-    --kauro-color-text-muted: #ada59e;
-    --kauro-color-background: #2d2c2f;
-    --kauro-color-surface: #262528;
-    --kauro-color-raised: #333236;
-    --kauro-color-border: #45434a;
-    --kauro-color-control-border: #857d77;
-    --kauro-color-primary: #c4a693;
-    --kauro-color-primary-hover: #d6bfae;
-    --kauro-color-on-primary: #242426;
-    --kauro-color-focus: #c4a693;
-    --kauro-color-accent-text: #c4a693;
-    --kauro-color-accent-surface: #3d332d;
-    --kauro-color-success-text: #a3cda9;
-    --kauro-color-success-surface: #213026;
     box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 80%, transparent), 0 0 0 1px var(--kauro-color-border);
   }
 }
@@ -5501,7 +4819,7 @@ body:has(> .kauro-site-header) {
 @media (min-width: 62rem) {
   .kauro-site-main p.kauro-board-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
+    grid-template-columns: minmax(12.5rem, 1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
     column-gap: 2rem;
     max-inline-size: none;
     padding-inline: 1.5rem;
@@ -5512,7 +4830,7 @@ body:has(> .kauro-site-header) {
     text-transform: uppercase;
   }
   .kauro-board-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
+    grid-template-columns: minmax(12.5rem, 1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
     align-items: start;
   }
   .kauro-board-for .kauro-board-label {
@@ -5593,6 +4911,10 @@ body:has(> .kauro-site-header) {
   --kauro-color-focus: #653a46;
   --kauro-color-accent-text: #7a5a45;
   --kauro-color-accent-surface: #ece2d9;
+  --kauro-color-control-border: #8c837d;
+  --kauro-color-primary-hover: #4f2c37;
+  --kauro-color-success-text: #2e5b38;
+  --kauro-color-success-surface: #e3ede2;
   background: var(--kauro-color-background);
   color: var(--kauro-color-text);
 }
@@ -5609,6 +4931,10 @@ body:has(> .kauro-site-header) {
   --kauro-color-focus: #c4a693;
   --kauro-color-accent-text: #c4a693;
   --kauro-color-accent-surface: #3d332d;
+  --kauro-color-control-border: #857d77;
+  --kauro-color-primary-hover: #d6bfae;
+  --kauro-color-success-text: #a3cda9;
+  --kauro-color-success-surface: #213026;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .kauro-paper {
@@ -5624,6 +4950,10 @@ body:has(> .kauro-site-header) {
     --kauro-color-focus: #c4a693;
     --kauro-color-accent-text: #c4a693;
     --kauro-color-accent-surface: #3d332d;
+    --kauro-color-control-border: #857d77;
+    --kauro-color-primary-hover: #d6bfae;
+    --kauro-color-success-text: #a3cda9;
+    --kauro-color-success-surface: #213026;
   }
 }
 
