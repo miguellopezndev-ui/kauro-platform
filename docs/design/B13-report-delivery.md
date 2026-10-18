@@ -134,7 +134,7 @@ granting the delivered PDF to its agency only and refusing every unpublished pac
 - **The database-backed `ReportInputsPort`** exists (order 6, `PlatformReportInputs`); binding it for a deployed worker is B14's.
 - **Replacement of a delivered package** (`AVAILABLE → RETIRED`, "LATER B13" in the B08 machine) is not performed; a corrected report is
   another job's package and the first delivery stays AVAILABLE. Deciding which one supersedes the other is a product decision.
-- Branding versions have a store (0095) but no writer route yet (CMD008); privacy class, findings and decisions come from records (order 6).
+- Branding versions have a store (0095) and, since order 7, their writer (CMD008) and stored logos (0096; docs/design/B13-branding.md); privacy class, findings and decisions come from records (order 6).
 - A transient storage outage while a report artifact is being written fails the job as it does for any staged artifact (B08 S035); a retryable class for writer failures would be a B08 change.
 - The report is read in memory (`readMigrationPackage`); a package larger than `DEFAULT_MAX_PACKAGE_BYTES` (256 MiB) is refused
   (`PACKAGE_TOO_LARGE`), not truncated.

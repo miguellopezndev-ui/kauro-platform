@@ -84,6 +84,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/activate ActivateAgency",
+      "POST /api/v1/agencies/{agencyId}/branding UpdateBranding",
+      "POST /api/v1/agencies/{agencyId}/branding/logos SubmitBrandingLogo",
       "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
       "POST /api/v1/agencies/{agencyId}/closure-requests CloseAgency",

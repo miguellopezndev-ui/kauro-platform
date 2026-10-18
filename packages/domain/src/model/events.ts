@@ -43,6 +43,8 @@ export const EVENT_TYPES = [
   "membership.revoked.v1",
   "membership.role_changed.v1",
   "agency.ownership_transferred.v1",
+  // the agency recorded a new branding version for future reports (CMD008, order 7; migrations 0095, 0096)
+  "agency.branding_versioned.v1",
   // End clients
   "end_client.created.v1",
   "end_client.archived.v1",
@@ -162,6 +164,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "membership.revoked.v1": ["membershipId", "agencyId", "byMembershipId", "reasonCode"],
   "membership.role_changed.v1": ["membershipId", "agencyId", "role", "previousRole", "byMembershipId"],
   "agency.ownership_transferred.v1": ["agencyId", "fromMembershipId", "toMembershipId"],
+  "agency.branding_versioned.v1": ["agencyId", "brandingVersion", "logoId", "logoSha256", "byMembershipId"],
   "end_client.created.v1": ["clientId", "agencyId", "processingAuthorityRef", "createdByMembershipId"],
   "end_client.archived.v1": ["clientId", "agencyId", "openProjects", "archivedByMembershipId"],
   "project.created.v1": ["projectId", "agencyId", "clientId", "mode", "capabilityId", "capabilityVersion", "initialRevisionId", "createdByMembershipId"],

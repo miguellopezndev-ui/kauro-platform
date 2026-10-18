@@ -109,9 +109,9 @@ instant is its transaction's, not its commit's, so without it a branding transac
 first report would change the version later reads and attempts select (independent review round 1, R1). A later version is for later jobs (registry CMD008: "a new branding version for future
 reports while preserving already delivered artifact identity"). The report's `brandingVersion` is `agency-branding-v<n>`. A delivered
 PDF and record never change: they are generation-0 objects of their package, and a new version is a new model hash in another job.
-No logo column: the stored-logo pipeline is CMD008's; an agency branding names no logo (`BRANDING_UNVERIFIABLE` if logo bytes are given).
-CMD008's route is not part of this edition: until it exists (or another owner-approved path records version 1), an agency has no
-branding version and its reports are refused `BRANDING_UNAVAILABLE`. The renderer's visual identity is `rendererVersion`, not branding:
+Order 7 added the stored logo and CMD008 itself (docs/design/B13-branding.md, migration 0096): a version names one of its agency's
+logos or none, and the report prints exactly the bytes whose SHA-256 it names. Until an agency records a version through CMD008, it has
+no branding version and its reports are refused `BRANDING_UNAVAILABLE`. The renderer's visual identity is `rendererVersion`, not branding:
 a new Kauro visual identity is a new renderer version, never an edit of a delivered report.
 
 ### 4.2 Privacy class: the audience of a B08 package
@@ -178,13 +178,13 @@ The exact list, and the procedure, are in `docs/owner/LEGAL_IDENTITY_SNAPSHOT.md
 digit, matrícula mercantil, registered address, and the professional confirmation of those facts. Until a document is recorded and a
 fiscal issuer names its hash, every report is refused `ISSUER_UNAVAILABLE`. Owner decisions this order took and that the owner may revise:
 the report's issuer line prints the NIT as `registrationId`; a B08 package report is `SECURE_DETAIL`; a job's branding is the version in
-force when it was queued; branding versions are recorded only by CMD008 (not built), so reports are also refused `BRANDING_UNAVAILABLE`
-until it, or another approved path, records one.
+force when it was queued; branding versions are recorded only by CMD008 (built by order 7), so an agency's reports are refused `BRANDING_UNAVAILABLE`
+until its OWNER or ADMIN records one.
 
 ## 9. Still blocked until B14/B15
 
 - Binding `ReportingExecutionEnvelope` and `PlatformReportInputs` in a deployment (B14's worker host and composition root; how the worker
   reaches the control plane's read); a deployment-pinned browser.
 - Cloud object storage, the fiscal issuance route and its provider (B15); the real fiscal issuer row.
-- CMD008 UpdateBranding (route, media pipeline, stored logo) and its UI.
+- The branding UI (CMD008, its media pipeline and the stored logo: order 7, docs/design/B13-branding.md).
 - Replacement of a delivered package (`AVAILABLE → RETIRED`), a product decision.

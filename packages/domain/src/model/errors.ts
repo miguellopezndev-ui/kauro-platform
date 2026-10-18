@@ -211,6 +211,13 @@ export const FAILURE_REASONS = [
   "PATCH_UNKNOWN_FIELD",
   "PATCH_EFFECT_NOT_PERMITTED",
   "PATCH_MALFORMED",
+  // the agency logo's safe media pipeline and the printable brand name (CMD008, order 7; @kauro/domain branding-logo.ts, migration 0095)
+  "LOGO_FORMAT_UNSUPPORTED",
+  "LOGO_MALFORMED",
+  "LOGO_TOO_LARGE",
+  "LOGO_DIMENSIONS_OUT_OF_RANGE",
+  "LOGO_DIGEST_MISMATCH",
+  "BRANDING_NAME_UNPRINTABLE",
   // request admission at the HTTP boundary (10 "Request envelope": content type, size, syntax, duplicate keys, schema, headers)
   "CONTENT_TYPE_UNSUPPORTED",
   "BODY_TOO_LARGE",

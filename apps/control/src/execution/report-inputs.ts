@@ -6,7 +6,7 @@
  * @kauro/persistence reportSourcesOf, the attempt of the scope's job, the job's subject, its VALID receipt, the quote its commercial
  * authorization names with every member of the quote's terms preimage, the agency's acceptance of that terms version, the fiscal issuer
  * the preimage names and its legal identity document, the job's branding version (bound once per job, at its first read, to the version in force when it was queued — the reader's
- * one write), the subject's
+ * one write) and the bytes of the stored logo it names (CMD008, migration 0096), the subject's
  * audit and the job's approval and plan; and, through the execution store, the counts the publication itself reads (`deliveryCountFacts`).
  * The disclosure set is composed again from the plan and the receipt by the edition's own composer (@kauro/application
  * disclosureItemsOf). Nothing is verified or defaulted here: every record is passed in its binding, a missing one as null, and
@@ -59,8 +59,18 @@ export function reportInputsOf(recorded: RecordedReportFacts, countFacts: Author
     expectedManifestSha256: receipt.artifactEvidenceHash,
     quote: quote === null ? null : { quoteId: quote.preimage.quoteId, billableSourceUnits: quote.preimage.billableUnits },
     privacyClass: B08_PACKAGE_REPORT_PRIVACY_CLASS,
-    branding: branding === null ? null : { binding: "AGENCY_BRANDING_V1", agencyId: branding.agencyId, version: branding.version, displayName: branding.displayName, recordedAt: branding.recordedAt },
-    logo: null,
+    branding:
+      branding === null
+        ? null
+        : {
+            binding: "AGENCY_BRANDING_V1",
+            agencyId: branding.agencyId,
+            version: branding.version,
+            displayName: branding.displayName,
+            recordedAt: branding.recordedAt,
+            logo: branding.logo === null ? null : { logoId: branding.logo.logoId, sha256: branding.logo.sha256, mediaType: branding.logo.mediaType },
+          },
+    logo: recorded.brandingLogo,
     terms:
       quote === null
         ? null

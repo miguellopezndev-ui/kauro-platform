@@ -201,6 +201,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0094_b12_prospect_contact_key.sql",
     // order 6: the sources of a B13 report (legal identity documents, branding versions, the control plane's column reads of the report's bindings)
     "0095_b13_report_sources.sql",
+    // order 7: the agency's stored logos (CMD008's safe media pipeline), the logo a branding version names, and agency.branding_versioned.v1
+    "0096_b13_branding_logos.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

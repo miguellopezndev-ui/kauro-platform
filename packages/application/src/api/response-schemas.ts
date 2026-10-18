@@ -23,6 +23,8 @@
 import { AGENCY_CAPABILITIES, DomainFailure, INQUIRY_BUYER_TYPES, INQUIRY_DESTINATIONS, INQUIRY_RECORD_BANDS, INQUIRY_TIMINGS, OFFERED_CAPABILITY_STATES, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
 import { AUDIT_ROUTES, type AuditCommandId, type AuditIntakeId, type AuditRouteId } from "../audit/contracts.js";
 import { AUDIT_COMMAND_RESPONSES, AUDIT_VIEW_DEFINITIONS } from "../audit/response-views.js";
+import type { BrandingCommandId, BrandingIntakeId } from "../branding/contracts.js";
+import { BRANDING_COMMAND_RESPONSES, BRANDING_VIEW_DEFINITIONS } from "../branding/response-views.js";
 import { EXECUTION_ROUTES, type ExecutionCommandId, type ExecutionRouteId } from "../execution/contracts.js";
 import { EXECUTION_COMMAND_RESPONSES, EXECUTION_VIEW_DEFINITIONS } from "../execution/response-views.js";
 import { SOURCE_ROUTES } from "../sources/contracts.js";
@@ -72,7 +74,7 @@ const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
  * (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths), and CMD044 of the support
  * package (B11 W4).
  */
-export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044" | "CMD042" | "CMD060";
+export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | BrandingCommandId | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044" | "CMD042" | "CMD060";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
@@ -82,8 +84,8 @@ export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${
  */
 export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId | ExecutionRouteId | AuditRouteId | "ListSupportCases" | "GetSupportCase" | "GetBuyerType" | "ListProjects";
 export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
-/** The document intakes this edition serves (B07 D-SEL-2: the selection manifest; B08 D8-PLAN-1: the decision artifact), by operation id. */
-export type IntakeOperationId = SourceIntakeId | AuditIntakeId;
+/** The document intakes this edition serves (B07 D-SEL-2: the selection manifest; B08 D8-PLAN-1: the decision artifact; B13 order 7: the agency logo), by operation id. */
+export type IntakeOperationId = SourceIntakeId | AuditIntakeId | BrandingIntakeId;
 export type IntakeResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}intake:${IntakeOperationId}`;
 export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId | IntakeResponseSchemaId;
 
@@ -555,7 +557,7 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
  * Every DTO definition of the served routes: B06's, then the source lifecycle's (sources/response-views, joined when mandate
  * B07-COMMANDS served its routes; design §9.5). A view is closed: a member not listed can never reach the wire.
  */
-export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([...B06_VIEW_DEFINITIONS, ...SOURCE_VIEW_DEFINITIONS, ...EXECUTION_VIEW_DEFINITIONS, ...AUDIT_VIEW_DEFINITIONS]);
+export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([...B06_VIEW_DEFINITIONS, ...SOURCE_VIEW_DEFINITIONS, ...EXECUTION_VIEW_DEFINITIONS, ...AUDIT_VIEW_DEFINITIONS, ...BRANDING_VIEW_DEFINITIONS]);
 
 /**
  * The success reply of a served command: a COMPLETED envelope carrying a view at 200 or 201, or — CompleteUpload (CMD014), whose
@@ -571,6 +573,7 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> 
   CMD005: { status: 200, view: "MembershipView" },
   CMD006: { status: 200, view: "MembershipView" },
   CMD007: { status: 200, view: "TransferOwnershipView" },
+  ...BRANDING_COMMAND_RESPONSES,
   CMD009: { status: 201, view: "EndClientView" },
   CMD010: { status: 200, view: "ArchiveClientView" },
   CMD011: { status: 201, view: "ProjectView" },
@@ -626,6 +629,7 @@ export function readResponseSchemaId(operationId: ReadOperationId): ReadResponse
 export const INTAKE_RESPONSES: Readonly<Record<IntakeOperationId, { readonly view: string }>> = Object.freeze({
   SubmitSelectionManifest: { view: SOURCE_ROUTES.SubmitSelectionManifest.view },
   SubmitDecisionArtifact: { view: "DecisionArtifactIntakeView" },
+  SubmitBrandingLogo: { view: "BrandingLogoIntakeView" },
 });
 
 export const INTAKE_OPERATION_IDS = Object.freeze(Object.keys(INTAKE_RESPONSES) as IntakeOperationId[]);

@@ -505,6 +505,7 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD005 ChangeMembership | POST /api/v1/memberships/{membershipId}/capabilities | AGENCY_OWNER | AGENCY_HEADER | fresh |  |  | — |
 | CMD006 RevokeMembership | POST /api/v1/memberships/{membershipId}/revoke | AGENCY_OWNER_OR_ADMIN | AGENCY_HEADER | — | Membership inviter_revokes; Membership authorized_revocation | membership.revoked.v1 | — |
 | CMD007 TransferOwnership | POST /api/v1/agencies/{agencyId}/ownership-transfers | AGENCY_OWNER | AGENCY_PATH | fresh |  |  | — |
+| CMD008 UpdateBranding | POST /api/v1/agencies/{agencyId}/branding | AGENCY_OWNER_OR_ADMIN | AGENCY_PATH | — |  | agency.branding_versioned.v1 | — |
 | CMD009 CreateClient | POST /api/v1/agencies/{agencyId}/clients | AGENCY_OPERATOR | AGENCY_PATH | — | EndClient (initial ACTIVE) | end_client.created.v1 | — |
 | CMD010 ArchiveClient | POST /api/v1/clients/{clientId}/archive | AGENCY_ADMIN | AGENCY_HEADER | — | EndClient archive_client | end_client.archived.v1 | — |
 | CMD011 CreateProject | POST /api/v1/clients/{clientId}/projects | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision (initial DRAFT); Project (initial OPEN) | project.created.v1, dataset_revision.created.v1 | — |
@@ -851,6 +852,47 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | NO_SEMANTIC_CHANGE | — | — | COMMAND | the successor already owns the agency |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD008 UpdateBranding
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | BRANDING_NAME_UNPRINTABLE | FORMAT | — | COMMAND | the name is padded, longer than 120 characters, not NFC, or holds a control, format, separator or markup-significant character a report could not print; nothing was recorded |
+| 400 | INVALID_REQUEST | UNKNOWN_REFERENCE | UNKNOWN_REFERENCE | — | COMMAND | logoArtifactRef is not a logo this agency stored through the logo intake (another agency's logo answers as a nonexistent one) |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the agency is not visible to the caller (another agency's path answers as a nonexistent one) |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the agency's current version (another branding change or agency edit committed first); nothing was recorded and the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | AGENCY_NOT_OPEN | — | always | COMMAND | the agency is not DRAFT or ACTIVE: it records no new branding |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | LOGO_MALFORMED | — | — | COMMAND | the stored logo the request names no longer decodes as the pipeline's PNG of its recorded size; nothing was recorded |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -4110,6 +4152,20 @@ the check proves every citation resolves to an existing test.
 | lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…"<br>`cmd007-transfer-ownership.test.ts` :: "RACE: …" |
 | external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
 
+### CMD008 UpdateBranding
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd008-update-branding.test.ts` :: "CMD008-OK: the OWNER stores a logo through the safe media pipeline…" |
+| wrong role | `cmd008-update-branding.test.ts` :: "CMD008-DENY roles and tenants: …" |
+| wrong agency | `cmd008-update-branding.test.ts` :: "CMD008-DENY roles and tenants: …"<br>`cmd008-update-branding.test.ts` :: "CMD008 isolation: …" |
+| stale version | `cmd008-update-branding.test.ts` :: "CMD008-DENY preconditions: …"<br>`cmd008-update-branding.test.ts` :: "CMD008-RACE: two branding changes naming one agency version…" |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…"<br>`cmd008-update-branding.test.ts` :: "CMD008-RACE: …" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…"<br>`cmd008-update-branding.test.ts` :: "CMD008-RACE: …" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…"<br>`cmd008-update-branding.test.ts` :: "CMD008-DENY media: …" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…"<br>`cmd008-update-branding.test.ts` :: "CMD008-RACE: …" |
+| external uncertainty | NOT_APPLICABLE: CMD008 and its logo intake reach no provider and fetch nothing (the logo is the request's own bytes, never a URL); every effect is rows of one database transaction |
+
 ### CMD009 CreateClient
 
 | Mutation | Applicability |
@@ -5809,6 +5865,7 @@ membership after its transition lock) plus the intake's own role; every denial i
 | --- | --- | --- | --- | --- | --- |
 | SubmitSelectionManifest | POST /api/v1/revisions/{revisionId}/selection-manifests | AGENCY_HEADER | SelectionManifestIntakeView | SUBMIT_SELECTION_MANIFEST | 10 "Upload and target routes" (selection edits require the revision version: the version is compared by CMD016); D-SEL-2 |
 | SubmitDecisionArtifact | POST /api/v1/audits/{auditId}/decision-artifacts | AGENCY_HEADER | DecisionArtifactIntakeView | SUBMIT_DECISION_ARTIFACT | B08 design §8, §12 (D8-PLAN-1, D8-API-1): the agency's decisions enter as evidence, never through a command; B07 D-SEL-2: a non-journaled, content-idempotent intake |
+| SubmitBrandingLogo | POST /api/v1/agencies/{agencyId}/branding/logos | AGENCY_HEADER | BrandingLogoIntakeView | SUBMIT_BRANDING_LOGO | registry CMD008 precondition ("The logo passed the safe media pipeline; branding rights and tenant scope are confirmed") and failure ("Unsafe SVG/script, invalid media or a foreign artifact reject; no remote image fetch from arbitrary URLs"); B07 D-SEL-2: a non-journaled, content-idempotent intake; AGENCY_OWNER_OR_ADMIN |
 
 ### SubmitSelectionManifest
 
@@ -5879,6 +5936,45 @@ membership after its transition lock) plus the intake's own role; every denial i
 | 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
 | 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
 | 404 | NOT_FOUND | — | — | — | COMMAND | the audit is not visible to the caller's agency |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### SubmitBrandingLogo
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | LOGO_DIGEST_MISMATCH | FORMAT | — | COMMAND | contentSha256 is not the SHA-256 of the bytes received, or contentBase64 is not canonical base64: nothing was stored |
+| 400 | INVALID_REQUEST | LOGO_FORMAT_UNSUPPORTED | — | — | COMMAND | the file is not a PNG (SVG, HTML, script, JPEG, GIF, WebP or anything else) or is an animated PNG: nothing was parsed or stored |
+| 400 | INVALID_REQUEST | LOGO_MALFORMED | — | — | COMMAND | the PNG is broken or forged (a chunk's length, type or CRC, the chunk order, the image data, a filter, a palette index, bytes after IEND) or its data inflates past what its header implies: nothing was stored |
+| 400 | INVALID_REQUEST | LOGO_TOO_LARGE | — | — | COMMAND | the file, or the PNG written again from its pixels, is larger than 512 KiB: nothing was stored |
+| 400 | INVALID_REQUEST | LOGO_DIMENSIONS_OUT_OF_RANGE | — | — | COMMAND | the image is not 1..2048 pixels a side: nothing was stored |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the agency is not visible to the caller (another agency's path answers as a nonexistent one) |
+| 409 | PRECONDITION_FAILED | AGENCY_NOT_OPEN | — | always | COMMAND | the agency is not DRAFT or ACTIVE: it stores no new logo |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |

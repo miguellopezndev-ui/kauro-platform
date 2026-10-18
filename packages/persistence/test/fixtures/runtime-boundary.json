@@ -1,11 +1,25 @@
 {
   "columns": {
     "kauro_app": {
+      "kauro.agency_branding_logos": {
+        "INSERT": [
+          "agency_id",
+          "content",
+          "height",
+          "logo_id",
+          "logo_sha256",
+          "media_type",
+          "recorded_by_membership_id",
+          "recorded_by_user_id",
+          "width"
+        ]
+      },
       "kauro.agency_branding_versions": {
         "INSERT": [
           "agency_id",
           "branding_version",
           "display_name",
+          "logo_id",
           "recorded_by_membership_id",
           "recorded_by_user_id"
         ]
@@ -2033,6 +2047,30 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "agency_branding_logos/agency_branding_logos_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "agency_branding_logos/agency_branding_logos_tenant_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "agency_branding_logos/agency_branding_logos_tenant_record": {
+      "check": "((agency_id = kauro.current_agency_id()) AND kauro.acting_branding_manager(agency_id, recorded_by_membership_id, recorded_by_user_id))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
     },
     "agency_branding_versions/agency_branding_versions_control_read": {
       "check": null,
@@ -9371,6 +9409,9 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.agency_branding_logos": [
+        "SELECT"
+      ],
       "kauro.agency_branding_versions": [
         "SELECT"
       ],
@@ -10189,6 +10230,9 @@
       ]
     },
     "kauro_control": {
+      "kauro.agency_branding_logos": [
+        "SELECT"
+      ],
       "kauro.agency_branding_versions": [
         "SELECT"
       ],

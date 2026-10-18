@@ -94,7 +94,7 @@ export function platformInputsOf(scope: ReportScope, record: { readonly expected
     expectedManifestSha256: record.expectedManifestSha256,
     quote: { quoteId: preimage.quoteId, billableSourceUnits: preimage.billableUnits },
     privacyClass: "SECURE_DETAIL",
-    branding: { binding: "AGENCY_BRANDING_V1", agencyId: scope.agencyId, version: 2, displayName: "Synthetic Test Agency", recordedAt: "2026-09-01T00:00:00.000000Z" },
+    branding: { binding: "AGENCY_BRANDING_V1", agencyId: scope.agencyId, version: 2, displayName: "Synthetic Test Agency", recordedAt: "2026-09-01T00:00:00.000000Z", logo: null },
     logo: null,
     terms,
     countFacts: {

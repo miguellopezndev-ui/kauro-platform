@@ -122,7 +122,7 @@ declared counts.
 | R2-069 | uses and hashes separate; guide lists only import files; every kind re-derived from its path (ADV-4 R7 refused); guide objects bound to lineage and migration keys | EXECUTED_LOCAL (model), pending B's re-review | HTML guide part |
 | R2-070 | issuer from the terms facts only; closed facts; terms hash recorded | PARTIAL (no binding of the issuer to the terms document) | terms snapshot input: B; invoices: B09/B15 |
 | R2-071 | complete exception counts kept | PARTIAL | pagination and escaping: HTML part |
-| CMD008-OK/DENY | at the model only: new hash per branding version; unsafe logo/name refused | PARTIAL | the command and the stored logo pipeline: B |
+| CMD008-OK/DENY | at the model only: new hash per branding version; unsafe logo/name refused | PARTIAL | the command and the stored logo pipeline: built by order 7 (docs/design/B13-branding.md) |
 | S069 / S070 | brand text fence at the model | PARTIAL | HTML/PDF part (Letter/A4) |
 
 ## 5. Questions and requests

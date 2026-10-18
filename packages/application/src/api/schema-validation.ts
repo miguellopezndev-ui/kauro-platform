@@ -16,6 +16,7 @@ import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } fro
 import { OPERATIONAL_ROUTES, buildResponseSchemas, operationalRequestSchemas, type OperationalRoute } from "./response-schemas.js";
 import { SELECTION_MANIFEST_SCHEMA, SELECTION_MANIFEST_SCHEMA_ID, SOURCE_REQUEST_SCHEMAS } from "../sources/request-schemas.js";
 import { AUDIT_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA, DECISION_ARTIFACT_SCHEMA_ID } from "../audit/request-schemas.js";
+import { BRANDING_LOGO_SCHEMA, BRANDING_LOGO_SCHEMA_ID } from "../branding/request-schemas.js";
 import { EXECUTION_REQUEST_SCHEMAS } from "../execution/request-schemas.js";
 import { COMMERCE_REQUEST_SCHEMAS } from "../commerce/request-schemas.js";
 import { buildCommerceResponseSchemas } from "../commerce/response-schemas.js";
@@ -119,6 +120,8 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[id] = schema;
   }
   roots[DECISION_ARTIFACT_SCHEMA_ID] = DECISION_ARTIFACT_SCHEMA;
+  // package B13 (order 7): the document of the logo intake
+  roots[BRANDING_LOGO_SCHEMA_ID] = BRANDING_LOGO_SCHEMA;
   // package B09: the payment commands' closed request schemas and the envelopes of their replies and reads (D-REQ-B7), derived
   // under the same rules; an id or a view that collided with a B06 or B07 one would be an integrity failure
   for (const [command, schema] of Object.entries(COMMERCE_REQUEST_SCHEMAS)) {

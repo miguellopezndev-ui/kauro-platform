@@ -195,6 +195,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/memberships/:membershipId/capabilities", "ChangeMembership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD005" } }],
       ["POST", "/api/v1/memberships/:membershipId/revoke", "RevokeMembership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD006" } }],
       ["POST", "/api/v1/agencies/:agencyId/ownership-transfers", "TransferOwnership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD007" } }],
+      // B13 order 7: CMD008 and the logo intake its logoArtifactRef names
+      ["POST", "/api/v1/agencies/:agencyId/branding", "UpdateBranding", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD008" } }],
+      ["POST", "/api/v1/agencies/:agencyId/branding/logos", "SubmitBrandingLogo", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitBrandingLogo" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitBrandingLogo" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],

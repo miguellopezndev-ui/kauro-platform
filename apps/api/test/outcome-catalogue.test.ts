@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
-import { AUDIT_COMMANDS, B06_COMMANDS, B07_COMMANDS, TEAM_COMMANDS, COMMAND_OUTCOMES, EXECUTION_COMMANDS, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, RETENTION_COMMANDS, SERVED_COMMAND_IDS, SUPPORT_COMMANDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
+import { AUDIT_COMMANDS, B06_COMMANDS, BRANDING_COMMANDS, B07_COMMANDS, TEAM_COMMANDS, COMMAND_OUTCOMES, EXECUTION_COMMANDS, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, RETENTION_COMMANDS, SERVED_COMMAND_IDS, SUPPORT_COMMANDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
@@ -19,8 +19,8 @@ import { approvalBodyOf, call, clock, completed, ids, outcome, routes, world, ty
 
 const validator = loadContractSchemas();
 const CONTENT_TYPE = "application/problem+json";
-/** The specs of every served command: B06's seven, B07's six (mandate B07-COMMANDS), B08's two job commands (B08-COMMANDS-EXECUTION) and four audit commands (B08-COMMANDS-AUDIT), and B11's CMD044 (W4). */
-const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS, ...EXECUTION_COMMANDS, ...AUDIT_COMMANDS, ...SUPPORT_COMMANDS, ...TEAM_COMMANDS, ...RETENTION_COMMANDS };
+/** The specs of every served command: B06's seven, B07's six (mandate B07-COMMANDS), B08's two job commands (B08-COMMANDS-EXECUTION) and four audit commands (B08-COMMANDS-AUDIT), B11's CMD044 (W4) and B13's CMD008 (order 7). */
+const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS, ...EXECUTION_COMMANDS, ...AUDIT_COMMANDS, ...SUPPORT_COMMANDS, ...TEAM_COMMANDS, ...RETENTION_COMMANDS, ...BRANDING_COMMANDS };
 
 function problemFor(entry: ProblemOutcome, overrides: { readonly fields?: ReadonlyArray<FieldError>; readonly current?: boolean } = {}) {
   const fields = overrides.fields ?? (entry.fieldCodes !== undefined ? entry.fieldCodes.map((code) => ({ field: "expectedVersion", code })) : undefined);
@@ -247,6 +247,7 @@ const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = 
   CMD005: b06team("change-membership.ts"),
   CMD006: b06team("revoke-membership.ts"),
   CMD007: b06team("transfer-ownership.ts"),
+  CMD008: ["branding/handlers/update-branding.ts", "commands/handlers/team-shared.ts"],
 };
 
 const handlerSitesOf = (command: ServedCommandId) => HANDLER_FILES[command].flatMap((file) => sitesOf(source(`packages/application/src/${file}`), file));

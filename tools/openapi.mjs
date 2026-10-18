@@ -118,6 +118,7 @@ export function runtimeSchemas(sources) {
   }
   byId[application.SELECTION_MANIFEST_SCHEMA_ID] = application.SELECTION_MANIFEST_SCHEMA;
   byId[application.DECISION_ARTIFACT_SCHEMA_ID] = application.DECISION_ARTIFACT_SCHEMA;
+  byId[application.BRANDING_LOGO_SCHEMA_ID] = application.BRANDING_LOGO_SCHEMA;
   for (const [command, schema] of Object.entries(application.EXECUTION_REQUEST_SCHEMAS)) {
     if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B08 request schema of ${command} collides with another one`);
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
@@ -285,8 +286,8 @@ export function generateOpenApi(sources) {
 
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
-  // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS), B08's two execution commands (mandate B08-COMMANDS-EXECUTION) and its four audit commands (mandate B08-COMMANDS-AUDIT), and B11's CMD044 (mandate W4)
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS };
+  // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS), B08's two execution commands (mandate B08-COMMANDS-EXECUTION) and its four audit commands (mandate B08-COMMANDS-AUDIT), B11's CMD044 (mandate W4) and B13's CMD008 (order 7)
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS, ...application.BRANDING_COMMANDS };
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
     const spec = specs[command.id];
@@ -386,11 +387,12 @@ export function generateOpenApi(sources) {
     };
   }
 
-  // the document intakes (B07 D-SEL-2, B08 D8-CMA-7): the selection manifest and the decision artifact, each stored once per content —
+  // the document intakes (B07 D-SEL-2, B08 D8-CMA-7, B13 order 7): the selection manifest, the decision artifact and the agency logo, each stored once per content —
   // 201 stored, 200 the same document again
   addComponent("SelectionManifestDocument", byId[application.SELECTION_MANIFEST_SCHEMA_ID], application.SELECTION_MANIFEST_SCHEMA_ID);
   addComponent("DecisionArtifactDocument", byId[application.DECISION_ARTIFACT_SCHEMA_ID], application.DECISION_ARTIFACT_SCHEMA_ID);
-  const intakeDocuments = { [application.SELECTION_MANIFEST_SCHEMA_ID]: "SelectionManifestDocument", [application.DECISION_ARTIFACT_SCHEMA_ID]: "DecisionArtifactDocument" };
+  addComponent("BrandingLogoDocument", byId[application.BRANDING_LOGO_SCHEMA_ID], application.BRANDING_LOGO_SCHEMA_ID);
+  const intakeDocuments = { [application.SELECTION_MANIFEST_SCHEMA_ID]: "SelectionManifestDocument", [application.DECISION_ARTIFACT_SCHEMA_ID]: "DecisionArtifactDocument", [application.BRANDING_LOGO_SCHEMA_ID]: "BrandingLogoDocument" };
   for (const spec of Object.values(application.INTAKE_ROUTES)) {
     const documentComponent = intakeDocuments[spec.schemaId];
     if (documentComponent === undefined) throw new Error(`${spec.operationId} admits a document schema this generator does not document`);
