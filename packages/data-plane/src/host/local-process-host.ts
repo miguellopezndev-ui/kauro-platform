@@ -65,6 +65,11 @@ const NETWORK_PRELOAD = join(SANDBOX_CODE_ROOT, "sandbox", "preload.js");
 const PROCESS_PRELOAD = join(SANDBOX_CODE_ROOT, "host", "worker-preload.js");
 const SUPERVISOR = join(SANDBOX_CODE_ROOT, "host", "supervisor.js");
 const MIB = 1024 * 1024;
+/**
+ * Files Playwright reads when it loads on Linux (is-wsl, is-inside-container: kernel and container markers, none a secret). Under the
+ * permission model an unreadable path makes `existsSync` throw instead of answering false, so the worker may read exactly these.
+ */
+const LINUX_RUNTIME_PROBES = ["/proc/version", "/proc/sys/fs/binfmt_misc/WSLInterop", "/run/WSL", "/run/.containerenv", "/.dockerenv", "/proc/self/cgroup"];
 
 /** What the control plane reads for one launch (its records, never decided here; a missing record is null). */
 export interface AttemptTicketReads {
@@ -405,7 +410,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   flagsOf(spec: WorkerLaunchSpec, ticketDigest: Sha256Hex): string[] {
     const attemptDir = attemptScratchDirectoryOf(this.#scratchRoot, spec.capability.attemptId);
     const browser = [dirname(this.#o.chromiumExecutable), dirname(realpathSync.native(this.#o.chromiumExecutable))];
-    const reads = [...new Set([...this.#codeRoots, ...browser]), attemptDir];
+    const probes = process.platform === "linux" ? LINUX_RUNTIME_PROBES : [];
+    const reads = [...new Set([...this.#codeRoots, ...browser, ...probes]), attemptDir];
     return [
       "--permission",
       ...reads.map((p) => `--allow-fs-read=${p}`),
