@@ -176,6 +176,37 @@ test("navigation: on a short screen (a phone in landscape) every link of the ope
   await expect(page).toHaveURL(/\/contact$/);
 });
 
+test("theme preference without JavaScript: the native form stores the choice and returns to the page it came from (independent review R-110-4)", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, ignoreHTTPSErrors: true });
+  const page = await context.newPage();
+  await page.goto("/pricing");
+  const before = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  const answered = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
+  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
+  expect((await answered).status(), "the site's own form is not refused (Origin: null under no-referrer)").toBe(303);
+  await expect(page).toHaveURL(/\/pricing$/);
+  const after = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  expect(after === "light" || after === "dark", "the stored theme is drawn").toBe(true);
+  expect(after).not.toBe(before);
+  expect((await context.cookies()).some((cookie) => cookie.name === "kauro_theme")).toBe(true);
+  await context.close();
+});
+
+test("theme preference with JavaScript: the choice is drawn at once and is still there after a reload (it was stored, not only drawn)", async ({ page }) => {
+  await page.goto("/pricing");
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form[action^='/preferences/theme']");
+    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
+  });
+  const stored = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
+  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
+  expect((await stored).status(), "the background post is accepted").toBe(204);
+  const chosen = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+  expect(chosen === "light" || chosen === "dark").toBe(true);
+  await page.reload();
+  expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe(chosen);
+});
+
 test("theme preference: the route stores a choice only for a page of this exact origin, scheme included (independent review R-110-3)", async ({ request, baseURL }) => {
   const own = new URL(baseURL ?? "https://localhost:44300").origin;
   const other = own.replace(/^https:/, "http:");

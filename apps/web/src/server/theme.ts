@@ -84,13 +84,21 @@ export function servedOrigin(facts: RequestOriginFacts): string | null {
 }
 
 /**
- * Whether a write came from a page of this site: the Origin, when the browser sends it, must equal the served origin exactly (scheme, host
- * and port; an opaque "null" origin is another site), and a browser's Sec-Fetch-Site, when sent, must say same-origin. A request with
- * neither (a client that is not a browser, or an old one) is treated as the site's own; the change it can make is a display preference.
+ * Whether a write came from a page of this site.
+ *
+ * - A browser's Sec-Fetch-Site decides first: anything but same-origin is refused.
+ * - An Origin that names an origin must equal the served origin exactly (scheme, host and port).
+ * - An opaque Origin ("null") is accepted only when Sec-Fetch-Site says same-origin. Under this site's `Referrer-Policy: no-referrer`,
+ *   Chromium sends `Origin: null` with the site's own native form (the theme control without script; independent review R-110-4). The
+ *   fetch metadata, which no referrer policy changes, then tells the site's own page from a sandboxed or foreign one. Without it, "null"
+ *   is refused.
+ * - A request with neither header (a client that is not a browser, or an old one) is treated as the site's own; the change it can make is
+ *   a display preference.
  */
 export function sameOriginWrite(facts: RequestOriginFacts): boolean {
   if (facts.fetchSite !== null && facts.fetchSite !== "same-origin") return false;
   if (facts.origin === null) return true;
+  if (facts.origin === "null") return facts.fetchSite === "same-origin";
   const served = servedOrigin(facts);
   if (served === null) return false;
   try {

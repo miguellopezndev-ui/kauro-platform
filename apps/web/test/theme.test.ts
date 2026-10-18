@@ -53,7 +53,10 @@ test("A10: a write is the site's own only when its Origin equals the served orig
   assert.equal(sameOriginWrite({ ...edge, origin: "https://localhost:44401", fetchSite: null }), false);
   assert.equal(sameOriginWrite({ ...edge, origin: "https://evil.example", fetchSite: null }), false);
   assert.equal(sameOriginWrite({ ...edge, origin: "https://www.localhost:44400", fetchSite: null }), false);
-  assert.equal(sameOriginWrite({ ...edge, origin: "null", fetchSite: null }), false, "an opaque origin is another site");
+  assert.equal(sameOriginWrite({ ...edge, origin: "null", fetchSite: null }), false, "an opaque origin without fetch metadata is refused");
+  // the site's own native form under no-referrer: Chromium sends Origin "null" with Sec-Fetch-Site same-origin (R-110-4)
+  assert.equal(sameOriginWrite({ ...edge, origin: "null", fetchSite: "same-origin" }), true, "the site's own form without script");
+  for (const site of ["cross-site", "same-site", "none"]) assert.equal(sameOriginWrite({ ...edge, origin: "null", fetchSite: site }), false, `null from ${site}`);
   assert.equal(sameOriginWrite({ ...edge, origin: "not a url", fetchSite: null }), false);
   // a browser that says the request crossed sites is refused whatever Origin says
   for (const site of ["cross-site", "same-site", "none"]) assert.equal(sameOriginWrite({ ...edge, fetchSite: site }), false, site);
