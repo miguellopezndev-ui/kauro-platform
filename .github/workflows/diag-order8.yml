@@ -72,7 +72,7 @@ jobs:
           KAURO_ORDER8_DIAG_FILE: ${{ github.workspace }}/diag-out/before.jsonl
         run: |
           bash ../../tools/diag-order8/loop.sh "$RUNS" ../../diag-out/before | tee ../../diag-out/before.txt
-          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/before-analysis.json | head -60
+          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/before-analysis.json
       - name: AFTER (created_at) — same cells x RUNS
         working-directory: apps/api
         env:
@@ -81,7 +81,7 @@ jobs:
           git -C ../.. apply tools/diag-order8/after.patch
           pnpm run build
           bash ../../tools/diag-order8/loop.sh "$RUNS" ../../diag-out/after | tee ../../diag-out/after.txt
-          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/after-analysis.json | head -60
+          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/after-analysis.json
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
