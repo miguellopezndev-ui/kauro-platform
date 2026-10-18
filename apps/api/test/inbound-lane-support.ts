@@ -39,6 +39,7 @@
 // EVIDENCE_UNAVAILABLE (503 CAPACITY_UNAVAILABLE), STEP_UP_STALE (403 ASSURANCE_REQUIRED), CORPORATE_ROLE_MISSING / IDENTITY_DISABLED
 // (403 NOT_AUTHORIZED), REQUEST_DIGEST_DIFFERS (409 IDEMPOTENCY_CONFLICT), ORDER_NOT_CAPTURABLE (409 PRECONDITION_FAILED).
 import assert from "node:assert/strict";
+import { appendFileSync } from "node:fs";
 import { BANK_FAKE_FORMAT, BANK_FAKE_PROVIDER, fakeCreditBytes, fakeStatementBytes, type FakeCreditFields, type FakeDebitFields } from "@kauro/application/testing";
 import type { CreateQuoteView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
@@ -369,12 +370,30 @@ export const matchService = (creditId: string): Promise<string> => deliverToServ
 /** P1 Kapply. */
 export const applyService = (creditId: string): Promise<string> => deliverToService(creditId, "bank_credit.matched.v1");
 /** P2: FINANCE passes until nothing is due. */
+// ORDER 8 DIAGNOSTIC (diag branch only): the watched aggregates' FINANCE outbox rows around every pass
+const DIAG_FILE = process.env["KAURO_ORDER8_DIAG_FILE"];
+let diagWatch: ReadonlyArray<string> | null = null;
+function diag(o: Record<string, unknown>): void {
+  if (DIAG_FILE !== undefined) appendFileSync(DIAG_FILE, `${JSON.stringify({ pid: process.pid, ...o })}
+`);
+}
+async function diagRows(): Promise<unknown> {
+  if (diagWatch === null) return null;
+  return (await L().iw.h.oracle.query(
+    "SELECT o.outbox_id, e.event_type, o.state, o.attempts, o.last_error_code, (extract(epoch FROM o.next_attempt_at) * 1000000)::bigint::text AS next_us, o.next_attempt_at::text AS next_txt FROM kauro.outbox_records o JOIN kauro.domain_events e ON e.event_id = o.event_id WHERE o.consumer = 'FINANCE' AND e.aggregate_id::text = ANY($1::text[]) ORDER BY e.sequence",
+    [diagWatch],
+  )).rows;
+}
 export async function finance(): Promise<ReadonlyArray<{ readonly eventType: string; readonly outcome: string }>> {
   const out: Array<{ eventType: string; outcome: string }> = [];
   const sink = L().iw.pw.backgroundFailures;
   for (let i = 0; i < 5; i++) {
     const before = sink.length;
+    const rowsBefore = DIAG_FILE !== undefined ? await diagRows() : null;
+    const tBefore = Date.now();
     const pass = await dispatch(L().iw.pw, "FINANCE");
+    const tAfter = Date.now();
+    if (DIAG_FILE !== undefined && diagWatch !== null) diag({ kind: "pass", i, tBeforeMs: tBefore, tAfterMs: tAfter, held: pass.held, deliveries: pass.deliveries.map((d) => `${d.eventType}:${d.outcome}`), rowsBefore, rowsAfter: await diagRows() });
     // the dispatcher records a delivery's failure and goes on: the pass's first failure is the booking's own error
     const failed = sink.slice(before)[0];
     if (failed !== undefined) throw failed.error;
@@ -410,10 +429,14 @@ export async function kbook(creditId: string): Promise<ReadonlyArray<string>> {
  * next attempt is due now. Answers how many were rescheduled.
  */
 export async function financeRetryDue(creditId: string): Promise<number> {
+  const aggregates = await bookedAggregates(creditId);
+  const tBefore = Date.now();
   const r = await L().iw.h.oracle.query(
-    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[])",
-    [await bookedAggregates(creditId)],
+    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[]) RETURNING o.outbox_id, (extract(epoch FROM o.next_attempt_at) * 1000000)::bigint::text AS next_us",
+    [aggregates],
   );
+  diagWatch = aggregates;
+  diag({ kind: "retryDue", creditId, tBeforeMs: tBefore, tAfterMs: Date.now(), rows: r.rows });
   return r.rowCount ?? 0;
 }
 /** E1: one pass of the payment service's sweeps (TRANSFER_EXPIRY is a registered bank sweep). */
