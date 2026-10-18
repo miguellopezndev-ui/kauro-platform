@@ -203,6 +203,9 @@ function decode(h: Header, data: Uint8Array, palette: Uint8Array | null, transpa
   if (consumed !== data.length) refuse("LOGO_MALFORMED", `${data.length - consumed} bytes of image data follow the end of its zlib stream`);
   const rgba = new Uint8Array(h.width * h.height * 4);
   const entries = palette === null ? 0 : palette.length / 3;
+  // a tRNS key sample is two bytes of which only the image's bit depth is used (PNG 11.3.2.1): the unused high bits are masked
+  const keyMask = h.bitDepth === 16 ? 0xffff : (1 << h.bitDepth) - 1;
+  const key = (i: number): number => (((transparency![2 * i]! << 8) | transparency![2 * i + 1]!) & keyMask);
   let at = 0;
   for (const [pass, pw, ph] of passes) {
     const stride = lineBytes(h, pw);
@@ -222,7 +225,7 @@ function decode(h: Header, data: Uint8Array, palette: Uint8Array | null, transpa
         switch (h.colorType) {
           case 0: {
             r = g = b = sample(lines, offset, px, h.bitDepth, true);
-            if (transparency !== null && rawSample(lines, offset, px, h.bitDepth) === ((transparency[0]! << 8) | transparency[1]!)) a = 0;
+            if (transparency !== null && rawSample(lines, offset, px, h.bitDepth) === key(0)) a = 0;
             break;
           }
           case 2: {
@@ -231,9 +234,9 @@ function decode(h: Header, data: Uint8Array, palette: Uint8Array | null, transpa
             b = sample(lines, offset, px * 3 + 2, h.bitDepth, true);
             if (
               transparency !== null &&
-              rawSample(lines, offset, px * 3, h.bitDepth) === ((transparency[0]! << 8) | transparency[1]!) &&
-              rawSample(lines, offset, px * 3 + 1, h.bitDepth) === ((transparency[2]! << 8) | transparency[3]!) &&
-              rawSample(lines, offset, px * 3 + 2, h.bitDepth) === ((transparency[4]! << 8) | transparency[5]!)
+              rawSample(lines, offset, px * 3, h.bitDepth) === key(0) &&
+              rawSample(lines, offset, px * 3 + 1, h.bitDepth) === key(1) &&
+              rawSample(lines, offset, px * 3 + 2, h.bitDepth) === key(2)
             )
               a = 0;
             break;

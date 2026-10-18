@@ -178,6 +178,35 @@ test("CMD008-DENY media: a forged or broken PNG is refused — each defect alone
   assert.equal(problemOf(png([head, chunk("acTL", Buffer.alloc(8)), idat, IEND])), "LOGO_FORMAT_UNSUPPORTED", "animated");
 });
 
+test("CMD008-OK media (review BR-002): a tRNS key is compared at the image's bit depth — its unused high bits masked — for greyscale at 1, 2, 4, 8 and 16 bits and for truecolour at 8 and 16 bits; each expected pixel is written out by hand", () => {
+  // the reviewer's 1x1 greyscale-8 PNG: pixel 0, tRNS key 0x0100 — masked to eight bits the key is 0, so the pixel is transparent
+  const reviewer = admitLogo(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAAAnRSTlMBAG+I/HkAAAAKSURBVHicY2AAAAACAAFIr6RxAAAAAElFTkSuQmCC", "base64"));
+  assert.ok(reviewer.ok, reviewer.ok ? "" : reviewer.detail);
+  assert.deepEqual([...decodeAdmittedPng(reviewer.logo.bytes).rgba], [0, 0, 0, 0]);
+  const key = (...values: number[]): Buffer => Buffer.concat(values.map((v) => { const b = Buffer.alloc(2); b.writeUInt16BE(v); return b; }));
+  // greyscale, 2 pixels per image: [the key value, another value]; the key carries garbage in its unused high bits
+  const grey: ReadonlyArray<readonly [number, Buffer, number, readonly number[]]> = [
+    // depth, the one scanline (filter byte, samples), the tRNS key as stored, the expected RGBA of the two pixels
+    [1, Buffer.from([0, 0b1000_0000]), 0xfffe, [255, 255, 255, 255, 0, 0, 0, 0]],
+    [2, Buffer.from([0, 0b0111_0000]), 0xab03, [85, 85, 85, 255, 255, 255, 255, 0]],
+    [4, Buffer.from([0, 0x5a]), 0x705a & 0xff0f, [85, 85, 85, 255, 170, 170, 170, 0]],
+    [8, Buffer.from([0, 7, 9]), 0x0109, [7, 7, 7, 255, 9, 9, 9, 0]],
+    [16, Buffer.from([0, 0x01, 0x09, 0x00, 0x09]), 0x0009, [1, 1, 1, 255, 0, 0, 0, 0]],
+  ];
+  for (const [depth, line, k, expected] of grey) {
+    const r = admitLogo(png([chunk("IHDR", ihdr(2, 1, depth, 0)), chunk("tRNS", key(k)), chunk("IDAT", deflateSync(line)), IEND]));
+    assert.ok(r.ok, `grey ${depth}: ${r.ok ? "" : r.detail}`);
+    assert.deepEqual([...decodeAdmittedPng(r.logo.bytes).rgba], expected, `greyscale at ${depth} bits`);
+  }
+  // truecolour: pixel 1 is the key, pixel 2 differs in its blue sample only
+  const rgb8 = admitLogo(png([chunk("IHDR", ihdr(2, 1, 8, 2)), chunk("tRNS", key(0xff10, 0x0020, 0x7f30)), chunk("IDAT", deflateSync(Buffer.from([0, 0x10, 0x20, 0x30, 0x10, 0x20, 0x31]))), IEND]));
+  assert.ok(rgb8.ok);
+  assert.deepEqual([...decodeAdmittedPng(rgb8.logo.bytes).rgba], [0x10, 0x20, 0x30, 0, 0x10, 0x20, 0x31, 255], "truecolour at 8 bits");
+  const rgb16 = admitLogo(png([chunk("IHDR", ihdr(2, 1, 16, 2)), chunk("tRNS", key(0x1001, 0x2002, 0x3003)), chunk("IDAT", deflateSync(Buffer.from([0, 0x10, 0x01, 0x20, 0x02, 0x30, 0x03, 0x10, 0x01, 0x20, 0x02, 0x30, 0x04]))), IEND]));
+  assert.ok(rgb16.ok);
+  assert.deepEqual([...decodeAdmittedPng(rgb16.logo.bytes).rgba], [0x10, 0x20, 0x30, 0, 0x10, 0x20, 0x30, 255], "truecolour at 16 bits: all sixteen bits compared, the high byte kept");
+});
+
 test("CMD008-DENY media: excessive images — too many bytes, too many pixels a side, zero pixels, and a decompression bomb — are refused before any allocation beyond their bound", () => {
   assert.equal(problemOf(Buffer.alloc(LOGO_MAX_BYTES + 1)), "LOGO_TOO_LARGE");
   assert.equal(problemOf(Buffer.concat([rgbaPng(), Buffer.alloc(LOGO_MAX_BYTES)])), "LOGO_TOO_LARGE", "the size is judged before anything parses the bytes");
@@ -194,9 +223,18 @@ test("CMD008-DENY media: excessive images — too many bytes, too many pixels a 
   // the largest admitted side is admitted
   const edge = admitLogo(png([chunk("IHDR", ihdr(LOGO_MAX_PIXELS, 1, 8, 0)), chunk("IDAT", deflateSync(Buffer.alloc(LOGO_MAX_PIXELS + 1))), IEND]));
   assert.ok(edge.ok);
-  // noise that cannot be compressed under the bound once written again is refused
-  const noise = new Uint8Array(400 * 400 * 4);
+  // review BR-003: an upload under the bound whose pixels, written again as RGB, are not — the output fence, not the input one, refuses it.
+  // A 700x700 indexed image of pseudo-random indices into 256 pseudo-random colours: one byte a pixel in, three out.
+  const side = 700;
   let s = 1;
-  for (let i = 0; i < noise.length; i++) noise[i] = (s = (s * 1103515245 + 12345) >>> 0) >>> 24;
-  assert.equal(problemOf(png([chunk("IHDR", ihdr(400, 400)), chunk("IDAT", deflateSync(rawLines(400, 400, 4, noise), { level: 0 })), IEND])), "LOGO_TOO_LARGE");
+  const next = (): number => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) >>> 24;
+  const palette = Buffer.alloc(256 * 3);
+  for (let k = 0; k < palette.length; k++) palette[k] = next();
+  const indexed = rawLines(side, side, 1, Uint8Array.from({ length: side * side }, next));
+  const upload = png([chunk("IHDR", ihdr(side, side, 8, 3)), chunk("PLTE", palette), chunk("IDAT", deflateSync(indexed, { level: 9 })), IEND]);
+  assert.ok(upload.length < LOGO_MAX_BYTES, `the upload is under the bound (${upload.length} bytes)`);
+  const rewritten = encodePng(side, side, decodeAdmittedPng(upload).rgba);
+  assert.ok(rewritten.length > LOGO_MAX_BYTES, `its pixels written again are over it (${rewritten.length} bytes)`);
+  const refusedOutput = admitLogo(upload);
+  assert.ok(!refusedOutput.ok && refusedOutput.problem === "LOGO_TOO_LARGE" && /written again/.test(refusedOutput.detail), "refused by the output fence");
 });

@@ -252,10 +252,19 @@ test("CMD008-OK in a synthetic report: a version recorded through the logo intak
   }
 });
 
-test("CMD008-RACE with a job: a branding change open while a job is queued and first read binds the version committed then, and the job keeps it after the change commits; a change committed before the first read is bound; later changes reach only later jobs", async () => {
+test("CMD008-RACE with a job: the job's first report binds the version committed then and keeps it — a change open at that read (begun after the queueing, or before it and so eligible by its instant) never replaces it once committed; a change committed between the queueing and the first read is bound; later changes reach only later jobs", async () => {
   const A = await w.agency("brand-race");
   w.scenario(A, { packageName: "A-clean-multi-object" });
   const logo = await product.uploadLogo(A, syntheticLogo(91));
+
+  const run = async (j: { readonly jobId: string; readonly identity: string }): Promise<void> => {
+    await launched(w, j.jobId);
+    await observedDone(w, j.identity);
+    await w.drain(w.x.consumers.jobExecution);
+    assert.equal((await w.job(j.jobId)).state, "READY");
+  };
+  const instantsOf = async (jobId: string, version: number): Promise<{ readonly recorded: string; readonly queued: string }> =>
+    (await w.h.oracle.query<{ recorded: string; queued: string }>("SELECT to_char(v.recorded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS recorded, to_char(j.queued_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS queued FROM kauro.agency_branding_versions v, kauro.processing_jobs j WHERE v.agency_id = $1 AND v.branding_version = $2 AND j.job_id = $3", [A.agencyId, version, jobId])).rows[0]!;
 
   // (a) the job is queued and admitted; CMD008 writes version 2 and is held before COMMIT; the job's first read binds what is committed: 1
   const p1 = await w.paid(A, "brand-race-1", { mode: "HUBSPOT", report: reportFixtureOf("A-clean-multi-object") });
@@ -268,11 +277,26 @@ test("CMD008-RACE with a job: a branding change open while a job is queued and f
   hold.release();
   assert.equal((await change).branding.brandingVersion, 2);
   for (let i = 0; i < 3; i++) assert.equal((await brandingOfJob(j1.jobId)).version, "agency-branding-v1", "the binding never moves");
-  await launched(w, j1.jobId);
-  await observedDone(w, j1.identity);
-  await w.drain(w.x.consumers.jobExecution);
-  assert.equal((await w.job(j1.jobId)).state, "READY");
+  await run(j1);
   assert.equal(await bindingOf(j1.jobId), 1, "delivered under the version bound at its first report");
+
+  // (c) review BR-004, the dangerous order: CMD008 begins (version 3 stamped at its transaction's instant) BEFORE the job is queued, the
+  // job is queued and its first report binds while CMD008 is still open — the committed version 2 —, then CMD008 commits. Version 3 is
+  // eligible by its instant (recorded at or before queued_at), yet the binding keeps 2: every later read, and the delivery, name 2
+  const holdC = product.holdBeforeCommit();
+  const changeC = rebrand(A, "Race Rebrand Before Queueing");
+  await holdC.reached;
+  const pc = await w.paid(A, "brand-race-c", { mode: "HUBSPOT", report: reportFixtureOf("A-clean-multi-object") });
+  const jc = await admitted(w, pc);
+  assert.equal((await brandingOfJob(jc.jobId)).version, "agency-branding-v2", "the first report binds the version committed then");
+  assert.equal(await bindingOf(jc.jobId), 2);
+  holdC.release();
+  assert.equal((await changeC).branding.brandingVersion, 3);
+  const c3 = await instantsOf(jc.jobId, 3);
+  assert.ok(c3.recorded <= c3.queued, `version 3 is stamped at or before the queueing (${c3.recorded} <= ${c3.queued}): eligible by its instant`);
+  for (let i = 0; i < 3; i++) assert.equal((await brandingOfJob(jc.jobId)).version, "agency-branding-v2", "the binding never moves to the later-committed version");
+  await run(jc);
+  assert.equal(await bindingOf(jc.jobId), 2, "delivered under the version bound at its first report");
 
   // (b) CMD008 begins (its version stamped at its transaction's instant) before a job is queued, the job is queued while it is open, and the
   // change commits before the job's first read: the first read binds the change — committed and in force at the queueing — and keeps it
@@ -282,26 +306,20 @@ test("CMD008-RACE with a job: a branding change open while a job is queued and f
   const p2 = await w.paid(A, "brand-race-2", { mode: "HUBSPOT", report: reportFixtureOf("A-clean-multi-object") });
   const j2 = await admitted(w, p2);
   hold2.release();
-  const v3 = (await change2).branding;
-  assert.equal(v3.brandingVersion, 3);
+  const v4 = (await change2).branding;
+  assert.equal(v4.brandingVersion, 4);
   const bound = (await brandingOfJob(j2.jobId)).version;
-  assert.equal(bound, "agency-branding-v3", "a version stamped before the queueing and committed before the first report is the job's");
-  // a fourth version afterwards changes nothing for this job, and is the next job's (each job runs to its end before the next: one slot)
+  assert.equal(bound, "agency-branding-v4", "a version stamped before the queueing and committed before the first report is the job's");
+  // a fifth version afterwards changes nothing for this job, and is the next job's (each job runs to its end before the next: one slot)
   await rebrand(A, "Race Rebrand Final");
   assert.equal((await brandingOfJob(j2.jobId)).version, bound);
-  const run = async (j: { readonly jobId: string; readonly identity: string }): Promise<void> => {
-    await launched(w, j.jobId);
-    await observedDone(w, j.identity);
-    await w.drain(w.x.consumers.jobExecution);
-    assert.equal((await w.job(j.jobId)).state, "READY");
-  };
   await run(j2);
   assert.equal((await brandingOfJob(j2.jobId)).version, bound, "delivered under the version bound at its first report");
   const p3 = await w.paid(A, "brand-race-3", { mode: "HUBSPOT", report: reportFixtureOf("A-clean-multi-object") });
   const j3 = await admitted(w, p3);
-  assert.equal((await brandingOfJob(j3.jobId)).version, "agency-branding-v4");
+  assert.equal((await brandingOfJob(j3.jobId)).version, "agency-branding-v5");
   await run(j3);
-  assert.deepEqual([await bindingOf(j1.jobId), await bindingOf(j2.jobId), await bindingOf(j3.jobId)], [1, 3, 4]);
+  assert.deepEqual([await bindingOf(j1.jobId), await bindingOf(jc.jobId), await bindingOf(j2.jobId), await bindingOf(j3.jobId)], [1, 2, 4, 5]);
 });
 
 test("CMD008 and published reports: a report already delivered keeps its bytes, generations and record after the agency records new versions and a new logo; the version it was bound to stays exactly as recorded", async () => {
