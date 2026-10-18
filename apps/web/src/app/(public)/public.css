@@ -3109,13 +3109,11 @@ body:has(> .kauro-site-header) {
 
 @keyframes kauro-rise {
   from {
-    opacity: 0;
     transform: translateY(0.75rem);
   }
 }
 @keyframes kauro-pop {
   from {
-    opacity: 0;
     transform: scale(0.6);
   }
 }
@@ -3146,7 +3144,6 @@ body:has(> .kauro-site-header) {
 }
 @keyframes kauro-doc-in {
   from {
-    opacity: 0;
     transform: rotate(-4deg) translateY(1rem);
   }
 }
@@ -3670,9 +3667,6 @@ body:has(> .kauro-site-header) {
   max-inline-size: none;
   font-size: 0.8125rem;
 }
-.kauro-walk-file .kauro-site-file {
-  animation: kauro-fade-in 0.4s ease backwards;
-}
 .kauro-walk-rows {
   color: var(--kauro-color-text-muted);
   font-variant-numeric: tabular-nums;
@@ -3753,12 +3747,8 @@ body:has(> .kauro-site-header) {
   animation: kauro-walk-new 1.6s ease 0.2s backwards;
 }
 @keyframes kauro-walk-new {
-  0% {
-    opacity: 0;
-    background: var(--kauro-color-accent-surface);
-  }
+  0%,
   30% {
-    opacity: 1;
     background: var(--kauro-color-accent-surface);
   }
 }
@@ -5185,23 +5175,19 @@ body:has(> .kauro-site-header) {
 /*   arrival: an object settles into its own tilt as the reader reaches it, and a stamp lands just after its card;                   */
 /*   response: a tilted card straightens a little under the pointer, a button presses;                                               */
 /*   change: the interactive pieces (journey, pile, menu) move only when something in them changes.                                   */
-/* Text never moves on its own. Arrival needs a browser that ties animation to scrolling; elsewhere everything is simply in place.    */
+/* Text never moves on its own, and nothing is ever see-through on its way in: text is legible at every instant. Arrival needs a     */
+/* browser that ties animation to scrolling; elsewhere everything is simply in place.                                                    */
 /* Nothing moves for a visitor who asked for less motion.                                                                              */
 /* =================================================================================================================================== */
 
 @keyframes kauro-settle {
   from {
-    opacity: 0;
     transform: translateY(1.75rem) rotate(0deg);
   }
 }
 @keyframes kauro-thunk {
-  0% {
-    opacity: 0;
+  from {
     transform: scale(1.7) rotate(0deg);
-  }
-  55% {
-    opacity: 1;
   }
 }
 
@@ -5211,12 +5197,6 @@ body:has(> .kauro-site-header) {
   .kauro-site-pagehead .kauro-acts,
   .kauro-site-pagehead .kauro-site-cover-sheet {
     animation: kauro-settle 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s backwards;
-  }
-  .kauro-site-showcase .kauro-site-note-hand {
-    animation: kauro-fade-in 0.6s ease 0.85s backwards;
-  }
-  .kauro-site-showcase .kauro-site-note-hand--counts {
-    animation-delay: 1.05s;
   }
   .kauro-site-showcase .kauro-site-stamp,
   .kauro-site-pagehead .kauro-site-stamp {

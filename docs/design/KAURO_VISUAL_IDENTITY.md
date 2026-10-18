@@ -158,8 +158,8 @@ photograph, no external image, no `<img>` or `<svg>` in public page markup.
 
 ## 8. Motion and interaction
 
-Motion serves the sale and stops for `prefers-reduced-motion`. **Text never moves on its own.**
-1. **First impression:** on load the hero window settles, its notes follow, and the stamp lands last. Interior head objects settle the
+Motion serves the sale and stops for `prefers-reduced-motion`. **Text never moves on its own, and nothing is see-through on its way in:** objects arrive by movement only (rise, settle, scale), so every text is legible at every instant (the browser suite runs axe on the real build with motion on). Opacity changes only where two words trade places in one spot, or for the backdrop of the open menu.
+1. **First impression:** on load the hero window settles and the stamp lands last. Interior head objects settle the
    same way.
 2. **Arrival:** an object rises and settles into its own tilt when the reader reaches it. Each stamp lands just after its card. This is
    tied to the scroll (`animation-timeline: view()`) where the browser supports it; elsewhere objects are simply in place.

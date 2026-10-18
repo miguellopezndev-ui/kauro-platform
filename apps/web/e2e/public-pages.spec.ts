@@ -243,7 +243,8 @@ test("contact: a valid inquiry is sent once, as the api's vocabulary, with no co
   await expect(page.getByRole("heading", { name: "We received your inquiry" })).toBeVisible();
   expect(await focusedGroupLabel(page)).toBe("contact-outcome-heading");
   await expect(page.getByRole("group", { name: "We received your inquiry" })).toContainText(UUID);
-  await expect(page.locator("form[method='post']")).toHaveCount(0);
+  // the inquiry form is gone from the page's main region (the header's theme control is a form of its own and stays)
+  await expect(page.locator("main form[method='post']")).toHaveCount(0);
   expect(bodies, "a second press while sending sends nothing").toHaveLength(1);
   expect(JSON.parse(bodies[0] ?? "null")).toEqual({
     buyerType: "agency",
