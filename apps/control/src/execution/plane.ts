@@ -3,8 +3,8 @@
  * docs/design/B08-audit-approval-jobs.md §3..§7, §10, §11): the consumers JOB_EXECUTION, EXECUTION_CONTROL, AUDIT_ORCHESTRATION and
  * PLAN_VALIDATION and the sweepers of EXECUTION_SWEEPERS over the audit units of work (a superset of the execution ones, D8-PAU-9),
  * the worker host, the verifier, the cores' ports, the validator's write path and the object storage the caller hands in. Assembled
- * only where those providers exist: the worker host is B14's (B14-A: the local process host, localExecutorOf; AWS ECS on Fargate qualified on
- * documentation only) and the cores adapter `b05/cores`', so a deployment of this
+ * only where those providers exist: the worker host is B14's (B14-A: the local process host, localExecutorOf; AWS ECS on Fargate selected, not
+ * yet qualified) and the cores adapter `b05/cores`', so a deployment of this
  * edition binds none (D8-PORT-1) and its control plane has no execution pipelines; the tests of this package bind the labelled contract
  * fakes of their owners (SIMULATED; D8-FAKE-1), never a composition root.
  */

@@ -112,7 +112,7 @@ export interface LocalRig {
   dispose(): Promise<void>;
 }
 
-export function localRig(options: { readonly root?: string; readonly workerEntry?: string; readonly hooks?: LocalProcessHostHooks; readonly maxWallClockMs?: number; readonly workerHeapMegabytes?: number; readonly coreHeapMegabytes?: number; readonly terminationGraceMs?: number } = {}): LocalRig {
+export function localRig(options: { readonly root?: string; readonly render?: typeof RENDER | { pageSize: "LETTER"; locale: string; rendererVersion: string }; readonly workerEntry?: string; readonly hooks?: LocalProcessHostHooks; readonly maxWallClockMs?: number; readonly workerHeapMegabytes?: number; readonly coreHeapMegabytes?: number; readonly terminationGraceMs?: number } = {}): LocalRig {
   if (BROWSER === null) throw new Error("no Chromium-family browser (set KAURO_PDF_BROWSER)");
   const root = options.root ?? mkdtempSync(join(tmpdir(), "kauro-b14a-"));
   const hostRoot = join(root, "host");
@@ -135,7 +135,7 @@ export function localRig(options: { readonly root?: string; readonly workerEntry
           return Promise.resolve(r as never);
         },
       },
-      render: RENDER,
+      render: options.render ?? RENDER,
       corePackageHash: CORE_PACKAGE_HASH,
       clock: WALL,
       sessionOrigin: "https://app.kauro.test",

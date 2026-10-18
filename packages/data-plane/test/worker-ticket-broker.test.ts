@@ -156,3 +156,30 @@ test("B14-A broker DENY: another object, another generation of the sealed object
   assert.equal(await refusal(broker, { op: "storage.readOpen", zone: "ACCEPTED", objectName: g!.objectName, generation: g!.generation }), "REVOKED");
   assert.equal(await storage.stat(storage.location("STAGING"), ticket.capability.manifestObjectName), null, "nothing was written");
 });
+
+test("B14-A broker (review R5): a session whose creation lands after the revocation is cancelled at once and never handed over; a read answered after it is never delivered", async () => {
+  const storage = new ContractFakeObjectStorage();
+  const ticket = ticketOf(storage, 3);
+  let land: () => void = () => undefined;
+  const cancelled: string[] = [];
+  // the fake keeps private state: a plain object delegates to it, with the creation held
+  const paused = {
+    location: (zone: Parameters<ContractFakeObjectStorage["location"]>[0]) => storage.location(zone),
+    createResumableSession: async (...args: Parameters<ContractFakeObjectStorage["createResumableSession"]>) => {
+      await new Promise<void>((resolve) => (land = resolve));
+      return storage.createResumableSession(...args);
+    },
+    cancelResumableSession: (ref: string, timeoutMs: number) => {
+      cancelled.push(ref);
+      return storage.cancelResumableSession(ref, timeoutMs);
+    },
+  } as unknown as ContractFakeObjectStorage;
+  const broker = new AttemptStorageBroker({ capability: ticket.capability, storage: paused, uploads: holderOf(storage), origin: "https://app.kauro.test", maxObjectBytes: 1 << 20 });
+  const creating = broker.handle({ op: "storage.createSession", zone: "STAGING", objectName: ticket.capability.manifestObjectName, declaredBytes: 5, contentType: "x", timeoutMs: 1000 });
+  await new Promise((r) => setImmediate(r));
+  await broker.revoke("TERMINATED_BY_HOST");
+  land();
+  await assert.rejects(creating, (e: unknown) => e instanceof BrokerRefusal && e.code === "REVOKED");
+  assert.equal(cancelled.length, 1, "the late session was cancelled");
+  assert.equal(broker.cancelledLate, 1);
+});

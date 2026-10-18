@@ -56,7 +56,10 @@ export interface AttemptWorkerOptions {
 export function diagnosticOf(error: unknown): string {
   if (!(error instanceof Error)) return `non-error ${typeof error}`;
   const code = (error as { code?: unknown }).code;
-  return `${error.name}${typeof code === "string" ? ` ${code}` : ""}: ${error.message.slice(0, 500)}`;
+  const line = `${error.name}${typeof code === "string" ? ` ${code}` : ""}: ${error.message.slice(0, 500)}`;
+  // the causes below it, as far down as three (a browser's own launch error under the engine's, for instance)
+  const cause = (error as { cause?: unknown }).cause;
+  return cause === undefined || line.length > 2000 ? line : `${line} <- ${diagnosticOf(cause).slice(0, 1200)}`;
 }
 
 const sameScope = (a: ReportScope, b: ReportScope): boolean => a.agencyId === b.agencyId && a.projectId === b.projectId && a.jobId === b.jobId && a.attemptId === b.attemptId;

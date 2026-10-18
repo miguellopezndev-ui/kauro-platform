@@ -5,7 +5,7 @@
 // system (Linux /proc, Windows CIM), never through the host's own word.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,7 +30,7 @@ function ticketsOf(rig: LocalRig): LocalProcessWorkerHostOptions["tickets"] {
 }
 
 /** A second host over the rig's roots that starts the hostile worker, its behaviour named in the ticket's render. */
-function hostileHost(rig: LocalRig, render: LocalProcessWorkerHostOptions["render"], workerHeapMegabytes = 256): LocalProcessWorkerHost {
+function hostileHost(rig: LocalRig, render: LocalProcessWorkerHostOptions["render"], workerHeapMegabytes = 256, more: Partial<LocalProcessWorkerHostOptions> = {}): LocalProcessWorkerHost {
   return new LocalProcessWorkerHost({
     workerEntry: HOSTILE_ENTRY,
     codeRoots: [REPO_ROOT],
@@ -46,6 +46,7 @@ function hostileHost(rig: LocalRig, render: LocalProcessWorkerHostOptions["rende
     sessionOrigin: "https://app.kauro.test",
     workerHeapMegabytes,
     coreHeapMegabytes: 256,
+    ...more,
   });
 }
 
@@ -69,6 +70,29 @@ test("B14-A RACE (duplicate launch, redelivery, a second host): three concurrent
     assert.equal((await rig.host.settled(spec.identity))?.state, "SUCCEEDED");
     assert.equal((await second.observe(spec.identity)).state, "SUCCEEDED", "another instance reads the finished record as it is");
     assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")), [spec.identity]);
+  } finally {
+    hold.open();
+    await rig.dispose();
+  }
+});
+
+test("B14-A RACE (two live control planes over one root): another live instance answers a running job as RUNNING — never as crashed — and its termination kills the worker by pid; the end it records first stands, and the running instance's own later reading of the exit adopts it instead of overwriting it", { skip }, async () => {
+  const hold = gate();
+  const rig = localRig({ hooks: { atStage: (_id, stage) => (stage === "CORE_STARTED" ? (hold.open(), never()) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 21);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await hold.promise;
+    const other = rig.restart();
+    assert.equal((await other.observe(spec.identity)).state, "RUNNING", "a live instance's job is not judged lost");
+    assert.equal((await other.terminate(spec.identity)).outcome, "TERMINATED");
+    const ended = await rig.host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.note], ["TERMINATED", "TERMINATED_BY_HOST"], "the first end recorded stands");
+    assert.equal((await other.observe(spec.identity)).state, "TERMINATED");
+    const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
+    assert.ok(await eventually(() => processesReferencing(attemptDir).length === 0));
   } finally {
     hold.open();
     await rig.dispose();
@@ -140,7 +164,7 @@ test("B14-A DENY (incomplete or unsafe configuration): a spec that is not one at
 
 // --- confinement and limits ------------------------------------------------------------------------------------------------------------
 
-test("B14-A DENY (confinement, hostile worker): a worker started exactly as the real one gets an empty environment without the host's secrets, cannot read another attempt's scratch, another job's ticket or any other file, cannot write outside its own attempt directory, cannot open a socket, fetch or resolve a name, and its broker refuses another attempt's source and prefix and the delivery zone — the one residual, an unconfined child process, is recorded", async () => {
+test("B14-A DENY (confinement, hostile worker): a worker started exactly as the real one gets an empty environment without the host's secrets, cannot read another attempt's scratch, another job's ticket or any other file, cannot write outside its own attempt directory, cannot open a socket, fetch or resolve a name, and its broker refuses another attempt's source and prefix and the delivery zone; it may start no program but the core's confined Node child and the named browser", async () => {
   const rig = localRig();
   let connections = 0;
   const server = createServer((socket) => {
@@ -179,13 +203,12 @@ test("B14-A DENY (confinement, hostile worker): a worker started exactly as the 
     for (const key of ["netConnect", "fetch", "dnsLookup"]) assert.equal(seen[key], "KAURO_NETWORK_REFUSED", key);
     assert.equal(connections, 0, "no byte reached the listening socket");
     for (const key of ["brokerForeignSource", "brokerForeignPrefix", "brokerDelivery"]) assert.equal(seen[key], "OUTSIDE_CAPABILITY", key);
-    // a Node child of the worker inherits its permission model
-    assert.equal(seen["nodeChildRead"], "ERR_ACCESS_DENIED");
-    // RESIDUAL (design §5): a native program the worker starts is not confined by Node's permission model; it still has no credential,
-    // no database connection and no storage of its own (the broker is the only way to an object), and in a cloud task the container is
-    // the boundary. Recorded, never hidden: this assertion changes when the local host gains an operating-system sandbox.
-    assert.equal(seen["nativeChildRead"], "READ");
+    // the process allowlist (worker-preload.ts): no native program, no shell, no Node child without a permission at most the worker's
+    // own, no NODE_OPTIONS — each refused before a process exists; the one Node child it admits still cannot read the secret
+    for (const key of ["nodeChildPlain", "nodeChildWiderPermission", "nodeChildNodeOptions", "nativeChild", "shellExec", "asyncSpawn"]) assert.equal(seen[key], "KAURO_PROCESS_REFUSED", key);
+    assert.notEqual(seen["nodeChildOwnPermission"], "READ");
     assert.deepEqual(hostile.refusals(spec.identity).map((r) => r.code), ["OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY"]);
+    await hostile.stop();
   } finally {
     delete process.env["KAURO_TEST_SECRET_DATABASE_URL"];
     server.close();
@@ -204,6 +227,7 @@ test("B14-A limits (memory): a worker past its heap dies and the host records WO
     const record = await host.settled(spec.identity);
     assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "WORKER_CRASHED", "MEMORY_EXHAUSTED"]);
     assert.ok(record?.flags.includes("--max-old-space-size=64"));
+    await host.stop();
   } finally {
     await rig.dispose();
   }
@@ -344,6 +368,8 @@ test("B14-A recovery (the control plane dies): the host process is killed while 
     assert.ok(await eventually(() => processesReferencing(started.attemptDir).length === 0, 30_000), "the orphaned worker ended itself and its children");
     const rig = localRig({ root });
     try {
+      // the dead host's instance goes quiet first (INSTANCE_LOST_MS); until then its job is answered as its record stands, never ended
+      assert.ok(await eventually(async () => (await rig.host.observe(started.identity)).state !== "RUNNING", 45_000, 500));
       const observed = await rig.host.observe(started.identity);
       assert.deepEqual([observed.state, observed.cause], ["FAILED", "WORKER_CRASHED"]);
       assert.equal(rig.host.record(started.identity)?.note, "HOST_RESTARTED");
@@ -405,5 +431,128 @@ test("B14-A DENY (sealed source): a sealed generation replaced after the seal, o
     for (const p of [replaced.fixture.prefix, forged.fixture.prefix]) assert.deepEqual((await rig.storage.list(rig.storage.location("STAGING"), p)).objects, []);
   } finally {
     await rig.dispose();
+  }
+});
+
+// --- review round 1 (R2, R3, R6, R7): the supervisor and the bounded launch ---------------------------------------------------------
+
+test("B14-A limits (review R2, scratch past every quota): a worker writing straight to its own directory, outside the attempt store's accounting, is ended by its supervisor once the directory passes the attempt's hard scratch — SCRATCH_EXHAUSTED, the tree gone", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 30);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-disk", rendererVersion: "x" }, 256, { supervisorPollMs: 100 });
+    const limits = { ...hostLimits(1 << 20), hardScratchBytes: 16 << 20 };
+    const spec = planted.fixture.spec(1, limits);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED"]);
+    const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
+    assert.ok(await eventually(() => processesReferencing(attemptDir).length === 0));
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A limits (review R2, native memory): a worker whose resident memory outside its heap passes the attempt's hard memory is ended by its supervisor — MEMORY_EXHAUSTED (Linux, where the tree's resident memory is read from /proc; in a cloud task the container's limit)", { skip: process.platform === "linux" ? false : "the tree's resident memory is read from /proc (Linux); a cloud task's memory limit is the container's" }, async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 31);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-buffers", rendererVersion: "x" }, 64, { coreHeapMegabytes: 64, browserReserveBytes: 0, supervisorPollMs: 100 });
+    const limits = { ...hostLimits(1 << 20), hardMemoryBytes: 512 << 20, memoryBudgetBytes: 256 << 20 };
+    const spec = planted.fixture.spec(1, limits);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "WORKER_CRASHED", "MEMORY_EXHAUSTED"]);
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A RACE (review R3): a launch whose records are still being read creates nothing when its identity is terminated meanwhile, or when the read outlasts its bound — the identity is proved absent and stays absent", async () => {
+  const rig = localRig();
+  try {
+    let release: (() => void) | null = null;
+    const planted = plantedAttempt(rig.storage, 32);
+    const late = plantedAttempt(rig.storage, 33);
+    const reads = { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null };
+    const host = new LocalProcessWorkerHost({
+      workerEntry: WORKER_ENTRY, codeRoots: [REPO_ROOT], hostRoot: rig.hostRoot, scratchRoot: rig.scratchRoot, chromiumExecutable: BROWSER ?? process.execPath, storage: rig.storage, uploads: holderOf(rig.storage),
+      tickets: { read: (spec) => new Promise((resolve) => (release = () => resolve(spec.capability.attemptId === planted.fixture.attemptId ? reads : { ...reads, inputs: late.inputs }) as never)) },
+      render: RENDER, corePackageHash: CORE_PACKAGE_HASH, clock: WALL, sessionOrigin: "https://app.kauro.test", creationHorizonSeconds: 2, workerHeapMegabytes: 256, coreHeapMegabytes: 256,
+    });
+    const spec = planted.fixture.spec(1);
+    const launching = host.launch(spec);
+    assert.equal((await host.observe(spec.identity)).state, "NOT_FOUND");
+    assert.equal((await host.terminate(spec.identity)).outcome, "NOT_FOUND", "nothing exists, and the pending launch is abandoned");
+    release!();
+    await assert.rejects(launching, /abandoned before its create/);
+    assert.equal(existsSync(join(rig.hostRoot, "jobs", spec.identity)), false);
+    assert.equal((await host.observe(spec.identity)).state, "NOT_FOUND");
+    // a read past its bound (half the 2 s horizon): the launch fails and nothing is ever created by it
+    const lateSpec = late.fixture.spec(1);
+    await assert.rejects(host.launch(lateSpec), /not read within 1000 ms/);
+    release!();
+    assert.equal(existsSync(join(rig.hostRoot, "jobs", lateSpec.identity)), false);
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A terminate (review R6): a worker whose storage call never answers is still ended at once by its termination — the broker closes, the tree is killed and the end recorded without waiting for the provider", { skip }, async () => {
+  const blocked = gate();
+  const rig = localRig({ hooks: { beforeCall: (_id, call) => (call.op === "storage.readNext" ? (blocked.open(), never()) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 34);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await blocked.promise;
+    assert.equal((await rig.host.terminate(spec.identity)).outcome, "TERMINATED");
+    assert.equal((await rig.host.observe(spec.identity)).state, "TERMINATED");
+    assert.ok(await eventually(() => processesReferencing(attemptDir).length === 0, 20_000));
+    const record = await rig.host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.note], ["TERMINATED", "TERMINATED_BY_HOST"], "the exit never overwrites the termination");
+  } finally {
+    blocked.open();
+    await rig.dispose();
+  }
+});
+
+test("B14-A recovery (review R7): the host dies while its worker is stuck in synchronous work — no handler of the worker can run — and the worker's supervisor ends the tree; a new host answers FAILED WORKER_CRASHED only once the supervisor's verdict (HOST_LOST) proves the tree ended", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-b14a-spin-"));
+  const script = join(dirname(fileURLToPath(import.meta.url)), "support", "host-process.js");
+  const child = spawn(process.execPath, [script, root, "hostile-spin"], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env } });
+  try {
+    const line = await new Promise<string>((resolve, reject) => {
+      let buffer = "";
+      child.stdout.on("data", (chunk: Buffer) => {
+        buffer += chunk.toString("utf8");
+        const at = buffer.indexOf("\n");
+        if (at >= 0) resolve(buffer.slice(0, at));
+      });
+      child.on("exit", (code) => reject(new Error(`the host process exited early (${code})`)));
+    });
+    const started = JSON.parse(line) as { identity: string; attemptDir: string; pid: number };
+    assert.ok(await eventually(() => processesReferencing(started.attemptDir).length > 0));
+    child.kill("SIGKILL");
+    assert.ok(await eventually(() => processesReferencing(started.attemptDir).length === 0, 30_000), "the supervisor ended the stuck worker");
+    const rig = localRig({ root });
+    try {
+      // the dead host's instance must go quiet before its job is judged (INSTANCE_LOST_MS)
+      assert.ok(await eventually(async () => (await rig.host.observe(started.identity)).state === "FAILED", 45_000, 500));
+      assert.deepEqual([rig.host.record(started.identity)?.cause, rig.host.record(started.identity)?.note], ["WORKER_CRASHED", "HOST_RESTARTED"]);
+      assert.equal(readFileSync(join(rig.hostRoot, "jobs", started.identity, "supervisor.json"), "utf8").includes("HOST_LOST"), true);
+    } finally {
+      await rig.dispose();
+    }
+  } finally {
+    child.kill("SIGKILL");
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });

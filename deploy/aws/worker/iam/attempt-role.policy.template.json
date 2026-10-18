@@ -1,5 +1,5 @@
 {
-  "$comment": "B14-A contract: the inline policy of one attempt's role kauro-attempt-<attemptId>, created by the launcher with the launch intent and deleted by STAGING_JANITOR. Exactly the attempt's capability (D8-STG-1): its ticket, its sealed generations (one statement per object and version), its own prefix and its protocol keys. No list, no delete, no other prefix.",
+  "$comment": "B14-A contract: the inline policy of one attempt's role kauro-attempt-<attemptId>, created by the launcher with the launch intent and deleted by STAGING_JANITOR. Exactly the attempt's capability (D8-STG-1): its ticket, its sealed generations (one statement per object and version), its own prefix and its protocol keys. No list, no delete, no other prefix. A resumable staging upload is an S3 multipart upload: its CreateMultipartUpload and UploadPart steps cannot carry If-None-Match (AWS: conditional-writes-enforce), so they are allowed by s3:ObjectCreationOperation = false, while the creation itself (PutObject, CompleteMultipartUpload) must carry it; an incomplete upload is aborted by the worker or by the bucket lifecycle rule (abort after 1 day).",
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -13,7 +13,11 @@
       "Effect": "Allow",
       "Action": "s3:GetObjectVersion",
       "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/${SEALED_OBJECT_NAME_1}",
-      "Condition": { "StringEquals": { "s3:VersionId": "${SEALED_GENERATION_1}" } }
+      "Condition": {
+        "StringEquals": {
+          "s3:VersionId": "${SEALED_GENERATION_1}"
+        }
+      }
     },
     {
       "Sid": "WriteOwnKeysOnce",
@@ -24,7 +28,32 @@
         "arn:aws:s3:::${OBJECT_BUCKET}/claims/kauro-attempt-${ATTEMPT_ID}",
         "arn:aws:s3:::${OBJECT_BUCKET}/results/kauro-attempt-${ATTEMPT_ID}"
       ],
-      "Condition": { "Null": { "s3:if-none-match": "false" } }
+      "Condition": {
+        "Null": {
+          "s3:if-none-match": "false"
+        }
+      }
+    },
+    {
+      "Sid": "MultipartStepsOfOwnKeys",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": [
+        "arn:aws:s3:::${OBJECT_BUCKET}/staging/${AGENCY_ID}/${PROJECT_ID}/${JOB_ID}/${ATTEMPT_ID}/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/claims/kauro-attempt-${ATTEMPT_ID}",
+        "arn:aws:s3:::${OBJECT_BUCKET}/results/kauro-attempt-${ATTEMPT_ID}"
+      ],
+      "Condition": {
+        "Bool": {
+          "s3:ObjectCreationOperation": "false"
+        }
+      }
+    },
+    {
+      "Sid": "AbortOwnMultipart",
+      "Effect": "Allow",
+      "Action": "s3:AbortMultipartUpload",
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/staging/${AGENCY_ID}/${PROJECT_ID}/${JOB_ID}/${ATTEMPT_ID}/*"
     },
     {
       "Sid": "Heartbeat",
@@ -35,7 +64,10 @@
     {
       "Sid": "ReadBackOwnPrefix",
       "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
       "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/staging/${AGENCY_ID}/${PROJECT_ID}/${JOB_ID}/${ATTEMPT_ID}/*"
     }
   ]

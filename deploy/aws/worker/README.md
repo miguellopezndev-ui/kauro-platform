@@ -1,7 +1,7 @@
 # The migration worker on AWS — deployment contracts (B14-A)
 
 **Status: contracts only.** Nothing in this directory has been built, registered, applied or run. There is no AWS account (A9 §5),
-and no Terraform `apply` or push to ECR happened. The host these contracts are for is qualified on documentation only:
+and no Terraform `apply` or push to ECR happened. The host these contracts are for is **selected but not qualified** (live proofs pending):
 [docs/design/B14-A-aws-host-qualification.md](../../../docs/design/B14-A-aws-host-qualification.md). The code they deploy is
 [docs/design/B14-A-worker-executor.md](../../../docs/design/B14-A-worker-executor.md).
 
@@ -10,7 +10,7 @@ and no Terraform `apply` or push to ECR happened. The host these contracts are f
 | `Dockerfile` | The image: Node 24.20.0 on Debian bookworm pinned by digest, Chromium from a fixed `snapshot.debian.org` date, the workspace from its lockfile, the worker started as non-root user 10001 under the Node permission model, read-only root, scratch at `/scratch` |
 | `task-definition.template.json` | Fargate, Linux/x86_64, 2 vCPU, 8 GiB (the attempt's hard memory), 72 GiB ephemeral storage (64 GiB hard scratch plus the image and the browser's profile), `stopTimeout` 30 s, `awslogs` |
 | `run-task.template.json` | One `RunTask` per launch: `clientToken` = the attempt id, `startedBy` = the identity, `overrides.taskRoleArn` = the attempt's own role, and the ticket's key and SHA-256. Never a secret: `DescribeTasks` shows overrides |
-| `iam/attempt-role.policy.template.json` | One attempt's capability as IAM: read its ticket and its sealed object versions; create (If-None-Match) under its prefix and its claim and result keys; write its heartbeat; read its own prefix back |
+| `iam/attempt-role.policy.template.json` | One attempt's capability as IAM: read its ticket and its sealed object versions; create (If-None-Match) under its prefix and its claim and result keys, the multipart steps that cannot carry the header allowed apart (`s3:ObjectCreationOperation` = false); abort its own multipart uploads; write its heartbeat; read its own prefix back |
 | `iam/attempt-boundary.policy.json` | The ceiling no attempt role can exceed (the launcher may create roles only with it) |
 | `iam/launcher.policy.template.json` | The control plane: run, observe and stop tasks in one cluster; create, pass and delete `kauro-attempts/*` roles within the boundary; write tickets once; read the protocol keys |
 | `iam/execution-role.policy.template.json` | ECS's own role: pull the one repository, write the one log group |
@@ -29,11 +29,13 @@ plays the part of the claim object.
 | `staging/<agency>/<project>/<job>/<attempt>/…` | the worker's `FencedArtifactWriter` | `If-None-Match: *`; read back by exact version | B08's submission and verification |
 | `results/<identity>` | the worker, once | `If-None-Match: *`: `{state, cause, manifest, refusal, peaks}` (the same `WorkerResultReport`) | `observe` (SUCCEEDED / FAILED, manifest) |
 
-`observe(identity)`:
-- a visible task (`ListTasks(startedBy)`, then `DescribeTasks`) with no result → `QUEUED` or `RUNNING`;
+`launch`: `RunTask` with `clientToken` = the attempt id; the task ARN of the answer is recorded at once; a lost answer is retried with the same token inside the hour the token is guaranteed (qualification §3), and an identity is never created again after that hour.
+
+`observe(identity)` (never infers an end from absence):
 - a result → its state;
-- a claim with no result and no visible task → `FAILED WORKER_CRASHED`, which B08 abandons and takes over at fence + 1;
-- nothing, before the creation horizon (900 s) → still uncertain; nothing after it → `NOT_FOUND`.
+- the recorded ARN described STOPPED → the end the task reports (no result: `FAILED WORKER_CRASHED`, taken over at fence + 1);
+- a visible task, or a claim with no result and no visible task → still running, its last heartbeat as `lastHeartbeatAt` (a stale one lets B08's lease lapse, and B08 terminates before it abandons);
+- no ARN, no claim, no task → `NOT_FOUND` only after a same-token retry inside the hour answered without a task; until then uncertain.
 
 `terminate(identity)`: `StopTask` on every task the identity names, and the deletion of the attempt role, which revokes the
 attempt's credentials. `resources(identity)`: from `DescribeTasks` (cpu, memory, ephemeral storage, start and stop) while visible,
@@ -49,7 +51,7 @@ then from the result's peaks; cost = runtime × the rates of the qualification's
 | Endpoints | S3 gateway; `ecr.api`, `ecr.dkr`, `logs` interface endpoints in that AZ | same |
 | Bucket | one per environment, SSE-S3, versioning on (B15 maps a version id to the platform's generation grammar: qualification §6 item 7) | same |
 | Log group | `/kauro/<env>/migration-worker`, 30-day retention | per the retention schedule |
-| `creationHorizonSeconds` | 900 | 900 |
+| `creationHorizonSeconds` | 3600 (the token's guaranteed hour) | 3600 |
 | Limits | `EXECUTION_POLICY` and manual 04: 8 GiB, 64 GiB, 8 h | same |
 
 ## What is logged

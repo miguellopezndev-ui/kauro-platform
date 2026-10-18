@@ -1,14 +1,17 @@
-# B14-A — Qualifying the AWS worker host (on documentation)
+# B14-A — Choosing and qualifying the AWS worker host
 
 Order 9, first part of B14. Under amendment A9 AWS is the primary cloud. This document qualifies the service that will run one
 processing attempt as one isolated worker. The worker's own code is in [B14-A-worker-executor.md](B14-A-worker-executor.md). No AWS
 account was opened and no AWS resource was created or called. Every fact about AWS below comes from AWS's official documentation and
 pricing pages, read on **2026-10-18**; each one is cited in §8.
 
-**Verdict: `QUALIFIED_ON_DOCUMENTATION` — Amazon ECS `RunTask` on AWS Fargate, Linux/x86_64.** Each attempt runs as one task. A
-claim object in S3, written with a conditional write, makes sure an attempt runs only once. Each attempt gets its own task role.
-This is a design verdict, not an execution verdict: §6 lists what only a real AWS account can prove. Until those proofs exist the
-host is **not** declared operational, and no test result may be called `EXECUTED_PROVIDER`.
+**Conclusion: `SELECTED_NOT_QUALIFIED`.** The selected host is **Amazon ECS `RunTask` on AWS Fargate, Linux/x86_64**: one task per
+attempt, a role per attempt, a conditional S3 claim so that at most one task of an identity executes, and a recorded task ARN. AWS
+Batch is discarded (§5). The host is **not qualified**: the documentation does not let anyone prove I1 and I2 as B08 states them (§3:
+AWS documents no maximum creation or visibility delay, and no unique creation after the client token's lifetime). Qualification
+waits for the live proofs of §6. No adapter is written before then, no host is declared operational, and nothing is called
+`EXECUTED_PROVIDER`. (Independent review round 1, R8–R10, corrected an earlier draft that claimed "qualified on documentation"
+with a guaranteed 900 s creation horizon.)
 
 Region: **us-east-1**. The legal checklist requires US Regions in IaC (`docs/legal/CHECKLIST.md` A-06, DPA §9). The prices in §7 are
 us-east-1 prices.
@@ -54,35 +57,38 @@ give each job its own role (§2), so I4 would rest on one shared role that every
 retries, job timeouts) duplicate what B08 already does (admission, takeover, `JOB_DEADLINES`).
 
 **ECS RunTask.** It is idempotent with `clientToken = attemptId` (36 characters), but only within the token's lifetime: at most
-24 h, and only the task's lifetime plus one hour once the task stops. B08 needs I1–I3 for the whole job, up to the 48 h delivery
-deadline. The token alone therefore does not qualify, and **the platform does not rely on it past its lifetime.** Four mechanisms
-carry the invariants instead:
+24 h, and only the task's lifetime plus one hour once the task stops. Because a task's lifetime is never negative, a retry with the
+same token **within one hour of the first request** is always inside that lifetime: within that hour, a retry either returns the task
+the first request created or creates it once [B1]. Beyond that hour nothing in the documentation deduplicates a create, and AWS
+documents eventual consistency without a maximum delay [B3]. So the design below **never answers `NOT_FOUND` from absence alone** and
+never re-creates an identity outside the token's guaranteed hour:
 
-1. **The claim object (I1, at most once).** The worker's first action is a conditional write
-   (`PutObject … If-None-Match: *`) of `claims/<identity>`. S3 guarantees that "the first write operation to finish succeeds" and
-   that every later one gets `412 Precondition Failed` [C4]. A second task of the same identity (a duplicate create, a retry after
-   the token expired, a redelivery) loses that race. It exits **before it reads a source byte**, and its task role lets it write
-   nothing else first (§4). S3 has strong read-after-write consistency for PUT [C4], so the check does not depend on ECS
-   consistency or ECS retention.
-2. **Durable observation (I3).** `observe(identity)` combines `ListTasks(startedBy=identity)` and `DescribeTasks` (for the minutes
-   and hours while a task is visible) with the S3 objects the worker writes under its own claim: `claims/<identity>` (it started),
-   `heartbeat/<identity>` (its last sign of life, at most every 30 s) and `results/<identity>` (its one result: manifest reference
-   or cause; conditional write). These objects outlive ECS's one-hour visibility of stopped tasks. A missing task with a claim and no
-   result is `FAILED WORKER_CRASHED`, which B08 resolves by abandoning the attempt and taking it over at fence + 1. A missing task with
-   no claim is `NOT_FOUND`.
-3. **The creation horizon (I2).** `RunTask` is a synchronous call. If its answer is lost, the adapter's observation does not
-   answer `NOT_FOUND` before `creationHorizonSeconds` = **900 s** has passed since the launch was recorded. That covers ECS's
-   eventual consistency (AWS recommends backing off "up to five minutes" [B3]). Because 900 s is far below the token's 24 h lifetime,
-   every relaunch B08 makes after the horizon (D8-HOST-1) is still **deduplicated by the same token** (`clientToken = attemptId`). If a
-   create ever lands after the horizon anyway, mechanism 1 stops it: the late task finds the claim taken, or takes the claim first
-   and the earlier task exits. Either way exactly one runs.
+1. **The task ARN is recorded (I1).** A `RunTask` answer with a task is recorded at once (the identity's task ARN). A lost answer is
+   resolved by **retrying the same request with the same token inside the guaranteed hour**, until an answer arrives: the task it names
+   is adopted, or a failures-only answer proves that no task exists. If no answer arrives within the hour, the identity is **never
+   created again**: it stays uncertain, and B08's lease lapse ends the attempt and takes it over under a **new** identity at fence + 1.
+   That is what D8-HOST-1 already allows; no NOT_FOUND is claimed.
+2. **The claim object (at most one execution).** The worker's first action is a conditional write (`PutObject … If-None-Match: *`) of
+   `claims/<identity>`. S3 guarantees that "the first write operation to finish succeeds" and that every later one gets
+   `412 Precondition Failed` [C4]. If a second task of the same identity ever exists, it loses that race and exits **before it reads
+   a source byte**. This bounds **execution**, not creation: it is defence in depth, never offered as proof of I1.
+3. **Observation never infers an end from absence (I3).** `observe(identity)` reads the recorded ARN with `DescribeTasks` (a stopped
+   task stays visible for at least one hour [B3]), `ListTasks(startedBy)`, and the S3 keys `claims/`, `heartbeat/` and
+   `results/<identity>`. A result is the end. A task described as STOPPED is the end. A task that is not visible, with a claim and no
+   result, is **not** an end: the adapter answers it as still running (its last heartbeat as `lastHeartbeatAt`). The heartbeat
+   then goes stale, B08's lease lapses, and B08 terminates the identity (`StopTask` on the recorded ARN, and deletion of the attempt
+   role, which removes the task's credentials) before it abandons the attempt. Absence becomes an end only through that termination,
+   never through an empty answer.
+4. **The creation horizon.** It is the hour above: the adapter reports `creationHorizonSeconds` = 3 600 and answers `NOT_FOUND` only
+   after a same-token retry inside that hour answered without a task.
 4. **Fences for everything else.** B08 accepts staged rows only from the lease's current attempt (KA080), at its fence. A stale task
    that somehow wrote objects cannot get them submitted. Read-back by exact generation and the publication guard reject anything
    that is not the current attempt's (S056, S061).
 
 A late `RunTask` retry with the same token but a different request answers `ConflictException` with the existing task's ARN [B1].
-The adapter treats that as `ALREADY_EXISTS` (adopt). The local executor reproduces these semantics and runs them with real processes
-(the exclusive job directory plays the claim's part; see B14-A-worker-executor.md §6). The AWS adapter itself is the next phase (§6).
+The adapter treats that as `ALREADY_EXISTS` (adopt). The local executor implements the equivalent guarantees with real processes: an
+exclusive, atomically prepared job directory is the create, a bounded read keeps a create from landing late, and a supervisor ends the
+tree (B14-A-worker-executor.md §5). Whether ECS behaves as documented under load is what §6 must prove before the adapter is written.
 
 ## 4. Credentials, network and storage (I4, I7)
 
@@ -130,7 +136,8 @@ The adapter treats that as `ALREADY_EXISTS` (adopt). The local executor reproduc
 
 ## 6. Not proved without AWS (blockers of `EXECUTED_PROVIDER` and of G-CLOUD)
 
-1. The `clientToken` behaviour, `ConflictException`, and the visibility of `startedBy` under load (a live probe).
+1. The `clientToken` behaviour inside the guaranteed hour, `ConflictException`, the visibility of a recorded ARN and of `startedBy`
+   under load, and the delays of eventual consistency actually observed (a live probe). Without them I1 and I2 are unproved.
 2. That Chromium's **sandbox** starts as the image's non-root user on Fargate. Fargate grants no extra kernel capabilities, and the
    documentation does not say whether unprivileged user namespaces are available. The engine never disables the sandbox (B13): if
    Fargate refuses it, printing fails closed, and this host is **not** qualified for the report until it is resolved.

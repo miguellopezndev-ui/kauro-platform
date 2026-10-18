@@ -22,7 +22,7 @@
  * Termination kills the worker's whole tree (process-tree.ts) and revokes the broker before anything else.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -53,7 +53,8 @@ import type { AuthorizedReportInputs } from "../report/facts.js";
 import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
-import { killProcessTree } from "./process-tree.js";
+import { killProcessTree, processExists } from "./process-tree.js";
+import { readVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
 
@@ -61,6 +62,8 @@ export const LOCAL_PROCESS_HOST = "kauro-local-process-host";
 export const LOCAL_PROCESS_MACHINE_TYPE = "local-process";
 const EVIDENCE: WorkerHostEvidenceClass = "EXECUTED_LOCAL";
 const NETWORK_PRELOAD = join(SANDBOX_CODE_ROOT, "sandbox", "preload.js");
+const PROCESS_PRELOAD = join(SANDBOX_CODE_ROOT, "host", "worker-preload.js");
+const SUPERVISOR = join(SANDBOX_CODE_ROOT, "host", "supervisor.js");
 const MIB = 1024 * 1024;
 
 /** What the control plane reads for one launch (its records, never decided here; a missing record is null). */
@@ -104,6 +107,8 @@ export interface LocalProcessWorkerHostOptions {
   readonly creationHorizonSeconds?: number;
   readonly workerHeapMegabytes?: number;
   readonly coreHeapMegabytes?: number;
+  /** How often each worker's supervisor reads the tree's memory and the attempt's scratch (milliseconds; default 500). */
+  readonly supervisorPollMs?: number;
   /** Memory kept for the browser beside the two heaps (default 1 GiB). */
   readonly browserReserveBytes?: number;
   /** The host's own cap on one attempt's wall clock (default: the attempt's limits alone). */
@@ -144,13 +149,20 @@ interface Live {
   readonly child: ChildProcess;
   readonly broker: AttemptStorageBroker;
   result: WorkerResultReport | null;
+  persistedBeatMs: number;
   ended: "TERMINATED" | "DEADLINE" | null;
   stderrTail: string;
   readonly settled: Promise<void>;
   timer: NodeJS.Timeout | null;
+  supervisor: ChildProcess | null;
 }
 
 const TERMINAL: ReadonlySet<RecordState> = new Set(["SUCCEEDED", "FAILED", "TERMINATED"]);
+/** How often an instance says it is alive, and how long another instance's silence means it is gone. */
+const INSTANCE_BEAT_MS = 5_000;
+const INSTANCE_LOST_MS = 30_000;
+/** How often a running job's heartbeat reaches its durable record (another instance reads it there). */
+const RECORD_BEAT_MS = 10_000;
 
 function isInside(root: string, path: string): boolean {
   const r = relative(root, path);
@@ -177,6 +189,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   readonly #workerHeap: number;
   readonly #coreHeap: number;
   readonly #browserReserve: number;
+  readonly #beat: NodeJS.Timeout;
+  #creations = 0;
+  /** Launches between their first check and their create: a termination of the identity abandons one (it then creates nothing). */
+  readonly #launching = new Map<string, { abandoned: boolean }>();
 
   /** Refuses an incomplete or unsafe configuration before any attempt can be launched (B14-A §5). */
   constructor(options: LocalProcessWorkerHostOptions) {
@@ -191,6 +207,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (typeof options.corePackageHash !== "string" || !/^[0-9a-f]{64}$/.test(options.corePackageHash)) problems.push("corePackageHash is not a SHA-256 hex digest");
     if (problems.length > 0) throw new TypeError(`${LOCAL_PROCESS_HOST}: ${problems.join("; ")}`);
     mkdirSync(join(options.hostRoot, "jobs"), { recursive: true });
+    mkdirSync(join(options.hostRoot, "instances"), { recursive: true });
     mkdirSync(options.scratchRoot, { recursive: true });
     this.#hostRoot = realpathSync.native(options.hostRoot);
     this.#scratchRoot = realpathSync.native(options.scratchRoot);
@@ -210,6 +227,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (![this.#workerHeap, this.#coreHeap].every((n) => Number.isSafeInteger(n) && n >= 64) || !Number.isSafeInteger(this.#browserReserve) || this.#browserReserve < 0) throw new TypeError(`${LOCAL_PROCESS_HOST}: heap sizes are whole megabytes of at least 64`);
     this.#o = options;
     this.instance = `${options.clock.nowMs().toString(36)}-${process.pid}`;
+    // this instance's sign of life: another instance over the same root judges this one's running jobs by it
+    const alive = (): void => writeAtomically(this.#instanceFile(this.instance), String(options.clock.nowMs()));
+    alive();
+    this.#beat = setInterval(alive, INSTANCE_BEAT_MS);
+    this.#beat.unref();
   }
 
   // --- the port -----------------------------------------------------------------------------------------------------------------
@@ -222,8 +244,27 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const jobDir = this.#jobDir(identity);
     if (existsSync(jobDir)) return answer("ALREADY_EXISTS", null);
 
-    // the control plane's records for this attempt, read before anything is created (a failed read creates nothing)
-    const reads = await this.#o.tickets.read(spec);
+    // the control plane's records for this attempt, read before anything is created (a failed read creates nothing). The read is
+    // bounded well inside the creation horizon, and a launch abandoned meanwhile (its identity terminated, or the bound passed)
+    // creates nothing when the read lands: no create can land after the horizon
+    const pending = { abandoned: false };
+    this.#launching.set(identity, pending);
+    const boundMs = Math.floor((this.creationHorizonSeconds * 1000) / 2);
+    const startedMs = this.#o.clock.nowMs();
+    let reads: AttemptTicketReads;
+    try {
+      reads = await new Promise<AttemptTicketReads>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`${LOCAL_PROCESS_HOST}: the attempt's records were not read within ${boundMs} ms; nothing was created`)), boundMs);
+        timer.unref();
+        this.#o.tickets.read(spec).then(
+          (r) => (clearTimeout(timer), resolve(r)),
+          (e: unknown) => (clearTimeout(timer), reject(e instanceof Error ? e : new Error(String(e)))),
+        );
+      });
+    } finally {
+      if (this.#launching.get(identity) === pending) this.#launching.delete(identity);
+    }
+    if (pending.abandoned || this.#o.clock.nowMs() - startedMs >= boundMs) throw new Error(`${LOCAL_PROCESS_HOST}: the launch was abandoned before its create; nothing was created`);
     if (reads.planBinding === null) return answer("REFUSED", "PLAN_BINDING_MISSING");
     const ticket: AttemptTicket = {
       identity,
@@ -242,15 +283,21 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (ticketProblem !== undefined) return answer("REFUSED", ticketProblem);
     const bytes = attemptTicketBytesOf(ticket);
 
-    // the create: one directory per identity, for good
+    // the create: one directory per identity, for good — prepared aside with its ticket and its first record, then renamed into
+    // place, so the identity never exists without its record and a second create finds it taken (rename refuses a non-empty target)
+    const record = this.#firstRecord(spec, bytes);
+    const prepared = join(this.#hostRoot, "jobs", `.creating-${identity}-${process.pid}-${++this.#creations}`);
+    mkdirSync(prepared);
+    writeFileSync(join(prepared, "ticket.json"), bytes);
+    writeFileSync(join(prepared, "record.json"), JSON.stringify(record));
     try {
-      mkdirSync(jobDir);
+      renameSync(prepared, jobDir);
     } catch (error) {
-      if ((error as { code?: unknown }).code === "EEXIST") return answer("ALREADY_EXISTS", null);
+      rmSync(prepared, { recursive: true, force: true });
+      if (existsSync(jobDir)) return answer("ALREADY_EXISTS", null);
       throw error;
     }
-    writeAtomically(join(jobDir, "ticket.json"), bytes);
-    this.#start(spec, bytes);
+    this.#start(spec, bytes, record);
     return answer("LAUNCHED", null);
   }
 
@@ -274,13 +321,20 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const live = this.#live.get(identity);
     if (live !== undefined) {
       if (TERMINAL.has(live.record.state)) return answer("ALREADY_TERMINAL");
-      await this.#end(live, "TERMINATED");
+      this.#end(live, "TERMINATED");
       return answer("TERMINATED");
     }
     const record = this.#recordOf(identity);
-    if (record === null) return answer("NOT_FOUND");
+    if (record === null) {
+      // a launch still reading its records is abandoned: it will create nothing, so the identity is proved absent
+      const pending = this.#launching.get(identity);
+      if (pending !== undefined) pending.abandoned = true;
+      return answer("NOT_FOUND");
+    }
     if (TERMINAL.has(record.state)) return answer("ALREADY_TERMINAL");
-    // a job of an earlier host instance that never reported its end: its worker ended itself when that host's channel closed
+    // a job of another instance: killed by its pid while that instance lives (its worker is its child, so the pid is that
+    // worker's); a lost instance's worker already ended itself when that host's channel closed
+    if (this.#instanceAlive(record.instance) && record.pid !== null) killProcessTree(record.pid);
     record.state = "TERMINATED";
     record.note = "TERMINATED_BY_HOST";
     record.endedAtMs = this.#o.clock.nowMs();
@@ -335,13 +389,23 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
 
   /** Ends every running worker (shutdown); their records say TERMINATED. */
   async stop(): Promise<void> {
-    for (const live of [...this.#live.values()]) if (!TERMINAL.has(live.record.state)) await this.#end(live, "TERMINATED");
+    clearInterval(this.#beat);
+    for (const live of [...this.#live.values()]) {
+      if (!TERMINAL.has(live.record.state)) this.#end(live, "TERMINATED");
+      this.#standDown(live);
+    }
+    try {
+      unlinkSync(this.#instanceFile(this.instance));
+    } catch {
+      // already gone
+    }
   }
 
   /** The exact command line a worker of `spec` would run (evidence of the confinement). */
   flagsOf(spec: WorkerLaunchSpec, ticketDigest: Sha256Hex): string[] {
     const attemptDir = attemptScratchDirectoryOf(this.#scratchRoot, spec.capability.attemptId);
-    const reads = [...this.#codeRoots, dirname(this.#o.chromiumExecutable), attemptDir];
+    const browser = [dirname(this.#o.chromiumExecutable), dirname(realpathSync.native(this.#o.chromiumExecutable))];
+    const reads = [...new Set([...this.#codeRoots, ...browser]), attemptDir];
     return [
       "--permission",
       ...reads.map((p) => `--allow-fs-read=${p}`),
@@ -350,6 +414,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       `--max-old-space-size=${this.#workerHeap}`,
       "--import",
       pathToFileURL(NETWORK_PRELOAD).href,
+      "--import",
+      pathToFileURL(PROCESS_PRELOAD).href,
       this.#o.workerEntry,
       "--ticket-digest",
       ticketDigest,
@@ -377,7 +443,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   /** Why a spec is not one attempt's own, complete and within this host's means (null when it is). */
   #specProblem(spec: WorkerLaunchSpec): string | null {
     const { capability, subject, limits } = spec;
-    if (!isAttemptIdentity(spec.identity) || spec.identity !== capability.identity || spec.identity !== attemptIdentityOf(subject.attemptId)) return "IDENTITY_NOT_THE_ATTEMPTS";
+    const own = typeof subject.attemptId === "string" && isAttemptIdentity(`kauro-attempt-${subject.attemptId}`) ? attemptIdentityOf(subject.attemptId) : null;
+    if (!isAttemptIdentity(spec.identity) || spec.identity !== capability.identity || spec.identity !== own) return "IDENTITY_NOT_THE_ATTEMPTS";
     const [capabilityProblem] = attemptCapabilityProblems(capability);
     if (capabilityProblem !== undefined) return `CAPABILITY_${capabilityProblem}`;
     if (subject.jobId !== capability.jobId || subject.agencyId !== capability.agencyId || subject.projectId !== capability.projectId) return "SUBJECT_NOT_THE_CAPABILITYS";
@@ -389,12 +456,13 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     return null;
   }
 
-  #start(spec: WorkerLaunchSpec, bytes: Uint8Array): void {
+  /** The job's record as it is created (QUEUED: no process yet). */
+  #firstRecord(spec: WorkerLaunchSpec, bytes: Uint8Array): LocalJobRecord {
     const identity = spec.identity;
     const digest = attemptTicketDigestOf(bytes);
     const flags = this.flagsOf(spec, digest);
     const now = this.#o.clock.nowMs();
-    const record: LocalJobRecord = {
+    return {
       host: LOCAL_PROCESS_HOST,
       identity,
       ticketDigest: digest,
@@ -415,7 +483,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       hardMemoryBytes: spec.limits.hardMemoryBytes,
       hardScratchBytes: spec.limits.hardScratchBytes,
     };
-    this.#persist(record);
+  }
+
+  #start(spec: WorkerLaunchSpec, bytes: Uint8Array, record: LocalJobRecord): void {
+    const identity = spec.identity;
+    const flags = record.flags;
     const env: Record<string, string> = {};
     // Windows resolves its system libraries through SystemRoot; nothing else of the host's environment reaches the worker
     const systemRoot = process.env["SystemRoot"];
@@ -437,7 +509,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     });
     const broker = new AttemptStorageBroker({ capability: spec.capability, storage: this.#o.storage, uploads: this.#o.uploads, origin: this.#o.sessionOrigin, maxObjectBytes: spec.limits.hardScratchBytes });
     let exited: () => void = () => undefined;
-    const live: Live = { record, child, broker, result: null, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null };
+    const live: Live = { record, child, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null };
     this.#live.set(identity, live);
     record.pid = child.pid ?? null;
     record.state = "RUNNING";
@@ -454,10 +526,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     });
     child.on("exit", () => {
       if (live.timer !== null) clearTimeout(live.timer);
-      void broker.revoke("WORKER_EXITED").finally(() => {
-        this.#closeRecord(live);
-        exited();
-      });
+      this.#standDown(live);
+      broker.close("WORKER_EXITED");
+      this.#closeRecord(live);
+      exited();
+      void broker.revoke("WORKER_EXITED");
     });
     if (child.pid === undefined) {
       record.state = "FAILED";
@@ -470,8 +543,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     // the deadline: the earlier of the execution deadline and the wall clock, then a grace for the worker's own end
     const wall = Math.min(spec.limits.wallClockMs, this.#o.maxWallClockMs ?? Number.MAX_SAFE_INTEGER);
     const until = Math.min(Date.parse(spec.subject.executionDeadlineAt) - this.#o.clock.nowMs(), wall) + (this.#o.terminationGraceMs ?? 5_000);
-    live.timer = setTimeout(() => void this.#end(live, "DEADLINE"), Math.max(0, Math.min(until, 2_147_483_647)));
+    const deadlineInMs = Math.max(0, Math.min(until, 2_147_483_647));
+    live.timer = setTimeout(() => this.#end(live, "DEADLINE"), deadlineInMs);
     live.timer.unref();
+    if (child.pid !== undefined) live.supervisor = this.#supervise(live, child.pid, attemptDir, deadlineInMs + 1_000, spec);
     this.#send(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes });
   }
 
@@ -488,7 +563,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (message === null || typeof message !== "object") return;
     const record = live.record;
     if (message.t === "beat") {
-      record.lastHeartbeatMs = this.#o.clock.nowMs();
+      this.#heartbeat(live);
       return;
     }
     if (message.t === "result") {
@@ -496,7 +571,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       return;
     }
     if (message.t !== "call" || typeof message.id !== "number") return;
-    record.lastHeartbeatMs = this.#o.clock.nowMs();
+    this.#heartbeat(live);
     const call = message.call;
     try {
       let value: unknown = null;
@@ -511,11 +586,54 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     }
   }
 
-  /** The host ends a job: the broker revoked first, then the worker's whole tree killed, then the record. */
-  async #end(live: Live, how: "TERMINATED" | "DEADLINE"): Promise<void> {
+  /** The worker's sign of life: in memory at once, in the durable record at most every RECORD_BEAT_MS (another instance reads it there). */
+  #heartbeat(live: Live): void {
+    const now = this.#o.clock.nowMs();
+    live.record.lastHeartbeatMs = now;
+    if (now - live.persistedBeatMs >= RECORD_BEAT_MS && !TERMINAL.has(live.record.state)) {
+      live.persistedBeatMs = now;
+      this.#persist(live.record);
+    }
+  }
+
+  /**
+   * The supervisor of one worker (supervisor.ts): a process of its own, outside the worker's confinement, that ends the worker's tree if
+   * this host dies, at the deadline whether or not this host lives, and past the attempt's hard memory or scratch.
+   */
+  #supervise(live: Live, workerPid: number, attemptDir: string, deadlineInMs: number, spec: WorkerLaunchSpec): ChildProcess {
+    const config: SupervisorConfig = { workerPid, jobDir: this.#jobDir(live.record.identity), attemptDir, deadlineInMs, hardMemoryBytes: spec.limits.hardMemoryBytes, hardScratchBytes: spec.limits.hardScratchBytes, pollMs: this.#o.supervisorPollMs ?? 500 };
+    const env: Record<string, string> = {};
+    const systemRoot = process.env["SystemRoot"];
+    if (systemRoot !== undefined) env["SystemRoot"] = systemRoot;
+    // detached on every platform: on Windows a child that is not detached is in the host's job object and dies with the host, before it
+    // could record why (the worker and its tree die with it there too: libuv's kill-on-close job); its working directory is the code's
+    const supervisor = spawn(process.execPath, [SUPERVISOR, JSON.stringify(config)], { cwd: SANDBOX_CODE_ROOT, env, stdio: ["pipe", "ignore", "ignore"], detached: true, windowsHide: true });
+    supervisor.stdin?.on("error", () => undefined);
+    supervisor.on("error", () => undefined);
+    supervisor.unref();
+    return supervisor;
+  }
+
+  /** The worker ended: its supervisor stands down. */
+  #standDown(live: Live): void {
+    const supervisor = live.supervisor;
+    live.supervisor = null;
+    if (supervisor === null) return;
+    try {
+      supervisor.stdin?.end("EXITED\n");
+    } catch {
+      // the supervisor is gone
+    }
+  }
+
+  /**
+   * The host ends a job: the broker refuses everything at once, the worker's whole tree is killed at once, the end is recorded, and only
+   * then is the provider's side cleaned (bounded, in the background): no cleanup can hold a termination or a deadline back.
+   */
+  #end(live: Live, how: "TERMINATED" | "DEADLINE"): void {
     if (live.ended !== null || TERMINAL.has(live.record.state)) return;
     live.ended = how;
-    await live.broker.revoke(how === "DEADLINE" ? "DEADLINE_EXCEEDED" : "TERMINATED_BY_HOST");
+    live.broker.close(how === "DEADLINE" ? "DEADLINE_EXCEEDED" : "TERMINATED_BY_HOST");
     if (live.record.pid !== null) killProcessTree(live.record.pid);
     const record = live.record;
     record.endedAtMs = this.#o.clock.nowMs();
@@ -528,6 +646,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.note = "TERMINATED_BY_HOST";
     }
     this.#persist(record);
+    void live.broker.revoke(how === "DEADLINE" ? "DEADLINE_EXCEEDED" : "TERMINATED_BY_HOST");
   }
 
   /** The worker exited: its result, or the host's own reading of an end without one. */
@@ -544,15 +663,58 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.peakScratchBytes = result.peakScratchBytes;
       record.peakMemoryBytes = result.peakMemoryBytes;
     } else {
+      // no result: the supervisor's verdict when it ended the tree, else the host's own reading of the exit
+      const verdict = readVerdict(this.#jobDir(record.identity))?.verdict ?? null;
       record.state = "FAILED";
-      record.cause = "WORKER_CRASHED";
-      record.note = /heap out of memory|Allocation failed|ERR_WORKER_OUT_OF_MEMORY/i.test(live.stderrTail) ? "MEMORY_EXHAUSTED" : "NO_RESULT";
+      record.cause = verdict === "SCRATCH_EXHAUSTED" ? "SCRATCH_EXHAUSTED" : verdict === "DEADLINE" ? "DEADLINE_EXCEEDED" : "WORKER_CRASHED";
+      record.note = verdict ?? (/heap out of memory|Allocation failed|ERR_WORKER_OUT_OF_MEMORY/i.test(live.stderrTail) ? "MEMORY_EXHAUSTED" : "NO_RESULT");
     }
     this.#persist(record);
   }
 
+  /**
+   * Writes the job's record. A job's end is written once, for good: `end.json` is created exclusively (a hard link to a complete file,
+   * which fails if it exists), so of two instances, or of a result and a termination, the first end wins and every later one adopts it.
+   */
   #persist(record: LocalJobRecord): void {
-    writeAtomically(join(this.#jobDir(record.identity), "record.json"), JSON.stringify(record));
+    const dir = this.#jobDir(record.identity);
+    if (TERMINAL.has(record.state)) {
+      const end = join(dir, "end.json");
+      const temporary = `${end}.${process.pid}.${++this.#creations}.tmp`;
+      writeFileSync(temporary, JSON.stringify(record));
+      try {
+        linkSync(temporary, end);
+      } catch (error) {
+        if ((error as { code?: unknown }).code !== "EEXIST") throw error;
+        Object.assign(record, JSON.parse(readFileSync(end, "utf8")) as LocalJobRecord);
+      } finally {
+        unlinkSync(temporary);
+      }
+    }
+    writeAtomically(join(dir, "record.json"), JSON.stringify(record));
+  }
+
+  /**
+   * Whether the tree of a job whose host is gone has ended: its supervisor recorded ending it (HOST_LOST, or any verdict), or its worker
+   * no longer exists. While neither holds, the job is answered as its record stands (RUNNING), never as ended.
+   */
+  #treeEnded(dir: string, record: LocalJobRecord): boolean {
+    if (readVerdict(dir) !== null) return true;
+    return record.pid === null || !processExists(record.pid);
+  }
+
+  #instanceFile(instance: string): string {
+    return join(this.#hostRoot, "instances", instance.replace(/[^a-z0-9-]/g, "_"));
+  }
+
+  /** Whether an instance over this root said it was alive within INSTANCE_LOST_MS (on this host's clock); this one always is. */
+  #instanceAlive(instance: string): boolean {
+    if (instance === this.instance) return true;
+    try {
+      return this.#o.clock.nowMs() - Number(readFileSync(this.#instanceFile(instance), "utf8")) < INSTANCE_LOST_MS;
+    } catch {
+      return false;
+    }
   }
 
   #recordOf(identity: string): LocalJobRecord | null {
@@ -563,16 +725,18 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (!existsSync(dir)) return null;
     let record: LocalJobRecord;
     try {
-      record = JSON.parse(readFileSync(join(dir, "record.json"), "utf8")) as LocalJobRecord;
+      const end = join(dir, "end.json");
+      record = JSON.parse(readFileSync(existsSync(end) ? end : join(dir, "record.json"), "utf8")) as LocalJobRecord;
     } catch {
-      // created, but its record never written: the creating host died between the two (nothing ran)
+      // a directory without a readable record was not made by a host (a create renames a directory that holds one): nothing ran
       const stamp = statSync(dir).mtimeMs;
       record = { host: LOCAL_PROCESS_HOST, identity, ticketDigest: "0".repeat(64), instance: "unknown", state: "FAILED", pid: null, createdAtMs: stamp, startedAtMs: null, endedAtMs: stamp, lastHeartbeatMs: null, cause: "WORKER_CRASHED", note: "CREATE_INTERRUPTED", manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, flags: [], hardMemoryBytes: 0, hardScratchBytes: 0 };
       this.#persist(record);
       return record;
     }
-    if (!TERMINAL.has(record.state) && record.instance !== this.instance) {
-      // the host that ran it is gone: its worker ended itself when that host's channel closed (main.ts), leaving no result
+    if (!TERMINAL.has(record.state) && !this.#instanceAlive(record.instance) && this.#treeEnded(dir, record)) {
+      // the host that ran it is gone (it no longer says it is alive): its worker ended itself when that host's channel closed (main.ts),
+      // leaving no result. A job of another live instance is answered from that instance's record as it stands.
       record.state = "FAILED";
       record.cause = "WORKER_CRASHED";
       record.note = "HOST_RESTARTED";

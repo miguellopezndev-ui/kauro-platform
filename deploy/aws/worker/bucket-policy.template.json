@@ -1,5 +1,5 @@
 {
-  "$comment": "B14-A contract: statements the platform bucket adds for the worker protocol (beside B15's own). TLS only; attempt roles only through the VPC's gateway endpoint; every create of a staging, ticket, claim or result key carries If-None-Match (no overwrite, ever); attempt roles never delete.",
+  "$comment": "B14-A contract: statements the platform bucket adds for the worker protocol (beside B15's own). TLS only; attempt roles only through the VPC's gateway endpoint; every object creation (PutObject, CompleteMultipartUpload) of a staging, ticket, claim or result key carries If-None-Match (no overwrite, ever) while the multipart steps that cannot carry it (CreateMultipartUpload, UploadPart) stay allowed, per AWS: conditional-writes-enforce; attempt roles never delete.",
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -24,7 +24,7 @@
       "Principal": "*",
       "Action": "s3:PutObject",
       "Resource": ["arn:aws:s3:::${OBJECT_BUCKET}/staging/*", "arn:aws:s3:::${OBJECT_BUCKET}/tickets/*", "arn:aws:s3:::${OBJECT_BUCKET}/claims/*", "arn:aws:s3:::${OBJECT_BUCKET}/results/*"],
-      "Condition": { "Null": { "s3:if-none-match": "true" } }
+      "Condition": { "Null": { "s3:if-none-match": "true" }, "Bool": { "s3:ObjectCreationOperation": "true" } }
     },
     {
       "Sid": "AttemptsNeverDelete",

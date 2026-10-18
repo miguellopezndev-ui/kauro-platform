@@ -62,6 +62,7 @@ export class AttemptStorageBroker {
   readonly #refusals: BrokerRefusalRecord[] = [];
   #nextStream = 0;
   #nextSession = 0;
+  #cancelledLate = 0;
   #revoked: string | null = null;
 
   constructor(options: AttemptStorageBrokerOptions) {
@@ -80,15 +81,37 @@ export class AttemptStorageBroker {
     return [...this.#refusals];
   }
 
-  /** Refuses every later call and cancels the sessions still open (their bearer references are worth nothing after this). */
+  /** Refuses every later call at once, and every answer still in flight when it lands (synchronous: nothing waits on the provider). */
+  close(reason: string): void {
+    this.#revoked ??= reason;
+  }
+
+  /**
+   * Closes the broker, then cancels the sessions still open — those created before and those whose creation lands after it — and
+   * releases the open reads. Each provider call is bounded by its own timeout; nothing here holds a termination back (the host kills
+   * the worker first and cleans after).
+   */
   async revoke(reason: string): Promise<void> {
-    if (this.#revoked !== null) return;
-    this.#revoked = reason;
-    for (const stream of this.#streams.values()) await stream.iterator.return?.().catch(() => undefined);
+    this.close(reason);
+    const streams = [...this.#streams.values()];
     this.#streams.clear();
+    for (const stream of streams) void stream.iterator.return?.().catch(() => undefined);
     const refs = [...this.#sessions.values()];
     this.#sessions.clear();
-    for (const ref of refs) await this.#o.storage.cancelResumableSession(ref, 10_000).catch(() => undefined);
+    await Promise.all(refs.map((ref) => this.#cancel(ref)));
+  }
+
+  /** Sessions the broker cancelled because they outlived its revocation (evidence; cleanup is never silent). */
+  get cancelledLate(): number {
+    return this.#cancelledLate;
+  }
+
+  #cancel(ref: string): Promise<unknown> {
+    return this.#o.storage.cancelResumableSession(ref, 10_000).catch(() => undefined);
+  }
+
+  #stillOpen(): void {
+    if (this.#revoked !== null) throw new BrokerRefusal("REVOKED", `the attempt's capability was revoked (${this.#revoked})`);
   }
 
   /** Answers one call, or throws: a BrokerRefusal for what the capability does not admit, the provider's error for what failed there. */
@@ -116,7 +139,9 @@ export class AttemptStorageBroker {
       }
       case "storage.stat": {
         this.#staging(call.zone, call.objectName);
-        return (await this.#o.storage.stat(this.#location("STAGING"), call.objectName)) satisfies StatAnswer;
+        const observed = (await this.#o.storage.stat(this.#location("STAGING"), call.objectName)) satisfies StatAnswer;
+        this.#stillOpen();
+        return observed;
       }
       case "storage.createSession":
         return this.#createSession(call);
@@ -130,6 +155,7 @@ export class AttemptStorageBroker {
         if (!(call.chunk instanceof Uint8Array) || call.chunk.byteLength > MAX_CHUNK_BYTES || typeof call.final !== "boolean") throw new BrokerRefusal("MALFORMED_CALL", "a chunk is at most 64 MiB of bytes");
         const answer = await this.#o.uploads.writeChunk(ref, call.chunk, { final: call.final });
         if (answer.outcome !== "IN_PROGRESS") this.#sessions.delete(call.handle);
+        this.#stillOpen();
         return answer;
       }
       case "stage":
@@ -156,6 +182,7 @@ export class AttemptStorageBroker {
     } else this.#staging(zone, objectName);
     if (this.#streams.size >= MAX_OPEN_STREAMS) throw new BrokerRefusal("TOO_MANY_STREAMS", "too many reads are open at once");
     const iterator = this.#o.storage.read(this.#location(zone as BrokeredZone), objectName as string, generation)[Symbol.asyncIterator]();
+    this.#stillOpen();
     const id = ++this.#nextStream;
     this.#streams.set(id, { iterator, pending: null });
     return id;
@@ -168,6 +195,8 @@ export class AttemptStorageBroker {
     stream.pending = null;
     if (chunk === null) {
       const next = await stream.iterator.next();
+      // an answer that lands after the revocation is never handed over
+      this.#stillOpen();
       if (next.done === true) {
         this.#streams.delete(streamId as number);
         return null;
@@ -190,6 +219,12 @@ export class AttemptStorageBroker {
       { location: this.#location("STAGING"), objectName: call.objectName, declaredBytes: call.declaredBytes, contentType: call.contentType, origin: this.#o.origin },
       boundedTimeout(call.timeoutMs),
     );
+    if (this.#revoked !== null) {
+      // created while the broker was being revoked: cancelled here, never handed over
+      this.#cancelledLate += 1;
+      await this.#cancel(session.sessionRef);
+      this.#stillOpen();
+    }
     const handle = `session-${++this.#nextSession}`;
     this.#sessions.set(handle, session.sessionRef);
     return { handle, chunkMultipleBytes: session.chunkMultipleBytes, providerExpiresAt: session.providerExpiresAt };

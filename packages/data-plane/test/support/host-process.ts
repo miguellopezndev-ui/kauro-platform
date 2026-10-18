@@ -4,13 +4,16 @@
 // that the worker ended itself and that a new host over the same roots answers the identity from its durable record.
 import { realpathSync } from "node:fs";
 import { attemptScratchDirectoryOf } from "../../src/index.js";
-import { localRig, plantedAttempt, readsFor } from "./local-host.js";
+import { HOSTILE_ENTRY, localRig, plantedAttempt, readsFor } from "./local-host.js";
 
 const root = process.argv[2] as string;
+// a second argument names a hostile behaviour (the hostile worker reads it from its ticket's render): no stage is reported then
+const hostile = process.argv[3];
 let atCore: () => void = () => undefined;
 const reached = new Promise<void>((resolve) => (atCore = resolve));
 const rig = localRig({
   root,
+  ...(hostile === undefined ? {} : { workerEntry: HOSTILE_ENTRY, render: { pageSize: "LETTER" as const, locale: hostile, rendererVersion: "x" } }),
   hooks: {
     atStage: (_identity, stage) => {
       if (stage !== "CORE_STARTED") return undefined;
@@ -20,10 +23,11 @@ const rig = localRig({
   },
 });
 const planted = plantedAttempt(rig.storage, 61);
-await readsFor(rig, planted);
+if (hostile === undefined) await readsFor(rig, planted);
+else rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
 const spec = planted.fixture.spec(1);
 const launch = await rig.host.launch(spec);
-await reached;
+if (hostile === undefined) await reached;
 const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
 process.stdout.write(`${JSON.stringify({ outcome: launch.outcome, identity: spec.identity, pid: rig.host.record(spec.identity)?.pid ?? null, attemptDir, spec })}\n`);
 setInterval(() => undefined, 60_000);

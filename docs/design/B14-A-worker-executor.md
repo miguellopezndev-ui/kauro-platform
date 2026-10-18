@@ -2,7 +2,7 @@
 
 Order 9, the first part of B14. It is local and synthetic: no AWS account or resource, no customer data, no real secret, no
 deployment. It builds a real executor that runs **Migration Core 3.0.0 and the B13 PDF report in an isolated process**, under B08's
-unchanged control plane. It also qualifies the AWS host on documentation ([B14-A-aws-host-qualification.md](B14-A-aws-host-qualification.md))
+unchanged control plane. It also selects the AWS host from the official documentation, without qualifying it ([B14-A-aws-host-qualification.md](B14-A-aws-host-qualification.md))
 and writes the deployment contracts ([deploy/aws/worker/](../../deploy/aws/worker/README.md)). It does not complete B14, and nothing
 here is production-ready.
 
@@ -62,12 +62,18 @@ Boundaries, from the outside in:
    staging prefix for writing. It hands out opaque session handles; the provider's bearer reference never reaches the worker. After
    a termination, a deadline or the result, it is revoked.
 3. **The process is confined.** The Node permission model lets the worker read only the code, the browser's directory and its own
-   attempt directory, and write only that directory. The network entry points are refused (the sandbox preload). The heap is
-   bounded, and so are the scratch quota and the wall clock.
-4. **Inside the worker,** the core runs in its own child with narrower flags (B05). Chromium runs with its own sandbox, offline, with
+   attempt directory, and write only that directory. The network entry points are refused (the sandbox preload). **Its process
+   allowlist** (`host/worker-preload.ts`) lets it start only the core's Node child, under a permission no wider than its own, and the
+   named browser without any flag that turns a sandbox layer off; every other program, every shell and every `NODE_OPTIONS` is
+   refused before a process exists. The permission model already refuses `process.binding`, workers, addons and WASI, so
+   `child_process` is the only way to a process. The heap is bounded, and so are the scratch quota and the wall clock.
+4. **A supervisor beside it** (`host/supervisor.ts`), outside the confinement and holding no customer data, ends the worker's whole
+   tree without the worker's cooperation: when the host dies (its pipe closes), at the deadline whether or not the host lives, and
+   when the tree's resident memory (Linux) or the attempt directory passes the attempt's hard limits.
+5. **Inside the worker,** the core runs in its own child with narrower flags (B05). Chromium runs with its own sandbox, offline, with
    JavaScript off and every request aborted (B13).
-5. **On AWS** (qualification §4), the task and its per-attempt IAM role replace items 2 and 3 as the hard boundary. The worker's code
-   is the same.
+6. **On AWS** (qualification §4), the task, its container and its per-attempt IAM role are the operating-system boundary. The
+   worker's code is the same.
 
 ## 3. The attempt ticket (KAURO_ATTEMPT_TICKET_V1)
 
@@ -112,30 +118,47 @@ most 1 MiB, so memory stays bounded.
 
 `LocalProcessWorkerHost` (`host/local-process-host.ts`):
 
-- **Creation by identity.** The create is the exclusive `mkdir` of `jobs/<identity>` under the host root. A second launch, a
-  concurrent one, a redelivery, or another host instance over the same root answers `ALREADY_EXISTS`. The control plane's records
-  are read before the create, so a failed read creates nothing. The job's durable record (`record.json`, written atomically) holds
-  state, pid, instants, cause, manifest reference, refusal, peaks and the exact command line. It never holds a customer value.
+- **Creation by identity.** The job's directory is prepared aside with its ticket and its first record, then renamed to
+  `jobs/<identity>`. A rename refuses a non-empty target, so the identity never exists without its record, and a second launch, a
+  concurrent one, a redelivery or another host instance over the same root answers `ALREADY_EXISTS`.
+- **No late create.** The control plane's records are read before the create, under a bound of half the creation horizon. A launch
+  whose read outlasts that bound, or whose identity is terminated meanwhile, creates nothing when the read lands (review R3).
+- **One end, for good.** The durable record (`record.json`, written atomically) holds state, pid, instants, cause, manifest
+  reference, refusal, peaks and the exact command line, never a customer value. A job's end is `end.json`, created exclusively (a
+  hard link that fails if the end exists): of a result, a termination, a deadline and another instance's verdict, the first end
+  stands and every later one adopts it.
 - **Configuration refused before it exists.** Relative paths, a missing entry or browser, no code roots, a host or scratch root
   that overlaps a code root the worker can read, overlapping host and scratch roots, a non-https session origin, or a malformed core
   hash. At launch, the two heaps plus the browser's reserve must fit in the attempt's hard memory.
 - **Limits.**
-  - Memory: `--max-old-space-size` on the worker, `heapMegabytes` on the core child, and the browser's reserve inside the attempt's
-    `hardMemoryBytes`.
-  - Disk: the attempt's scratch quota (AttemptScratchStore and the core's byte ledger).
-  - Time: the worker's own deadline (the adapter's `Operation`), and the host's timer at the earlier of the execution deadline and
-    the wall clock. When that timer fires, the host kills the tree and records `DEADLINE_EXCEEDED`.
-- **Termination** revokes the broker first, then kills the worker's whole tree. On Linux this walks `/proc` and then kills the
-  worker's process group; on Windows it uses `taskkill /T /F`. The browser and the core child go with the worker.
-- **Restart.** A worker whose host's channel closes ends itself and everything it started (`killOwnTree`). A new host over the same
-  root answers the identity from its durable record: `FAILED WORKER_CRASHED` (`HOST_RESTARTED`), never `NOT_FOUND`. B08 then
-  abandons the attempt and takes it over at fence + 1.
+  - Memory: `--max-old-space-size` on the worker and `heapMegabytes` on the core child, with the browser's reserve, must fit inside
+    the attempt's `hardMemoryBytes` (checked at launch). The supervisor reads the whole tree's resident memory, native allocations
+    and the browser included, and ends the tree past `hardMemoryBytes` (`MEMORY_EXHAUSTED`). It does this on Linux, from /proc. On
+    Windows only the heaps are bounded locally; the cloud task's memory limit is the container's.
+  - Disk: the attempt's scratch budget is enforced inside (AttemptScratchStore, the core's byte ledger). The supervisor measures the
+    whole attempt directory, so it also counts writes outside those quotas and the browser's profile, and ends the tree past
+    `hardScratchBytes` (`SCRATCH_EXHAUSTED`).
+  - Time: the worker's own deadline (the adapter's `Operation`); the host's timer at the earlier of the execution deadline and the
+    wall clock; and the supervisor's own timer, which still fires if the host has died.
+- **Termination** closes the broker at once, kills the worker's whole tree at once and records the end. Only then are the provider's
+  sessions cancelled and reads released, each bounded, in the background, so no provider call can hold a termination or a deadline
+  back (review R6). A session or a read that lands after the closing is cancelled and never handed over (review R5). On Linux the kill
+  walks `/proc` and then kills the worker's process group; on Windows it uses `taskkill /T /F`.
+- **Restart and other instances.** Each host instance renews an `instances/<id>` file every 5 s. Another instance answers a job by
+  its record as it stands (`RUNNING`) while the owning instance is alive. It may terminate that job by pid, since the job is a live
+  instance's child. It declares the job `FAILED WORKER_CRASHED` (`HOST_RESTARTED`) only once the owner has been silent for 30 s
+  **and** the tree is known to have ended: the supervisor's verdict (`HOST_LOST`) or a pid that no longer exists (review R4, R7). A
+  worker whose host's channel closes also ends itself (`killOwnTree`), and a worker stuck in synchronous work is ended by its
+  supervisor. On Windows the operating system does it first: libuv puts a process's children in a kill-on-close job object, so the
+  worker's whole tree ends with the host; the supervisor is started detached, outside that job, and records `HOST_LOST`. B08 then abandons the attempt and takes it over at fence + 1.
 
-**Residual (local only), recorded by a test:** a *native* program started by the worker is not confined by Node's permission model.
-A Node child inherits it, and a hostile worker proves both. What still holds is boundary 1 (no credential) and boundary 2 (no storage
-except through the broker). Another attempt's leftover scratch on the same disk, before the janitor removes it, is readable by such a
-program run as the same OS user. The local host is therefore for qualification and development; multi-tenant isolation is the cloud
-task's, one attempt per task. An OS-level sandbox for the local host would close this residual and is not built.
+**Residual (local only).** Locally, all of the above runs as one operating-system user with no OS sandbox. The allowlist admits the
+named browser, and Chromium's browser process is not confined by Node's permission model. A worker that was already compromised
+(arbitrary code in the worker's own process) could drive that browser over its pipe to a `file:` URL. Such a worker still has no
+credential (boundary 1) and no storage except through the broker (boundary 2). The hostile-worker test proves that every other way
+out is refused. The local host is therefore for qualification and single-tenant development. Multi-tenant isolation belongs to the
+cloud task: one attempt per container, with its own filesystem and its own role. An OS sandbox for the local host (a container,
+bubblewrap or a Windows job object with an AppContainer) would close this residual and is not built.
 
 ## 6. B13 inside the worker
 
@@ -166,9 +189,9 @@ Windows with Google Chrome required (`KAURO_REQUIRE_PDF_ENGINE=1`).
 
 | Suite | File | Cases |
 |---|---|---|
-| Ticket and broker, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 4: digest, canonical bytes, closed shape (18 refusals), broker OK, broker DENY (14 refusals and revocation) |
+| Ticket and broker, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 5: a session landing after revocation is cancelled; digest, canonical bytes, closed shape (18 refusals), broker OK, broker DENY (14 refusals and revocation) |
 | Local executor, happy path | `packages/data-plane/test/local-process-host.test.ts` | 1: real Migration Core and Chromium in a confined process; the manifest names the package, the PDF and its record; scratch removed |
-| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
+| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 20: two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
 | End to end, PostgreSQL 17 | `apps/control/test/b14a-local-executor.test.ts` | 5: OK (package AVAILABLE, job READY, entitlement DELIVERED, verification VALID EXECUTED_LOCAL 3.0.0, delivered manifest = the receipt's, janitor CLEANED with REPORTED resources); S056 lost answer adopted through B08; CMD037 during the run; worker killed, then takeover at fence 2 delivers; no legal identity → FAILED REFUSED |
 | Regressions | data-plane, control, persistence, application suites; `pnpm run verify` | B05 adapter (with F1), B08 control plane, B13 report suites unchanged and green |
 
@@ -188,6 +211,14 @@ EXECUTED_PROVIDER.**
 | F3 | The real verifier needs `controls.limits`; the pipeline passes none. | `localExecutorOf` binds the verifier with the plane's limits. |
 | F4 | Under Node 24's permission model `fsync` is disabled, and a directory's contents are granted only if the directory exists when the process starts. | The host creates the attempt directory before spawning. `AttemptScratchStore` gains `confined` (no root `mkdir`, no `fsync`; the length on the device is still checked). |
 | F5 | On Windows a process's working directory cannot be removed. | The worker's working directory is the scratch root, which it cannot read. |
+| R1 | (independent review, round 1) A native child of the worker escaped the permission model. | The process allowlist (§2 item 3); the hostile worker's native, shell, wider-permission and `NODE_OPTIONS` children are refused. The narrowed residual is stated in §5. |
+| R2 | Heap caps are not the attempt's hard memory or scratch. | The supervisor measures the tree's resident memory (Linux) and the attempt directory (all platforms). |
+| R3 | A slow record read could create a job after the horizon. | A bounded read; a launch abandoned meanwhile creates nothing. |
+| R4 | Another live instance declared a running job dead. | Instance liveness; an end only once the tree is known to have ended; `end.json`, where the first end stands. |
+| R5 | A session created after revocation survived it. | The broker checks again after each provider answer and cancels a late session. |
+| R6 | Termination waited on provider cleanup; an exit could overwrite a termination. | Synchronous close, kill and record, with cleanup afterwards; the first end stands. |
+| R7 | A worker stuck in synchronous work outlived its dead host. | The supervisor ends the tree when the host's pipe closes. |
+| R8–R10 | The AWS document claimed a guaranteed 900 s horizon and permanent single creation, inferred an end from absence, and blocked multipart uploads. | The verdict became `SELECTED_NOT_QUALIFIED`; the token's guaranteed hour, a recorded ARN, no end from absence; the multipart steps are allowed by `s3:ObjectCreationOperation`. |
 
 ## 10. Decisions
 

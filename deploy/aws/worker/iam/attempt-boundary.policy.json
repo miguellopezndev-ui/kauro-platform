@@ -5,7 +5,12 @@
     {
       "Sid": "AttemptCeiling",
       "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"],
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:AbortMultipartUpload"
+      ],
       "Resource": [
         "arn:aws:s3:::${OBJECT_BUCKET}/tickets/*",
         "arn:aws:s3:::${OBJECT_BUCKET}/accepted/*",

@@ -54,6 +54,14 @@ async function main(): Promise<void> {
     return;
   }
   const rpc = new WorkerRpc(send);
+  // a sign of life between the core's cancellation checks too (the lease's heartbeat is the host's observation, D8-ATT-2)
+  setInterval(() => {
+    try {
+      rpc.beat();
+    } catch {
+      // the channel is closing: the disconnect handler ends the worker
+    }
+  }, 30_000).unref();
   process.on("disconnect", () => {
     if (finishing) exitWith(0);
     rpc.close("the host's channel closed");
