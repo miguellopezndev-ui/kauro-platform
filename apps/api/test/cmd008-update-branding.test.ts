@@ -193,6 +193,8 @@ test("CMD008-DENY media: SVG, script, JPEG, forged or broken PNGs, image bombs, 
       ["bad CRC", Buffer.concat([SIGNATURE, chunk("IHDR", ihdr(4, 4), true), idat, chunk("IEND", new Uint8Array(0))]), "LOGO_MALFORMED"],
       ["bytes after IEND", Buffer.concat([good, Buffer.from("<script>alert(1)</script>")]), "LOGO_MALFORMED"],
       ["truncated", good.subarray(0, good.length - 9), "LOGO_MALFORMED"],
+      // review BR-001: an IDAT whose zlib stream lacks its Adler-32 trailer (every chunk CRC correct)
+      ["zlib stream without its Adler-32", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACElEQVR4nGP4z8AAAPAwxZIAAAAASUVORK5CYII=", "base64"), "LOGO_MALFORMED"],
       ["decompression bomb", Buffer.concat([SIGNATURE, chunk("IHDR", ihdr(1, 1)), chunk("IDAT", deflateSync(Buffer.alloc(64 * 1024 * 1024), { level: 9 })), chunk("IEND", new Uint8Array(0))]), "LOGO_MALFORMED"],
       ["more than 2048 pixels a side", Buffer.concat([SIGNATURE, chunk("IHDR", ihdr(4096, 1)), idat, chunk("IEND", new Uint8Array(0))]), "LOGO_DIMENSIONS_OUT_OF_RANGE"],
     ];

@@ -18,8 +18,8 @@
  *    depth and colour type, deflate, standard filtering), the palette and transparency chunks the colour type admits, consecutive IDAT,
  *    IEND last with nothing after it; an unknown critical chunk, an animation (acTL, fcTL, fdAT) or anything else is refused. SVG, HTML,
  *    script, JPEG, GIF, WebP, a renamed file of any kind fail at the signature: no other format is ever parsed;
- * 3. the image data is inflated with its output bounded by the exact size IHDR implies (an image bomb stops at that bound, before any
- *    allocation beyond it), then every scanline is unfiltered — interlaced (Adam7) or not — and every palette index checked;
+ * 3. the image data is inflated as one complete zlib stream (its Adler-32 checked, nothing after it) with its output bounded by the exact
+ *    size IHDR implies (an image bomb stops at that bound, before any allocation beyond it), then every scanline is unfiltered — interlaced (Adam7) or not — and every palette index checked;
  * 4. the pixels are written again as a new PNG: 8-bit RGBA (RGB when every pixel is opaque), IHDR, IDAT and IEND only. Nothing of the
  *    upload survives but its pixels: text, EXIF, ICC profiles, timestamps, private chunks and trailing bytes are all dropped;
  * 5. the new PNG is bounded again (LOGO_MAX_BYTES) and named by its SHA-256 — the value a branding version and a report name.
@@ -31,7 +31,7 @@
  * refused LOGO_FORMAT_UNSUPPORTED rather than stored unverified.
  */
 import { createHash } from "node:crypto";
-import { constants as zlibConstants, crc32, deflateSync, inflateSync } from "node:zlib";
+import { crc32, deflateSync, inflateSync } from "node:zlib";
 
 /** The report model's bound on a logo's bytes (@kauro/reports LOGO_MAX_BYTES): the upload and the platform's PNG are both held to it. */
 export const LOGO_MAX_BYTES = 512 * 1024;
@@ -189,13 +189,18 @@ function decode(h: Header, data: Uint8Array, palette: Uint8Array | null, transpa
   const passes = passesOf(h).filter(([, w, hh]) => w > 0 && hh > 0);
   const expected = passes.reduce((n, [, w, hh]) => n + (lineBytes(h, w) + 1) * hh, 0);
   let raw: Buffer;
+  let consumed: number;
   try {
-    // the bound is the exact size IHDR implies: an image bomb stops here, before allocating anything beyond it
-    raw = inflateSync(data, { maxOutputLength: expected, finishFlush: zlibConstants.Z_SYNC_FLUSH });
+    // the bound is the exact size IHDR implies: an image bomb stops here, before allocating anything beyond it. The stream must end
+    // (Z_FINISH, the default: an unfinished DEFLATE stream or a missing Adler-32 trailer throws) and be the whole of the image data.
+    const inflated = inflateSync(data, { maxOutputLength: expected, info: true }) as unknown as { readonly buffer: Buffer; readonly engine: { readonly bytesWritten: number } };
+    raw = inflated.buffer;
+    consumed = inflated.engine.bytesWritten;
   } catch (e) {
-    return refuse("LOGO_MALFORMED", `the image data does not inflate to the ${expected} bytes its header implies (${e instanceof Error && "code" in e ? String(e.code) : "zlib"})`);
+    return refuse("LOGO_MALFORMED", `the image data is not one complete zlib stream of the ${expected} bytes its header implies (${e instanceof Error && "code" in e ? String(e.code) : "zlib"})`);
   }
   if (raw.length !== expected) refuse("LOGO_MALFORMED", `the image data inflates to ${raw.length} bytes, not the ${expected} its header implies`);
+  if (consumed !== data.length) refuse("LOGO_MALFORMED", `${data.length - consumed} bytes of image data follow the end of its zlib stream`);
   const rgba = new Uint8Array(h.width * h.height * 4);
   const entries = palette === null ? 0 : palette.length / 3;
   let at = 0;

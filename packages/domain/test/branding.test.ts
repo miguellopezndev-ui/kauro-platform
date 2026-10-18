@@ -163,6 +163,11 @@ test("CMD008-DENY media: a forged or broken PNG is refused — each defect alone
     ["short image data", png([head, chunk("IDAT", deflateSync(rawLines(7, 4, 4, rgbaPixels(7, 4)))), IEND])],
     ["long image data", png([head, chunk("IDAT", deflateSync(rawLines(7, 6, 4, rgbaPixels(7, 6)))), IEND])],
     ["not deflate", png([head, chunk("IDAT", Buffer.from("not a zlib stream at all")), IEND])],
+    // review BR-001: the stream must end and be the whole image data — no missing Adler-32, no unfinished DEFLATE, nothing after it
+    ["zlib stream without its Adler-32", png([head, chunk("IDAT", deflateSync(rawLines(7, 5, 4, rgbaPixels(7, 5))).subarray(0, -4)), IEND])],
+    ["unfinished DEFLATE stream", png([head, chunk("IDAT", deflateSync(rawLines(7, 5, 4, rgbaPixels(7, 5))).subarray(0, -9)), IEND])],
+    ["data after the zlib stream", png([head, chunk("IDAT", Buffer.concat([deflateSync(rawLines(7, 5, 4, rgbaPixels(7, 5))), Buffer.from("<svg/>")])), IEND])],
+    ["the reviewer's 1x1 PNG without its Adler-32", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACElEQVR4nGP4z8AAAPAwxZIAAAAASUVORK5CYII=", "base64")],
     ["bad scanline filter", png([head, chunk("IDAT", deflateSync((() => { const r = rawLines(7, 5, 4, rgbaPixels(7, 5)); r[0] = 9; return r; })())), IEND])],
     ["indexed without palette", png([chunk("IHDR", ihdr(2, 2, 8, 3)), chunk("IDAT", deflateSync(Buffer.from([0, 0, 0, 0, 0, 0]))), IEND])],
     ["palette index out of range", png([chunk("IHDR", ihdr(2, 2, 8, 3)), chunk("PLTE", Buffer.from([1, 2, 3])), chunk("IDAT", deflateSync(Buffer.from([0, 0, 1, 0, 0, 0]))), IEND])],
