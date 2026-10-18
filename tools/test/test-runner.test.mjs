@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { command, killRunner, normalizePath, runTest, summarizeEvents, testTarget } from '../test-runner.mjs';
+import { assertDead, killUnconfirmed } from './gate-process.mjs';
 
 test('path normalisation decodes file URLs and percent-encoded paths before resolving Windows aliases', () => {
   const calls = [];
@@ -168,7 +169,7 @@ test('testTarget canonicalises repository and test paths without allowing a sibl
 });
 
 for (const code of ['EPERM', 'ESRCH']) {
-  test(`a ${code} killer cannot leave runTest waiting forever`, () => {
+  test(`a ${code} killer cannot leave runTest waiting forever`, async () => {
     const root = mkdtempSync(join(tmpdir(), 'kauro-kill-failure-'));
     const runner = join(root, 'gate.mjs');
     const compiled = join(root, 'hung.test.mjs');
@@ -191,16 +192,18 @@ assert.ok(result.durationMs < 2000);
 console.log(result.killFailure);
 `);
     let pid;
+    // The gate's exit hook kills the runner it could not stop. Signalling that pid again afterwards, unconditionally, could hit
+    // another process the OS has given it (ADV-24): it was 2 taskkill calls on a dead pid per tools-suite round on windows-latest.
+    const confirmed = new Set();
     try {
       const result = command(process.execPath, [runner], root);
       pid = Number(readFileSync(join(root, 'pid'), 'utf8'));
       assert.equal(result.status, 0, result.output);
       assert.match(result.output, new RegExp(code));
+      await assertDead([pid], 'runner', 'its gate exiting', confirmed);
     } finally {
-      if (pid) {
-        if (process.platform === 'win32') command('taskkill', ['/PID', String(pid), '/T', '/F'], root);
-        else { try { process.kill(-pid, 'SIGKILL'); } catch { /* already terminated */ } }
-      }
+      if (pid) killUnconfirmed([pid], confirmed, process.platform === 'win32'
+        ? (unconfirmed) => command('taskkill', ['/PID', String(unconfirmed), '/T', '/F'], root) : (unconfirmed) => process.kill(-unconfirmed, 'SIGKILL'));
       rmSync(root, {recursive: true, force: true});
     }
   });
