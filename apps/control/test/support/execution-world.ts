@@ -47,6 +47,7 @@ import type {
   ValidatePort,
   WorkerHostPort,
 } from "@kauro/application";
+import { disclosureItemsOf, disclosuresHashOf } from "@kauro/application";
 import { ContractFakeAuthorityJournal, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH, CONTRACT_FAKE_MIGRATION_CORE_VERSION, ContractFakeIntelligenceCore, ContractFakeMigrationCore } from "@kauro/application/testing/cores";
 import { ContractFakeMalwareScanner } from "@kauro/data-plane/testing";
@@ -271,7 +272,8 @@ export interface AuditSubject {
 export interface ReportFixture {
   readonly counts: RowCounts;
   readonly expectedManifestSha256: Sha256Hex;
-  readonly termsHash: Sha256Hex;
+  /** A terms hash the quote records instead of KAURO_QUOTE_TERMS_V1 of its own preimage (a test of terms nobody accepted). */
+  readonly termsHash?: Sha256Hex;
 }
 
 /** What a second control-plane process may bind instead of the world's own units, providers and cores (each a test decorator). */
@@ -543,6 +545,12 @@ let seq = 0;
 export interface ExecutionWorldOptions {
   /** The worker's execution envelope instead of the Migration core fake (built over the world's storage and units once they exist). */
   readonly envelope?: (parts: { readonly storage: ContractFakeObjectStorage; readonly units: TestClockExecutionUnits; readonly oracle: Harness["oracle"] }) => ExecutionEnvelopePort;
+  /** The world's fiscal issuer instead of a qualified one with a fixture legal identity hash (a report world names a recorded identity's). */
+  readonly issuer?: (h: Harness) => Promise<FiscalIssuerRef>;
+  /** Runs for each agency once it is ACTIVE with its reviewed profile (a report world records its accepted terms and branding). */
+  readonly onAgency?: (h: Harness, agency: AgencyFixture) => Promise<void>;
+  /** Runs for each subject of a paid purchase before its plan exists (a report world takes the subject's audit to its findings). */
+  readonly onSubject?: (subject: AuditSubject) => Promise<void>;
 }
 
 export async function startExecutionWorld(tag: string, worldOptions: ExecutionWorldOptions = {}): Promise<ExecutionWorld> {
@@ -600,7 +608,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
   // the platform's commercial configuration and a corporate owner (B09 fixtures)
   const kora = await h.person(`${tag}-kora`);
   await h.grantKauroOwner(kora);
-  const issuerRef: FiscalIssuerRef = await h.qualifiedFiscalIssuer();
+  const issuerRef: FiscalIssuerRef = worldOptions.issuer === undefined ? await h.qualifiedFiscalIssuer() : await worldOptions.issuer(h);
   const route: QualifiedRoute = await h.qualifiedPaymentRoute();
   const capabilityId = await h.offeredCapability("HUBSPOT");
   const clients = new Map<string, ClientId>();
@@ -612,6 +620,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
     await activateAgency(h, ag);
     clients.set(ag.agencyId, await h.endClient(ag, await h.processingAuthority(ag), `${label} client`));
     profiles.set(ag.agencyId, await recordReviewedFiscalProfile(h, { operatorUserId: kora, agencyId: ag.agencyId, issuerRef, treatment: "EXEMPT_EXPORT" }));
+    await worldOptions.onAgency?.(h, ag);
     return ag;
   };
   const A = await agency("alpha");
@@ -710,7 +719,9 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
   }
 
   async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE", report?: ReportFixture): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
-    const { projectId, revisionId, revisionHash, contractId, targetContractHash, capabilityId: withCapability } = await subjectOf(ag, label, mode, {}, report);
+    const subject = await subjectOf(ag, label, mode, {}, report);
+    await worldOptions.onSubject?.(subject);
+    const { projectId, revisionId, revisionHash, contractId, targetContractHash, capabilityId: withCapability } = subject;
     const source = { revisionId, revisionHash };
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
@@ -730,6 +741,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
     });
     const receiptHash = sha(`receipt-${planId}`);
     const units120 = 120;
+    const receiptCounts = report?.counts ?? { physicalSourceRows: units120, logicalSourceRecords: units120, billableSourceUnits: units120, associationEdges: 0, emittedRepresentatives: units120, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: units120 };
     await h.recordValidationReceipt({
       receiptId: ids.next() as ValidationReceiptId,
       agencyId: ag.agencyId,
@@ -745,7 +757,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
       startedAt: toUtcInstant(Date.now() - 60_000),
       completedAt: clock.now(),
       result: "VALID",
-      counts: report?.counts ?? { physicalSourceRows: units120, logicalSourceRecords: units120, billableSourceUnits: units120, associationEdges: 0, emittedRepresentatives: units120, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: units120 },
+      counts: receiptCounts,
       blockingIssueCodes: [],
     } as never);
     const proof = await h.recordStepUp(ag.ownerUserId);
@@ -755,7 +767,8 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
       const causationId = uow.ids.next() as CausationId;
       const validated = applied(await uow.plans.transition(planId, 3, { state: "VALIDATED", validationReceiptHash: receiptHash }, clock.now()), "validated");
       await uow.events.publish({ aggregateKind: "plan", aggregateId: planId, aggregateVersion: validated.version, agencyId: ag.agencyId, eventType: "plan.validated.v1", actor, causationId, correlationId, payload: { planId, agencyId: ag.agencyId, bodyHash, validationReceiptHash: receiptHash } });
-      const disclosuresHash = sha(`disclosures-${approvalId}`);
+      // the edition's composer over the plan and the receipt, as CMD025 compares it (the disclosure set a report's material decisions are)
+      const disclosuresHash = disclosuresHashOf(bodyHash, receiptHash, disclosureItemsOf(body, receiptCounts.physicalSourceRows));
       const approvalHash = sha(`approval-${approvalId}`);
       const approval = await uow.approvals.insert({
         approvalId,
@@ -860,7 +873,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
         profileId: profiles.get(ag.agencyId) as FiscalProfileId,
         treatment: "EXEMPT_EXPORT",
         route,
-        ...(options.report === undefined ? {} : { billableUnits: options.report.counts.billableSourceUnits, termsHash: options.report.termsHash }),
+        ...(options.report === undefined ? {} : { billableUnits: options.report.counts.billableSourceUnits, ...(options.report.termsHash === undefined ? {} : { termsHash: options.report.termsHash }) }),
       });
       return { ...subject, authorizationId: paid.authorizationId, orderId: paid.orderId, captureId: paid.captureId };
     },

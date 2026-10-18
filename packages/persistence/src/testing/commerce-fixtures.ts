@@ -52,15 +52,23 @@ export async function recordQualifiedPaymentRoute(
 
 /**
  * The contracting and invoicing entity's issuance route (15 "Accounting integration decision"): legal facts professionally
- * confirmed, a numbering authorization and verified entitlement (R2-083), CONFIGURED then QUALIFIED; one per jurisdiction.
+ * confirmed (or observed), a numbering authorization and verified entitlement (R2-083), CONFIGURED then QUALIFIED; one per jurisdiction —
+ * or, for legal facts of another status, CONFIGURED only (a route never qualifies on them). Its legal
+ * identity hash is a fixture digest no document has, unless the test names the hash of a recorded identity (order 6, report-sources.ts).
  */
-export async function recordQualifiedFiscalIssuer(control: Control, options: { readonly jurisdiction?: string } = {}): Promise<FiscalIssuerRef> {
+export async function recordQualifiedFiscalIssuer(
+  control: Control,
+  options: { readonly jurisdiction?: string; readonly legalIdentityHash?: string; readonly legalFactStatus?: "OBSERVED" | "PROFESSIONALLY_CONFIRMED" | "OWNER_DECLARED" | "PENDING" | "EXPIRED"; readonly qualify?: boolean } = {},
+): Promise<FiscalIssuerRef> {
   const issuerRef = ids.next() as FiscalIssuerRef;
+  const status = options.legalFactStatus ?? "PROFESSIONALLY_CONFIRMED";
   await control.query(
     `INSERT INTO kauro.fiscal_issuers (issuer_ref, jurisdiction, legal_identity_hash, legal_fact_status, route_kind, integration_class, numbering_authorization_ref, entitlement_evidence_hash, created_at, updated_at)
-     VALUES ($1, $2, $3, 'PROFESSIONALLY_CONFIRMED', 'PROVIDER_API', 'CONTRACT_FAKE', 'DIAN-18764000001', $4, now(), now())`,
-    [issuerRef, options.jurisdiction ?? "CO", sha(`issuer-legal-identity-${issuerRef}`), sha(`issuer-entitlement-${issuerRef}`)],
+     VALUES ($1, $2, $3, $5, 'PROVIDER_API', 'CONTRACT_FAKE', 'DIAN-18764000001', $4, now(), now())`,
+    [issuerRef, options.jurisdiction ?? "CO", options.legalIdentityHash ?? sha(`issuer-legal-identity-${issuerRef}`), sha(`issuer-entitlement-${issuerRef}`), status],
   );
+  // a route qualifies only on observed or professionally confirmed facts (fiscal_issuers_qualified_route): any other stays CONFIGURED
+  if ((status !== "OBSERVED" && status !== "PROFESSIONALLY_CONFIRMED") || options.qualify === false) return issuerRef;
   await control.query("UPDATE kauro.fiscal_issuers SET route_state = 'QUALIFIED', qualification_evidence_hashes = $2::jsonb, valid_from = now() - interval '24 hours' WHERE issuer_ref = $1", [
     issuerRef,
     JSON.stringify([sha(`issuer-qualification-${issuerRef}`)]),

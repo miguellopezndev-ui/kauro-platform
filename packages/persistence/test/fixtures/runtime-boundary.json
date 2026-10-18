@@ -1,6 +1,15 @@
 {
   "columns": {
     "kauro_app": {
+      "kauro.agency_branding_versions": {
+        "INSERT": [
+          "agency_id",
+          "branding_version",
+          "display_name",
+          "recorded_by_membership_id",
+          "recorded_by_user_id"
+        ]
+      },
       "kauro.agency_execution_capacity": {
         "INSERT": [
           "agency_id",
@@ -1031,6 +1040,16 @@
           "version"
         ]
       },
+      "kauro.agency_agreement_acceptances": {
+        "SELECT": [
+          "acceptance_id",
+          "accepted_at",
+          "agency_id",
+          "terms_document_hash",
+          "terms_kind",
+          "terms_version"
+        ]
+      },
       "kauro.agency_execution_capacity": {
         "INSERT": [
           "agency_id",
@@ -1049,6 +1068,7 @@
           "approval_hash",
           "approval_id",
           "created_at",
+          "disclosures_hash",
           "plan_hash",
           "plan_id",
           "revision_hash",
@@ -1182,6 +1202,12 @@
       "kauro.dispatch_liabilities": {
         "UPDATE": [
           "state"
+        ]
+      },
+      "kauro.legal_identity_snapshots": {
+        "INSERT": [
+          "document",
+          "legal_identity_hash"
         ]
       },
       "kauro.model_task_journal": {
@@ -1365,6 +1391,41 @@
           "version"
         ]
       },
+      "kauro.quotes": {
+        "SELECT": [
+          "agency_id",
+          "approval_id",
+          "base_service_cents",
+          "billable_units",
+          "currency",
+          "discount_bps",
+          "discount_cents",
+          "discount_policy_version",
+          "eligibility_snapshot_id",
+          "expires_at",
+          "fiscal_profile_id",
+          "issued_at",
+          "issuer_ref",
+          "mode",
+          "plan_hash",
+          "plan_id",
+          "price_policy_version",
+          "project_id",
+          "quote_id",
+          "revision_hash",
+          "service_cents",
+          "source_available_until",
+          "state",
+          "target_contract_hash",
+          "tax_cents",
+          "tax_rate_bps",
+          "tax_rule",
+          "tax_treatment",
+          "terms_hash",
+          "terms_version",
+          "total_cents"
+        ]
+      },
       "kauro.recovery_gate": {
         "SELECT": [
           "gate_id",
@@ -1372,6 +1433,13 @@
         ],
         "UPDATE": [
           "gate_id"
+        ]
+      },
+      "kauro.report_branding_bindings": {
+        "INSERT": [
+          "agency_id",
+          "branding_version",
+          "job_id"
         ]
       },
       "kauro.retention_records": {
@@ -1942,6 +2010,14 @@
       ],
       "using": null
     },
+    "agency_agreement_acceptances/agency_agreement_acceptances_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
     "agency_agreement_acceptances/agency_agreement_acceptances_tenant_accept": {
       "check": "((agency_id = kauro.current_agency_id()) AND (user_id = kauro.current_user_id()))",
       "command": "INSERT",
@@ -1957,6 +2033,30 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "agency_branding_versions/agency_branding_versions_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "agency_branding_versions/agency_branding_versions_tenant_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "agency_branding_versions/agency_branding_versions_tenant_record": {
+      "check": "((agency_id = kauro.current_agency_id()) AND kauro.acting_branding_manager(agency_id, recorded_by_membership_id, recorded_by_user_id))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
     },
     "agency_buyer_types/agency_buyer_types_owner_read": {
       "check": null,
@@ -5232,6 +5332,22 @@
       ],
       "using": "(account_code = 'PSP_AVAILABLE'::text)"
     },
+    "legal_identity_snapshots/legal_identity_snapshots_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true"
+    },
+    "legal_identity_snapshots/legal_identity_snapshots_control_record": {
+      "check": "true",
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null
+    },
     "membership_invitations/membership_invitations_invitee_read": {
       "check": null,
       "command": "SELECT",
@@ -7093,6 +7209,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "quotes/quotes_control_report_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
     "quotes/quotes_finance_read": {
       "check": null,
       "command": "SELECT",
@@ -7371,6 +7495,22 @@
       "command": "INSERT",
       "roles": [
         "kauro_app"
+      ],
+      "using": null
+    },
+    "report_branding_bindings/report_branding_bindings_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "report_branding_bindings/report_branding_bindings_control_record": {
+      "check": "(agency_id = kauro.current_agency_id())",
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
       ],
       "using": null
     },
@@ -9231,6 +9371,9 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.agency_branding_versions": [
+        "SELECT"
+      ],
       "kauro.agency_buyer_types": [
         "INSERT",
         "SELECT"
@@ -10046,6 +10189,9 @@
       ]
     },
     "kauro_control": {
+      "kauro.agency_branding_versions": [
+        "SELECT"
+      ],
       "kauro.agency_execution_capacity": [
         "SELECT"
       ],
@@ -10161,6 +10307,9 @@
         "SELECT",
         "UPDATE"
       ],
+      "kauro.legal_identity_snapshots": [
+        "SELECT"
+      ],
       "kauro.model_task_journal": [
         "SELECT"
       ],
@@ -10218,6 +10367,9 @@
         "INSERT",
         "SELECT",
         "UPDATE"
+      ],
+      "kauro.report_branding_bindings": [
+        "SELECT"
       ],
       "kauro.request_journal": [
         "INSERT",

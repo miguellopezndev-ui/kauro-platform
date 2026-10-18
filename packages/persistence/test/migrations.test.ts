@@ -199,6 +199,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0093_sec_policy_hygiene.sql",
     // order 4 (review finding F2, owner decision option A): the business contact's key on the prospect, so every reader of it derives a CONTACT suppression
     "0094_b12_prospect_contact_key.sql",
+    // order 6: the sources of a B13 report (legal identity documents, branding versions, the control plane's column reads of the report's bindings)
+    "0095_b13_report_sources.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
