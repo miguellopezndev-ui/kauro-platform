@@ -406,14 +406,21 @@ export async function kbook(creditId: string): Promise<ReadonlyArray<string>> {
   return out;
 }
 /**
- * The dispatcher's backoff of the credit's failed FINANCE deliveries elapses (it schedules a retry on the real process clock): their
- * next attempt is due now. Answers how many were rescheduled.
+ * The dispatcher's backoff of the credit's failed FINANCE deliveries elapses (it schedules a retry on its own clock): each is due again
+ * at the instant it first became due, its created_at (the publisher wrote next_attempt_at = created_at on the application clock, and the
+ * failed pass claimed it with the dispatcher's clock at or after that instant). Never the database's now(): the dispatcher compares
+ * next_attempt_at with its runtime clock, Date.now() here: whole milliseconds, and on Windows a GetSystemTimeAsFileTime baseline V8
+ * extrapolates and resyncs each minute, while PostgreSQL's now() reads GetSystemTimePreciseAsFileTime. It stood up to 2.3 ms behind the
+ * database clock on a GitHub Windows runner, and the claim followed this write by as little as 1.7 ms: a pass then claimed nothing and
+ * booked nothing (order 8). Answers how many were rescheduled, each due on the dispatcher's clock.
  */
 export async function financeRetryDue(creditId: string): Promise<number> {
-  const r = await L().iw.h.oracle.query(
-    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[])",
+  const r = await L().iw.h.oracle.query<{ due: Date | string }>(
+    "UPDATE kauro.outbox_records o SET next_attempt_at = o.created_at FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[]) RETURNING o.next_attempt_at AS due",
     [await bookedAggregates(creditId)],
   );
+  const now = L().iw.pw.service.runtime.clock.nowMs();
+  for (const row of r.rows) assert.ok(new Date(row.due).getTime() <= now, `a rescheduled FINANCE delivery is due on the dispatcher's clock: ${new Date(row.due).toISOString()} <= ${new Date(now).toISOString()}`);
   return r.rowCount ?? 0;
 }
 /** E1: one pass of the payment service's sweeps (TRANSFER_EXPIRY is a registered bank sweep). */
