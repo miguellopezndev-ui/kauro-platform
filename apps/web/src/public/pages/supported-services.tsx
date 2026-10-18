@@ -84,7 +84,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
   const someClosed = publication.kind === "READ" && MODE_ORDER.some((mode) => availabilityOf(publication, mode) === "CLOSED");
   return (
     <>
-      <PageHead eyebrow={PUBLIC_COPY["nav.services.label"]} accent={3} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} />
+      <PageHead eyebrow={PUBLIC_COPY["nav.services.label"]} accent={3} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} size="compact" />
       <Section
         id="services-availability"
         heading={PUBLIC_COPY["services.availability.heading"]}

@@ -22,12 +22,6 @@ export interface HomePageProps {
   readonly signInHref: string;
 }
 
-const PRICE_LINE: Readonly<Record<ServiceMode, PublicCopyId>> = {
-  CLEAN: "pricing.ladder.clean.body",
-  HUBSPOT: "pricing.ladder.hubspot.body",
-  SALESFORCE: "pricing.ladder.salesforce.body",
-};
-
 const RESULT: Readonly<Record<RecordResult, PublicCopyId>> = {
   valid: "home.app.result.valid",
   normalised: "home.app.result.normalised",
@@ -106,7 +100,7 @@ const FACTS = [
   { name: "home.facts.quote.name", body: "home.facts.quote.body", mark: "quote" },
 ] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId; readonly mark: string }>;
 
-/** What Kauro does not do: each refusal set large and struck through, and the sentence that says it plainly beneath. */
+/** What Kauro does not do: the three things that stay with the team, set as a permissions panel locked on "Never". */
 const LIMITS = [
   { name: "home.limits.live.name", body: "home.limits.live" },
   { name: "home.limits.import.name", body: "home.limits.import" },
@@ -121,16 +115,20 @@ const MODE_LINE: Readonly<Record<ServiceMode, PublicCopyId>> = {
   SALESFORCE: "home.modes.salesforce.line",
 };
 
+const MODE_FOR: Readonly<Record<Exclude<ServiceMode, "CLEAN">, PublicCopyId>> = {
+  HUBSPOT: "home.modes.hubspot.for",
+  SALESFORCE: "home.modes.salesforce.for",
+};
+
 /**
- * The services open now. CLEAN leads: it is the one most buyers start with (any data that is not going into a qualified destination) and
- * the lowest price, so it is set on wine with who it is made for; HubSpot and Salesforce follow as the two specialised preparations. Each
- * says what it delivers and where its price starts, and the links lead to the page that explains both.
+ * The services open now, as one board: a row per service with what it is, who it is made for and where its price starts. CLEAN leads on
+ * wine: it is the one most buyers need (any data that is not going into a qualified destination) and it has the lowest starting price.
+ * HubSpot and Salesforce follow as the two specialised preparations. The links lead to the pages that explain both.
  */
 function ModesSection({ publication }: { readonly publication: Publication }): ReactElement {
   const modes = publishedModes(publication);
   const firstBand = formatCount(bandRange(0).to);
-  const clean = modes.find((published) => published.mode === "CLEAN");
-  const others = modes.filter((published) => published.mode !== "CLEAN");
+  const ordered = [...modes].sort((a, b) => (a.mode === "CLEAN" ? -1 : b.mode === "CLEAN" ? 1 : 0));
   return (
     <Section id="home-modes" heading={PUBLIC_COPY["home.modes.heading"]} lead={publication.kind === "READ" && modes.length > 0 ? PUBLIC_COPY["home.modes.published.lead"] : undefined} variant="kauro-site-offer">
       {publication.kind === "UNAVAILABLE" ? (
@@ -138,47 +136,45 @@ function ModesSection({ publication }: { readonly publication: Publication }): R
       ) : modes.length === 0 ? (
         <p className="kauro-site-callout">{PUBLIC_COPY["home.modes.none.body"]}</p>
       ) : (
-        <ul className={clean === undefined ? "kauro-offer kauro-offer--even" : "kauro-offer"}>
-          {clean === undefined ? null : (
-            <li className="kauro-offer-lead kauro-wine">
-              <div className="kauro-offer-lead-main">
-                <h3>{modeName("CLEAN")}</h3>
-                <ServiceState availability={clean.state === "AVAILABLE_LIMITED" ? "LIMITED" : "AVAILABLE"} />
-                <p className="kauro-offer-line">{PUBLIC_COPY[MODE_LINE.CLEAN]}</p>
-                <p className="kauro-offer-for-label">{PUBLIC_COPY["home.modes.clean.for.label"]}</p>
-                <ul className="kauro-offer-for">
-                  {CLEAN_FOR.map((id) => (
-                    <li key={id}>{PUBLIC_COPY[id]}</li>
-                  ))}
-                </ul>
-                <p className="kauro-offer-for-label">{PUBLIC_COPY["home.modes.clean.receive.label"]}</p>
-                <ul className="kauro-offer-for kauro-offer-for--files">
-                  {[...MANIFEST_FILES.map((file) => file.name), PUBLIC_COPY["home.delivery.report.name"], PUBLIC_COPY["home.delivery.manifest.name"], PUBLIC_COPY["home.delivery.steps.name"]].map((name) => (
-                    <li key={name}>
-                      <FileName>{name}</FileName>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="kauro-offer-lead-price">
-                <PriceFigure amount={formatUsd(startingPrice("CLEAN"))} />
-                <p className="kauro-offer-price-line">{copy(PRICE_LINE.CLEAN, { price: formatUsd(startingPrice("CLEAN")), units: firstBand })}</p>
-                <LinkButton href={ROUTE.services} kind="text">
-                  {PUBLIC_COPY["nav.services.label"]}
-                </LinkButton>
-              </div>
-            </li>
-          )}
-          {others.map((published) => (
-            <li key={published.mode} className="kauro-offer-item">
-              <h3>{modeName(published.mode)}</h3>
-              <ServiceState availability={published.state === "AVAILABLE_LIMITED" ? "LIMITED" : "AVAILABLE"} />
-              <p className="kauro-offer-line">{PUBLIC_COPY[MODE_LINE[published.mode]]}</p>
-              <PriceFigure amount={formatUsd(startingPrice(published.mode))} />
-              <p className="kauro-offer-price-line">{copy(PRICE_LINE[published.mode], { price: formatUsd(startingPrice(published.mode)), units: firstBand })}</p>
-            </li>
-          ))}
-        </ul>
+        <div className="kauro-board">
+          <p className="kauro-board-head" aria-hidden="true">
+            <span>{PUBLIC_COPY["home.modes.col.service"]}</span>
+            <span>{PUBLIC_COPY["home.modes.col.what"]}</span>
+            <span>{PUBLIC_COPY["home.modes.clean.for.label"]}</span>
+            <span>{PUBLIC_COPY["home.modes.col.from"]}</span>
+          </p>
+          <ul className="kauro-board-rows">
+            {ordered.map((published) => {
+              const lead = published.mode === "CLEAN";
+              return (
+                <li key={published.mode} className={lead ? "kauro-board-row kauro-board-row--lead kauro-wine" : "kauro-board-row"}>
+                  <div className="kauro-board-name">
+                    <h3>{modeName(published.mode)}</h3>
+                    <ServiceState availability={published.state === "AVAILABLE_LIMITED" ? "LIMITED" : "AVAILABLE"} />
+                    {lead ? <p className="kauro-board-tag">{PUBLIC_COPY["home.modes.clean.tag"]}</p> : null}
+                  </div>
+                  <p className="kauro-board-what">{PUBLIC_COPY[MODE_LINE[published.mode]]}</p>
+                  <div className="kauro-board-for">
+                    <p className="kauro-board-label">{PUBLIC_COPY["home.modes.clean.for.label"]}</p>
+                    {published.mode === "CLEAN" ? (
+                      <ul className="kauro-board-chips">
+                        {CLEAN_FOR.map((id) => (
+                          <li key={id}>{PUBLIC_COPY[id]}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>{PUBLIC_COPY[MODE_FOR[published.mode]]}</p>
+                    )}
+                  </div>
+                  <div className="kauro-board-price">
+                    <PriceFigure amount={formatUsd(startingPrice(published.mode))} />
+                    <p>{copy("home.modes.units", { units: firstBand })}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
       <p className="kauro-site-links">
         <LinkButton href={ROUTE.pricing} kind="text">
@@ -229,23 +225,31 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
           </LinkButton>
         </p>
       </Section>
-      <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]} layout="split" variant="kauro-site-buyer-section">
+      <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]} variant="kauro-site-buyer-section">
         <Audience />
       </Section>
       <Section id="home-delivery" heading={PUBLIC_COPY["home.delivery.heading"]} tone="sunken" variant="kauro-site-delivery">
         <PackageFolder sampleHref={ROUTE.sample} sampleLabel={PUBLIC_COPY["home.hero.sample.cta"]} />
       </Section>
-      <Section id="home-limits" heading={PUBLIC_COPY["home.limits.heading"]} tone="inverse" variant="kauro-site-limits">
-        <ol className="kauro-strikes">
-          {LIMITS.map((limit) => (
-            <li key={limit.name} className="kauro-strike">
-              <span className="kauro-strike-name" aria-hidden="true">
-                {PUBLIC_COPY[limit.name]}
-              </span>
-              <p className="kauro-strike-body">{PUBLIC_COPY[limit.body]}</p>
-            </li>
-          ))}
-        </ol>
+      <Section id="home-limits" heading={PUBLIC_COPY["home.limits.heading"]} lead={PUBLIC_COPY["home.limits.lead"]} layout="split" variant="kauro-site-limits">
+        <div className="kauro-locks kauro-inverse">
+          <p className="kauro-locks-bar" aria-hidden="true">
+            <span className="kauro-locks-brand">{PUBLIC_COPY["site.name"]}</span>
+            <span className="kauro-locks-title">{PUBLIC_COPY["home.limits.panel"]}</span>
+            <span className="kauro-locks-state">{PUBLIC_COPY["home.limits.locked"]}</span>
+          </p>
+          <ul className="kauro-locks-list">
+            {LIMITS.map((limit) => (
+              <li key={limit.name} className="kauro-lock">
+                <h3>{PUBLIC_COPY[limit.name]}</h3>
+                <p>{PUBLIC_COPY[limit.body]}</p>
+                <span className="kauro-lock-state" aria-hidden="true">
+                  {PUBLIC_COPY["home.limits.never"]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </Section>
       <ModesSection publication={publication} />
       <Section id="home-context" heading={PUBLIC_COPY["home.context.heading"]} tone="wine" variant="kauro-site-quote">

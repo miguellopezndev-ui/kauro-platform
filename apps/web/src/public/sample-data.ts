@@ -80,3 +80,29 @@ export const SAMPLE_TRACE: ReadonlyArray<{ readonly output: number; readonly sou
   { output: 1205, source: 1207, unified: 1209 },
   { output: 1206, source: 1210, unified: null },
 ]);
+
+/** What the health check flags on a row of the synthetic file the Home journey works on. */
+export type RowFlag = "duplicate" | "email" | "company" | "name";
+
+export interface JourneyRow {
+  readonly id: string;
+  /** The name as it arrived, and the name the plan normalises it to (the same when nothing changes). */
+  readonly name: string;
+  readonly fixed: string;
+  readonly email: string;
+  readonly company: string | null;
+  readonly flags: readonly RowFlag[];
+}
+
+/**
+ * Five invented rows of contacts.csv (reserved example domains), the one file the Home journey measures, decides on, prepares and hands
+ * over. Rows c3 and c4 are the duplicate pair the plan unifies into c3; c2 is the name it normalises; c5's address is invalid and c4 has no
+ * company, which the report lists and the preparation never invents.
+ */
+export const JOURNEY_ROWS: readonly JourneyRow[] = Object.freeze([
+  { id: "c1", name: "Ana Ruiz", fixed: "Ana Ruiz", email: "ana.ruiz@example.com", company: "Larch Studio", flags: [] },
+  { id: "c2", name: "JOHN  SMITH", fixed: "John Smith", email: "john.smith@example.com", company: "Osprey Freight", flags: ["name"] },
+  { id: "c3", name: "Maria Lopez", fixed: "Maria Lopez", email: "m.lopez@example.com", company: "Tidewell", flags: ["duplicate"] },
+  { id: "c4", name: "M. Lopez", fixed: "M. Lopez", email: "m.lopez@example.com", company: null, flags: ["duplicate", "company"] },
+  { id: "c5", name: "Leo Park", fixed: "Leo Park", email: "leo.park@example", company: "Harbor Mill", flags: ["email"] },
+]);

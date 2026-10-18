@@ -583,10 +583,6 @@ body:has(> .kauro-site-header) {
     column-gap: clamp(3rem, 6vw, 7rem);
     align-items: start;
   }
-  .kauro-site-section--split .kauro-site-section-head {
-    position: sticky;
-    inset-block-start: 7rem;
-  }
   .kauro-site-section--stack .kauro-site-section-inner {
     gap: var(--kauro-space-7);
   }
@@ -1717,10 +1713,6 @@ body:has(> .kauro-site-header) {
   .kauro-site-contact-inner {
     grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
     column-gap: clamp(2rem, 4vw, 4rem);
-  }
-  .kauro-site-contact-aside {
-    position: sticky;
-    inset-block-start: 7rem;
   }
 }
 
@@ -2995,17 +2987,6 @@ body:has(> .kauro-site-header) {
 .kauro-site-header .kauro-site-menu .kauro-site-nav-list li:first-child a[aria-current="page"]::after {
   content: none;
 }
-.kauro-site-main .kauro-site-menu-tagline,
-.kauro-site-menu-tagline {
-  margin: 0.5rem 0 0;
-  padding: 0.875rem 0.75rem 0.5rem;
-  border-block-start: 1px solid var(--kauro-color-border);
-  color: var(--kauro-color-text-muted);
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
-  font-size: 0.9375rem;
-  font-style: italic;
-  line-height: 1.35;
-}
 
 /* ---- the footer: plain, small, in order -------------------------------------------------------------------------------------- */
 
@@ -3759,777 +3740,6 @@ body:has(> .kauro-site-header) {
   }
 }
 
-/* ---- the journey (Home: the process) ------------------------------------------------------------------------------------------ */
-
-.kauro-site-process .kauro-site-section-body > .kauro-journey + .kauro-site-links {
-  margin-block-start: var(--kauro-space-6);
-}
-.kauro-journey-track {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-block-end: clamp(2rem, 4vw, 3rem);
-}
-.kauro-journey:not(.is-ready) .kauro-journey-track {
-  display: none;
-}
-.kauro-journey-rail {
-  position: absolute;
-  inset-block-start: 1.375rem;
-  inset-inline: 1.375rem calc(25% - 1.375rem);
-  block-size: 2px;
-  background: var(--kauro-color-border);
-}
-.kauro-journey-fill {
-  display: block;
-  block-size: 100%;
-  background: var(--kauro-color-primary);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.kauro-journey.is-step-1 .kauro-journey-fill {
-  transform: scaleX(0.3334);
-}
-.kauro-journey.is-step-2 .kauro-journey-fill {
-  transform: scaleX(0.6667);
-}
-.kauro-journey.is-step-3 .kauro-journey-fill {
-  transform: scaleX(1);
-}
-.kauro-journey-tab {
-  position: relative;
-  display: grid;
-  justify-items: start;
-  gap: 0.75rem;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--kauro-color-text-muted);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.kauro-journey-dot {
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  inline-size: 2.75rem;
-  block-size: 2.75rem;
-  border: 1px solid var(--kauro-color-control-border);
-  border-radius: 50%;
-  background: var(--kauro-color-background);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
-}
-.kauro-journey-name {
-  font-family: var(--kauro-display-family);
-  font-size: clamp(1.125rem, 0.9rem + 0.8vw, 1.5rem);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  transition: color 0.3s ease;
-}
-.kauro-journey-tab:hover .kauro-journey-dot {
-  border-color: var(--kauro-color-primary);
-}
-.kauro-journey-tab.is-done .kauro-journey-dot {
-  border-color: var(--kauro-color-primary);
-  color: var(--kauro-color-primary);
-}
-.kauro-journey-tab.is-current {
-  color: var(--kauro-color-text);
-}
-.kauro-journey-tab.is-current .kauro-journey-dot {
-  border-color: var(--kauro-color-primary);
-  background: var(--kauro-color-primary);
-  color: var(--kauro-color-on-primary);
-  transform: scale(1.08);
-}
-.kauro-journey-panel {
-  display: grid;
-  gap: clamp(2rem, 4vw, 3.5rem);
-  align-items: center;
-}
-.kauro-journey:not(.is-ready) .kauro-journey-panel + .kauro-journey-panel {
-  margin-block-start: var(--kauro-space-7);
-}
-.kauro-journey.is-ready .kauro-journey-panel:not([hidden]) .kauro-journey-copy > * {
-  animation: kauro-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-}
-.kauro-journey.is-ready .kauro-journey-panel:not([hidden]) .kauro-journey-copy > :nth-child(2) {
-  animation-delay: 0.05s;
-}
-.kauro-journey.is-ready .kauro-journey-panel:not([hidden]) .kauro-journey-copy > :nth-child(3) {
-  animation-delay: 0.1s;
-}
-.kauro-journey.is-ready .kauro-journey-panel:not([hidden]) .kauro-journey-copy > :nth-child(4) {
-  animation-delay: 0.15s;
-}
-.kauro-site-main p.kauro-journey-count {
-  margin: 0 0 var(--kauro-space-3);
-  color: var(--kauro-color-accent-text);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-.kauro-site-main .kauro-journey-copy h3 {
-  margin-block-end: var(--kauro-space-3);
-  font-size: clamp(2rem, 1.3rem + 2.4vw, 3.25rem);
-  font-weight: 650;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-.kauro-journey-copy > p:not(.kauro-journey-count) {
-  max-inline-size: 38ch;
-  color: var(--kauro-color-text-muted);
-  font-size: 1.125rem;
-}
-.kauro-journey-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kauro-space-3);
-  margin-block-start: var(--kauro-space-6);
-}
-.kauro-journey-next,
-.kauro-journey-back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kauro-space-2);
-  min-block-size: 2.75rem;
-  padding: 0 1.125rem;
-  border: 1px solid var(--kauro-color-control-border);
-  border-radius: var(--kauro-radius);
-  background: transparent;
-  color: var(--kauro-color-text);
-  font: inherit;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--kauro-site-ease), border-color var(--kauro-site-ease);
-}
-.kauro-journey-next {
-  border-color: var(--kauro-color-primary);
-  background: var(--kauro-color-primary);
-  color: var(--kauro-color-on-primary);
-}
-.kauro-journey-next::after {
-  content: "\2192" / "";
-  transition: transform var(--kauro-site-ease);
-}
-.kauro-journey-next:hover::after {
-  transform: translateX(2px);
-}
-.kauro-journey-back:hover {
-  border-color: var(--kauro-color-text);
-}
-@media (min-width: 62rem) {
-  .kauro-journey-panel {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  }
-}
-@media (max-width: 40rem) {
-  .kauro-journey-track {
-    gap: 0.25rem;
-  }
-  .kauro-journey-name {
-    font-size: 0.875rem;
-  }
-}
-
-/* The window of each step. */
-.kauro-journey-window {
-  overflow: hidden;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.875rem;
-  background: var(--kauro-color-raised);
-  box-shadow: 0 2.5rem 5rem -2.5rem color-mix(in srgb, #000 70%, transparent);
-  animation: kauro-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-}
-.kauro-journey:not(.is-ready) .kauro-journey-window {
-  animation: none;
-}
-.kauro-journey-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  padding: 0.75rem 1.125rem;
-  border-block-end: 1px solid var(--kauro-color-border);
-  font-size: 0.8125rem;
-}
-.kauro-journey-brand {
-  font-family: var(--kauro-display-family);
-  font-size: 1rem;
-  font-weight: 650;
-  letter-spacing: -0.035em;
-}
-.kauro-journey-project {
-  padding-inline-start: 1rem;
-  border-inline-start: 1px solid var(--kauro-color-border);
-  color: var(--kauro-color-text-muted);
-}
-.kauro-journey-chip {
-  display: inline-grid;
-  margin-inline-start: auto;
-  padding: 0.125rem 0.625rem;
-  border: 1px solid var(--kauro-color-primary);
-  border-radius: 62.5rem;
-  color: var(--kauro-color-primary);
-  font-size: 0.75rem;
-  font-weight: 650;
-}
-.kauro-journey-chip > span {
-  grid-area: 1 / 1;
-}
-/* A state that becomes another once the step is done. */
-.kauro-journey-chip--swap .kauro-journey-chip-now {
-  animation: kauro-fade-out 0.3s ease 1.6s forwards;
-}
-.kauro-journey-chip--swap .kauro-journey-chip-then {
-  animation: kauro-fade-in 0.3s ease 1.9s backwards;
-}
-.kauro-journey:not(.is-ready) .kauro-journey-chip-now {
-  display: none;
-}
-.kauro-journey-body {
-  display: grid;
-  gap: 1rem;
-  padding: 1.25rem 1.375rem 1.5rem;
-  font-size: 0.875rem;
-}
-.kauro-site-main p.kauro-journey-file,
-.kauro-site-main p.kauro-journey-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  max-inline-size: none;
-  color: var(--kauro-color-text-muted);
-}
-.kauro-site-main p.kauro-journey-label {
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-/* Measure: three counts with their share, and a bar each. */
-.kauro-journey-metrics {
-  display: grid;
-  gap: 1rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-journey-metric {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 0.375rem 0.875rem;
-}
-.kauro-journey-metric-figure {
-  color: var(--kauro-color-text);
-  font-family: var(--kauro-display-family);
-  font-size: 2rem;
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  text-align: end;
-}
-.kauro-journey-metric-share {
-  color: var(--kauro-color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.kauro-journey-meter {
-  grid-column: 2 / -1;
-  appearance: none;
-  inline-size: 100%;
-  block-size: 0.375rem;
-  border: 0;
-  border-radius: 62.5rem;
-  background: var(--kauro-color-surface);
-  overflow: hidden;
-}
-.kauro-journey-meter::-webkit-progress-bar {
-  border-radius: 62.5rem;
-  background: var(--kauro-color-surface);
-}
-.kauro-journey-meter::-webkit-progress-value {
-  border-radius: 62.5rem;
-  background: var(--kauro-color-primary);
-}
-.kauro-journey-meter::-moz-progress-bar {
-  border-radius: 62.5rem;
-  background: var(--kauro-color-primary);
-}
-
-/* Decide: proposals the visitor approves. */
-.kauro-journey-proposals {
-  display: grid;
-  gap: 0.625rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-journey-proposal {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.125rem 1rem;
-  padding: 0.875rem 1rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.625rem;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-  animation: kauro-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-}
-.kauro-journey-proposal:nth-child(2) {
-  animation-delay: 0.08s;
-}
-.kauro-journey-proposal:nth-child(3) {
-  animation-delay: 0.16s;
-}
-.kauro-journey-proposal-title {
-  font-weight: 650;
-}
-.kauro-journey-proposal-detail {
-  grid-column: 1;
-  color: var(--kauro-color-text-muted);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.75rem;
-}
-.kauro-journey-approve {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-block-size: 2.5rem;
-  padding: 0 1rem;
-  border: 1px solid var(--kauro-color-primary);
-  border-radius: var(--kauro-radius);
-  background: var(--kauro-color-primary);
-  color: var(--kauro-color-on-primary);
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 650;
-  cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-.kauro-journey-approve[aria-pressed="true"] {
-  background: transparent;
-  color: var(--kauro-color-success-text);
-  border-color: var(--kauro-color-success-text);
-}
-.kauro-journey-approve[aria-pressed="true"]::before {
-  content: "";
-  inline-size: 0.3125rem;
-  block-size: 0.5625rem;
-  border: solid currentColor;
-  border-width: 0 1.5px 1.5px 0;
-  transform: translateY(-0.125rem) rotate(45deg);
-  animation: kauro-pop 0.25s ease-out;
-}
-.kauro-journey-proposal.is-approved {
-  border-color: var(--kauro-color-success-text);
-  background: var(--kauro-color-success-surface);
-}
-.kauro-journey-proposal.is-approved .kauro-journey-proposal-detail {
-  color: var(--kauro-color-text);
-}
-.kauro-site-main p.kauro-journey-hint {
-  color: var(--kauro-color-accent-text);
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
-  font-size: 1rem;
-  font-style: italic;
-}
-
-/* Prepare: the sum runs down to its result, and three checks land. */
-.kauro-site-main p.kauro-journey-sum {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  max-inline-size: none;
-  font-family: var(--kauro-display-family);
-  font-size: clamp(2.25rem, 1.6rem + 2vw, 3.25rem);
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.045em;
-  line-height: 1;
-}
-.kauro-journey-sum-from {
-  color: var(--kauro-color-text-muted);
-}
-.kauro-journey-sum-arrow::before {
-  content: "\2192";
-  color: var(--kauro-color-text-muted);
-  font-size: 0.6em;
-}
-.kauro-journey-sum-to {
-  color: var(--kauro-color-primary);
-}
-.kauro-journey-checks {
-  display: grid;
-  gap: 0.625rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-journey-checks li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  animation: kauro-rise 0.4s ease backwards;
-}
-.kauro-journey-checks li::before {
-  content: "";
-  flex: none;
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
-  border-radius: 50%;
-  background: var(--kauro-color-success-surface);
-  box-shadow: inset 0 0 0 1px var(--kauro-color-success-text);
-}
-.kauro-journey-checks li:nth-child(1) {
-  animation-delay: 0.4s;
-}
-.kauro-journey-checks li:nth-child(2) {
-  animation-delay: 0.9s;
-}
-.kauro-journey-checks li:nth-child(3) {
-  animation-delay: 1.4s;
-}
-.kauro-journey:not(.is-ready) .kauro-journey-checks li,
-.kauro-journey:not(.is-ready) .kauro-journey-order li,
-.kauro-journey:not(.is-ready) .kauro-journey-proposal {
-  animation: none;
-}
-
-/* Import: the files go in, in order, each ticked. */
-.kauro-journey-order {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: order;
-}
-.kauro-journey-order li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.5rem;
-  counter-increment: order;
-  animation: kauro-rise 0.4s ease backwards;
-}
-.kauro-journey-order li::before {
-  content: counter(order);
-  display: grid;
-  place-items: center;
-  flex: none;
-  inline-size: 1.5rem;
-  block-size: 1.5rem;
-  border-radius: 50%;
-  background: var(--kauro-color-primary);
-  color: var(--kauro-color-on-primary);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.75rem;
-  font-weight: 650;
-}
-.kauro-journey-order li:nth-child(2) {
-  animation-delay: 0.45s;
-}
-.kauro-journey-order li:nth-child(3) {
-  animation-delay: 0.9s;
-}
-.kauro-site-main p.kauro-journey-compare {
-  padding: 0.75rem 0.875rem;
-  border-radius: 0.5rem;
-  background: var(--kauro-color-success-surface);
-  color: var(--kauro-color-success-text);
-  font-weight: 600;
-  animation: kauro-rise 0.4s ease 1.4s backwards;
-}
-
-/* ---- the audience switch (Home: who buys) -------------------------------------------------------------------------------------- */
-
-.kauro-audience {
-  display: grid;
-  gap: var(--kauro-space-5);
-}
-.kauro-audience-switch {
-  display: inline-flex;
-  justify-self: start;
-  padding: 0.25rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 62.5rem;
-  background: var(--kauro-color-surface);
-}
-.kauro-audience:not(.is-ready) .kauro-audience-switch {
-  display: none;
-}
-.kauro-audience-option {
-  min-block-size: 2.5rem;
-  padding: 0 1.25rem;
-  border: 0;
-  border-radius: 62.5rem;
-  background: transparent;
-  color: var(--kauro-color-text-muted);
-  font: inherit;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
-}
-.kauro-audience-option[aria-selected="true"] {
-  background: var(--kauro-color-raised);
-  color: var(--kauro-color-text);
-  box-shadow: 0 0.25rem 0.75rem -0.375rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
-}
-.kauro-audience-panel {
-  display: grid;
-  gap: var(--kauro-space-5);
-}
-.kauro-audience:not(.is-ready) .kauro-audience-panel + .kauro-audience-panel {
-  margin-block-start: var(--kauro-space-6);
-}
-.kauro-audience.is-ready .kauro-audience-panel:not([hidden]) > * {
-  animation: kauro-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-}
-.kauro-audience.is-ready .kauro-audience-panel:not([hidden]) > :nth-child(2) {
-  animation-delay: 0.08s;
-}
-.kauro-site-main .kauro-audience-copy h3 {
-  margin-block-end: var(--kauro-space-2);
-  font-size: 1.5rem;
-  letter-spacing: -0.03em;
-}
-.kauro-audience-copy p {
-  color: var(--kauro-color-text-muted);
-}
-.kauro-site-main p.kauro-audience-terms {
-  margin-block-start: var(--kauro-space-3);
-  color: var(--kauro-color-text);
-  font-weight: 600;
-}
-/* The workspace, on rock. */
-.kauro-audience-stage {
-  display: grid;
-  gap: 1rem;
-  padding: clamp(1.5rem, 4vw, 2.5rem);
-  border-radius: var(--kauro-radius-large);
-  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
-}
-:root[data-theme="dark"] .kauro-audience-stage {
-  background-image: url("./textures/ember-rock.svg");
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .kauro-audience-stage {
-    background-image: url("./textures/ember-rock.svg");
-  }
-}
-.kauro-audience-switcher {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.75rem;
-  background: var(--kauro-color-raised);
-  box-shadow: 0 2rem 4rem -2rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent);
-}
-.kauro-audience-client {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.875rem 1.125rem;
-  font-size: 0.875rem;
-  animation: kauro-rise 0.4s ease backwards;
-}
-.kauro-audience-client:nth-child(2) {
-  animation-delay: 0.08s;
-}
-.kauro-audience-client:nth-child(3) {
-  animation-delay: 0.16s;
-}
-.kauro-audience-client + .kauro-audience-client {
-  border-block-start: 1px solid var(--kauro-color-border);
-}
-.kauro-audience-client.is-open {
-  box-shadow: inset 3px 0 0 var(--kauro-color-primary);
-  background: color-mix(in srgb, var(--kauro-color-accent-surface) 60%, var(--kauro-color-raised));
-}
-.kauro-audience-client-name {
-  font-family: var(--kauro-display-family);
-  font-size: 1.0625rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-.kauro-audience-client-phase {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-.kauro-audience-client-phase::before {
-  content: "";
-  inline-size: 0.5rem;
-  block-size: 0.5rem;
-  border-radius: 50%;
-  background: var(--kauro-color-accent);
-}
-.kauro-audience-client--decide .kauro-audience-client-phase {
-  color: var(--kauro-color-primary);
-  font-weight: 650;
-}
-.kauro-audience-client--decide .kauro-audience-client-phase::before {
-  background: var(--kauro-color-primary);
-}
-.kauro-audience-client--ready .kauro-audience-client-phase::before {
-  background: var(--kauro-color-success-text);
-}
-.kauro-audience-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.kauro-audience-chip {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  background: var(--kauro-color-raised);
-  color: var(--kauro-color-text);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-.kauro-audience-chip--note {
-  color: var(--kauro-color-primary);
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
-  font-size: 0.9375rem;
-  font-style: italic;
-  font-weight: 400;
-}
-.kauro-audience-price {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  background: var(--kauro-color-ink);
-  color: var(--kauro-color-on-ink);
-  font-size: 0.8125rem;
-}
-.kauro-audience-price-figure {
-  font-family: var(--kauro-display-family);
-  font-size: 1.125rem;
-  font-weight: 300;
-}
-@media (min-width: 48rem) {
-  .kauro-audience-panel {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-    align-items: center;
-  }
-}
-@media (min-width: 62rem) {
-  .kauro-site-buyer-section .kauro-audience-panel {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ---- the package folder (Home: what your team receives) ---------------------------------------------------------------------- */
-
-.kauro-folder-tabs {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  gap: 0.25rem;
-  padding-inline-start: 1rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.kauro-folder:not(.is-ready) .kauro-folder-tabs {
-  display: none;
-}
-.kauro-folder-tab {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  flex: none;
-  min-block-size: 2.75rem;
-  margin-block-end: -1px;
-  padding: 0.625rem 1.125rem 0.5rem;
-  border: 1px solid var(--kauro-color-border);
-  border-block-end: 0;
-  border-radius: 0.625rem 0.625rem 0 0;
-  background: var(--kauro-color-surface);
-  color: var(--kauro-color-text-muted);
-  font: inherit;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.25s ease, color 0.25s ease, padding 0.25s ease;
-}
-.kauro-folder-tab-number {
-  font-family: var(--kauro-mono-family);
-  font-size: 0.6875rem;
-}
-.kauro-folder-tab:hover {
-  color: var(--kauro-color-text);
-}
-.kauro-folder-tab[aria-selected="true"] {
-  padding-block-start: 0.875rem;
-  border-color: var(--kauro-color-wine);
-  background: var(--kauro-color-wine);
-  color: var(--kauro-color-on-wine);
-}
-.kauro-folder-panel {
-  position: relative;
-  display: grid;
-  gap: clamp(1.75rem, 4vw, 3rem);
-  align-items: center;
-  padding: clamp(1.5rem, 4vw, 3rem);
-  border: 1px solid var(--kauro-color-border);
-  border-block-start: 4px solid var(--kauro-color-wine);
-  border-radius: 0 var(--kauro-radius-large) var(--kauro-radius-large) var(--kauro-radius-large);
-  background: var(--kauro-color-raised);
-}
-.kauro-folder:not(.is-ready) .kauro-folder-panel {
-  border-radius: var(--kauro-radius-large);
-}
-.kauro-folder:not(.is-ready) .kauro-folder-panel + .kauro-folder-panel {
-  margin-block-start: var(--kauro-space-5);
-}
-.kauro-site-main .kauro-folder-copy h3 {
-  margin-block-end: var(--kauro-space-3);
-  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.5rem);
-  letter-spacing: -0.035em;
-  line-height: 1.05;
-}
-.kauro-folder-copy p {
-  margin-block-end: var(--kauro-space-4);
-  color: var(--kauro-color-text-muted);
-  font-size: 1.0625rem;
-}
-.kauro-folder.is-ready .kauro-folder-panel:not([hidden]) .kauro-folder-copy > * {
-  animation: kauro-rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-}
-.kauro-folder.is-ready .kauro-folder-panel:not([hidden]) .kauro-folder-copy > :nth-child(2) {
-  animation-delay: 0.05s;
-}
-.kauro-folder.is-ready .kauro-folder-panel:not([hidden]) .kauro-folder-copy > :nth-child(3) {
-  animation-delay: 0.1s;
-}
-@media (min-width: 56rem) {
-  .kauro-folder-panel {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  }
-}
-
 /* The documents: sheets of paper, slightly lifted, the top one tilted a little. */
 .kauro-folder-doc {
   position: relative;
@@ -4699,175 +3909,6 @@ body:has(> .kauro-site-header) {
   font-weight: 650;
 }
 
-/* ---- the refusals, struck (Home: what Kauro does not do) -------------------------------------------------------------------------- */
-
-.kauro-strikes {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-block-start: 1px solid var(--kauro-color-border);
-}
-.kauro-strike {
-  display: grid;
-  gap: 0.75rem 3rem;
-  align-items: baseline;
-  padding-block: clamp(1.5rem, 3vw, 2.25rem);
-  border-block-end: 1px solid var(--kauro-color-border);
-}
-.kauro-strike-name {
-  position: relative;
-  justify-self: start;
-  color: var(--kauro-color-text-muted);
-  font-family: var(--kauro-display-family);
-  font-size: clamp(2rem, 1.2rem + 3.4vw, 4rem);
-  font-weight: 600;
-  letter-spacing: -0.045em;
-  line-height: 1;
-}
-/* The line that strikes the refusal out, in clay, drawn as the row comes into view where the browser can tie it to scrolling. */
-.kauro-strike-name::after {
-  content: "";
-  position: absolute;
-  inset-inline: -0.25rem;
-  inset-block-start: 55%;
-  block-size: 0.09em;
-  min-block-size: 3px;
-  border-radius: 62.5rem;
-  background: var(--kauro-color-accent);
-  transform-origin: left center;
-}
-@supports (animation-timeline: view()) {
-  .kauro-strike-name::after {
-    animation: kauro-strike linear both;
-    animation-timeline: view();
-    animation-range: entry 40% cover 45%;
-  }
-}
-@keyframes kauro-strike {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-.kauro-site-main p.kauro-strike-body {
-  max-inline-size: 44ch;
-  color: var(--kauro-color-text);
-  font-size: 1.125rem;
-  line-height: 1.5;
-}
-@media (min-width: 62rem) {
-  .kauro-strike {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  }
-}
-
-/* ---- the offer (Home: services open now) --------------------------------------------------------------------------------------- */
-
-.kauro-offer {
-  display: grid;
-  gap: var(--kauro-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-offer-lead {
-  display: grid;
-  gap: clamp(1.5rem, 4vw, 3rem);
-  padding: clamp(1.75rem, 4vw, 3rem);
-  border-radius: var(--kauro-radius-large);
-  background-image: url("./textures/grain.svg");
-  background-size: 240px;
-}
-.kauro-site-main .kauro-offer-lead h3 {
-  margin-block-end: var(--kauro-space-3);
-  font-size: clamp(2.25rem, 1.5rem + 2.6vw, 3.5rem);
-  letter-spacing: -0.045em;
-  line-height: 1;
-}
-.kauro-site-main .kauro-offer-line {
-  margin-block: var(--kauro-space-4);
-  max-inline-size: 40ch;
-  font-size: 1.125rem;
-}
-.kauro-site-main .kauro-offer-for-label {
-  margin-block-end: var(--kauro-space-3);
-  color: var(--kauro-color-accent-text);
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.kauro-offer-for {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-offer-for li {
-  padding: 0.375rem 0.875rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 62.5rem;
-  font-size: 0.875rem;
-}
-.kauro-offer-lead-price {
-  display: grid;
-  align-content: end;
-  justify-items: start;
-  gap: var(--kauro-space-3);
-}
-.kauro-site-main .kauro-offer-lead-price .kauro-site-price {
-  font-size: clamp(3rem, 2rem + 3.4vw, 4.75rem);
-}
-.kauro-site-main .kauro-offer-price-line {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
-}
-.kauro-offer-lead .kauro-site-arrow {
-  color: var(--kauro-color-accent-text);
-}
-.kauro-offer-item {
-  display: grid;
-  align-content: start;
-  justify-items: start;
-  gap: var(--kauro-space-3);
-  padding: clamp(1.5rem, 3vw, 2rem);
-  border: 1px solid var(--kauro-color-border);
-  border-radius: var(--kauro-radius-large);
-  background: var(--kauro-color-raised);
-}
-.kauro-site-main .kauro-offer-item h3 {
-  font-size: 1.625rem;
-  letter-spacing: -0.03em;
-}
-.kauro-site-main .kauro-offer-item .kauro-offer-line {
-  margin: 0;
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
-}
-.kauro-site-main .kauro-offer-item .kauro-site-price {
-  margin-block-start: var(--kauro-space-3);
-  font-size: 2.5rem;
-}
-@media (min-width: 62rem) {
-  .kauro-offer {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    grid-template-rows: auto auto;
-  }
-  .kauro-offer-lead {
-    grid-row: 1 / span 2;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  }
-  .kauro-offer--even {
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  }
-}
-
 /* ---- the wine sentence: its label close above it -------------------------------------------------------------------------------- */
 
 .kauro-site-quote .kauro-site-section-inner {
@@ -4897,139 +3938,6 @@ body:has(> .kauro-site-header) {
 /* A panel the script has hidden stays hidden, whatever layout its class gives it. */
 .kauro-site-main [role="tabpanel"][hidden] {
   display: none;
-}
-
-.kauro-journey-checks li {
-  position: relative;
-}
-.kauro-journey-checks li::after {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0.4375rem;
-  inset-block-start: calc(50% - 0.375rem);
-  inline-size: 0.3125rem;
-  block-size: 0.5625rem;
-  border: solid var(--kauro-color-success-text);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-}
-@media (min-width: 62rem) {
-  .kauro-journey-panel {
-    min-block-size: 22rem;
-  }
-}
-
-@media (min-width: 56rem) {
-  .kauro-folder.is-ready .kauro-folder-panel {
-    min-block-size: 24rem;
-  }
-}
-
-.kauro-site-main .kauro-offer-for + .kauro-offer-for-label {
-  margin-block-start: var(--kauro-space-5);
-}
-.kauro-offer-for--files li {
-  border-style: dashed;
-  font-size: 0.8125rem;
-}
-
-/* ---- How it works: the steps read by scrolling, the pane of the step being read held beside them ------------------------------- */
-
-.kauro-scrolly-stage {
-  display: none;
-}
-@media (min-width: 62rem) {
-  .kauro-scrolly.is-ready {
-    display: grid;
-    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-    column-gap: clamp(3rem, 6vw, 6rem);
-  }
-  .kauro-scrolly.is-ready .kauro-scrolly-inline {
-    display: none;
-  }
-  .kauro-scrolly.is-ready .kauro-scrolly-stage {
-    display: block;
-  }
-  .kauro-scrolly.is-ready .kauro-site-timeline-step {
-    padding-block-end: clamp(4rem, 10vh, 7rem);
-    opacity: 0.45;
-    transition: opacity 0.35s ease;
-  }
-  .kauro-scrolly.is-ready .kauro-site-timeline-step.is-active,
-  .kauro-scrolly.is-ready .kauro-site-timeline-step.is-past {
-    opacity: 1;
-  }
-  .kauro-scrolly.is-ready .kauro-site-timeline-step.is-past {
-    opacity: 0.7;
-  }
-  .kauro-scrolly.is-ready .kauro-site-timeline-step.is-active::before {
-    transform: scale(1.1);
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--kauro-color-primary) 18%, transparent);
-  }
-  .kauro-scrolly.is-ready .kauro-site-timeline-step::before {
-    transition: transform 0.35s ease, box-shadow 0.35s ease;
-  }
-}
-.kauro-scrolly-sticky {
-  position: sticky;
-  inset-block-start: 7rem;
-  display: grid;
-  min-block-size: 20rem;
-  padding: clamp(2rem, 3vw, 2.75rem);
-  border-radius: var(--kauro-radius-large);
-  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
-}
-:root[data-theme="dark"] .kauro-scrolly-sticky {
-  background-image: url("./textures/ember-rock.svg");
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .kauro-scrolly-sticky {
-    background-image: url("./textures/ember-rock.svg");
-  }
-}
-.kauro-site-main p.kauro-scrolly-count {
-  justify-self: start;
-  margin: 0 0 1rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 0.25rem;
-  background: var(--kauro-color-background);
-  color: var(--kauro-color-primary);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.75rem;
-  font-weight: 650;
-}
-.kauro-scrolly-pane {
-  grid-area: 2 / 1;
-  align-self: center;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(0.75rem) rotate(-1deg);
-  transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.35s;
-}
-.kauro-scrolly-pane.is-active {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-  transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s;
-}
-.kauro-scrolly-pane .kauro-site-frag {
-  max-inline-size: none;
-  margin: 0;
-  padding: 1.25rem 1.375rem;
-  font-size: 0.9375rem;
-  box-shadow: 0 2rem 4rem -2rem color-mix(in srgb, #000 65%, transparent);
-}
-.kauro-scrolly-pane .kauro-site-frag-figure {
-  font-size: 2rem;
-}
-.kauro-scrolly-pane .kauro-site-margin {
-  margin-block-start: 1rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 0.25rem;
-  background: var(--kauro-color-background);
-}
-.kauro-site-how-steps .kauro-site-section-head {
-  margin-block-end: var(--kauro-space-5);
 }
 
 /* ---- Data handling: the answer to a request across customers, and a file a model sees a line of ------------------------------- */
@@ -5133,58 +4041,1805 @@ body:has(> .kauro-site-header) {
   border-block-end-color: var(--kauro-color-border);
 }
 .kauro-site-main .kauro-site-service--lead h3 {
-  font-size: clamp(2.25rem, 1.5rem + 2.6vw, 3.5rem);
-  letter-spacing: -0.045em;
+  font-size: 1.75rem;
+  letter-spacing: -0.03em;
 }
 .kauro-site-service--lead .kauro-site-frag {
   background: var(--kauro-color-surface);
 }
+
+
+/* =================================================================================================================================== */
+/* Fifth pass (A10 §8): one file walked through the process, buyers on two cards under one stamp, the delivery as a manifest beside its */
+/* documents, the limits as a locked panel, the offer as a structured board. Nothing sticks to the screen while it scrolls; a piece     */
+/* keeps its size while its contents change, so the page never jumps.                                                                   */
+/* =================================================================================================================================== */
+
+/* ---- the walk (Home: the process) --------------------------------------------------------------------------------------------- */
+
+.kauro-walk {
+  display: grid;
+  grid-template-areas: "window" "controls" "steps";
+  gap: var(--kauro-space-5);
+  margin-block-start: var(--kauro-space-6);
+}
 @media (min-width: 62rem) {
-  .kauro-site-cards--three {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .kauro-site-cards--three > .kauro-site-service--lead {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: clamp(2rem, 5vw, 4rem);
+  .kauro-walk {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "steps window" "controls window";
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+    row-gap: var(--kauro-space-5);
     align-items: start;
   }
-  .kauro-site-cards--three > .kauro-site-service--lead > * {
-    grid-column: 2;
-  }
-  .kauro-site-cards--three > .kauro-site-service--lead > .kauro-site-service-top {
-    grid-column: 1;
-    grid-row: 1 / span 6;
-    border-block-end: 0;
+}
+.kauro-walk:not(.is-ready) {
+  grid-template-areas: "steps" "window";
+}
+@media (min-width: 62rem) {
+  .kauro-walk:not(.is-ready) {
+    grid-template-areas: "steps window";
   }
 }
 
-.kauro-scrolly-sticky {
-  grid-template-rows: auto 1fr;
+/* The four steps, read as a column: every sentence stays on the page, the current one lit. */
+.kauro-walk-steps {
+  grid-area: steps;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.kauro-site-main p.kauro-scrolly-count {
-  align-self: start;
+.kauro-walk-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  column-gap: 1rem;
+  padding-block: 0 1.25rem;
+}
+.kauro-walk-step:last-child {
+  padding-block-end: 0;
+}
+/* the rail between two numbers, lit up to the step being shown */
+.kauro-walk-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  inset-block: 2.375rem 0.125rem;
+  inset-inline-start: calc(1.125rem - 1px);
+  inline-size: 2px;
+  background: var(--kauro-color-border);
+  transition: background-color 0.35s ease;
+}
+.kauro-walk-step.is-done::after {
+  background: var(--kauro-color-accent);
+}
+.kauro-walk-step-number {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border: 1.5px solid var(--kauro-color-border);
+  border-radius: 50%;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+}
+.kauro-walk-step.is-done .kauro-walk-step-number {
+  border-color: var(--kauro-color-accent);
+  color: var(--kauro-color-accent);
+}
+.kauro-walk-step.is-current .kauro-walk-step-number {
+  border-color: var(--kauro-color-accent);
+  background: var(--kauro-color-accent);
+  color: var(--kauro-color-on-primary);
+  transform: scale(1.06);
+}
+.kauro-walk:not(.is-ready) .kauro-walk-step-number {
+  border-color: var(--kauro-color-accent);
+  background: transparent;
+  color: var(--kauro-color-accent);
+  transform: none;
+}
+.kauro-site-main .kauro-walk-step h3 {
+  margin: 0;
+  padding-block-start: 0.3125rem;
+  font-size: 1.1875rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+.kauro-walk-step h3 button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-text-muted);
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: color 0.25s ease;
+}
+.kauro-walk-step h3 button:hover {
+  color: var(--kauro-color-text);
+}
+.kauro-walk-step.is-current h3 button {
+  color: var(--kauro-color-text);
+}
+.kauro-site-main .kauro-walk-step p {
+  max-inline-size: 34ch;
+  margin-block-start: 0.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
-/* On a phone the four folder tabs sit two by two above the open document instead of running off the edge. */
+.kauro-walk-controls {
+  grid-area: controls;
+}
+.kauro-walk-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-block-size: 2.75rem;
+  padding: 0.5rem 1.125rem;
+  border: 1px solid var(--kauro-color-accent);
+  border-radius: var(--kauro-radius-medium, 0.375rem);
+  background: var(--kauro-color-accent);
+  color: var(--kauro-color-on-primary);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.kauro-walk-next::after {
+  content: "\2192";
+  transition: transform 0.2s ease;
+}
+.kauro-walk-next:hover {
+  background: var(--kauro-color-primary-hover);
+}
+.kauro-walk-next:hover::after {
+  transform: translateX(3px);
+}
+.kauro-walk.is-step-3 .kauro-walk-next::after {
+  content: "\21BA";
+}
+@media (max-width: 61.99rem) {
+  .kauro-walk-next {
+    inline-size: 100%;
+    justify-content: center;
+  }
+}
+
+/* The window: one sheet of paper on the carbon band, the same size at every step. */
+.kauro-walk-window {
+  grid-area: window;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-inline-size: 0;
+  border-radius: var(--kauro-radius-large);
+  overflow: hidden;
+  color-scheme: light;
+  --kauro-color-text: #242426;
+  --kauro-color-text-muted: #5f5955;
+  --kauro-color-background: #f8f6f3;
+  --kauro-color-surface: #f1ede8;
+  --kauro-color-raised: #ffffff;
+  --kauro-color-border: #e3dcd4;
+  --kauro-color-control-border: #8c837d;
+  --kauro-color-primary: #653a46;
+  --kauro-color-primary-hover: #4f2c37;
+  --kauro-color-on-primary: #f8f6f3;
+  --kauro-color-focus: #653a46;
+  --kauro-color-accent-text: #7a5a45;
+  --kauro-color-accent-surface: #ece2d9;
+  --kauro-color-success-text: #2e5b38;
+  --kauro-color-success-surface: #e3ede2;
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 70%, transparent), 0 0 0 1px color-mix(in srgb, #000 20%, transparent);
+}
+:root[data-theme="dark"] .kauro-walk-window {
+  color-scheme: dark;
+  --kauro-color-text: #f1ece6;
+  --kauro-color-text-muted: #ada59e;
+  --kauro-color-background: #2d2c2f;
+  --kauro-color-surface: #262528;
+  --kauro-color-raised: #333236;
+  --kauro-color-border: #45434a;
+  --kauro-color-control-border: #857d77;
+  --kauro-color-primary: #c4a693;
+  --kauro-color-primary-hover: #d6bfae;
+  --kauro-color-on-primary: #242426;
+  --kauro-color-focus: #c4a693;
+  --kauro-color-accent-text: #c4a693;
+  --kauro-color-accent-surface: #3d332d;
+  --kauro-color-success-text: #a3cda9;
+  --kauro-color-success-surface: #213026;
+  box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 80%, transparent), 0 0 0 1px var(--kauro-color-border);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-walk-window {
+    color-scheme: dark;
+    --kauro-color-text: #f1ece6;
+    --kauro-color-text-muted: #ada59e;
+    --kauro-color-background: #2d2c2f;
+    --kauro-color-surface: #262528;
+    --kauro-color-raised: #333236;
+    --kauro-color-border: #45434a;
+    --kauro-color-control-border: #857d77;
+    --kauro-color-primary: #c4a693;
+    --kauro-color-primary-hover: #d6bfae;
+    --kauro-color-on-primary: #242426;
+    --kauro-color-focus: #c4a693;
+    --kauro-color-accent-text: #c4a693;
+    --kauro-color-accent-surface: #3d332d;
+    --kauro-color-success-text: #a3cda9;
+    --kauro-color-success-surface: #213026;
+    box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 80%, transparent), 0 0 0 1px var(--kauro-color-border);
+  }
+}
+@media (min-width: 62rem) {
+  .kauro-walk.is-ready .kauro-walk-window {
+    block-size: 29rem;
+  }
+}
+
+.kauro-walk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-inline-size: 0;
+  padding: 0.75rem 1.125rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+  font-size: 0.8125rem;
+}
+.kauro-walk-brand {
+  font-family: var(--kauro-display-family);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kauro-walk-project {
+  min-inline-size: 0;
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the state of the project: two words that trade places when a step completes */
+.kauro-walk-chip {
+  display: grid;
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0.1875rem 0.625rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 999px;
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-walk-chip > span {
+  grid-area: 1 / 1;
+  text-align: center;
+}
+.kauro-walk-chip--swap .kauro-walk-chip-now {
+  animation: kauro-fade-out 0.3s ease 1.3s forwards;
+}
+.kauro-walk-chip--swap .kauro-walk-chip-then {
+  animation: kauro-fade-in 0.3s ease 1.6s backwards;
+}
+
+.kauro-walk-sheet {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-inline-size: 0;
+  padding: 1rem 1.125rem 0.75rem;
+}
+.kauro-site-main p.kauro-walk-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  max-inline-size: none;
+  font-size: 0.8125rem;
+}
+.kauro-walk-file .kauro-site-file {
+  animation: kauro-fade-in 0.4s ease backwards;
+}
+.kauro-walk-rows {
+  color: var(--kauro-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-walk.is-step-2 .kauro-walk-rows,
+.kauro-walk.is-step-3 .kauro-walk-rows {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+}
+
+/* The rows of the file. Each row keeps its place; the flags, the margin marks and the changes are what move. */
+.kauro-walk-table {
+  display: grid;
+  min-inline-size: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  background: var(--kauro-color-raised);
+  overflow: hidden;
+}
+.kauro-walk-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 0.95fr);
+  max-block-size: 3rem;
+  overflow: hidden;
+  transition: max-block-size 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s, opacity 0.35s ease 0.35s, background-color 0.4s ease;
+}
+.kauro-walk-row + .kauro-walk-row {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-walk-row--head {
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-walk-row.is-folded {
+  max-block-size: 0;
+  opacity: 0;
+  border-block-start-color: transparent;
+}
+.kauro-walk-row.is-unified {
+  background: var(--kauro-color-success-surface);
+}
+.kauro-walk-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-inline-size: 0;
+  min-block-size: 2.375rem;
+  padding: 0.4375rem 0.625rem;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+}
+.kauro-walk-cell--mono {
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+}
+.kauro-walk-cell--mark {
+  justify-content: center;
+  padding-inline: 0;
+}
+.kauro-walk-cell s {
+  flex: none;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  text-decoration-color: var(--kauro-color-primary);
+  text-decoration-thickness: 1.5px;
+}
+.kauro-walk-new {
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.1875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: kauro-walk-new 1.6s ease 0.2s backwards;
+}
+@keyframes kauro-walk-new {
+  0% {
+    opacity: 0;
+    background: var(--kauro-color-accent-surface);
+  }
+  30% {
+    opacity: 1;
+    background: var(--kauro-color-accent-surface);
+  }
+}
+.kauro-walk-row--head .kauro-walk-new {
+  color: var(--kauro-color-primary);
+}
+.kauro-walk-tag {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0 0.375rem;
+  border: 1px solid var(--kauro-color-success-text);
+  border-radius: 999px;
+  color: var(--kauro-color-success-text);
+  font-size: 0.625rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  animation: kauro-pop 0.35s cubic-bezier(0.3, 1.4, 0.6, 1) 0.7s backwards;
+}
+
+/* A flag: the cell the health check points at, marked like a proofreader's underline. */
+.kauro-walk-cell.is-flag {
+  background: color-mix(in srgb, var(--kauro-color-accent) 22%, transparent);
+  box-shadow: inset 0 -2px 0 var(--kauro-color-accent);
+}
+.kauro-walk.is-step-0 .kauro-walk-cell.is-flag {
+  animation: kauro-walk-flag 0.6s ease backwards;
+}
+.kauro-walk.is-step-0 .kauro-walk-row:nth-child(3) .is-flag {
+  animation-delay: 0.15s;
+}
+.kauro-walk.is-step-0 .kauro-walk-row:nth-child(4) .is-flag {
+  animation-delay: 0.3s;
+}
+.kauro-walk.is-step-0 .kauro-walk-row:nth-child(5) .is-flag {
+  animation-delay: 0.45s;
+}
+.kauro-walk.is-step-0 .kauro-walk-row:nth-child(6) .is-flag {
+  animation-delay: 0.6s;
+}
+@keyframes kauro-walk-flag {
+  from {
+    background: transparent;
+    box-shadow: inset 0 0 0 var(--kauro-color-accent);
+  }
+}
+.kauro-walk:not(.is-ready) .kauro-walk-cell.is-flag {
+  animation: none;
+}
+/* in prepare and import, what the report lists and nobody approved to change stays marked, but quieter */
+.kauro-walk.is-step-2 .kauro-walk-cell.is-flag,
+.kauro-walk.is-step-3 .kauro-walk-cell.is-flag {
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--kauro-color-accent);
+}
+/* the duplicate pair, bracketed in the margin while it is a pair */
+.kauro-walk-row.is-pair .kauro-walk-cell--mark {
+  position: relative;
+}
+.kauro-walk-row.is-pair .kauro-walk-cell--mark::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0.3125rem;
+  inline-size: 3px;
+  background: var(--kauro-color-accent);
+}
+
+/* The number in the margin that ties a row to the change proposed for it. */
+.kauro-walk-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.625rem;
+  font-weight: 700;
+  animation: kauro-pop 0.3s cubic-bezier(0.3, 1.4, 0.6, 1) backwards;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.kauro-walk-mark.is-approved {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-walk-mark.is-skipped {
+  border-style: dashed;
+  border-color: var(--kauro-color-text-muted);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text-muted);
+}
+
+/* The tray under the file: the tool of the step, in a space that does not change size. */
+.kauro-walk-tray {
+  min-inline-size: 0;
+  padding: 0.875rem 1.125rem 1rem;
+  border-block-start: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+  font-size: 0.8125rem;
+}
+.kauro-walk.is-ready .kauro-walk-tray > * {
+  animation: kauro-rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.kauro-walk-metrics,
+.kauro-walk-proposals,
+.kauro-walk-checks,
+.kauro-walk-order {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  block-size: 100%;
+  align-content: center;
+}
+.kauro-walk-metric {
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+  padding-inline-start: 0.75rem;
+  border-inline-start: 3px solid var(--kauro-color-accent);
+}
+.kauro-walk-metric-figure {
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+.kauro-walk-metric-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.kauro-walk-metric-share {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.kauro-walk-decide {
+  display: grid;
+  gap: 0.5rem;
+}
+.kauro-walk-proposals {
+  display: grid;
+  gap: 0.375rem;
+}
+.kauro-walk-proposal {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.3125rem 0.375rem 0.3125rem 0.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.4375rem;
+  background: var(--kauro-color-raised);
+  transition: border-color 0.25s ease;
+}
+.kauro-walk-proposal.is-approved {
+  border-color: var(--kauro-color-primary);
+}
+.kauro-walk-proposal-title {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-walk-proposal-detail {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kauro-walk-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-block-size: 2rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--kauro-color-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.kauro-walk-approve:hover {
+  background: var(--kauro-color-accent-surface);
+}
+.kauro-walk-approve[aria-pressed="true"] {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-walk-approve[aria-pressed="true"]::before {
+  content: "";
+  inline-size: 0.3125rem;
+  block-size: 0.5625rem;
+  margin-block-start: -0.125rem;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.kauro-site-main p.kauro-walk-hint {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+
+.kauro-walk-checks {
+  display: grid;
+  gap: 0.5rem;
+}
+.kauro-walk-checks li {
+  position: relative;
+  padding-inline-start: 1.75rem;
+  animation: kauro-rise 0.35s ease backwards;
+}
+.kauro-walk-checks li:nth-child(1) {
+  animation-delay: 0.3s;
+}
+.kauro-walk-checks li:nth-child(2) {
+  animation-delay: 0.7s;
+}
+.kauro-walk-checks li:nth-child(3) {
+  animation-delay: 1.1s;
+}
+.kauro-walk-checks li:nth-child(4) {
+  animation-delay: 1.4s;
+}
+.kauro-walk-checks li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0.0625rem;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  border: 1.5px solid var(--kauro-color-success-text);
+  border-radius: 50%;
+}
+.kauro-walk-checks li::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.4375rem;
+  inset-block-start: 0.25rem;
+  inline-size: 0.25rem;
+  block-size: 0.5rem;
+  border: solid var(--kauro-color-success-text);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.kauro-walk-checks li.is-skipped {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-walk-checks li.is-skipped::before {
+  border-style: dashed;
+  border-color: var(--kauro-color-text-muted);
+}
+.kauro-walk-checks li.is-skipped::after {
+  inset-block-start: 0.5625rem;
+  inline-size: 0.5rem;
+  block-size: 0;
+  border-width: 1.5px 0 0;
+  border-color: var(--kauro-color-text-muted);
+  transform: none;
+  inset-inline-start: 0.3125rem;
+}
+
+.kauro-walk-import {
+  display: grid;
+  gap: 0.625rem;
+}
+.kauro-site-main p.kauro-walk-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-walk-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  counter-reset: walk;
+}
+.kauro-walk-order li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.3125rem 0.625rem 0.3125rem 0.375rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.375rem;
+  background: var(--kauro-color-raised);
+  counter-increment: walk;
+  animation: kauro-rise 0.35s ease backwards;
+}
+.kauro-walk-order li::before {
+  content: counter(walk);
+  display: grid;
+  place-items: center;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  border-radius: 50%;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+.kauro-walk-order li:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.kauro-walk-order li:nth-child(3) {
+  animation-delay: 0.6s;
+}
+.kauro-site-main p.kauro-walk-compare {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+
 @media (max-width: 39.99rem) {
-  .kauro-folder-tabs {
+  .kauro-walk-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr);
+  }
+  .kauro-walk-cell {
+    padding-inline: 0.375rem;
+    font-size: 0.75rem;
+  }
+  .kauro-walk-cell--mono {
+    font-size: 0.6875rem;
+  }
+  .kauro-walk-metrics {
+    gap: 0.625rem;
+  }
+  .kauro-walk-proposal {
+    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  }
+  .kauro-walk-proposal-detail {
+    display: none;
+  }
+  .kauro-walk.is-ready .kauro-walk-tray {
+    min-block-size: 11.5rem;
+  }
+}
+
+/* the file keeps its height when the duplicate pair folds into one row */
+.kauro-walk-table {
+  align-content: start;
+  min-block-size: calc(6 * 2.375rem + 7px);
+}
+.kauro-walk,
+.kauro-walk * {
+  box-sizing: border-box;
+}
+.kauro-walk-cell {
+  min-block-size: 2.125rem;
+  padding-block: 0.3125rem;
+}
+.kauro-walk-table {
+  min-block-size: calc(6 * 2.125rem + 6px);
+}
+.kauro-walk-approve {
+  min-block-size: 1.75rem;
+  padding-block: 0.1875rem;
+}
+.kauro-walk-proposal {
+  padding-block: 0.25rem;
+}
+@media (min-width: 62rem) {
+  .kauro-walk.is-ready .kauro-walk-window {
+    block-size: 31rem;
+  }
+}
+
+/* ---- the buyers (Home): two cards, one over the other, under one stamp ------------------------------------------------------- */
+
+.kauro-buyers,
+.kauro-buyers * {
+  box-sizing: border-box;
+}
+.kauro-buyers {
+  position: relative;
+  display: grid;
+  gap: 0;
+  padding-block: var(--kauro-space-3) var(--kauro-space-5);
+}
+.kauro-buyer {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 1.5rem 1.625rem 1.625rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+}
+.kauro-buyer--agency {
+  z-index: 1;
+  box-shadow: 0 2rem 3.5rem -1.75rem color-mix(in srgb, #000 60%, transparent);
+  transform: rotate(-2deg);
+}
+.kauro-buyer--company {
+  z-index: 2;
+  margin-block-start: -1.25rem;
+  margin-inline-start: 12%;
+  box-shadow: 0 2rem 3.5rem -1.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
+  transform: rotate(1.5deg);
+}
+.kauro-site-main .kauro-buyer h3 {
+  margin: 0;
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+}
+.kauro-site-main .kauro-buyer > p {
+  max-inline-size: 38ch;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+.kauro-buyer-spaces {
+  display: grid;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  list-style: none;
+  overflow: hidden;
+}
+.kauro-buyer-space {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5625rem 0.875rem;
+  background: var(--kauro-color-surface);
+  font-size: 0.875rem;
+}
+.kauro-buyer-space + .kauro-buyer-space {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-buyer-space-name {
+  font-weight: 650;
+}
+.kauro-buyer-space-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-buyer-space-phase::before {
+  content: "";
+  inline-size: 0.4375rem;
+  block-size: 0.4375rem;
+  border-radius: 50%;
+  background: var(--kauro-color-accent);
+}
+.kauro-buyer-space--ready .kauro-buyer-space-phase::before {
+  background: var(--kauro-color-success-text);
+}
+.kauro-buyer-space--decide .kauro-buyer-space-phase {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+}
+.kauro-buyer-space--decide .kauro-buyer-space-phase::before {
+  background: var(--kauro-color-primary);
+}
+.kauro-site-main p.kauro-buyer-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kauro-color-accent-text);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-buyer-foot::before {
+  content: "";
+  inline-size: 0.75rem;
+  block-size: 0.9375rem;
+  border: 1.5px solid currentColor;
+  border-radius: 0.125rem;
+}
+/* the stamp that holds the two cards together: same price, same discounts */
+.kauro-site-main p.kauro-buyers-stamp {
+  position: absolute;
+  z-index: 3;
+  inset-inline-end: 0;
+  inset-block-start: 42%;
+  max-inline-size: 13rem;
+  padding: 0.5rem 0.875rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.3125rem;
+  background: var(--kauro-color-raised);
+  box-shadow: inset 0 0 0 3px var(--kauro-color-raised), inset 0 0 0 4px var(--kauro-color-primary), 0 0.75rem 1.5rem -1rem color-mix(in srgb, #000 50%, transparent);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+}
+@media (min-width: 40rem) {
+  .kauro-buyers {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .kauro-buyer--agency {
+    grid-column: 1 / span 8;
+    grid-row: 1;
+  }
+  .kauro-buyer--company {
+    grid-column: 6 / -1;
+    grid-row: 1;
+    align-self: end;
+    margin: 9rem 0 0;
+  }
+  .kauro-site-main p.kauro-buyers-stamp {
+    inset-inline-end: auto;
+    inset-inline-start: 50%;
+    inset-block-start: 1.5rem;
+    translate: -10% 0;
+  }
+}
+@media (max-width: 39.99rem) {
+  .kauro-site-main p.kauro-buyers-stamp {
+    position: relative;
+    inset: auto;
+    justify-self: center;
+    margin-block: -0.5rem;
+  }
+  .kauro-buyers {
+    grid-template-areas: "agency" "stamp" "company";
+  }
+  .kauro-buyer--agency {
+    grid-area: agency;
+  }
+  .kauro-buyers-stamp {
+    grid-area: stamp;
+  }
+  .kauro-buyer--company {
+    grid-area: company;
+    margin: 0 0 0 1.5rem;
+  }
+}
+@media (min-width: 40rem) {
+  .kauro-buyer--agency {
+    grid-column: 1 / span 8;
+  }
+  .kauro-buyer--company {
+    grid-column: 7 / -1;
+    margin-block-start: 12.5rem;
+  }
+  .kauro-site-main p.kauro-buyers-stamp {
+    inset-inline: auto 1%;
+    inset-block-start: 2.5rem;
+    translate: none;
+    transform: rotate(9deg);
+  }
+}
+@media (min-width: 40rem) {
+  .kauro-buyers {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    column-gap: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: start;
+    margin-block-start: var(--kauro-space-5);
+  }
+  .kauro-buyer--agency {
+    grid-column: 1;
+  }
+  .kauro-buyer--company {
+    grid-column: 2;
+    margin: 3.5rem 0 0;
+  }
+  .kauro-site-main p.kauro-buyers-stamp {
+    inset-inline: calc(58% - 7rem) auto;
+    inset-block-start: -0.25rem;
+    transform: rotate(-7deg);
+  }
+}
+/* the heading and its sentence share one row, so the two cards arrive sooner */
+@media (min-width: 62rem) {
+  .kauro-site-buyer-section .kauro-site-section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: clamp(2rem, 5vw, 5rem);
+    align-items: end;
+  }
+  .kauro-site-buyer-section .kauro-site-section-head > * {
+    margin: 0;
+  }
+  .kauro-site-buyer-section .kauro-site-section-lead {
+    max-inline-size: 52ch;
+  }
+}
+.kauro-site-main .kauro-buyer--agency > p {
+  max-inline-size: 46ch;
+}
+.kauro-buyers {
+  max-inline-size: 64rem;
+  margin-inline: auto;
+}
+
+/* ---- the delivery (Home): a pile of the four documents, the list beside it --------------------------------------------------- */
+
+.kauro-pack,
+.kauro-pack * {
+  box-sizing: border-box;
+}
+.kauro-pack {
+  display: grid;
+  gap: clamp(2.5rem, 5vw, 4.5rem);
+  align-items: center;
+  margin-block-start: var(--kauro-space-5);
+}
+@media (min-width: 56rem) {
+  .kauro-pack {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+}
+.kauro-pack-pile {
+  display: grid;
+  padding: 3.25rem 2.75rem 0.5rem 0;
+}
+.kauro-pack-sheet {
+  position: relative;
+  grid-area: 1 / 1;
+  display: grid;
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.5s ease;
+}
+.kauro-pack-sheet .kauro-doc {
+  align-content: start;
+  block-size: 100%;
+  transform: none;
+  animation: none;
+}
+.kauro-pack-sheet--0 {
+  z-index: 4;
+  transform: rotate(-1deg);
+}
+.kauro-pack.is-ready .kauro-pack-sheet--0 .kauro-doc {
+  animation: kauro-doc-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.kauro-pack-sheet--1 {
+  z-index: 3;
+  transform: translate(0.875rem, -1rem) rotate(1.5deg);
+}
+.kauro-pack-sheet--2 {
+  z-index: 2;
+  transform: translate(1.75rem, -2rem) rotate(3.5deg);
+}
+.kauro-pack-sheet--3 {
+  z-index: 1;
+  transform: translate(2.625rem, -3rem) rotate(5.5deg);
+}
+/* the sheets underneath show only their paper and their title */
+.kauro-pack-sheet:not(.kauro-pack-sheet--0) .kauro-doc > * {
+  visibility: hidden;
+}
+.kauro-pack-sheet:not(.kauro-pack-sheet--0) .kauro-doc {
+  background: var(--kauro-color-surface);
+  box-shadow: 0 1rem 2rem -1.75rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent);
+}
+.kauro-pack-sheet--0 .kauro-doc {
+  box-shadow: 0 2rem 3.5rem -2rem color-mix(in srgb, var(--kauro-color-ink) 70%, transparent);
+}
+.kauro-pack-sheet-tab {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: -1.625rem;
+  padding: 0.25rem 0.75rem 0.375rem;
+  border: 1px solid var(--kauro-color-border);
+  border-block-end: 0;
+  border-radius: 0.375rem 0.375rem 0 0;
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-pack-sheet:nth-child(1) .kauro-pack-sheet-tab {
+  inset-inline-start: 1rem;
+}
+.kauro-pack-sheet:nth-child(2) .kauro-pack-sheet-tab {
+  inset-inline-start: 26%;
+}
+.kauro-pack-sheet:nth-child(3) .kauro-pack-sheet-tab {
+  inset-inline-start: 51%;
+}
+.kauro-pack-sheet:nth-child(4) .kauro-pack-sheet-tab {
+  inset-inline-end: 1rem;
+}
+.kauro-pack-sheet--0 .kauro-pack-sheet-tab {
+  border-color: var(--kauro-color-wine);
+  background: var(--kauro-color-wine);
+  color: var(--kauro-color-on-wine);
+}
+
+/* the list: every document named and explained, the one on top marked in wine */
+.kauro-pack-list {
+  display: grid;
+  gap: var(--kauro-space-4);
+  justify-items: start;
+}
+.kauro-pack-list ol {
+  display: grid;
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-pack-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  column-gap: 0.875rem;
+  padding: 0.9375rem 0 0.9375rem 0.25rem;
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-pack-item:last-child {
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-pack-item::before {
+  content: "";
+  position: absolute;
+  inset-block: -1px;
+  inset-inline-start: -0.875rem;
+  inline-size: 3px;
+  background: var(--kauro-color-wine);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.kauro-pack.is-ready .kauro-pack-item.is-current::before {
+  opacity: 1;
+}
+.kauro-pack-number {
+  grid-row: 1 / span 2;
+  padding-block-start: 0.25rem;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-pack.is-ready .kauro-pack-item.is-current .kauro-pack-number {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-main .kauro-pack-item h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+.kauro-pack-item h3 button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-text);
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.kauro-pack-item h3 button:hover {
+  color: var(--kauro-color-primary);
+}
+.kauro-pack-item.is-current h3 button {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-main .kauro-pack-item p {
+  margin-block-start: 0.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+@media (max-width: 39.99rem) {
+  .kauro-pack-pile {
+    padding: 2.75rem 1.75rem 0 0;
+  }
+  .kauro-pack-sheet--1 {
+    transform: translate(0.5rem, -0.75rem) rotate(1.5deg);
+  }
+  .kauro-pack-sheet--2 {
+    transform: translate(1rem, -1.5rem) rotate(3deg);
+  }
+  .kauro-pack-sheet--3 {
+    transform: translate(1.5rem, -2.25rem) rotate(4.5deg);
+  }
+  .kauro-pack-sheet-tab {
+    display: none;
+  }
+}
+
+/* ---- the limits (Home): Kauro's permissions, locked on Never ------------------------------------------------------------------- */
+
+.kauro-locks,
+.kauro-locks * {
+  box-sizing: border-box;
+}
+.kauro-locks {
+  max-inline-size: 38rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 60%, transparent);
+  transform: rotate(-1.25deg);
+}
+.kauro-site-main p.kauro-locks-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-inline-size: none;
+  padding: 0.75rem 1.25rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  font-size: 0.8125rem;
+}
+.kauro-locks-brand {
+  font-family: var(--kauro-display-family);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kauro-locks-title {
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-locks-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  margin-inline-start: auto;
+  color: var(--kauro-color-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* a padlock drawn with two borders: the shackle and the body */
+.kauro-locks-state::before,
+.kauro-lock h3::before {
+  content: "";
+  flex: none;
+  inline-size: 0.625rem;
+  block-size: 0.5rem;
+  margin-block-start: 0.3125rem;
+  border: 1.5px solid currentColor;
+  border-radius: 0.125rem;
+  box-shadow: 0 -0.3125rem 0 -0.0625rem var(--kauro-color-raised), 0 -0.3125rem 0 0.03125rem currentColor;
+}
+.kauro-locks-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-lock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1.25rem;
+  row-gap: 0.25rem;
+  align-items: baseline;
+  padding: 1.125rem 1.25rem;
+}
+.kauro-lock + .kauro-lock {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-lock h3 {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin: 0;
+  color: var(--kauro-color-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.kauro-lock h3::before {
+  color: var(--kauro-color-accent);
+}
+.kauro-site-main .kauro-lock p {
+  grid-column: 1;
+  max-inline-size: 48ch;
+  padding-inline-start: 1.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+}
+.kauro-lock-state {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--kauro-color-accent);
+  border-radius: 999px;
+  color: var(--kauro-color-accent);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+@media (min-width: 62rem) {
+  .kauro-site-limits .kauro-site-section-inner {
+    align-items: center;
+  }
+}
+.kauro-lock h3::before {
+  content: none;
+}
+.kauro-site-main .kauro-lock p {
+  padding-inline-start: 0;
+}
+.kauro-locks-state {
+  position: relative;
+  padding-inline-start: 1.125rem;
+}
+.kauro-locks-state::before {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-end: 0.125rem;
+  inline-size: 0.6875rem;
+  block-size: 0.5rem;
+  margin: 0;
+  border-radius: 0.125rem;
+  background: currentColor;
+  box-shadow: none;
+}
+.kauro-locks-state::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.125rem;
+  inset-block-end: 0.5625rem;
+  inline-size: 0.4375rem;
+  block-size: 0.375rem;
+  border: 1.5px solid currentColor;
+  border-block-end: 0;
+  border-radius: 0.25rem 0.25rem 0 0;
+  box-sizing: border-box;
+}
+
+/* ---- the offer (Home): one board, a row per service, CLEAN on wine ------------------------------------------------------------- */
+
+.kauro-board,
+.kauro-board * {
+  box-sizing: border-box;
+}
+.kauro-board {
+  display: grid;
+  gap: 0.5rem;
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-site-main p.kauro-board-head {
+  display: none;
+}
+.kauro-board-rows {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-board-row {
+  display: grid;
+  gap: 1rem 2rem;
+  padding: 1.375rem 1.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-board-row--lead {
+  border-color: transparent;
+  background: var(--kauro-color-wine) url("./textures/grain.svg") 0 0 / 240px;
+  box-shadow: 0 1.75rem 3rem -2rem color-mix(in srgb, var(--kauro-color-wine) 90%, #000);
+}
+.kauro-board-name {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 0.5rem;
+}
+.kauro-site-main .kauro-board-name h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.kauro-site-main .kauro-board-row--lead .kauro-board-name h3 {
+  font-size: 1.875rem;
+}
+.kauro-site-main p.kauro-board-tag {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 0.25rem;
+  color: var(--kauro-color-on-wine);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main p.kauro-board-what {
+  max-inline-size: 40ch;
+  font-size: 0.9375rem;
+}
+.kauro-board-for {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+}
+.kauro-site-main .kauro-board-for > p:not(.kauro-board-label) {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+.kauro-site-main p.kauro-board-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-board-chips li {
+  padding: 0.1875rem 0.625rem;
+  border: 1px solid color-mix(in srgb, var(--kauro-color-on-wine) 45%, transparent);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+}
+.kauro-board-price {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+}
+.kauro-board-price .kauro-site-price {
+  margin: 0;
+}
+.kauro-site-main .kauro-board-price p:not(.kauro-site-price) {
+  max-inline-size: 22ch;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+@media (min-width: 62rem) {
+  .kauro-site-main p.kauro-board-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
+    column-gap: 2rem;
+    max-inline-size: none;
+    padding-inline: 1.5rem;
+    color: var(--kauro-color-text-muted);
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .kauro-board-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
+    align-items: start;
+  }
+  .kauro-board-for .kauro-board-label {
+    display: none;
+  }
+  .kauro-board-price {
+    justify-items: end;
+    text-align: end;
+  }
+}
+.kauro-site-main .kauro-board-price .kauro-site-price {
+  font-size: clamp(2rem, 1.6rem + 1vw, 2.5rem);
+}
+.kauro-site-main .kauro-board-row--lead .kauro-board-price .kauro-site-price {
+  font-size: clamp(2.5rem, 2rem + 1.4vw, 3.25rem);
+}
+.kauro-site-main .kauro-board-row > *,
+.kauro-site-main .kauro-board-for > * {
+  margin: 0;
+}
+
+/* ---- the menu, quieter: no numbers, lighter names, the page dimmed a little behind the card ---------------------------------- */
+
+.kauro-site-header {
+  z-index: 40;
+}
+.kauro-site-menu-scrim {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  background: color-mix(in srgb, #19191b 28%, transparent);
+  animation: kauro-fade-in 0.2s ease-out;
+}
+:root[data-theme="dark"] .kauro-site-menu-scrim {
+  background: color-mix(in srgb, #000 45%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-site-menu-scrim {
+    background: color-mix(in srgb, #000 45%, transparent);
+  }
+}
+.kauro-site-menu-toggle {
+  position: relative;
+  z-index: 31;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a::before {
+  content: none;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a,
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list li:first-child a {
+  align-items: center;
+  min-block-size: 2.625rem;
+  padding: 0.5rem 0.875rem;
+  font-family: var(--kauro-font-family);
+  font-size: 1rem;
+  font-weight: 450;
+  letter-spacing: 0;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a[aria-current="page"] {
+  font-weight: 600;
+}
+.kauro-site-menu-panel {
+  inline-size: min(18rem, calc(100vw - 2 * var(--kauro-site-gutter)));
+}
+
+/* ---- paper: a sheet that keeps the light palette on any band in the light theme, and is a raised dark sheet in the dark theme ---- */
+
+.kauro-paper {
+  color-scheme: light;
+  --kauro-color-text: #242426;
+  --kauro-color-text-muted: #5f5955;
+  --kauro-color-background: #f8f6f3;
+  --kauro-color-surface: #f1ede8;
+  --kauro-color-raised: #ffffff;
+  --kauro-color-border: #e3dcd4;
+  --kauro-color-primary: #653a46;
+  --kauro-color-on-primary: #f8f6f3;
+  --kauro-color-focus: #653a46;
+  --kauro-color-accent-text: #7a5a45;
+  --kauro-color-accent-surface: #ece2d9;
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+}
+:root[data-theme="dark"] .kauro-paper {
+  color-scheme: dark;
+  --kauro-color-text: #f1ece6;
+  --kauro-color-text-muted: #ada59e;
+  --kauro-color-background: #2d2c2f;
+  --kauro-color-surface: #262528;
+  --kauro-color-raised: #333236;
+  --kauro-color-border: #45434a;
+  --kauro-color-primary: #c4a693;
+  --kauro-color-on-primary: #242426;
+  --kauro-color-focus: #c4a693;
+  --kauro-color-accent-text: #c4a693;
+  --kauro-color-accent-surface: #3d332d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-paper {
+    color-scheme: dark;
+    --kauro-color-text: #f1ece6;
+    --kauro-color-text-muted: #ada59e;
+    --kauro-color-background: #2d2c2f;
+    --kauro-color-surface: #262528;
+    --kauro-color-raised: #333236;
+    --kauro-color-border: #45434a;
+    --kauro-color-primary: #c4a693;
+    --kauro-color-on-primary: #242426;
+    --kauro-color-focus: #c4a693;
+    --kauro-color-accent-text: #c4a693;
+    --kauro-color-accent-surface: #3d332d;
+  }
+}
+
+/* ---- How it works: a wine head with the card of who acts, the steps beside their panes ---------------------------------------- */
+
+.kauro-site-head-how.kauro-wine {
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+}
+.kauro-acts,
+.kauro-acts * {
+  box-sizing: border-box;
+}
+.kauro-acts {
+  inline-size: min(100%, 27rem);
+  margin-inline: auto;
+  border-radius: var(--kauro-radius-large);
+  box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 70%, transparent);
+  transform: rotate(-2deg);
+}
+.kauro-site-main p.kauro-acts-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-inline-size: none;
+  padding: 0.75rem 1.25rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  font-size: 0.8125rem;
+}
+.kauro-acts-brand {
+  font-family: var(--kauro-display-family);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kauro-acts-title {
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-acts-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.kauro-acts-column {
+  display: grid;
+  align-content: start;
+  gap: 0.625rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+.kauro-acts-column + .kauro-acts-column {
+  border-inline-start: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+.kauro-site-main p.kauro-acts-actor {
+  color: var(--kauro-color-primary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.kauro-acts-column--kauro .kauro-acts-actor {
+  color: var(--kauro-color-accent-text);
+}
+.kauro-acts-column ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-acts-column li {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+.kauro-acts-number {
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  line-height: 1.7;
+}
+
+.kauro-steps .kauro-step {
+  padding-block-end: clamp(2.5rem, 5vw, 3.5rem);
+}
+.kauro-steps .kauro-step:last-child {
+  padding-block-end: 0;
+}
+.kauro-step-pane .kauro-site-frag {
+  margin-block-start: var(--kauro-space-4);
+}
+@media (min-width: 62rem) {
+  .kauro-steps .kauro-step {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+    align-items: start;
+  }
+  .kauro-site-main .kauro-step-text > p:last-child {
+    max-inline-size: 56ch;
+  }
+  .kauro-step-pane .kauro-site-frag {
+    margin-block-start: 0;
+  }
+}
+
+/* Supported services: three cards side by side, CLEAN the wine one, none wider than the others */
+@media (min-width: 62rem) {
+  .kauro-site-cards--three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+.kauro-site-service--lead.kauro-wine {
+  box-shadow: 0 2rem 3.5rem -2.25rem color-mix(in srgb, var(--kauro-color-wine) 90%, #000);
+}
+
+/* ---- Status: the services read, as one panel with a lamp beside each state ---------------------------------------------------- */
+
+.kauro-status-panel {
+  box-sizing: border-box;
+  max-inline-size: 36rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  box-shadow: 0 2rem 3.5rem -2.25rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent);
+  overflow: hidden;
+}
+.kauro-site-main p.kauro-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-inline-size: none;
+  padding: 0.75rem 1.25rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+  font-size: 0.8125rem;
+}
+.kauro-status-brand {
+  font-family: var(--kauro-display-family);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kauro-status-title {
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-status-panel .kauro-site-status-list {
+  border: 0;
+}
+.kauro-status-panel .kauro-site-status-row {
+  padding: 1rem 1.25rem;
+}
+.kauro-status-panel .kauro-site-status-row:last-child {
+  border-block-end: 0;
+}
+.kauro-status-panel .kauro-site-status-row strong {
+  font-size: 1.25rem;
+}
+.kauro-status-panel .kauro-site-status-state {
+  font-size: 0.875rem;
+}
+.kauro-status-panel .kauro-site-status-state::before {
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+/* ---- Contact: the six short fields in pairs, the choice, the message and the button across ------------------------------------- */
+
+@media (min-width: 48rem) {
+  .kauro-site-contact .kauro-site-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--kauro-space-5);
+    max-inline-size: none;
+  }
+  .kauro-site-contact .kauro-site-form > * {
+    grid-column: 1 / -1;
+  }
+  .kauro-site-contact .kauro-site-form > .kauro-site-field:not(:has(textarea)) {
+    grid-column: auto;
+  }
+  .kauro-site-contact .kauro-site-form > .kauro-site-field select,
+  .kauro-site-contact .kauro-site-form > .kauro-site-field input {
+    inline-size: 100%;
+    box-sizing: border-box;
+  }
+  .kauro-site-contact .kauro-site-fieldset {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding-inline-start: 0;
-    overflow: visible;
+    column-gap: var(--kauro-space-4);
   }
-  .kauro-folder-tab,
-  .kauro-folder-tab[aria-selected="true"] {
-    min-inline-size: 0;
-    padding: 0.625rem 0.75rem 0.5rem;
-    font-size: 0.875rem;
+  .kauro-site-contact .kauro-site-fieldset > legend,
+  .kauro-site-contact .kauro-site-fieldset > :not(.kauro-site-choice) {
+    grid-column: 1 / -1;
   }
-  .kauro-folder-tab:nth-child(-n + 2) {
-    margin-block-end: 0;
+  .kauro-site-contact .kauro-site-form > button {
+    justify-self: start;
   }
-  .kauro-folder-panel {
-    border-radius: 0 0 var(--kauro-radius-large) var(--kauro-radius-large);
+}
+@media (min-width: 48rem) {
+  .kauro-site-contact .kauro-site-form {
+    align-items: end;
+  }
+}
+@media (max-width: 39.99rem) {
+  .kauro-walk-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1.3fr);
+  }
+  .kauro-walk-row > .kauro-walk-cell:nth-child(4) {
+    display: none;
+  }
+  .kauro-walk-metrics {
+    align-content: start;
+  }
+  .kauro-walk-sheet {
+    padding-inline: 0.875rem;
   }
 }

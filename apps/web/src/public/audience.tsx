@@ -1,18 +1,9 @@
-"use client";
-
-// Who buys (Home): the visitor says which they are, an agency or a company, and the workspace beside it shows what that looks like in
-// Kauro: one workspace per client for an agency, one for a company, and the same price either way (D-33). Without the script both are
-// shown one after the other.
+// Who buys Kauro, on Home (A10 §8): two cards laid one over the other, an agency's and an in-house team's, held together by one stamp,
+// because the point is that both buy the same thing at the same price. The agency card lists three invented client workspaces at different
+// phases; the in-house card has one. Everything is on the page at once; nothing is behind a switch.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, type PublicCopyId } from "../copy/public.ts";
-import { formatUsd, startingPrice } from "./pricing-bands.ts";
 import { SAMPLE_CLIENTS } from "./sample-data.ts";
-import { useTabs } from "./tabs.ts";
-
-const KINDS = [
-  { key: "agency", name: "home.buyer.agency.name", body: "home.audience.agency.body" },
-  { key: "company", name: "home.buyer.company.name", body: "home.audience.company.body" },
-] as const satisfies ReadonlyArray<{ readonly key: string; readonly name: PublicCopyId; readonly body: PublicCopyId }>;
 
 const PHASE: Readonly<Record<(typeof SAMPLE_CLIENTS)[number]["phase"], PublicCopyId>> = {
   check: "home.app.phase.check.label",
@@ -20,90 +11,40 @@ const PHASE: Readonly<Record<(typeof SAMPLE_CLIENTS)[number]["phase"], PublicCop
   ready: "home.app.state.label",
 };
 
-const cx = (...names: ReadonlyArray<string | false>): string => names.filter((name) => name !== false && name !== "").join(" ");
-
-function Price(): ReactElement {
+function Workspace({ name, phase }: { readonly name: string; readonly phase: keyof typeof PHASE }): ReactElement {
   return (
-    <span className="kauro-audience-price">
-      <span className="kauro-audience-price-label">{PUBLIC_COPY["pricing.ladder.clean.name"]}</span>
-      <span className="kauro-audience-price-figure">{formatUsd(startingPrice("CLEAN"))}</span>
-    </span>
-  );
-}
-
-function Agency(): ReactElement {
-  return (
-    <div className="kauro-audience-stage">
-      <div className="kauro-audience-switcher">
-        {SAMPLE_CLIENTS.map((client, index) => (
-          <span key={client.name} className={cx("kauro-audience-client", index === 0 && "is-open", `kauro-audience-client--${client.phase}`)}>
-            <span className="kauro-audience-client-name">{client.name}</span>
-            <span className="kauro-audience-client-phase">{PUBLIC_COPY[PHASE[client.phase]]}</span>
-          </span>
-        ))}
-      </div>
-      <div className="kauro-audience-foot">
-        <span className="kauro-audience-chip">{PUBLIC_COPY["home.audience.reports"]}</span>
-        <Price />
-      </div>
-    </div>
-  );
-}
-
-function Company(): ReactElement {
-  return (
-    <div className="kauro-audience-stage">
-      <div className="kauro-audience-switcher">
-        <span className="kauro-audience-client is-open kauro-audience-client--ready">
-          <span className="kauro-audience-client-name">{PUBLIC_COPY["home.audience.workspace"]}</span>
-          <span className="kauro-audience-client-phase">{PUBLIC_COPY["home.app.state.label"]}</span>
-        </span>
-      </div>
-      <div className="kauro-audience-foot">
-        <span className="kauro-audience-chip kauro-audience-chip--note">{PUBLIC_COPY["home.note.same"]}</span>
-        <Price />
-      </div>
-    </div>
+    <li className={`kauro-buyer-space kauro-buyer-space--${phase}`}>
+      <span className="kauro-buyer-space-name">{name}</span>
+      <span className="kauro-buyer-space-phase">{PUBLIC_COPY[PHASE[phase]]}</span>
+    </li>
   );
 }
 
 export function Audience(): ReactElement {
-  const tabs = useTabs(KINDS.length);
   return (
-    <div className={cx("kauro-audience", tabs.ready && "is-ready")}>
-      <div className="kauro-audience-switch" role="tablist" aria-label={PUBLIC_COPY["home.audience.label"]} onKeyDown={tabs.onKeyDown}>
-        {KINDS.map((kind, index) => (
-          <button
-            key={kind.key}
-            ref={(element) => {
-              tabs.refs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            id={`audience-tab-${kind.key}`}
-            aria-selected={tabs.index === index}
-            aria-controls={`audience-panel-${kind.key}`}
-            tabIndex={tabs.index === index ? 0 : -1}
-            className="kauro-audience-option"
-            onClick={() => tabs.select(index)}
-          >
-            {PUBLIC_COPY[kind.name]}
-          </button>
-        ))}
-      </div>
-      {KINDS.map((kind, index) => {
-        const shown = !tabs.ready || tabs.index === index;
-        return (
-          <div key={kind.key} role="tabpanel" id={`audience-panel-${kind.key}`} aria-labelledby={`audience-tab-${kind.key}`} hidden={!shown} className="kauro-audience-panel">
-            <div className="kauro-audience-copy">
-              <h3>{PUBLIC_COPY[kind.name]}</h3>
-              <p>{PUBLIC_COPY[kind.body]}</p>
-              {kind.key === "company" ? <p className="kauro-audience-terms">{PUBLIC_COPY["pricing.in-house.body"]}</p> : null}
-            </div>
-            {kind.key === "agency" ? <Agency /> : <Company />}
-          </div>
-        );
-      })}
+    <div className="kauro-buyers">
+      <article className="kauro-buyer kauro-buyer--agency kauro-inverse" aria-labelledby="buyer-agency">
+        <h3 id="buyer-agency">{PUBLIC_COPY["home.buyer.agency.name"]}</h3>
+        <p>{PUBLIC_COPY["home.audience.agency.body"]}</p>
+        <ul className="kauro-buyer-spaces" aria-hidden="true">
+          {SAMPLE_CLIENTS.map((client) => (
+            <Workspace key={client.name} name={client.name} phase={client.phase} />
+          ))}
+        </ul>
+        <p className="kauro-buyer-foot" aria-hidden="true">
+          {PUBLIC_COPY["home.audience.reports"]}
+        </p>
+      </article>
+      <article className="kauro-buyer kauro-buyer--company" aria-labelledby="buyer-company">
+        <h3 id="buyer-company">{PUBLIC_COPY["home.buyer.company.name"]}</h3>
+        <p>{PUBLIC_COPY["home.audience.company.body"]}</p>
+        <ul className="kauro-buyer-spaces" aria-hidden="true">
+          <Workspace name={PUBLIC_COPY["home.audience.workspace"]} phase="decide" />
+        </ul>
+      </article>
+      <p className="kauro-buyers-stamp" aria-hidden="true">
+        {PUBLIC_COPY["home.note.same"]}
+      </p>
     </div>
   );
 }

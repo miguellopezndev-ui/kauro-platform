@@ -101,3 +101,39 @@ The owner asked for more personality on the base of the reference sketches. What
    - Data handling answers a cross-customer request with a "Not found" stamp and shows the model's limited context as a redacted file.
 5. **Depth only where something rests.** The ticket of the free check carries a shadow over a darkened rock, so it sits in front of it.
    The 404 is one larger tilted lookup card that holds the heading, the zero and the stamp together.
+
+## 8. Fifth pass (2026-10-18): one file through the process, objects instead of boxes, nothing that sticks
+
+The references the owner confirmed are the not-found card, the ticket of the free check, the wine context band and the Home hero. What
+they share is the rule for every new piece: one physical object (a window, a card, a sheet, a ticket) drawn from the product, sized to
+its content, set slightly off square with depth, and a stamp only where a verdict belongs. Big type that says nothing, panels with an
+empty half, and anything that follows the reader down the screen are removed.
+
+1. **The process is one file** (`journey.tsx`). Home shows the same window and the same five rows of `contacts.csv` at every step:
+   - Measure flags the cells the health check finds.
+   - Decide numbers the three proposed changes in the margin, and the visitor approves them.
+   - Prepare applies only what was approved: the duplicate pair folds into one row, the name is normalised, the column renamed and the
+     count runs down. Anything not approved stays as it was, and the window says so.
+   - Import hands the same file over in order.
+
+   The window keeps its height, so nothing below it moves. The four steps stay listed beside it with every sentence visible.
+2. **The buyers are two cards under one stamp.** An agency's card with three client workspaces and an in-house team's card with one, side
+   by side, slightly turned, with "Same price, same discounts" stamped across the gap. Nothing hides behind a switch.
+3. **The delivery is a pile.** The four documents lie on top of each other, the chosen one on top and the others showing their titles. The
+   list beside the pile names and explains all four.
+4. **The limits are a permissions panel.** A carbon card, "Permissions", locked, where each of the three things Kauro does not do is set
+   to Never. It replaces the giant struck-through words.
+5. **The offer is a board.** One row per service with what it is, who it is for and where its price starts. CLEAN's row is wine and
+   says "Lowest starting price"; HubSpot and Salesforce follow as the specialised rows.
+6. **The menu is quieter.** No numbers, no tagline, regular-weight names, and the page dims a little behind the card. A press on the dimmed
+   page closes it.
+7. **Nothing sticks.** The split sections and the contact aside no longer follow the reader. How it works lost its sticky stage: each step
+   sits beside its pane.
+8. **Wine leads where a page has one point.**
+   - How it works opens on wine, with a card of who acts at each step; its closing band is carbon.
+   - Supported services sets CLEAN as the wine card of three equal cards.
+   - Status is one panel with a lamp beside each state.
+   - The contact form sets its short fields in pairs.
+   - A legal document that is not yet published is the not-found card again, stamped "Not published".
+9. **Paper.** `.kauro-paper` keeps the light palette for a sheet that sits on a dark or wine band in the light theme, and becomes a raised
+   dark sheet in the dark theme, so a document always reads as a document.

@@ -1,12 +1,11 @@
 // UI02 How it works: six steps in one ordered list (A3 3.2: the check is free, bounded and never promised as immediate; approval and the quote
-// are named; the import is the team's own), then where the team's responsibility starts. Each step says who acts in it, so the page shows at
-// a glance that the decisions and the import stay with the customer and the preparation is Kauro's; and each carries a fragment of the
-// product as it looks at that step (artifacts.tsx), from the synthetic sample and the policy.
+// are named; the import is the team's own), then where the team's responsibility starts. The head is wine and carries a card of who acts at
+// each step, so the page shows at a glance that the decisions and the import stay with the customer and the preparation is Kauro's (A10
+// §8). Each step sits beside a fragment of the product as it looks at that step (artifacts.tsx), from the synthetic sample and the policy.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { Approval, Counts, FileChips, ImportOrder, MarginNote, Pane, Reconcile } from "../artifacts.tsx";
 import { LinkButton, PageHead, PriceFigure, Section } from "../parts.tsx";
-import { Scrolly } from "../scrolly.tsx";
 import { formatUsd, startingPrice } from "../pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_SOURCES } from "../sample-data.ts";
@@ -81,20 +80,41 @@ function StepPane({ step }: { readonly step: StepKey }): ReactElement | null {
   }
 }
 
+/** Who acts at each step, as one card beside the heading: the team on one side, Kauro on the other. */
+function WhoActs(): ReactElement {
+  const column = (actor: Actor): ReactElement => (
+    <div className={`kauro-acts-column kauro-acts-column--${actor}`}>
+      <p className="kauro-acts-actor">{PUBLIC_COPY[ACTOR_LABEL[actor]]}</p>
+      <ul>
+        {STEPS.map((step, index) =>
+          step.actor === actor ? (
+            <li key={step.key}>
+              <span className="kauro-acts-number">{String(index + 1).padStart(2, "0")}</span>
+              {PUBLIC_COPY[step.heading]}
+            </li>
+          ) : null,
+        )}
+      </ul>
+    </div>
+  );
+  return (
+    <div className="kauro-acts kauro-paper" aria-hidden="true">
+      <p className="kauro-acts-bar">
+        <span className="kauro-acts-brand">{PUBLIC_COPY["site.name"]}</span>
+        <span className="kauro-acts-title">{PUBLIC_COPY["how.acts.label"]}</span>
+      </p>
+      <div className="kauro-acts-columns">
+        {column("team")}
+        {column("kauro")}
+      </div>
+    </div>
+  );
+}
+
 export function HowItWorksPage(): ReactElement {
   return (
     <>
-      <PageHead
-        eyebrow={PUBLIC_COPY["nav.how.label"]}
-        title={PUBLIC_COPY["how.title"]}
-        accent={3}
-        lead={PUBLIC_COPY["how.lead"]}
-        aside={
-          <p className="kauro-site-bignum" aria-hidden="true">
-            {String(STEPS.length).padStart(2, "0")}
-          </p>
-        }
-      />
+      <PageHead eyebrow={PUBLIC_COPY["nav.how.label"]} title={PUBLIC_COPY["how.title"]} accent={3} lead={PUBLIC_COPY["how.lead"]} tone="wine" size="compact" variant="kauro-site-head-how" aside={<WhoActs />} />
       <Section
         id="how-steps"
         heading={PUBLIC_COPY["how.steps.heading"]}
@@ -106,18 +126,22 @@ export function HowItWorksPage(): ReactElement {
           </ul>
         }
       >
-        <Scrolly
-          steps={STEPS.map((step) => ({
-            key: step.key,
-            actor: step.actor,
-            actorLabel: PUBLIC_COPY[ACTOR_LABEL[step.actor]],
-            heading: PUBLIC_COPY[step.heading],
-            body: PUBLIC_COPY[step.body],
-            pane: <StepPane step={step.key} />,
-          }))}
-        />
+        <ol className="kauro-site-timeline kauro-steps">
+          {STEPS.map((step) => (
+            <li key={step.key} className={`kauro-site-timeline-step kauro-site-timeline-step--${step.actor} kauro-step`}>
+              <div className="kauro-step-text">
+                <p className="kauro-site-actor">{PUBLIC_COPY[ACTOR_LABEL[step.actor]]}</p>
+                <h3>{PUBLIC_COPY[step.heading]}</h3>
+                <p>{PUBLIC_COPY[step.body]}</p>
+              </div>
+              <div className="kauro-step-pane">
+                <StepPane step={step.key} />
+              </div>
+            </li>
+          ))}
+        </ol>
       </Section>
-      <Section id="how-responsibility" heading={PUBLIC_COPY["how.responsibility.heading"]} layout="split" tone="wine" variant="kauro-site-band-grain">
+      <Section id="how-responsibility" heading={PUBLIC_COPY["how.responsibility.heading"]} layout="split" tone="inverse" variant="kauro-site-band-grain">
         <p className="kauro-site-statement">{PUBLIC_COPY["how.responsibility.body"]}</p>
         <div className="kauro-site-actions">
           <LinkButton href={ROUTE.services}>{PUBLIC_COPY["how.next.services.cta"]}</LinkButton>

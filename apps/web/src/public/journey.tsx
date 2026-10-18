@@ -1,231 +1,255 @@
 "use client";
 
-// The process on Home as a journey the visitor walks (A10 §7): four steps on a rail, and for each one the Kauro window as it looks at that
-// step, from the synthetic sample. The visitor can approve the proposed changes in the Decide step themselves, watch the counts reconcile in
-// Prepare and the files go in, in order, in Import. Without the script the four steps are simply shown one after the other.
-import { useState, type ReactElement } from "react";
+// The process on Home as one file the visitor walks through four steps (A10 §8). It is the same window and the same rows of contacts.csv
+// from the first step to the last; each step changes them in place. Measure flags what the health check finds. Decide asks for the three
+// changes, which the visitor approves themselves. Prepare applies only what was approved: the duplicate pair folds into one row, the
+// name is normalised, the column renamed, and the row count runs down. Import hands the same file over, in order. The window keeps its size,
+// so nothing on the page moves. Without the script the four steps are listed and the window shows the first one.
+import { useEffect, useState, type ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../copy/public.ts";
 import { FileName } from "./parts.tsx";
 import { formatCount } from "./pricing-bands.ts";
-import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_COLUMN, SAMPLE_RECORDS, sharePercent } from "./sample-data.ts";
-import { useCountUp, useTabs } from "./tabs.ts";
+import { JOURNEY_ROWS, MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_COLUMN, SAMPLE_SOURCES, sharePercent, type JourneyRow, type RowFlag } from "./sample-data.ts";
+import { useCountUp } from "./tabs.ts";
 
-type StepKey = "measure" | "decide" | "prepare" | "import";
+type ProposalId = "unify" | "normalise" | "map";
 
-const STEPS: ReadonlyArray<{ readonly key: StepKey; readonly name: PublicCopyId; readonly body: PublicCopyId }> = [
-  { key: "measure", name: "home.process.measure.name", body: "home.process.measure.body" },
-  { key: "decide", name: "home.process.decide.name", body: "home.process.decide.body" },
-  { key: "prepare", name: "home.process.prepare.name", body: "home.process.prepare.body" },
-  { key: "import", name: "home.process.import.name", body: "home.process.import.body" },
+const STEPS: ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId }> = [
+  { name: "home.process.measure.name", body: "home.process.measure.body" },
+  { name: "home.process.decide.name", body: "home.process.decide.body" },
+  { name: "home.process.prepare.name", body: "home.process.prepare.body" },
+  { name: "home.process.import.name", body: "home.process.import.body" },
 ];
+const MEASURE = 0;
+const DECIDE = 1;
+const PREPARE = 2;
+const IMPORT = 3;
 
 const cx = (...names: ReadonlyArray<string | false>): string => names.filter((name) => name !== false && name !== "").join(" ");
 const two = (n: number): string => String(n).padStart(2, "0");
 const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
+const sourceRows = contacts?.source ?? SAMPLE.contacts;
+const countOf = (label: PublicCopyId): number => REPORT_ROWS.find((row) => row.label === label)?.count ?? 0;
 
-function Window({ state, done, children }: { readonly state: string; readonly done?: string; readonly children: ReactElement | ReactElement[] }): ReactElement {
-  return (
-    <div className="kauro-journey-window">
-      <div className="kauro-journey-bar">
-        <span className="kauro-journey-brand">{PUBLIC_COPY["site.name"]}</span>
-        <span className="kauro-journey-project">{PUBLIC_COPY["home.app.project.name"]}</span>
-        <span className={cx("kauro-journey-chip", done !== undefined && "kauro-journey-chip--swap")}>
-          <span className="kauro-journey-chip-now">{state}</span>
-          {done === undefined ? null : <span className="kauro-journey-chip-then">{done}</span>}
-        </span>
-      </div>
-      <div className="kauro-journey-body">{children}</div>
-    </div>
-  );
-}
+/** Which proposal touches a row: the number it carries in the margin while the visitor decides. */
+const PROPOSAL_OF_ROW: Readonly<Record<string, ProposalId>> = { c2: "normalise", c3: "unify", c4: "unify" };
+const PROPOSALS: readonly ProposalId[] = ["unify", "normalise", "map"];
+const markOf = (id: ProposalId): string => String(PROPOSALS.indexOf(id) + 1);
 
-function Metric({ label, count, population, max, active }: { readonly label: string; readonly count: number; readonly population: number; readonly max: number; readonly active: boolean }): ReactElement {
-  const shown = useCountUp(count, active);
+function Metric({ label, count, run }: { readonly label: string; readonly count: number; readonly run: boolean }): ReactElement {
+  const shown = useCountUp(count, run);
   return (
-    <li className="kauro-journey-metric">
-      <span className="kauro-journey-metric-figure">{formatCount(shown)}</span>
-      <span className="kauro-journey-metric-label">{label}</span>
-      <span className="kauro-journey-metric-share">{sharePercent(count, population)}</span>
-      <progress className="kauro-journey-meter" max={max} value={shown} aria-hidden="true" />
+    <li className="kauro-walk-metric">
+      <span className="kauro-walk-metric-figure">{formatCount(shown)}</span>
+      <span className="kauro-walk-metric-label">{label}</span>
+      <span className="kauro-walk-metric-share">{sharePercent(count, SAMPLE.contacts)}</span>
     </li>
   );
 }
 
-function Measure({ active }: { readonly active: boolean }): ReactElement {
-  const rows = [
-    { id: "sample.report.duplicates", label: PUBLIC_COPY["home.frag.candidates"] },
-    { id: "sample.report.emails", label: PUBLIC_COPY["home.frag.invalid"] },
-    { id: "sample.report.company", label: PUBLIC_COPY["home.frag.company"] },
-  ] as const;
-  const found = rows.map((row) => ({ ...row, count: REPORT_ROWS.find((report) => report.label === row.id)?.count ?? 0 }));
-  const max = Math.max(...found.map((row) => row.count));
+function Row({ row, step, approved }: { readonly row: JourneyRow; readonly step: number; readonly approved: ReadonlySet<ProposalId> }): ReactElement {
+  const applied = step >= PREPARE;
+  const proposal = PROPOSAL_OF_ROW[row.id];
+  const unified = applied && approved.has("unify");
+  const folded = unified && row.id === "c4";
+  const renamed = applied && approved.has("normalise") && row.name !== row.fixed;
+  const flagged = (flag: RowFlag): boolean => row.flags.includes(flag) && !(flag === "duplicate" && unified) && !(flag === "name" && renamed);
+  const mark = proposal === undefined || step < DECIDE ? null : (
+    <span className={cx("kauro-walk-mark", approved.has(proposal) && "is-approved", applied && !approved.has(proposal) && "is-skipped")}>{markOf(proposal)}</span>
+  );
   return (
-    <Window state={PUBLIC_COPY["home.journey.measured"]}>
-      <p className="kauro-journey-file">
-        <FileName>{SAMPLE.contactsFile.replace("-clean", "")}</FileName>
-        <span>{copy("home.files.rows", { count: formatCount(SAMPLE.contacts) })}</span>
-      </p>
-      <ul className="kauro-journey-metrics">
-        {found.map((row) => (
-          <Metric key={row.id} label={row.label} count={row.count} population={SAMPLE.contacts} max={max} active={active} />
-        ))}
-      </ul>
-    </Window>
+    <div className={cx("kauro-walk-row", folded && "is-folded", flagged("duplicate") && "is-pair", unified && row.id === "c3" && "is-unified")}>
+      <span className="kauro-walk-cell kauro-walk-cell--mark">{mark}</span>
+      <span className={cx("kauro-walk-cell", flagged("name") && "is-flag")}>
+        {renamed ? (
+          <>
+            <s>{row.name}</s>
+            <span className="kauro-walk-new">{row.fixed}</span>
+          </>
+        ) : (
+          row.name
+        )}
+        {unified && row.id === "c3" ? <span className="kauro-walk-tag">{PUBLIC_COPY["home.journey.unified"]}</span> : null}
+      </span>
+      <span className={cx("kauro-walk-cell kauro-walk-cell--mono", flagged("email") && "is-flag")}>{row.email}</span>
+      <span className={cx("kauro-walk-cell", flagged("company") && "is-flag")}>{row.company ?? "—"}</span>
+    </div>
   );
 }
 
-function Decide(): ReactElement {
-  const candidate = SAMPLE_RECORDS.find((record) => record.result === "candidate");
-  const normalised = SAMPLE_RECORDS.find((record) => record.result === "normalised");
-  const proposals = [
-    { id: "unify", title: copy("home.frag.unify", { count: 2 }), detail: candidate?.name ?? "" },
-    { id: "normalise", title: PUBLIC_COPY["home.journey.normalise"], detail: `${normalised?.before ?? ""} → ${normalised?.name ?? ""}` },
-    { id: "map", title: PUBLIC_COPY["home.journey.map"], detail: `${SAMPLE_COLUMN.from} → ${SAMPLE_COLUMN.to}` },
-  ];
-  const [approved, setApproved] = useState<ReadonlySet<string>>(new Set());
-  const toggle = (id: string): void =>
+function Tray({ step, approved, toggle, run }: { readonly step: number; readonly approved: ReadonlySet<ProposalId>; readonly toggle: (id: ProposalId) => void; readonly run: boolean }): ReactElement {
+  switch (step) {
+    case MEASURE:
+      return (
+        <ul className="kauro-walk-metrics" aria-hidden="true">
+          <Metric label={PUBLIC_COPY["home.frag.candidates"]} count={countOf("sample.report.duplicates")} run={run} />
+          <Metric label={PUBLIC_COPY["home.frag.invalid"]} count={countOf("sample.report.emails")} run={run} />
+          <Metric label={PUBLIC_COPY["home.frag.company"]} count={countOf("sample.report.company")} run={run} />
+        </ul>
+      );
+    case DECIDE: {
+      const detail: Readonly<Record<ProposalId, string>> = {
+        unify: JOURNEY_ROWS[2]?.name ?? "",
+        normalise: `${JOURNEY_ROWS[1]?.name ?? ""} → ${JOURNEY_ROWS[1]?.fixed ?? ""}`,
+        map: `${SAMPLE_COLUMN.from} → ${SAMPLE_COLUMN.to}`,
+      };
+      const title: Readonly<Record<ProposalId, string>> = {
+        unify: copy("home.frag.unify", { count: 2 }),
+        normalise: PUBLIC_COPY["home.journey.normalise"],
+        map: PUBLIC_COPY["home.journey.map"],
+      };
+      return (
+        <div className="kauro-walk-decide">
+          <ul className="kauro-walk-proposals">
+            {PROPOSALS.map((id) => {
+              const on = approved.has(id);
+              return (
+                <li key={id} className={cx("kauro-walk-proposal", on && "is-approved")}>
+                  <span className="kauro-walk-mark" aria-hidden="true">
+                    {markOf(id)}
+                  </span>
+                  <span className="kauro-walk-proposal-title">{title[id]}</span>
+                  <span className="kauro-walk-proposal-detail" aria-hidden="true">
+                    {detail[id]}
+                  </span>
+                  <button type="button" className="kauro-walk-approve" aria-pressed={on} onClick={() => toggle(id)}>
+                    {on ? PUBLIC_COPY["home.journey.approved"] : PUBLIC_COPY["home.frag.approve"]}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="kauro-walk-hint" role="status">
+            {approved.size === PROPOSALS.length ? PUBLIC_COPY["home.journey.all"] : PUBLIC_COPY["home.journey.waiting"]}
+          </p>
+        </div>
+      );
+    }
+    case PREPARE: {
+      const skipped = PROPOSALS.length - approved.size;
+      return (
+        <ul className="kauro-walk-checks" aria-hidden="true">
+          <li>{PUBLIC_COPY["home.journey.applied"]}</li>
+          <li>{PUBLIC_COPY["home.journey.traced"]}</li>
+          <li>{PUBLIC_COPY["home.app.phase.prepare.body"]}</li>
+          {skipped > 0 ? <li className="is-skipped">{copy("home.journey.skipped", { count: skipped })}</li> : null}
+        </ul>
+      );
+    }
+    default: {
+      const files = [...MANIFEST_FILES.map((file) => file.name).reverse(), PUBLIC_COPY["home.frag.links"]];
+      return (
+        <div className="kauro-walk-import" aria-hidden="true">
+          <p className="kauro-walk-label">{PUBLIC_COPY["home.frag.order"]}</p>
+          <ol className="kauro-walk-order">
+            {files.map((file) => (
+              <li key={file}>
+                <FileName>{file}</FileName>
+              </li>
+            ))}
+          </ol>
+          <p className="kauro-walk-compare">{PUBLIC_COPY["sample.guide.step.counts"]}</p>
+        </div>
+      );
+    }
+  }
+}
+
+const STATE: readonly PublicCopyId[] = ["home.journey.measured", "home.journey.approved.count", "home.journey.preparing", "home.frag.team"];
+const DONE: ReadonlyArray<PublicCopyId | null> = [null, null, "home.app.state.label", "home.journey.imported"];
+
+export function Journey(): ReactElement {
+  const [step, setStep] = useState(MEASURE);
+  const [ready, setReady] = useState(false);
+  const [approved, setApproved] = useState<ReadonlySet<ProposalId>>(new Set());
+  useEffect(() => setReady(true), []);
+  const toggle = (id: ProposalId): void =>
     setApproved((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  const go = (next: number): void => {
+    if (next === MEASURE && step === IMPORT) setApproved(new Set());
+    setStep(next);
+  };
+  const out = approved.has("unify") ? (contacts?.rows ?? sourceRows) : sourceRows;
+  const counted = useCountUp(out, ready && step === PREPARE, sourceRows, 1400);
+  const rows = step < PREPARE ? sourceRows : step === PREPARE ? counted : out;
+  const mapped = step >= PREPARE && approved.has("map");
+  const fileName = step >= PREPARE ? SAMPLE.contactsFile : (SAMPLE_SOURCES[0] ?? SAMPLE.contactsFile);
+  const done = DONE[step] ?? null;
+  const state = STATE[step] === "home.journey.approved.count" ? copy("home.journey.approved.count", { count: `${approved.size}/${PROPOSALS.length}` }) : PUBLIC_COPY[STATE[step] ?? "home.journey.measured"];
   return (
-    <Window state={copy("home.journey.approved.count", { count: `${approved.size}/${proposals.length}` })}>
-      <ul className="kauro-journey-proposals">
-        {proposals.map((proposal) => {
-          const on = approved.has(proposal.id);
-          return (
-            <li key={proposal.id} className={cx("kauro-journey-proposal", on && "is-approved")}>
-              <span className="kauro-journey-proposal-title">{proposal.title}</span>
-              <span className="kauro-journey-proposal-detail">{proposal.detail}</span>
-              <button type="button" className="kauro-journey-approve" aria-pressed={on} onClick={() => toggle(proposal.id)}>
-                {on ? PUBLIC_COPY["home.journey.approved"] : PUBLIC_COPY["home.frag.approve"]}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="kauro-journey-hint" role="status">
-        {approved.size === proposals.length ? PUBLIC_COPY["home.journey.all"] : PUBLIC_COPY["home.journey.waiting"]}
-      </p>
-    </Window>
-  );
-}
-
-function Prepare({ active }: { readonly active: boolean }): ReactElement {
-  const out = useCountUp(contacts?.rows ?? 0, active, contacts?.source ?? 0, 1400);
-  return (
-    <Window state={PUBLIC_COPY["home.journey.preparing"]} done={PUBLIC_COPY["home.app.state.label"]}>
-      <p className="kauro-journey-sum">
-        <span className="kauro-journey-sum-from">{formatCount(contacts?.source ?? 0)}</span>
-        <span className="kauro-journey-sum-arrow" aria-hidden="true" />
-        <span className="kauro-journey-sum-to">{formatCount(out)}</span>
-      </p>
-      <ul className="kauro-journey-checks">
-        <li>{PUBLIC_COPY["home.journey.applied"]}</li>
-        <li>{PUBLIC_COPY["home.journey.traced"]}</li>
-        <li>{PUBLIC_COPY["home.app.phase.prepare.body"]}</li>
-      </ul>
-    </Window>
-  );
-}
-
-function Import(): ReactElement {
-  const files = [...MANIFEST_FILES.map((file) => file.name).reverse(), PUBLIC_COPY["home.frag.links"]];
-  return (
-    <Window state={PUBLIC_COPY["home.frag.team"]} done={PUBLIC_COPY["home.journey.imported"]}>
-      <p className="kauro-journey-label">{PUBLIC_COPY["home.frag.order"]}</p>
-      <ol className="kauro-journey-order">
-        {files.map((file) => (
-          <li key={file}>
-            <FileName>{file}</FileName>
+    <div className={cx("kauro-walk", ready && "is-ready", `is-step-${step}`)}>
+      <ol className="kauro-walk-steps" aria-label={PUBLIC_COPY["home.journey.label"]}>
+        {STEPS.map((entry, index) => (
+          <li key={entry.name} className={cx("kauro-walk-step", index < step && "is-done", index === step && "is-current")}>
+            <span className="kauro-walk-step-number" aria-hidden="true">
+              {two(index + 1)}
+            </span>
+            <h3>
+              {ready ? (
+                <button type="button" aria-current={index === step ? "step" : undefined} onClick={() => go(index)}>
+                  {PUBLIC_COPY[entry.name]}
+                </button>
+              ) : (
+                PUBLIC_COPY[entry.name]
+              )}
+            </h3>
+            <p>{PUBLIC_COPY[entry.body]}</p>
           </li>
         ))}
       </ol>
-      <p className="kauro-journey-compare">{PUBLIC_COPY["sample.guide.step.counts"]}</p>
-    </Window>
-  );
-}
-
-function Stage({ step, active }: { readonly step: StepKey; readonly active: boolean }): ReactElement {
-  switch (step) {
-    case "measure":
-      return <Measure active={active} />;
-    case "decide":
-      return <Decide />;
-    case "prepare":
-      return <Prepare active={active} />;
-    case "import":
-      return <Import />;
-  }
-}
-
-export function Journey(): ReactElement {
-  const tabs = useTabs(STEPS.length);
-  const last = STEPS.length - 1;
-  return (
-    <div className={cx("kauro-journey", tabs.ready && "is-ready", `is-step-${tabs.index}`)}>
-      <div className="kauro-journey-track" role="tablist" aria-label={PUBLIC_COPY["home.journey.label"]} onKeyDown={tabs.onKeyDown}>
-        <span className="kauro-journey-rail" aria-hidden="true">
-          <span className="kauro-journey-fill" />
-        </span>
-        {STEPS.map((step, index) => (
-          <button
-            key={step.key}
-            ref={(element) => {
-              tabs.refs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            id={`journey-tab-${step.key}`}
-            aria-selected={tabs.index === index}
-            aria-controls={`journey-panel-${step.key}`}
-            tabIndex={tabs.index === index ? 0 : -1}
-            className={cx("kauro-journey-tab", index < tabs.index && "is-done", index === tabs.index && "is-current")}
-            onClick={() => tabs.select(index)}
-          >
-            <span className="kauro-journey-dot" aria-hidden="true">
-              {two(index + 1)}
-            </span>
-            <span className="kauro-journey-name">{PUBLIC_COPY[step.name]}</span>
+      {ready ? (
+        <div className="kauro-walk-controls">
+          <button type="button" className="kauro-walk-next" onClick={() => go(step === IMPORT ? MEASURE : step + 1)}>
+            {step === IMPORT ? PUBLIC_COPY["home.journey.restart.cta"] : PUBLIC_COPY["home.journey.next.cta"]}
           </button>
-        ))}
-      </div>
-      {STEPS.map((step, index) => {
-        const shown = !tabs.ready || tabs.index === index;
-        return (
-          <div
-            key={step.key}
-            role="tabpanel"
-            id={`journey-panel-${step.key}`}
-            aria-labelledby={`journey-tab-${step.key}`}
-            hidden={!shown}
-            className="kauro-journey-panel"
-          >
-            <div className="kauro-journey-copy">
-              <p className="kauro-journey-count" aria-hidden="true">
-                {`${two(index + 1)} / ${two(STEPS.length)}`}
-              </p>
-              <h3>{PUBLIC_COPY[step.name]}</h3>
-              <p>{PUBLIC_COPY[step.body]}</p>
-              {tabs.ready ? (
-                <div className="kauro-journey-controls">
-                  {index > 0 ? (
-                    <button type="button" className="kauro-journey-back" onClick={() => tabs.select(index - 1)}>
-                      {PUBLIC_COPY["home.journey.previous.cta"]}
-                    </button>
-                  ) : null}
-                  <button type="button" className="kauro-journey-next" onClick={() => tabs.select(index === last ? 0 : index + 1)}>
-                    {index === last ? PUBLIC_COPY["home.journey.restart.cta"] : PUBLIC_COPY["home.journey.next.cta"]}
-                  </button>
-                </div>
-              ) : null}
+        </div>
+      ) : null}
+      <div className="kauro-walk-window">
+        <div className="kauro-walk-bar" aria-hidden="true">
+          <span className="kauro-walk-brand">{PUBLIC_COPY["site.name"]}</span>
+          <span className="kauro-walk-project">{PUBLIC_COPY["home.app.project.name"]}</span>
+          <span key={`state-${step}`} className={cx("kauro-walk-chip", done !== null && "kauro-walk-chip--swap")}>
+            <span className="kauro-walk-chip-now">{state}</span>
+            {done === null ? null : <span className="kauro-walk-chip-then">{PUBLIC_COPY[done]}</span>}
+          </span>
+        </div>
+        <div className="kauro-walk-sheet" aria-hidden="true">
+          <p className="kauro-walk-file">
+            <FileName key={fileName}>{fileName}</FileName>
+            <span className="kauro-walk-rows">{copy("home.files.rows", { count: formatCount(rows) })}</span>
+          </p>
+          <div className="kauro-walk-table">
+            <div className="kauro-walk-row kauro-walk-row--head">
+              <span className="kauro-walk-cell kauro-walk-cell--mark">
+                {step >= DECIDE ? <span className={cx("kauro-walk-mark", approved.has("map") && "is-approved", step >= PREPARE && !approved.has("map") && "is-skipped")}>{markOf("map")}</span> : null}
+              </span>
+              <span className="kauro-walk-cell">{PUBLIC_COPY["home.app.contact.label"]}</span>
+              <span className={cx("kauro-walk-cell", mapped && "is-renamed")}>
+                {mapped ? (
+                  <>
+                    <s>{SAMPLE_COLUMN.from}</s>
+                    <span className="kauro-walk-new">{SAMPLE_COLUMN.to}</span>
+                  </>
+                ) : (
+                  SAMPLE_COLUMN.from
+                )}
+              </span>
+              <span className="kauro-walk-cell">{PUBLIC_COPY["home.app.company.label"]}</span>
             </div>
-            <div className="kauro-journey-stage">{shown ? <Stage key={`${step.key}-${tabs.ready ? tabs.index : "all"}`} step={step.key} active={tabs.ready && tabs.index === index} /> : null}</div>
+            {JOURNEY_ROWS.map((row) => (
+              <Row key={row.id} row={row} step={step} approved={approved} />
+            ))}
           </div>
-        );
-      })}
+        </div>
+        <div className="kauro-walk-tray" key={`tray-${step}`}>
+          <Tray step={step} approved={approved} toggle={toggle} run={ready && step === MEASURE} />
+        </div>
+      </div>
     </div>
   );
 }

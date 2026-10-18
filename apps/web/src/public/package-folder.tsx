@@ -1,14 +1,14 @@
 "use client";
 
-// What the team receives (Home): the delivery package as a folder with four tabs, and each tab opens the document it holds, drawn from the
-// synthetic sample: the report's counts, the cleaned file with a change it explains, the manifest that adds up and traces rows, the import
-// steps in order. Without the script the four documents are shown one after the other.
-import type { ReactElement } from "react";
+// What the team receives (Home, A10 §8): the delivery package as a pile of its four documents, drawn from the synthetic sample: the report's
+// counts, the cleaned file with a change it explains, the manifest that adds up and traces rows, the import steps in order. Choosing one in
+// the list beside the pile brings its sheet to the top; the others stay underneath with their titles showing. Every name and sentence is in
+// the list, and the pile is a picture of it. Without the script the report lies on top.
+import { useEffect, useState, type ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../copy/public.ts";
 import { FileName } from "./parts.tsx";
 import { formatCount } from "./pricing-bands.ts";
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_RECORDS, SAMPLE_TRACE, sharePercent } from "./sample-data.ts";
-import { useTabs } from "./tabs.ts";
 
 type DocKey = "report" | "files" | "manifest" | "steps";
 
@@ -127,47 +127,47 @@ function Doc({ doc }: { readonly doc: DocKey }): ReactElement {
 }
 
 export function PackageFolder({ sampleHref, sampleLabel }: { readonly sampleHref: string; readonly sampleLabel: string }): ReactElement {
-  const tabs = useTabs(DOCS.length);
+  const [active, setActive] = useState(0);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   return (
-    <div className={cx("kauro-folder", tabs.ready && "is-ready")}>
-      <div className="kauro-folder-tabs" role="tablist" aria-label={PUBLIC_COPY["home.package.label"]} onKeyDown={tabs.onKeyDown}>
-        {DOCS.map((doc, index) => (
-          <button
-            key={doc.key}
-            ref={(element) => {
-              tabs.refs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            id={`folder-tab-${doc.key}`}
-            aria-selected={tabs.index === index}
-            aria-controls={`folder-panel-${doc.key}`}
-            tabIndex={tabs.index === index ? 0 : -1}
-            className="kauro-folder-tab"
-            onClick={() => tabs.select(index)}
-          >
-            <span className="kauro-folder-tab-number" aria-hidden="true">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            {PUBLIC_COPY[doc.name]}
-          </button>
-        ))}
-      </div>
-      {DOCS.map((doc, index) => {
-        const shown = !tabs.ready || tabs.index === index;
-        return (
-          <div key={doc.key} role="tabpanel" id={`folder-panel-${doc.key}`} aria-labelledby={`folder-tab-${doc.key}`} hidden={!shown} className="kauro-folder-panel">
-            <div className="kauro-folder-copy">
-              <h3>{PUBLIC_COPY[doc.name]}</h3>
-              <p>{PUBLIC_COPY[doc.body]}</p>
-              <a className="kauro-site-arrow" href={sampleHref}>
-                {sampleLabel}
-              </a>
+    <div className={cx("kauro-pack", ready && "is-ready")}>
+      <div className="kauro-pack-pile" aria-hidden="true">
+        {DOCS.map((doc, index) => {
+          // how far a sheet lies under the one on top: 0 is the top sheet
+          const depth = (index - active + DOCS.length) % DOCS.length;
+          return (
+            <div key={doc.key} className={cx("kauro-pack-sheet", `kauro-pack-sheet--${depth}`)}>
+              <span className="kauro-pack-sheet-tab">{PUBLIC_COPY[doc.name]}</span>
+              <Doc key={depth === 0 ? `${doc.key}-top-${active}` : doc.key} doc={doc.key} />
             </div>
-            <div className="kauro-folder-doc">{shown ? <Doc key={`${doc.key}-${tabs.ready ? tabs.index : "all"}`} doc={doc.key} /> : null}</div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      <div className="kauro-pack-list">
+        <ol aria-label={PUBLIC_COPY["home.package.label"]}>
+          {DOCS.map((doc, index) => (
+            <li key={doc.key} className={cx("kauro-pack-item", index === active && "is-current")}>
+              <span className="kauro-pack-number" aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <h3>
+                {ready ? (
+                  <button type="button" aria-pressed={index === active} onClick={() => setActive(index)}>
+                    {PUBLIC_COPY[doc.name]}
+                  </button>
+                ) : (
+                  PUBLIC_COPY[doc.name]
+                )}
+              </h3>
+              <p>{PUBLIC_COPY[doc.body]}</p>
+            </li>
+          ))}
+        </ol>
+        <a className="kauro-site-arrow" href={sampleHref}>
+          {sampleLabel}
+        </a>
+      </div>
     </div>
   );
 }
