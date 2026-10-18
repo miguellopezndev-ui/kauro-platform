@@ -4,7 +4,7 @@ This file separates the surfaces of Kauro the owner has designed and reviewed to
 or not touched. Anything that is **not** in the first list was not designed together. That includes a screen, file or message added
 later by anyone (Claude included): treat it as unreviewed until it is added here after a review.
 
-The design language every surface follows is A10 (`docs/authority/amendments/A10_VISUAL_IDENTITY.md`, §1–§8). The short version:
+The visual authority is [KAURO_VISUAL_IDENTITY.md](KAURO_VISUAL_IDENTITY.md) (decision record: A10, `docs/authority/amendments/A10_VISUAL_IDENTITY.md`, §1–§9; per-screen coverage: [KAURO_SCREEN_COVERAGE.md](KAURO_SCREEN_COVERAGE.md)). The short version:
 
 - Palette carbon `#242426`, porcelain `#F8F6F3`, wine `#653A46`, clay `#C4A693`. Wine leads where a page has one point.
 - One physical object per idea (a window, card, sheet or ticket), drawn from the product, sized to its content, slightly off square,
@@ -14,7 +14,7 @@ The design language every surface follows is A10 (`docs/authority/amendments/A10
   dashboards.
 - Everything readable without the script, AA contrast in both themes, no horizontal scroll at 320 px.
 
-Last updated: 2026-10-18, fifth pass plus motion and tilt (A10 §9; branch `design/kauro-visual-refresh`).
+Last updated: 2026-10-18, integration of identity v1.0 (branch `design/visual-identity-integration`).
 
 ## 1. Designed together (reviewed by the owner)
 
@@ -49,21 +49,39 @@ for the next review.
 | Legal pages | Not-published card (the 404 card, stamped "Not published") | revised |
 | Legal pages | A published document's reading layout | restyled only (no document is published yet to review) |
 
-## 2. Restyled only (new tokens and shell, never designed together)
+## 2. Implemented by Claude — owner review pending
 
-These pages took the palette, the themes and the restyled app shell (`apps/web/src/shell`) automatically. Nobody has designed their
-layout or content with the owner. They need a session in which we can sign in locally and see them.
+The owner could not open these screens: there is no sign-in yet, for the owner or for sellers, and some features are still locked for
+external reasons. Claude implemented the approved identity on them. They use its tokens, typography and components, the restyled app
+shell (`apps/web/src/shell`) and the application register of KAURO_VISUAL_IDENTITY.md §10.
 
-- Signed-in agency app: `billing`, `payments/[orderId]`, `projects/[id]/audit`, `projects/[id]/processing`, `projects/[id]/purchase`,
-  `projects/[id]/sources`, `projects/[id]/sources/seal`, `projects/[id]/sources/selection`, `settings` and `support` (under
-  `apps/web/src/app/(app)/agencies/[agencyId]/`).
-- Operations: `ops/finance` (`apps/web/src/app/(ops)/`).
-- The sign-in flow and any identity-provider screens.
+Claude checked every state their unit tests render, in the real stylesheets: both themes, 320/375/768/1280 px, and axe. Claude fixed
+what those checks showed (commit `01d6c820`). They stay **pending the owner's review** until the owner can sign in and look at them.
+
+| Screen | Route |
+| --- | --- |
+| UI14 Sources | `/agencies/{agencyId}/projects/{id}/sources` |
+| UI15 Table selection | `/agencies/{agencyId}/projects/{id}/sources/selection` |
+| UI16 Seal | `/agencies/{agencyId}/projects/{id}/sources/seal` |
+| UI18 Free data health check | `/agencies/{agencyId}/projects/{id}/audit` |
+| UI23 Quote and purchase | `/agencies/{agencyId}/projects/{id}/purchase` |
+| UI24 Payment | `/agencies/{agencyId}/payments/{orderId}` |
+| UI25 Processing | `/agencies/{agencyId}/projects/{id}/processing` |
+| UI30 Billing | `/agencies/{agencyId}/billing` |
+| UI32 Settings | `/agencies/{agencyId}/settings` |
+| UI52 Support | `/agencies/{agencyId}/support` |
+| UI39 Company finance (operations) | `/ops/finance` |
+
+The sign-in flow (UI50) and the other 30 registered screens are not built yet. When they are, they follow the identity and enter this
+list as "implemented, owner review pending".
 
 ## 3. Not designed yet (planned next)
 
 - **The deliverables**: the report as HTML and PDF (`packages/reports/src/html.ts`, `pdf.ts`; `docs/design/B13-report-pdf.md`), the
   CSV files and the package manifest (`packages/reports`), and the import steps.
 - **Outgoing messages**: emails and notifications (`apps/api/src/outreach`, `apps/control/src/consumers`).
-- **Guidance for future work**: a short rule in the repository's instructions telling Claude to follow A10 and to add any new surface
-  to this ledger as "not designed together" until the owner reviews it.
+
+## 4. Done for future work
+
+- **Guidance for Claude Code:** `CLAUDE.md` at the repository root makes KAURO_VISUAL_IDENTITY.md mandatory for new screens, requires
+  every new screen in the coverage document and in this ledger, and reserves identity changes for the owner.

@@ -158,3 +158,9 @@ Nothing moves for a visitor who asked for less motion, and a stamp mid-landing n
 **Tilt.** Cards do not all lean the same way. The not-found card and its sibling, the unpublished legal card, lean right. On Home they
 alternate down the page: buyers left and right, the pile left, the permissions panel right, the ticket left. The "who acts" card leans
 right, toward its headline, and the redacted file leans right after the stamp that leans left.
+
+## 10. Consolidation (2026-10-18)
+
+The rules decided in §1–§9 are consolidated as identity version 1.0 in `docs/design/KAURO_VISUAL_IDENTITY.md`, which is the visual
+authority for new work. The screens that follow it are listed in `docs/design/KAURO_SCREEN_COVERAGE.md`. Who directed and who built it is
+recorded in `docs/design/KAURO_VISUAL_PROVENANCE.md`. This amendment remains the record of how each decision was reached.
