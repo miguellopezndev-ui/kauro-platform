@@ -40,7 +40,7 @@ body { display: flex; flex-direction: column; min-height: 100dvh; margin: 0; bac
 .kauro-legal-foot a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--kauro-color-text); text-decoration: none; }
 .kauro-legal-foot a:hover { text-decoration: underline; }
 .kauro-legal-foot a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-decoration-color: var(--kauro-color-primary); text-decoration-thickness: 2px; }
-.kauro-legal-card { position: relative; margin-top: var(--kauro-space-4); border: 1px solid var(--kauro-color-border); border-radius: 1rem; background: var(--kauro-color-raised); box-shadow: 0 2.5rem 4rem -2.25rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent); transform: rotate(-1.5deg); }
+.kauro-legal-card { position: relative; margin-top: var(--kauro-space-4); border: 1px solid var(--kauro-color-border); border-radius: 1rem; background: var(--kauro-color-raised); box-shadow: 0 2.5rem 4rem -2.25rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent); transform: rotate(1.5deg); }
 .kauro-legal-main .kauro-legal-card-bar { display: flex; gap: 0.875rem; margin: 0; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--kauro-color-border); background: var(--kauro-color-surface); border-radius: 1rem 1rem 0 0; font-size: 0.8125rem; line-height: 1.4; }
 .kauro-legal-card-bar span:first-child { font-family: var(--kauro-display-family); font-weight: 700; letter-spacing: -0.02em; }
 .kauro-legal-card-bar span + span { padding-left: 0.875rem; border-left: 1px solid var(--kauro-color-border); color: var(--kauro-color-text-muted); }

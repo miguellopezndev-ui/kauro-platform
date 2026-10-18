@@ -364,7 +364,7 @@ body {
   border-radius: 1rem;
   background: var(--kauro-color-raised);
   box-shadow: 0 3rem 6rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent), 0 0.75rem 1.5rem -1rem color-mix(in srgb, var(--kauro-color-ink) 35%, transparent);
-  transform: rotate(-2deg);
+  transform: rotate(2deg);
 }
 
 .kauro-notfound-bar {

@@ -87,7 +87,7 @@ export function SecurityPage(): ReactElement {
         <p>{PUBLIC_COPY["security.residual.body"]}</p>
       </Section>
       <Section id="security-claims" heading={PUBLIC_COPY["security.claims.heading"]} layout="split" variant="kauro-site-policy">
-        <p className="kauro-site-callout">{PUBLIC_COPY["security.claims.body"]}</p>
+        <p>{PUBLIC_COPY["security.claims.body"]}</p>
       </Section>
       <Section id="security-next" heading={PUBLIC_COPY["security.next.heading"]} layout="split" tone="inverse" variant="kauro-site-band-compact">
         <div className="kauro-site-actions">

@@ -3985,7 +3985,7 @@ body:has(> .kauro-site-header) {
   border-radius: 0.5rem;
   background: var(--kauro-color-raised);
   box-shadow: 0 1.5rem 3rem -2rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent);
-  transform: rotate(-1deg);
+  transform: rotate(1deg);
 }
 .kauro-redact-file {
   margin-block-end: 0.375rem;
@@ -5258,7 +5258,7 @@ body:has(> .kauro-site-header) {
   border-radius: var(--kauro-radius-large);
   background: var(--kauro-color-raised);
   box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 60%, transparent);
-  transform: rotate(-1.25deg);
+  transform: rotate(1.25deg);
 }
 .kauro-site-main p.kauro-locks-bar {
   display: flex;
@@ -5642,7 +5642,7 @@ body:has(> .kauro-site-header) {
   margin-inline: auto;
   border-radius: var(--kauro-radius-large);
   box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 70%, transparent);
-  transform: rotate(-2deg);
+  transform: rotate(2deg);
 }
 .kauro-site-main p.kauro-acts-bar {
   display: flex;
@@ -5842,4 +5842,9 @@ body:has(> .kauro-site-header) {
   .kauro-walk-sheet {
     padding-inline: 0.875rem;
   }
+}
+
+/* the notes under the retention table keep a clear gap from it */
+.kauro-site-table-region + .kauro-site-facts-inline {
+  margin-block-start: var(--kauro-space-6);
 }
