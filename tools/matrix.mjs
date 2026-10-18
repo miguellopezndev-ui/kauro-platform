@@ -505,6 +505,19 @@ export const APPLICABILITY = {
     "lost response": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
     "external uncertainty": "NOT_APPLICABLE: an approval records the immutable refund intent in one transaction and calls no provider; the provider effect and its uncertainty belong to CMD033 ExecuteRefund (the payment service)",
   },
+  // package B13 branding (order 7; docs/design/B13-branding.md): CMD008's own OK / DENY / RACE tests
+  CMD008: {
+    ...common,
+    "legitimate state": [["cmd008-update-branding.test.ts", "CMD008-OK: the OWNER stores a logo through the safe media pipeline"]],
+    "wrong role": [["cmd008-update-branding.test.ts", "CMD008-DENY roles and tenants: "]],
+    "wrong agency": [["cmd008-update-branding.test.ts", "CMD008-DENY roles and tenants: "], ["cmd008-update-branding.test.ts", "CMD008 isolation: "]],
+    "stale version": [["cmd008-update-branding.test.ts", "CMD008-DENY preconditions: "], ["cmd008-update-branding.test.ts", "CMD008-RACE: two branding changes naming one agency version"]],
+    "duplicate request": [...common["duplicate request"], ["cmd008-update-branding.test.ts", "CMD008-RACE: "]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd008-update-branding.test.ts", "CMD008-RACE: "]],
+    "lost response": [...common["lost response"], ["cmd008-update-branding.test.ts", "CMD008-RACE: "]],
+    "invalid schema": [...common["invalid schema"], ["cmd008-update-branding.test.ts", "CMD008-DENY media: "]],
+    "external uncertainty": "NOT_APPLICABLE: CMD008 and its logo intake reach no provider and fetch nothing (the logo is the request's own bytes, never a URL); every effect is rows of one database transaction",
+  },
   // package B16 team commands (docs/design/B16-team-commands.md): each command's own OK / DENY / RACE tests
   CMD003: {
     ...common,
@@ -1093,6 +1106,7 @@ export async function loadMatrixSources() {
     CMD005: "commands/handlers/change-membership.ts",
     CMD006: "commands/handlers/revoke-membership.ts",
     CMD007: "commands/handlers/transfer-ownership.ts",
+    CMD008: "branding/handlers/update-branding.ts",
     CMD009: "commands/handlers/create-client.ts",
     CMD010: "commands/handlers/archive-client.ts",
     CMD011: "commands/handlers/create-project.ts",
@@ -1157,7 +1171,7 @@ export async function loadMatrixSources() {
   published.CMD040 = [];
   published.CMD041 = [];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS, ...application.BRANDING_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };
   for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
     const c = application.COMMERCE_COMMANDS[id];

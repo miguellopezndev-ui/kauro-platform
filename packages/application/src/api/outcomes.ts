@@ -19,6 +19,7 @@
  */
 import type { B06CommandId, TeamCommandId } from "../commands/contracts.js";
 import { AUDIT_COMMAND_OUTCOMES, AUDIT_INTAKE_OUTCOMES, AUDIT_ROUTE_OUTCOMES, CORE_SERVICES_UNAVAILABLE } from "../audit/outcomes.js";
+import { BRANDING_COMMAND_OUTCOMES, BRANDING_INTAKE_OUTCOMES } from "../branding/outcomes.js";
 import { EXECUTION_COMMAND_OUTCOMES, EXECUTION_ROUTE_OUTCOMES } from "../execution/outcomes.js";
 import { SOURCE_COMMAND_OUTCOMES, SOURCE_ROUTE_OUTCOMES } from "../sources/outcomes.js";
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "./outcome-kit.js";
@@ -222,6 +223,7 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD005: catalogueOf("CMD005"),
   CMD006: catalogueOf("CMD006"),
   CMD007: catalogueOf("CMD007"),
+  ...BRANDING_COMMAND_OUTCOMES,
   CMD009: catalogueOf("CMD009"),
   CMD010: catalogueOf("CMD010"),
   CMD011: catalogueOf("CMD011"),
@@ -292,10 +294,11 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetAudit: AUDIT_ROUTE_OUTCOMES.GetAudit,
 });
 
-/** The closed problem catalogue of each served document intake (B07 D-SEL-2; B08 D8-PLAN-1). */
+/** The closed problem catalogue of each served document intake (B07 D-SEL-2; B08 D8-PLAN-1; B13 order 7, the agency logo). */
 export const INTAKE_OUTCOMES: Readonly<Record<IntakeOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   SubmitSelectionManifest: SOURCE_ROUTE_OUTCOMES.SubmitSelectionManifest,
   SubmitDecisionArtifact: AUDIT_INTAKE_OUTCOMES.SubmitDecisionArtifact,
+  SubmitBrandingLogo: BRANDING_INTAKE_OUTCOMES.SubmitBrandingLogo,
 });
 
 /**

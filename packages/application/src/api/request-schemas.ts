@@ -97,6 +97,11 @@ export const REQUEST_SCHEMAS = Object.freeze({
   CMD005: schema("CMD005", ["expectedVersion", "role", "assuranceProofRef"], { expectedVersion: VERSION, role: LABEL, assuranceProofRef: ID }),
   CMD006: schema("CMD006", ["expectedVersion", "reasonCode"], { expectedVersion: VERSION, reasonCode: LABEL }),
   CMD007: schema("CMD007", ["expectedVersion", "newOwnerMembershipId", "assuranceProofRef"], { expectedVersion: VERSION, newOwnerMembershipId: ID, assuranceProofRef: ID }),
+  /**
+   * UpdateBranding (B13, order 7): the agency's version, the brand name (a label; the handler refuses a name a report could not print,
+   * BRANDING_NAME_UNPRINTABLE) and, optionally, a logo the agency stored through the logo intake (absent, the version names none).
+   */
+  CMD008: schema("CMD008", ["expectedVersion", "displayName"], { expectedVersion: VERSION, displayName: LABEL, logoArtifactRef: ID }),
   /** RequestDeletion (B16 L3): the project's deletion; the step-up is re-judged at COMMIT. */
   CMD042: schema("CMD042", ["expectedVersion", "reasonCode", "assuranceProofRef"], { expectedVersion: VERSION, reasonCode: DELETION_REASON, assuranceProofRef: ID }),
   /** RequestRetentionExtension (B16 L2): the one explicit extension, at most 72 h; the hard cap is not a request member and never moves. */

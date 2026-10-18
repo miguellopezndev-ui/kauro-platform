@@ -7,7 +7,8 @@
  *   write is the job's branding binding, recorded the first time and never again (migration 0095 2b). It returns records; it decides nothing — a missing record is null, never an empty list or a default, and @kauro/data-plane assembleReportFacts
  *   verifies every binding (the quote's terms preimage against its hash, the legal identity against the issuer's hash, the disclosure set
  *   against the approval's hash) before a report can be made.
- * - `brandingVersions` is the request handlers' (kauro_app): the agency's ACTIVE OWNER or ADMIN records the next version as itself.
+ * - `brandingVersions` is the request handlers' (kauro_app): the agency's ACTIVE OWNER or ADMIN stores a logo (migration 0096) and records
+ *   the next version, naming one of the agency's logos or none, as itself (CMD008).
  * - `legalIdentities` is the control plane's: the operator records the owner's legal identity document, content-addressed.
  */
 import type { Sha256Hex } from "@kauro/contracts";
@@ -15,9 +16,11 @@ import {
   DomainFailure,
   readLegalIdentity,
   type AgencyId,
+  type BrandingLogoRecord,
   type BrandingVersionRecord,
   type BrandingVersionRepository,
   type LegalFactStatus,
+  type NewBrandingLogo,
   type NewBrandingVersion,
   type PlanBody,
   type QuoteTermsPreimage,
@@ -81,40 +84,101 @@ function preimageOf(q: Row): QuoteTermsPreimage {
   };
 }
 
+const LOGO_COLUMNS = `l.agency_id AS logo_agency_id, l.logo_id, l.logo_sha256, l.media_type, l.width, l.height, octet_length(l.content) AS byte_length, ${exact("l.recorded_at", "logo_recorded_at")}`;
+const VERSION_COLUMNS = `v.agency_id, v.branding_version, v.display_name, ${exact("v.recorded_at", "recorded_at")}, ${LOGO_COLUMNS}`;
+/** A version and the logo it names (a left join: a version may name none). */
+const VERSIONS = "kauro.agency_branding_versions v LEFT JOIN kauro.agency_branding_logos l ON l.agency_id = v.agency_id AND l.logo_id = v.logo_id";
+
+const logoOf = (r: Row): BrandingLogoRecord => ({
+  agencyId: str(r["logo_agency_id"]),
+  logoId: str(r["logo_id"]),
+  sha256: str(r["logo_sha256"]),
+  mediaType: str(r["media_type"]) as "image/png",
+  width: int(r["width"]),
+  height: int(r["height"]),
+  byteLength: int(r["byte_length"]),
+  recordedAt: str(r["logo_recorded_at"]),
+});
+
 const brandingOf = (r: Row): BrandingVersionRecord => ({
   agencyId: str(r["agency_id"]),
   version: int(r["branding_version"]),
   displayName: str(r["display_name"]),
+  logo: r["logo_id"] === null || r["logo_id"] === undefined ? null : logoOf(r),
   recordedAt: str(r["recorded_at"]),
 });
 
-/** The agency's branding versions (migration 0095): append-only, numbered by the database's guard, recorded by an OWNER or ADMIN. */
+/**
+ * The agency's branding versions and stored logos (migrations 0095, 0096): append-only, the versions numbered by the database's guard,
+ * both recorded by an ACTIVE OWNER or ADMIN of the bound agency as itself; a version names one of the agency's own logos or none
+ * (agency_branding_versions_logo_fk).
+ */
 export class PgBrandingVersions implements BrandingVersionRepository {
   constructor(private readonly db: Queryable) {}
 
   async record(input: NewBrandingVersion): Promise<BrandingVersionRecord> {
-    // the next number; a concurrent recorder of the same number loses on the primary key (agency_branding_versions_pkey), and a number
-    // that is not the next is refused by the guard (agency_branding_versions_contiguous)
+    // the given number, or the next; a concurrent recorder of the same number loses on the primary key (agency_branding_versions_pkey),
+    // and a number that is not the next is refused by the guard (agency_branding_versions_contiguous)
     const r = await execute<Row>(
       this.db,
-      `INSERT INTO kauro.agency_branding_versions (agency_id, branding_version, display_name, recorded_by_membership_id, recorded_by_user_id)
-       SELECT $1::uuid, coalesce(max(b.branding_version), 0) + 1, $2, $3::uuid, kauro.current_user_id()
+      `INSERT INTO kauro.agency_branding_versions (agency_id, branding_version, display_name, recorded_by_membership_id, recorded_by_user_id, logo_id)
+       SELECT $1::uuid, coalesce($4::integer, coalesce(max(b.branding_version), 0) + 1), $2, $3::uuid, kauro.current_user_id(), $5::uuid
          FROM kauro.agency_branding_versions b WHERE b.agency_id = $1::uuid
-       RETURNING agency_id, branding_version, display_name, ${exact("recorded_at")}`,
-      [input.agencyId, input.displayName, input.recordedByMembershipId],
+       RETURNING branding_version`,
+      [input.agencyId, input.displayName, input.recordedByMembershipId, input.version ?? null, input.logoId ?? null],
     );
     const row = r.rows[0];
     if (row === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the branding version was not recorded");
-    return brandingOf(row);
+    const recorded = await this.versionOf(input.agencyId, int(row["branding_version"]));
+    if (recorded === null) throw new DomainFailure("INTEGRITY_FAILURE", "the branding version recorded is not visible");
+    return recorded;
+  }
+
+  private async versionOf(agencyId: AgencyId, version: number): Promise<BrandingVersionRecord | null> {
+    const r = await execute<Row>(this.db, `SELECT ${VERSION_COLUMNS} FROM ${VERSIONS} WHERE v.agency_id = $1 AND v.branding_version = $2`, [agencyId, version]);
+    const row = r.rows[0];
+    return row === undefined ? null : brandingOf(row);
   }
 
   async versionsOf(agencyId: AgencyId): Promise<readonly BrandingVersionRecord[]> {
-    const r = await execute<Row>(
-      this.db,
-      `SELECT agency_id, branding_version, display_name, ${exact("recorded_at")} FROM kauro.agency_branding_versions WHERE agency_id = $1 ORDER BY branding_version`,
-      [agencyId],
-    );
+    const r = await execute<Row>(this.db, `SELECT ${VERSION_COLUMNS} FROM ${VERSIONS} WHERE v.agency_id = $1 ORDER BY v.branding_version`, [agencyId]);
     return r.rows.map(brandingOf);
+  }
+
+  async latestOf(agencyId: AgencyId): Promise<BrandingVersionRecord | null> {
+    const r = await execute<Row>(this.db, `SELECT ${VERSION_COLUMNS} FROM ${VERSIONS} WHERE v.agency_id = $1 ORDER BY v.branding_version DESC LIMIT 1`, [agencyId]);
+    const row = r.rows[0];
+    return row === undefined ? null : brandingOf(row);
+  }
+
+  async recordLogo(input: NewBrandingLogo): Promise<{ readonly created: boolean; readonly logo: BrandingLogoRecord }> {
+    // once per content (agency_branding_logos_one_per_content): a concurrent or repeated upload of the same bytes stores nothing and
+    // answers the logo already stored
+    const inserted = await execute(
+      this.db,
+      `INSERT INTO kauro.agency_branding_logos (agency_id, logo_id, logo_sha256, media_type, width, height, content, recorded_by_membership_id, recorded_by_user_id)
+       VALUES ($1::uuid, $2::uuid, $3, 'image/png', $4, $5, $6, $7::uuid, kauro.current_user_id())
+       ON CONFLICT (agency_id, logo_sha256) DO NOTHING`,
+      [input.agencyId, input.logoId, input.sha256, input.width, input.height, Buffer.from(input.bytes), input.recordedByMembershipId],
+    );
+    const r = await execute<Row>(this.db, `SELECT ${LOGO_COLUMNS} FROM kauro.agency_branding_logos l WHERE l.agency_id = $1 AND l.logo_sha256 = $2`, [input.agencyId, input.sha256]);
+    const row = r.rows[0];
+    if (row === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the logo was not stored");
+    return { created: (inserted.rowCount ?? 0) === 1, logo: logoOf(row) };
+  }
+
+  async logoOf(agencyId: AgencyId, logoId: string): Promise<BrandingLogoRecord | null> {
+    if (!UUID.test(logoId)) return null;
+    const r = await execute<Row>(this.db, `SELECT ${LOGO_COLUMNS} FROM kauro.agency_branding_logos l WHERE l.agency_id = $1 AND l.logo_id = $2`, [agencyId, logoId]);
+    const row = r.rows[0];
+    return row === undefined ? null : logoOf(row);
+  }
+
+  async logoBytesOf(agencyId: AgencyId, logoId: string): Promise<Uint8Array | null> {
+    if (!UUID.test(logoId)) return null;
+    const r = await execute<{ content: Buffer }>(this.db, "SELECT content FROM kauro.agency_branding_logos WHERE agency_id = $1 AND logo_id = $2", [agencyId, logoId]);
+    const row = r.rows[0];
+    return row === undefined ? null : new Uint8Array(row.content);
   }
 }
 
@@ -233,12 +297,16 @@ export class PgReportSources implements ReportFactsReader {
       [agencyId, jobId, job.queuedAt],
     );
     const b = await this.first(
-      `SELECT v.agency_id, v.branding_version, v.display_name, ${exact("v.recorded_at", "recorded_at")}
-         FROM kauro.report_branding_bindings x JOIN kauro.agency_branding_versions v ON v.agency_id = x.agency_id AND v.branding_version = x.branding_version
+      `SELECT ${VERSION_COLUMNS}
+         FROM kauro.report_branding_bindings x
+         JOIN kauro.agency_branding_versions v ON v.agency_id = x.agency_id AND v.branding_version = x.branding_version
+         LEFT JOIN kauro.agency_branding_logos l ON l.agency_id = v.agency_id AND l.logo_id = v.logo_id
         WHERE x.agency_id = $1 AND x.job_id = $2`,
       [agencyId, jobId],
     );
     const branding = b === null ? null : brandingOf(b);
+    // the bytes of the logo that version names (the assembler and the renderer hold them to its recorded SHA-256)
+    const brandingLogo = branding === null || branding.logo === null ? null : await this.brandingVersions.logoBytesOf(agencyId as AgencyId, branding.logo.logoId);
 
     // the one audit of the job's subject (audits_one_per_subject; a revision and a target contract hash name one row each in a project)
     const audits = await execute<Row>(
@@ -269,6 +337,7 @@ export class PgReportSources implements ReportFactsReader {
       issuer,
       legalIdentity,
       branding,
+      brandingLogo,
       audit,
       approval,
       plan,

@@ -5,15 +5,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
 import { SUPPORT_CATEGORIES } from "@kauro/domain";
-import { B06_COMMANDS, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SUPPORT_COMMANDS, requestSchemaId } from "../src/index.js";
+import { B06_COMMANDS, BRANDING_COMMANDS, BRANDING_INTAKE_ROUTES, BRANDING_LOGO_SCHEMA, BRANDING_LOGO_SCHEMA_ID, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SUPPORT_COMMANDS, requestSchemaId } from "../src/index.js";
 
 const IN_SCOPE = ["CMD001", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"] as const;
 /** B16's five team commands (CMD003-CMD007). */
 const TEAM = ["CMD003", "CMD004", "CMD005", "CMD006", "CMD007"] as const;
 /** B16 retention package: CMD042 RequestDeletion (L3) and CMD060 RequestRetentionExtension (L2). */
 const RETENTION = ["CMD042", "CMD060"] as const;
-/** The B06 commands, CMD044 of the support package (B11 W4) and the B16 team and retention commands, whose request schemas are checked against the catalogue too. */
-const WITH_SUPPORT = [...IN_SCOPE, "CMD044", ...TEAM, ...RETENTION] as const;
+/** The B06 commands, CMD044 of the support package (B11 W4), the B16 team and retention commands and CMD008 of B13 (order 7), whose request schemas are checked against the catalogue too. */
+const WITH_SUPPORT = [...IN_SCOPE, "CMD044", ...TEAM, ...RETENTION, "CMD008"] as const;
 
 test("every in-scope spec matches the catalogue entry: method, path, role, fields in order", () => {
   for (const id of IN_SCOPE) {
@@ -106,4 +106,23 @@ test("scope resolution: only CreateAgency runs without a tenant; agency-path rou
   }
   assert.equal(B06_COMMANDS.CMD025.stepUpRequired, true);
   assert.deepEqual([...B06_COMMANDS.CMD025.authorityHashFields], ["planHash", "validationReceiptHash", "disclosuresHash"]);
+});
+
+test("CMD008 UpdateBranding matches the catalogue entry; its schema names the agency's version, a label and an optional logo reference, and the logo intake's document carries the bytes, never a URL (B13, order 7)", () => {
+  const catalogue = COMMANDS.find((c) => c.id === "CMD008")!;
+  const spec = BRANDING_COMMANDS.CMD008;
+  assert.deepEqual([spec.id, spec.name, spec.method, spec.path, spec.role], [catalogue.id, catalogue.name, catalogue.method, catalogue.path, catalogue.role]);
+  assert.equal(spec.role, "AGENCY_OWNER_OR_ADMIN");
+  assert.deepEqual([...spec.fields], catalogue.fields.map((f) => f.name));
+  assert.deepEqual([catalogue.idempotency, catalogue.gate], ["REQUIRED", "G-REPORT"]);
+  assert.deepEqual([...(catalogue.testIds ?? [])], ["CMD008-OK", "CMD008-DENY", "CMD008-RACE"]);
+  assert.deepEqual([spec.scope, spec.aggregateParam, spec.expectedVersionRequired, spec.stepUpRequired], ["AGENCY_PATH", "agencyId", true, false]);
+  assert.deepEqual([...REQUEST_SCHEMAS.CMD008.required], ["expectedVersion", "displayName"], "a version may name no logo");
+  // the logo intake: the bytes and their hash, PNG declared, the rights confirmed; no member can carry a URL or another format
+  const intake = BRANDING_INTAKE_ROUTES.SubmitBrandingLogo;
+  assert.deepEqual([intake.method, intake.path, intake.scope, intake.schemaId], ["POST", "/api/v1/agencies/{agencyId}/branding/logos", "AGENCY_HEADER", BRANDING_LOGO_SCHEMA_ID]);
+  assert.equal(intake.maxStringLength, BRANDING_LOGO_SCHEMA.properties.contentBase64.maxLength);
+  assert.deepEqual(Object.keys(BRANDING_LOGO_SCHEMA.properties).sort(), ["contentBase64", "contentSha256", "mediaType", "rightsConfirmed"]);
+  assert.deepEqual(BRANDING_LOGO_SCHEMA.properties.mediaType.enum, ["image/png"]);
+  assert.equal(BRANDING_LOGO_SCHEMA.additionalProperties, false);
 });

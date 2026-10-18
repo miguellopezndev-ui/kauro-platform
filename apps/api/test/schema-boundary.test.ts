@@ -26,6 +26,7 @@ import {
   COMMERCIAL_READ_ROUTES,
   COMMERCIAL_REQUEST_SCHEMAS,
   DECISION_ARTIFACT_SCHEMA_ID,
+  BRANDING_LOGO_SCHEMA_ID,
   EXECUTION_REQUEST_SCHEMA_IDS,
   INTAKE_OPERATION_IDS,
   OPERATIONAL_ROUTES,
@@ -141,7 +142,7 @@ test("the validator the api composes is closed: exactly the contract names, the 
   const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
   const commercialRequestIds = Object.keys(COMMERCIAL_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
   const operationalRequestIds = OPERATIONAL_ROUTES.filter((r) => r.request !== undefined).map((r) => operationalRequestSchemaId(r.operationId));
-  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID, ...commercialRequestIds, ...operationalRequestIds];
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID, BRANDING_LOGO_SCHEMA_ID, ...commercialRequestIds, ...operationalRequestIds];
   const expected = [...CONTRACT_NAMES, ...requestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);

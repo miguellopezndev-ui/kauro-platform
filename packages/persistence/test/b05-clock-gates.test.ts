@@ -44,6 +44,7 @@ const OWNER_BY_STEM: Readonly<Record<string, string>> = {
   b12_opt_out_misses: "B12",
   b12_owner_tools: "B12",
   b13_report_sources: "B13",
+  b13_branding_logos: "B13",
 };
 const stemOfTag = (tag: string): string | undefined => {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.startsWith(`${tag}_`) && f.endsWith(".sql"));

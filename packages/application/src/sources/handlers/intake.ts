@@ -34,6 +34,8 @@ export interface IntakeSpec extends AccessSpec {
   readonly schemaId: KnownSchemaId;
   readonly summary: string;
   readonly authority: string;
+  /** The body parser's string bound for this route when it is not api.maxStringLength (the logo intake's base64 content, exactly its schema's maxLength). The body's byte bound (api.jsonBytes) is never raised. */
+  readonly maxStringLength?: number;
 }
 
 export const SOURCE_INTAKE_ROUTES: Readonly<Record<SourceIntakeId, IntakeSpec>> = Object.freeze({

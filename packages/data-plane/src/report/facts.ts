@@ -99,8 +99,18 @@ export interface QuoteTerms {
 
 export type ReportBrandingInputs =
   | { readonly binding: "SIMULATED"; readonly branding: Branding }
-  /** The job's branding version, bound once to the version in force when it was queued (migration 0095; no logo: CMD008's pipeline). */
-  | { readonly binding: "AGENCY_BRANDING_V1"; readonly agencyId: string; readonly version: number; readonly displayName: string; readonly recordedAt: string };
+  /**
+   * The job's branding version, bound once to the version in force when it was queued (migration 0095), and the stored logo it names
+   * (migration 0096, CMD008's safe media pipeline): a PNG named by the SHA-256 of its bytes, or null.
+   */
+  | {
+      readonly binding: "AGENCY_BRANDING_V1";
+      readonly agencyId: string;
+      readonly version: number;
+      readonly displayName: string;
+      readonly recordedAt: string;
+      readonly logo: { readonly logoId: string; readonly sha256: string; readonly mediaType: "image/png" } | null;
+    };
 
 export type ReportFindingsInputs =
   | { readonly binding: "SIMULATED"; readonly ids: readonly string[] }
@@ -255,8 +265,15 @@ function brandingOf(scope: ReportScope, inputs: AuthorizedReportInputs, platform
   }
   if (b.agencyId !== scope.agencyId) throw new ReportStageError("FACTS_FOREIGN_SCOPE", "the branding is another agency's");
   if (!Number.isSafeInteger(b.version) || b.version < 1) throw new ReportStageError("FACTS_MALFORMED", "a branding version is a positive integer");
-  if (inputs.logo !== null) throw new ReportStageError("BRANDING_UNVERIFIABLE", "an agency branding version names no logo");
-  return { version: AGENCY_BRANDING_VERSION(b.version), displayName: b.displayName, logo: null };
+  // the logo is the one the version names, its bytes those whose SHA-256 the version recorded: nothing else is printed under the brand
+  if (b.logo === null) {
+    if (inputs.logo !== null) throw new ReportStageError("BRANDING_UNVERIFIABLE", "logo bytes were given for a branding version that names no logo");
+    return { version: AGENCY_BRANDING_VERSION(b.version), displayName: b.displayName, logo: null };
+  }
+  if (b.logo.mediaType !== "image/png" || !isSha256Hex(b.logo.sha256)) throw new ReportStageError("FACTS_MALFORMED", "a stored logo is a PNG named by its SHA-256");
+  if (inputs.logo === null) throw new ReportStageError("BRANDING_UNAVAILABLE", "the branding version names a stored logo whose bytes are not visible");
+  if (rawDigest(inputs.logo) !== b.logo.sha256) throw new ReportStageError("BRANDING_UNVERIFIABLE", "the logo bytes are not the stored logo the branding version names");
+  return { version: AGENCY_BRANDING_VERSION(b.version), displayName: b.displayName, logo: { sha256: b.logo.sha256, mediaType: b.logo.mediaType } };
 }
 
 function findingIdsOf(inputs: AuthorizedReportInputs, platform: boolean): readonly string[] {

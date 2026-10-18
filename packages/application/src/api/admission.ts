@@ -204,6 +204,8 @@ export interface DocumentRoute {
   readonly scope: "AGENCY_HEADER";
   /** The closed schema the document is validated against. */
   readonly schemaId: KnownSchemaId;
+  /** The parser's string bound when it is not api.maxStringLength (the logo intake's base64 content). */
+  readonly maxStringLength?: number;
 }
 
 export interface DocumentAdmission {
@@ -236,7 +238,7 @@ export function admitDocument(route: DocumentRoute, raw: RawRequest, validator: 
     }
     let parsed: unknown;
     try {
-      parsed = parseStrictJson(text);
+      parsed = parseStrictJson(text, route.maxStringLength === undefined ? {} : { maxStringLength: route.maxStringLength });
     } catch (e) {
       if (e instanceof StrictJsonError) throw invalid(e.reason);
       throw e;

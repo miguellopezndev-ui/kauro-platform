@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { disclosuresHashOf } from "@kauro/application";
-import { LEGAL_IDENTITY_DOMAIN, legalIdentityBytesOf, legalIdentityProblems, quoteTermsHash, readLegalIdentity, type QuoteTermsPreimage } from "@kauro/domain";
+import { LEGAL_IDENTITY_DOMAIN, admitLogo, encodePng, legalIdentityBytesOf, legalIdentityProblems, quoteTermsHash, readLegalIdentity, type QuoteTermsPreimage } from "@kauro/domain";
 import { canonicalBytes, rawDigest } from "@kauro/contracts";
 import {
   B08_PACKAGE_REPORT_PRIVACY_CLASS,
@@ -158,7 +158,7 @@ describe("order 6 the platform's bindings: every fact verified against the recor
     ];
     for (const [label, inputs, code] of cases) refused(inputs, code, label);
     // a brand that looks like a legal name changes nothing about the issuer
-    const facts = assembleReportFacts(SCOPE, { ...good(), branding: { binding: "AGENCY_BRANDING_V1", agencyId: SCOPE.agencyId, version: 3, displayName: "Kauro Data S.A.S.", recordedAt: "2026-09-02T00:00:00.000000Z" } }, RENDERER);
+    const facts = assembleReportFacts(SCOPE, { ...good(), branding: { binding: "AGENCY_BRANDING_V1", agencyId: SCOPE.agencyId, version: 3, displayName: "Kauro Data S.A.S.", recordedAt: "2026-09-02T00:00:00.000000Z", logo: null } }, RENDERER);
     assert.equal(facts.issuer.legalName, TEST_IDENTITY.legalName);
   });
 
@@ -167,8 +167,8 @@ describe("order 6 the platform's bindings: every fact verified against the recor
     const d = i.materialDecisions as Extract<AuthorizedReportInputs["materialDecisions"], { binding: "APPROVAL_DISCLOSURES_V1" }>;
     const cases: ReadonlyArray<readonly [string, AuthorizedReportInputs, string]> = [
       ["no branding version when the job was queued", { ...i, branding: null }, "BRANDING_UNAVAILABLE"],
-      ["another agency's branding", { ...i, branding: { binding: "AGENCY_BRANDING_V1", agencyId: v7(6001), version: 1, displayName: "Other Agency", recordedAt: "2026-09-01T00:00:00.000000Z" } }, "FACTS_FOREIGN_SCOPE"],
-      ["a branding version that is no positive integer", { ...i, branding: { binding: "AGENCY_BRANDING_V1", agencyId: SCOPE.agencyId, version: 0, displayName: "Synthetic Test Agency", recordedAt: "2026-09-01T00:00:00.000000Z" } }, "FACTS_MALFORMED"],
+      ["another agency's branding", { ...i, branding: { binding: "AGENCY_BRANDING_V1", agencyId: v7(6001), version: 1, displayName: "Other Agency", recordedAt: "2026-09-01T00:00:00.000000Z", logo: null } }, "FACTS_FOREIGN_SCOPE"],
+      ["a branding version that is no positive integer", { ...i, branding: { binding: "AGENCY_BRANDING_V1", agencyId: SCOPE.agencyId, version: 0, displayName: "Synthetic Test Agency", recordedAt: "2026-09-01T00:00:00.000000Z", logo: null } }, "FACTS_MALFORMED"],
       ["logo bytes for a branding that names no logo", { ...i, logo: new Uint8Array([1, 2, 3]) }, "BRANDING_UNVERIFIABLE"],
       ["a simulated branding in the platform's inputs", { ...i, branding: { binding: "SIMULATED", branding: { version: "brand-1", displayName: "Invented", logo: null } } }, "BRANDING_UNVERIFIABLE"],
       ["no audit of the subject", { ...i, findings: null }, "FINDINGS_UNAVAILABLE"],
@@ -189,6 +189,24 @@ describe("order 6 the platform's bindings: every fact verified against the recor
       ["no inputs at all", null as unknown as AuthorizedReportInputs, "FACTS_UNAVAILABLE"],
     ];
     for (const [label, inputs, code] of cases) refused(inputs, code, label);
+  });
+
+  it("order 7 (CMD008): a branding version's stored logo is printed only as the bytes whose SHA-256 the version names — other bytes, missing bytes or a malformed record are refused", () => {
+    const px = new Uint8Array(8 * 4 * 4).fill(200);
+    const admitted = admitLogo(encodePng(8, 4, px));
+    assert.ok(admitted.ok);
+    const logo = admitted.logo;
+    const i = good();
+    const b = i.branding as Extract<AuthorizedReportInputs["branding"], { binding: "AGENCY_BRANDING_V1" }>;
+    const named = { ...i, branding: { ...b, logo: { logoId: v7(7001), sha256: logo.sha256, mediaType: "image/png" as const } }, logo: logo.bytes };
+    assert.deepEqual(assembleReportFacts(SCOPE, named, RENDERER).branding, { version: "agency-branding-v2", displayName: b.displayName, logo: { sha256: logo.sha256, mediaType: "image/png" } });
+    const other = admitLogo(encodePng(8, 4, new Uint8Array(8 * 4 * 4).fill(10)));
+    assert.ok(other.ok);
+    refused({ ...named, logo: other.logo.bytes }, "BRANDING_UNVERIFIABLE", "bytes that are not the stored logo the version names");
+    refused({ ...named, logo: null }, "BRANDING_UNAVAILABLE", "a version naming a logo whose bytes are not visible");
+    refused({ ...named, branding: { ...named.branding, logo: { ...named.branding.logo, sha256: "not-a-hash" } } }, "FACTS_MALFORMED", "a logo not named by a SHA-256");
+    refused({ ...named, branding: { ...named.branding, logo: { ...named.branding.logo, mediaType: "image/svg+xml" as "image/png" } } }, "FACTS_MALFORMED", "a logo that is not the pipeline's PNG");
+    refused({ ...i, logo: logo.bytes }, "BRANDING_UNVERIFIABLE", "logo bytes for a version that names no logo");
   });
 
   it("the legal identity document admits only recorded facts: complete, closed, canonical, printable and no placeholder", () => {

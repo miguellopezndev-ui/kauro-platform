@@ -197,7 +197,7 @@ export type {
 // download authorizations of delivered packages (package B16 lane L5, CMD038 AuthorizeDownload)
 export type { DownloadSignState, DownloadPackageRow, DownloadArtifactRow, GoverningRetentionRow, IssueDownloadInput, DownloadAuthorizationRow, DownloadRecheck, DownloadAuthorizationStore } from "./download-store.js";
 // the records a B13 report is made from and the agency's branding versions (order 6; docs/design/B13-report-inputs.md)
-export type { ReportFactsScope, RecordedReportFacts, ReportFactsReader, BrandingVersionRecord, NewBrandingVersion, BrandingVersionRepository } from "./report-sources.js";
+export type { ReportFactsScope, RecordedReportFacts, ReportFactsReader, BrandingVersionRecord, NewBrandingVersion, BrandingVersionRepository, BrandingLogoRecord, NewBrandingLogo } from "./report-sources.js";
 // the control plane's discovery of execution work (package B08, mandate B08-CONTROL-EXECUTION)
 export type { ExecutionJobRef, ExecutionAttemptRef, ExecutionFact, ExecutionSourceGeneration, ExecutionInput, ExecutionDiscovery } from "./execution-discovery.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §10)

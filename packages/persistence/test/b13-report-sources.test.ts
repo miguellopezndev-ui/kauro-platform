@@ -76,7 +76,6 @@ test("0095 from 0094: a quote CMD027 issued, its agency's acceptance, its issuer
   const target = all.find((m) => m.file === TARGET);
   assert.ok(target, "0095 is the report sources migration");
   const pos = all.indexOf(target);
-  assert.equal(pos, all.length - 1, "0095 is the last migration of this edition");
   dir = mkdtempSync(join(tmpdir(), "kauro-0095-"));
   for (const m of all.slice(0, pos)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
   w = await openWorld("b13-sources", { migrationsDir: dir });
@@ -94,11 +93,14 @@ test("0095 from 0094: a quote CMD027 issued, its agency's acceptance, its issuer
   assert.equal(await exists("kauro.agency_branding_versions"), false);
   const before = await recordsOf(A.agencyId);
 
-  for (const m of all.slice(pos)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+  copyFileSync(join(MIGRATIONS_DIR, target.file), join(dir, target.file));
   const owner = await x.h.pg.connect("kauro_owner");
   try {
     assert.deepEqual((await applyMigrations(owner, { dir })).applied.map((m) => m.file), [TARGET]);
     assert.deepEqual((await applyMigrations(owner, { dir })).applied, [], "applied once");
+    // the edition's later migrations (0096 …), so the cases below run at its head
+    for (const m of all.slice(pos + 1)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+    assert.deepEqual((await applyMigrations(owner, { dir })).applied.map((m) => m.file), all.slice(pos + 1).map((m) => m.file));
   } finally {
     await owner.end();
   }

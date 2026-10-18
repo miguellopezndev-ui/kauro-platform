@@ -227,6 +227,10 @@ export * from "./model/source/index.js";
 
 export * from "./ports/index.js";
 
+// the agency branding: the printable brand name and the logo's safe media pipeline (B13 CMD008, order 7; docs/design/B13-branding.md)
+export type { AdmittedLogo, LogoAdmission, LogoProblem } from "./model/branding.js";
+export { BRAND_NAME_MAX_LENGTH, LOGO_MAX_BYTES, LOGO_MAX_PIXELS, LOGO_MEDIA_TYPE, LOGO_PROBLEMS, admitLogo, brandNameProblem, decodeAdmittedPng, encodePng } from "./model/branding.js";
+
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
 
