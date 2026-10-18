@@ -92,7 +92,9 @@ const LOADER_NAMES: ReadonlySet<string> = new Set(["createRequire", "getBuiltinM
  * - packages/data-plane/src/sandbox/child.ts runs the task module of a sandbox job inside the isolated child, whose preload refuses every
  *   network entry point (D-ISO-1), so no module it loads can reach a database;
  * - packages/data-plane/src/sandbox/preload.ts imports node:module (syncBuiltinESMExports, to publish its network hooks) and
- *   node:worker_threads (to observe the permission model's refusals); it loads nothing by name.
+ *   node:worker_threads (to observe the permission model's refusals); it loads nothing by name;
+ * - packages/data-plane/src/host/worker-preload.ts (B14-A, the worker's process allowlist) imports node:module for
+ *   syncBuiltinESMExports, to publish its wrapped child_process exports; it loads nothing by name.
  */
 const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: number; readonly text: string }> = [
   { file: "apps/web/scripts/next.mjs", line: 7, text: 'import { createRequire } from "node:module";' },
@@ -102,6 +104,7 @@ const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: num
   { file: "packages/data-plane/src/sandbox/preload.ts", line: 26, text: 'import { syncBuiltinESMExports } from "node:module";' },
   { file: "packages/data-plane/src/sandbox/preload.ts", line: 29, text: 'import workerThreads from "node:worker_threads";' },
   { file: "packages/data-plane/src/cores/child-preload-fs.ts", line: 10, text: 'import { syncBuiltinESMExports } from "node:module";' },
+  { file: "packages/data-plane/src/host/worker-preload.ts", line: 18, text: 'import { syncBuiltinESMExports } from "node:module";' },
   { file: "packages/data-plane/src/cores/core-child.ts", line: 56, text: "const task = (await import(pathToFileURL(job.task).href)) as { run?: (payload: unknown, context: CoreChildContext) => Promise<unknown> };" },
   // DB-TLS gap 2: the "LOCAL" values that are not an environment handed to a connection: the two lists of the three environments, the
   // origin policy kind of the web host, and the browser suite's default for its own local stack

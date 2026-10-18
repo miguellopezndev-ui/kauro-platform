@@ -56,10 +56,15 @@ export interface AttemptWorkerOptions {
 export function diagnosticOf(error: unknown): string {
   if (!(error instanceof Error)) return `non-error ${typeof error}`;
   const code = (error as { code?: unknown }).code;
-  const line = `${error.name}${typeof code === "string" ? ` ${code}` : ""}: ${error.message.slice(0, 500)}`;
+  // the head and the tail of a long message (a browser's launch error ends with the browser's own log lines)
+  const message = error.message.length > 2000 ? `${error.message.slice(0, 400)} … ${error.message.slice(-1600)}` : error.message;
+  const line = `${error.name}${typeof code === "string" ? ` ${code}` : ""}: ${message}`;
   // the causes below it, as far down as three (a browser's own launch error under the engine's, for instance)
   const cause = (error as { cause?: unknown }).cause;
-  return cause === undefined || line.length > 2000 ? line : `${line} <- ${diagnosticOf(cause).slice(0, 1200)}`;
+  if (cause === undefined) return line;
+  const below = diagnosticOf(cause);
+  // the deepest cause's end is the most telling part
+  return `${line.slice(0, 600)} <- ${below.length > 2400 ? `… ${below.slice(-2400)}` : below}`;
 }
 
 const sameScope = (a: ReportScope, b: ReportScope): boolean => a.agencyId === b.agencyId && a.projectId === b.projectId && a.jobId === b.jobId && a.attemptId === b.attemptId;
@@ -124,7 +129,8 @@ export async function runAttemptWorker(ticket: AttemptTicket, options: AttemptWo
     // the browser's temporary profile lives inside the attempt's own directory, the only place this process may write
     const browserTemp = join(scratch.directory, BROWSER_TEMP_DIRECTORY);
     mkdirSync(browserTemp);
-    for (const name of ["TMPDIR", "TMP", "TEMP"]) process.env[name] = browserTemp;
+    // a home and caches of its own too: the browser writes there, and the worker's environment names no other
+    for (const name of ["TMPDIR", "TMP", "TEMP", "HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"]) process.env[name] = browserTemp;
 
     const cancellation: CancellationChannel = {
       check: (): Promise<CancellationState> => {

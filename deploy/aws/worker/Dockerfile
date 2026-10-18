@@ -19,9 +19,10 @@ RUN printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian
  && apt-get update && apt-get install -y --no-install-recommends chromium fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
+# the same two preloads as the local host gives every worker: the network entry points refused, the process allowlist
 # a non-root worker; the attempt's scratch is the task's ephemeral volume mounted at /scratch, the root filesystem read-only
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin kauro && mkdir -p /scratch && chown kauro:kauro /scratch
 USER 10001:10001
 ENV NODE_ENV=production
 WORKDIR /app
-ENTRYPOINT ["node", "--permission", "--allow-fs-read=/app", "--allow-fs-read=/usr/lib/chromium", "--allow-fs-read=/scratch", "--allow-fs-write=/scratch", "--allow-child-process", "--max-old-space-size=1024", "dist/src/main.js"]
+ENTRYPOINT ["node", "--permission", "--allow-fs-read=/app", "--allow-fs-read=/usr/lib/chromium", "--allow-fs-read=/usr/bin/chromium", "--allow-fs-read=/proc/version", "--allow-fs-read=/proc/sys/fs/binfmt_misc/WSLInterop", "--allow-fs-read=/run/WSL", "--allow-fs-read=/run/.containerenv", "--allow-fs-read=/.dockerenv", "--allow-fs-read=/proc/self/cgroup", "--allow-fs-read=/scratch", "--allow-fs-write=/scratch", "--allow-child-process", "--max-old-space-size=1024", "--import", "./node_modules/@kauro/data-plane/dist/src/sandbox/preload.js", "--import", "./node_modules/@kauro/data-plane/dist/src/host/worker-preload.js", "dist/src/main.js"]

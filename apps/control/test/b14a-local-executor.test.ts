@@ -179,7 +179,7 @@ async function observedAndDrained(rig: Rig, identity: string): Promise<void> {
   await w.drain(rig.x.consumers.jobExecution);
 }
 
-test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a confined worker process — Migration Core 3.0.0 over the sealed acceptance file, the B13 report from the platform's records printed by Chromium — and B08's own steps verify it with Migration Core's verifier and publish it: package AVAILABLE, job READY, entitlement DELIVERED, the delivered package exactly the one the validation receipt bound", { skip }, async () => {
+test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a confined worker process — Migration Core 3.0.0 over the sealed acceptance file, the B13 report from the platform's records printed by Chromium — and B08's own steps verify it with Migration Core's verifier and publish it: package AVAILABLE, job READY, entitlement DELIVERED, the delivered package exactly the one the validation receipt bound", { skip, timeout: 600_000 }, async () => {
   const rig = rigOf();
   const p = await purchase("b14a-ok");
   const { jobId, identity } = await launchedOn(rig, p);
@@ -236,7 +236,7 @@ test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a conf
   assert.deepEqual(cleanup, [{ result: "CLEANED", resource_report: "REPORTED" }]);
 });
 
-test("B14-A RACE (S056 through B08): the launch's answer is lost after the local host created the job — the pipeline records UNCERTAIN, ATTEMPT_MONITOR observes the identity before any other create and adopts it, and the one worker run is the one published", { skip }, async () => {
+test("B14-A RACE (S056 through B08): the launch's answer is lost after the local host created the job — the pipeline records UNCERTAIN, ATTEMPT_MONITOR observes the identity before any other create and adopts it, and the one worker run is the one published", { skip, timeout: 600_000 }, async () => {
   let lost = 0;
   const rig = rigOf({
     host: (h) => ({
@@ -265,7 +265,7 @@ test("B14-A RACE (S056 through B08): the launch's answer is lost after the local
   assert.equal((await w.job(job.jobId)).state, "READY");
 });
 
-test("B14-A cancellation (CMD037 while the worker runs): EXECUTION_CONTROL terminates the identity — the worker, the core's child and every process of the attempt end — the job is CANCELLED, nothing is delivered and the entitlement is never DELIVERED", { skip }, async () => {
+test("B14-A cancellation (CMD037 while the worker runs): EXECUTION_CONTROL terminates the identity — the worker, the core's child and every process of the attempt end — the job is CANCELLED, nothing is delivered and the entitlement is never DELIVERED", { skip, timeout: 600_000 }, async () => {
   let reached: () => void = () => undefined;
   const atCore = new Promise<void>((r) => (reached = r));
   const rig = rigOf({ hooks: { atStage: (_id, stage) => (stage === "CORE_STARTED" ? (reached(), new Promise<void>(() => undefined)) : undefined) } });
@@ -286,7 +286,7 @@ test("B14-A cancellation (CMD037 while the worker runs): EXECUTION_CONTROL termi
   assert.equal(rig.exec.host.running().length, 0);
 });
 
-test("B14-A recovery (a worker killed mid-run, S075): the host observes the crash, B08 abandons the attempt and takes the lease over at fence 2 — a new identity, a new prefix, a new worker — which delivers; STAGING_JANITOR cleans the dead attempt's scratch", { skip }, async () => {
+test("B14-A recovery (a worker killed mid-run, S075): the host observes the crash, B08 abandons the attempt and takes the lease over at fence 2 — a new identity, a new prefix, a new worker — which delivers; STAGING_JANITOR cleans the dead attempt's scratch", { skip, timeout: 600_000 }, async () => {
   let first: string | null = null;
   let reached: () => void = () => undefined;
   const atCore = new Promise<void>((r) => (reached = r));
@@ -330,7 +330,7 @@ test("B14-A recovery (a worker killed mid-run, S075): the host observes the cras
   assert.throws(() => readFileSync(attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), firstAttempt.attempt_id)), /ENOENT/);
 });
 
-test("B14-A B13 (no legal identity, the production state): when the platform's records hold no issuer document, the real worker refuses the report — the job ends FAILED REFUSED, nothing is published, the entitlement stays CONSUMED", { skip }, async () => {
+test("B14-A B13 (no legal identity, the production state): when the platform's records hold no issuer document, the real worker refuses the report — the job ends FAILED REFUSED, nothing is published, the entitlement stays CONSUMED", { skip, timeout: 600_000 }, async () => {
   const platform = new PlatformReportInputs({ units: w.units, ids });
   const withoutIdentity: ReportInputsPort = {
     async read(scope): Promise<AuthorizedReportInputs | null> {
