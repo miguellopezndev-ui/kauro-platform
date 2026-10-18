@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 120
     env:
       PGBIN: ${{ matrix.pgbin }}
-      RUNS: 25
+      RUNS: 40
     defaults:
       run:
         shell: bash
@@ -73,6 +73,23 @@ jobs:
           KAURO_ORDER8_DIAG_FILE: ${{ github.workspace }}/diag-out/before.jsonl
         run: |
           bash ../../tools/diag-order8/loop.sh "$RUNS" ../../diag-out/before | tee ../../diag-out/before.txt
+      - name: BEFORE under CPU load, the clock probe running alongside, same cells x RUNS
+        working-directory: apps/api
+        env:
+          KAURO_ORDER8_DIAG_FILE: ${{ github.workspace }}/diag-out/before-load.jsonl
+        run: |
+          sock=""; if [ "$RUNNER_OS" = Linux ]; then sock=" -k $RUNNER_TEMP"; fi
+          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -o "-p 55432$sock" -l "$RUNNER_TEMP/probe2.log" -w start > /dev/null
+          node ../../tools/diag-order8/clock-probe.mjs "$GITHUB_WORKSPACE/packages/persistence/package.json" 55432 1500 > ../../diag-out/probe-load.txt &
+          probe=$!
+          cores=$(node -p "require('os').availableParallelism()")
+          hogs=()
+          for i in $(seq 1 "$cores"); do node -e "for(;;){}" & hogs+=($!); done
+          bash ../../tools/diag-order8/loop.sh "$RUNS" ../../diag-out/before-load | tee ../../diag-out/before-load.txt
+          kill "${hogs[@]}" || true
+          kill "$probe" || true
+          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" > ../../diag-out/before-load-analysis.json
+          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -m fast stop > /dev/null || true
           node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/before-analysis.json
       - name: AFTER (created_at) — same cells x RUNS
         working-directory: apps/api

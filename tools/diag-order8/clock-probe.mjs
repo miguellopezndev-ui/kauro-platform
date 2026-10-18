@@ -22,12 +22,13 @@ while (Date.now() - start < seconds * 1000) {
   if (lead > 10) over10++;
   maxLead = Math.max(maxLead, lead);
   const k = Math.floor((b - start) / 5000) * 5;
+  // a bucket is printed as soon as the next one opens (the probe may be killed when the loop it shadows ends)
+  if (!buckets.has(k) && buckets.size > 0) { const [pk, ps] = [...buckets].at(-1); console.log(`${new Date(start + pk * 1000).toISOString()} +${String(pk).padStart(4)}s n=${ps.n} lead ms min=${ps.minLeadMs.toFixed(3)} max=${ps.maxLeadMs.toFixed(3)}`); }
   const s = buckets.get(k) ?? { n: 0, maxLeadMs: -Infinity, minLeadMs: Infinity };
   s.n++; s.maxLeadMs = Math.max(s.maxLeadMs, lead); s.minLeadMs = Math.min(s.minLeadMs, lead);
   buckets.set(k, s);
   await new Promise((r) => setTimeout(r, 2));
 }
 await c.end();
-const perBucket = [...buckets].map(([k, s]) => `${String(k).padStart(4)}s n=${s.n} lead ms min=${s.minLeadMs.toFixed(3)} max=${s.maxLeadMs.toFixed(3)}`);
+const perBucket = [...buckets].map(([k, s]) => `${new Date(start + k * 1000).toISOString()} +${String(k).padStart(4)}s n=${s.n} lead ms min=${s.minLeadMs.toFixed(3)} max=${s.maxLeadMs.toFixed(3)}`);
 console.log(JSON.stringify({ platform: process.platform, node: process.version, samples: n, pgAfterNode: ahead, leadOver2ms: over2, leadOver5ms: over5, leadOver10ms: over10, maxLeadMs: Number(maxLead.toFixed(3)) }, null, 1));
-console.log(perBucket.join("\n"));
