@@ -57,9 +57,15 @@ local environment with its git identity. The code in them was written by Claude.
 | `7897a954` | 2026-10-18 | miguellopezndev-ui | Claude Opus 5.5 | final pass: dead CSS removed, shared paper palette |
 | `f9d42b14` | 2026-10-18 | miguellopezndev-ui | (merge commit) | integration of the delivery onto `main` `ac63409` |
 | `01d6c820` | 2026-10-18 | miguellopezndev-ui | Claude Opus 5.5 | app and ops screens: wrapping, fact lists, action lists, heading order |
+| `63c40b82` | 2026-10-18 | miguellopezndev-ui | Claude Opus 5.5 | identity, provenance, coverage, ledger, `CLAUDE.md` |
+| `ea12f987` | 2026-10-18 | miguellopezndev-ui | Claude Opus 5.5 | motion by movement only (text legible at every instant); contact check scoped to main |
+| `7739bbe2` | 2026-10-18 | miguellopezndev-ui | (merge commit) | `main` `66423d92` (Order 8, #109) incorporated once; its file is unchanged |
 
-The pull request, the commit that is finally merged and the CI results are recorded in the pull request itself and in the integration
-report.
+- Pull request: [#110](https://github.com/miguellopezndev-ui/kauro-platform/pull/110).
+- Order 8 compatibility: `apps/api/test/inbound-lane-support.ts`, the only file Order 8 changed, is byte-identical to `main` on this
+  branch, and the integration changes nothing in `apps/api`, `apps/control`, `packages/persistence` or `packages/data-plane`.
+- The commit that is finally merged and the CI results of the exact candidate are recorded on the pull request and in the integration
+  report.
 
 ## Screens incorporated
 

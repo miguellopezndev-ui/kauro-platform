@@ -1,7 +1,7 @@
 # Kauro screen coverage of the visual identity
 
 Generated from `packages/contracts/registry/screens.json`, `apps/web/src/screens.ts` and `apps/web/src/screens/implemented/` on the integration
-branch `design/visual-identity-integration` (base `main` ac6340965c098f3d0a1ed24d45ff4cbd49593b1e). Every new screen is added here when it is built
+branch `design/visual-identity-integration` (cut from `main` ac6340965c098f3d0a1ed24d45ff4cbd49593b1e; `main` 66423d92 with Order 8 incorporated once). Every new screen is added here when it is built
 (see `CLAUDE.md`).
 
 - Registered screens: **55**. Implemented: **24**. Pending (registered, not built): **31**.
