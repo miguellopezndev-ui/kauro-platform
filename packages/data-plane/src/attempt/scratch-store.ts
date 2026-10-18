@@ -67,6 +67,12 @@ export interface AttemptScratchOptions {
   /** The attempt's scratch budget (ExecutionLimits.scratchBudgetBytes). */
   readonly quotaBytes: number;
   readonly device?: ScratchDevice;
+  /**
+   * The store runs in a confined worker that may read and write its own attempt directory only (B14-A): `root` is then taken as the
+   * host's real path and never opened or created; the attempt directory is still refused if it resolves anywhere else. The permission
+   * model disables fsync, so a confined store checks a sealed file's length on the device without flushing it first.
+   */
+  readonly confined?: boolean;
 }
 
 /** A binary spool of the artifact writer: written once, sealed, streamed back in chunks verified before the last one. */
@@ -162,6 +168,12 @@ export class AttemptScratchStore implements ScratchStore {
   readonly directory: string;
   readonly quotaBytes: number;
   readonly #device: ScratchDevice;
+  /**
+   * Whether a sealed segment or spool is flushed to the device first. A confined worker runs under the Node permission model, which
+   * disables fsync; its scratch never outlives its process (a crash abandons the attempt), so the flush buys nothing there, and the
+   * length on the device is still checked.
+   */
+  readonly #flush: boolean;
   readonly #segments = new Map<string, LiveSegment>();
   readonly #families = new Map<string, FamilyCounters>();
   readonly #fds = new Set<number>();
@@ -182,16 +194,20 @@ export class AttemptScratchStore implements ScratchStore {
     this.attemptId = options.attemptId;
     this.quotaBytes = options.quotaBytes;
     this.#device = options.device ?? REAL_DEVICE;
-    mkdirSync(options.root, { recursive: true });
-    this.directory = attemptScratchDirectoryOf(realpathSync.native(options.root), options.attemptId);
+    this.#flush = options.confined !== true;
+    // a confined worker (B14-A) may touch its own attempt directory only: the root is the host's, already real, and never opened
+    if (options.confined !== true) mkdirSync(options.root, { recursive: true });
+    this.directory = attemptScratchDirectoryOf(options.confined === true ? options.root : realpathSync.native(options.root), options.attemptId);
     const existing = lstatOrNull(this.directory);
     if (existing !== null) {
       if (existing.isSymbolicLink()) throw new AttemptEnvelopeFailure("OUTSIDE_CAPABILITY", "DIRECTORY_IS_A_LINK", `the scratch of ${this.attemptId} is a link`);
       if (!existing.isDirectory()) throw new AttemptEnvelopeFailure("OUTSIDE_CAPABILITY", "DIRECTORY_REPLACED", `the scratch of ${this.attemptId} is not a directory`);
-      // leftovers of this same attempt (its identity run again) are its own, and never reused as if they were sealed now
-      removeTree(this.directory);
+      // leftovers of this same attempt (its identity run again) are its own, and never reused as if they were sealed now; a confined
+      // worker's host created the directory (its permission names it), so only its contents go
+      if (options.confined === true) for (const name of readdirSync(this.directory)) removeTree(join(this.directory, name));
+      else removeTree(this.directory);
     }
-    mkdirSync(this.directory);
+    if (existing === null || options.confined !== true) mkdirSync(this.directory);
     if (realpathSync.native(this.directory) !== this.directory) {
       throw new AttemptEnvelopeFailure("OUTSIDE_CAPABILITY", "DIRECTORY_IS_A_LINK", `the scratch of ${this.attemptId} resolves elsewhere`);
     }
@@ -285,7 +301,7 @@ export class AttemptScratchStore implements ScratchStore {
         if (closed) throw new TypeError(`segment ${segmentId} is closed`);
         return guarded(() => {
           flush();
-          fsyncSync(fd);
+          if (this.#flush) fsyncSync(fd);
           const onDevice = fstatSync(fd).size;
           if (onDevice !== byteLength) this.#fail("SHORT_WRITE", "LENGTH_ON_DEVICE", `segment ${segmentId} holds ${onDevice} of ${byteLength} bytes`);
           this.#closeFile(fd);
@@ -443,7 +459,7 @@ export class AttemptScratchStore implements ScratchStore {
         this.#usable();
         if (sealed !== null || discarded) throw new TypeError(`spool ${spoolId} is closed`);
         return guarded(() => {
-          fsyncSync(fd);
+          if (this.#flush) fsyncSync(fd);
           const onDevice = fstatSync(fd).size;
           if (onDevice !== byteLength) this.#fail("SHORT_WRITE", "LENGTH_ON_DEVICE", `spool ${spoolId} holds ${onDevice} of ${byteLength} bytes`);
           this.#closeFile(fd);

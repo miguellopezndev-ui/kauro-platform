@@ -6,7 +6,9 @@
  * `kauro-attempt-<attemptId>`, recorded before launch (07 "deterministic provider job identity"; 10 "Provider adapter contract"):
  * launch creates by identity (ALREADY_EXISTS adopts), a timeout is AMBIGUOUS and nothing is created again until `observe`
  * answers, and only NOT_FOUND after the host's creation horizon proves no effect. The real host is B14's (Cloud Batch); tests bind
- * the labelled ContractFakeWorkerHost (`@kauro/data-plane/testing/worker-host`, D8-FAKE-1). Every answer carries `evidenceClass`.
+ * the labelled ContractFakeWorkerHost (`@kauro/data-plane/testing/worker-host`, D8-FAKE-1). Every answer carries `evidenceClass`:
+ * EXECUTED_PROVIDER only from a cloud provider's real answer, EXECUTED_LOCAL from the local process host of B14-A (a real isolated
+ * process on this machine, never a provider), SIMULATED from a contract fake.
  *
  * `AttemptCapability` is everything an attempt may touch (D8-STG-1): exactly its staging prefix
  * `staging/{agency}/{project}/{job}/{attempt}/`, the manifest name inside it and the sealed ACCEPTED generations it reads.
@@ -195,6 +197,9 @@ export interface ResumableUploadPort {
   writeChunk(sessionRef: string, chunk: Uint8Array, options: { readonly final: boolean }): Promise<ResumableUploadAnswer>;
 }
 
+/** Where a worker host's answer came from (21 "Evidence classes"): a provider's, a real local process host's, or a fake's. */
+export type WorkerHostEvidenceClass = ProviderEvidenceClass | "EXECUTED_LOCAL";
+
 // --- WorkerHostPort ------------------------------------------------------------------------------------------------------------
 
 export interface WorkerLaunchSpec {
@@ -245,14 +250,14 @@ export interface WorkerResources {
 }
 
 export interface WorkerLaunchResult {
-  readonly evidenceClass: ProviderEvidenceClass;
+  readonly evidenceClass: WorkerHostEvidenceClass;
   readonly identity: string;
   readonly outcome: WorkerLaunchOutcome;
   readonly reason: string | null;
 }
 
 export interface WorkerObservation {
-  readonly evidenceClass: ProviderEvidenceClass;
+  readonly evidenceClass: WorkerHostEvidenceClass;
   readonly identity: string;
   readonly state: WorkerObservedState;
   /** The host's instant of the worker's last sign of life; the lease heartbeat is the monitor's, on the server clock (D8-ATT-2). */
@@ -264,17 +269,17 @@ export interface WorkerObservation {
 }
 
 export interface WorkerTerminationResult {
-  readonly evidenceClass: ProviderEvidenceClass;
+  readonly evidenceClass: WorkerHostEvidenceClass;
   readonly identity: string;
   readonly outcome: WorkerTerminationOutcome;
 }
 
 export type WorkerResourceReport =
-  | { readonly evidenceClass: ProviderEvidenceClass; readonly identity: string; readonly outcome: "REPORTED"; readonly state: WorkerObservedState; readonly resources: WorkerResources }
-  | { readonly evidenceClass: ProviderEvidenceClass; readonly identity: string; readonly outcome: "NOT_FOUND" };
+  | { readonly evidenceClass: WorkerHostEvidenceClass; readonly identity: string; readonly outcome: "REPORTED"; readonly state: WorkerObservedState; readonly resources: WorkerResources }
+  | { readonly evidenceClass: WorkerHostEvidenceClass; readonly identity: string; readonly outcome: "NOT_FOUND" };
 
 export interface WorkerHostPort {
-  readonly evidenceClass: ProviderEvidenceClass;
+  readonly evidenceClass: WorkerHostEvidenceClass;
   /** After this long past a create request the host guarantees it can no longer land: only then does NOT_FOUND prove no effect. */
   readonly creationHorizonSeconds: number;
   launch(spec: WorkerLaunchSpec): Promise<WorkerLaunchResult>;
