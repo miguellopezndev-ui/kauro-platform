@@ -14,7 +14,7 @@ The design language every surface follows is A10 (`docs/authority/amendments/A10
   dashboards.
 - Everything readable without the script, AA contrast in both themes, no horizontal scroll at 320 px.
 
-Last updated: 2026-10-18, fifth pass (branch `design/kauro-visual-refresh`).
+Last updated: 2026-10-18, fifth pass plus motion and tilt (A10 §9; branch `design/kauro-visual-refresh`).
 
 ## 1. Designed together (reviewed by the owner)
 
@@ -26,6 +26,7 @@ for the next review.
 | Whole site | Palette, light and dark themes, theme switch, typography and weight contrast | approved |
 | Whole site | Header with the menu card (no numbers, quiet type, dimmed page) | revised |
 | Whole site | Footer (small wordmark, tagline, links) | approved |
+| Whole site | Motion: first impression, arrival, response; alternating card tilts | revised |
 | Home | Hero: product window on rock, margin notes, stamp | approved |
 | Home | Facts strip | approved |
 | Home | Process: one file walked through Measure, Decide, Prepare, Import | revised |

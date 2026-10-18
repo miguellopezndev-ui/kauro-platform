@@ -5848,3 +5848,141 @@ body:has(> .kauro-site-header) {
 .kauro-site-table-region + .kauro-site-facts-inline {
   margin-block-start: var(--kauro-space-6);
 }
+
+/* =================================================================================================================================== */
+/* Motion (A10 §9). Four kinds, each serving the sale and nothing else:                                                               */
+/*   first impression: the hero window settles once on load, its notes follow, the stamp lands last;                                */
+/*   arrival: an object settles into its own tilt as the reader reaches it, and a stamp lands just after its card;                   */
+/*   response: a tilted card straightens a little under the pointer, a button presses;                                               */
+/*   change: the interactive pieces (journey, pile, menu) move only when something in them changes.                                   */
+/* Text never moves on its own. Arrival needs a browser that ties animation to scrolling; elsewhere everything is simply in place.    */
+/* Nothing moves for a visitor who asked for less motion.                                                                              */
+/* =================================================================================================================================== */
+
+@keyframes kauro-settle {
+  from {
+    opacity: 0;
+    transform: translateY(1.75rem) rotate(0deg);
+  }
+}
+@keyframes kauro-thunk {
+  0% {
+    opacity: 0;
+    transform: scale(1.7) rotate(0deg);
+  }
+  55% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* first impression: the product, then what the editor noted on it, then the verdict */
+  .kauro-site-showcase .kauro-site-window,
+  .kauro-site-pagehead .kauro-acts,
+  .kauro-site-pagehead .kauro-site-cover-sheet {
+    animation: kauro-settle 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s backwards;
+  }
+  .kauro-site-showcase .kauro-site-note-hand {
+    animation: kauro-fade-in 0.6s ease 0.85s backwards;
+  }
+  .kauro-site-showcase .kauro-site-note-hand--counts {
+    animation-delay: 1.05s;
+  }
+  .kauro-site-showcase .kauro-site-stamp,
+  .kauro-site-pagehead .kauro-site-stamp {
+    animation: kauro-thunk 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 1.3s backwards;
+  }
+
+  /* response: a card on the table straightens a little when it is pointed at; a button gives under the press */
+  @media (hover: hover) {
+    .kauro-buyer,
+    .kauro-locks,
+    .kauro-acts,
+    .kauro-site-ticket {
+      transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.45s ease;
+    }
+    .kauro-buyer:hover,
+    .kauro-locks:hover,
+    .kauro-acts:hover,
+    .kauro-site-ticket:hover {
+      transform: rotate(0deg) translateY(-0.25rem);
+    }
+    .kauro-board-row {
+      transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+    .kauro-board-row:hover {
+      transform: translateY(-0.1875rem);
+      box-shadow: 0 1.5rem 2.5rem -2rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent);
+    }
+    .kauro-board-row:not(.kauro-board-row--lead):hover {
+      border-color: var(--kauro-color-accent);
+    }
+  }
+  .kauro-site-button:active,
+  .kauro-walk-next:active,
+  .kauro-walk-approve:active {
+    transform: scale(0.97);
+  }
+  .kauro-site-button,
+  .kauro-walk-next,
+  .kauro-walk-approve {
+    transition-property: background-color, border-color, color, transform;
+  }
+}
+
+/* arrival: tied to the scroll, so it happens exactly when the reader gets there and never runs ahead */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .kauro-walk-window,
+    .kauro-buyer,
+    .kauro-pack-pile,
+    .kauro-locks,
+    .kauro-board-row,
+    .kauro-site-ticket-rock,
+    .kauro-status-panel,
+    .kauro-redact,
+    .kauro-answer,
+    .kauro-site-service,
+    .kauro-step-pane,
+    .kauro-site-rung {
+      animation: kauro-settle linear backwards;
+      animation-timeline: view();
+      animation-range: entry 5% entry 70%;
+    }
+    /* the second card of a pair arrives a beat after the first */
+    .kauro-buyer--company,
+    .kauro-board-row + .kauro-board-row {
+      animation-range: entry 15% entry 85%;
+    }
+    /* the verdicts land once their card is there */
+    .kauro-buyers-stamp,
+    .kauro-site-ticket-stamp,
+    .kauro-answer-stamp,
+    .kauro-lock-state,
+    .kauro-board-tag {
+      animation: kauro-thunk linear backwards;
+      animation-timeline: view();
+      animation-range: entry 55% cover 30%;
+    }
+    .kauro-lock + .kauro-lock .kauro-lock-state {
+      animation-range: entry 70% cover 35%;
+    }
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* the "same price" stamp follows the two cards it joins, not its own place at their top */
+    .kauro-buyers {
+      view-timeline-name: --kauro-buyers;
+    }
+    .kauro-buyers-stamp {
+      animation-timeline: --kauro-buyers;
+      animation-range: entry 95% cover 45%;
+    }
+  }
+}
+
+/* a stamp mid-landing is larger than its place for an instant; it never widens the page */
+.kauro-site-main {
+  overflow-x: clip;
+}

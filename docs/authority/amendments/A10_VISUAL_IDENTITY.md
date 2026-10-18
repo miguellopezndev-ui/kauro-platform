@@ -137,3 +137,24 @@ empty half, and anything that follows the reader down the screen are removed.
    - A legal document that is not yet published is the not-found card again, stamped "Not published".
 9. **Paper.** `.kauro-paper` keeps the light palette for a sheet that sits on a dark or wine band in the light theme, and becomes a raised
    dark sheet in the dark theme, so a document always reads as a document.
+
+## 9. Motion and tilt (2026-10-18)
+
+Motion exists to sell: it shows the product working, puts a verdict where the reader has just read the reason for it, and otherwise stays
+out of the way. Text never moves on its own. Motion comes in four kinds, all in `public.css` under "Motion":
+
+1. **First impression.** On load, the hero window settles onto the rock, its two notes appear, and the "Synthetic sample data" stamp lands
+   last. The head objects of interior pages (the "who acts" card, the report cover) settle the same way.
+2. **Arrival.** As the reader reaches an object, it rises and settles into its own tilt: the journey window, the two buyer cards (the
+   second a beat later), the pile, the permissions panel, each board row, the ticket, service cards, step panes, pricing rungs, the
+   status panel and the data-handling pieces. A stamp lands just after its card: "Same price", each "Never", "Lowest starting price",
+   the ticket's "Free", and "Not found". Arrival is tied to the scroll (`animation-timeline: view()`), so it happens exactly where the
+   reader is, in browsers that support it; elsewhere everything is simply in place.
+3. **Response.** A tilted card straightens and lifts a little under the pointer, a board row lifts, and a button gives under the press.
+4. **Change.** The interactive pieces move only when something in them changes (§8).
+
+Nothing moves for a visitor who asked for less motion, and a stamp mid-landing never widens the page (`overflow-x: clip` on main).
+
+**Tilt.** Cards do not all lean the same way. The not-found card and its sibling, the unpublished legal card, lean right. On Home they
+alternate down the page: buyers left and right, the pile left, the permissions panel right, the ticket left. The "who acts" card leans
+right, toward its headline, and the redacted file leans right after the stamp that leans left.
