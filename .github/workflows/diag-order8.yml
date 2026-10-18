@@ -63,7 +63,7 @@ jobs:
           set -eu
           mkdir -p diag-out
           "$PGBIN/initdb" -D "$RUNNER_TEMP/probe" -U postgres -A trust > /dev/null
-          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -o "-p 55432" -l "$RUNNER_TEMP/probe.log" -w start > /dev/null
+          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -o "-p 55432 -k $RUNNER_TEMP" -l "$RUNNER_TEMP/probe.log" -w start > /dev/null
           node tools/diag-order8/clock-probe.mjs "$GITHUB_WORKSPACE/packages/persistence/package.json" 55432 150 | tee diag-out/probe.txt
           "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -m fast stop > /dev/null
       - name: BEFORE (database now()) — ACH-M-P2 CRASH-BEFORE and PARTIAL x RUNS
