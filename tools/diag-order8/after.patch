@@ -1,0 +1,13 @@
+diff --git a/apps/api/test/inbound-lane-support.ts b/apps/api/test/inbound-lane-support.ts
+index 5d214e3e..c3857538 100644
+--- a/apps/api/test/inbound-lane-support.ts
++++ b/apps/api/test/inbound-lane-support.ts
+@@ -432,7 +432,7 @@ export async function financeRetryDue(creditId: string): Promise<number> {
+   const aggregates = await bookedAggregates(creditId);
+   const tBefore = Date.now();
+   const r = await L().iw.h.oracle.query(
+-    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[]) RETURNING o.outbox_id, (extract(epoch FROM o.next_attempt_at) * 1000000)::bigint::text AS next_us",
++    "UPDATE kauro.outbox_records o SET next_attempt_at = o.created_at FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[]) RETURNING o.outbox_id, (extract(epoch FROM o.next_attempt_at) * 1000000)::bigint::text AS next_us",
+     [aggregates],
+   );
+   diagWatch = aggregates;

@@ -1,0 +1,90 @@
+name: diag-order8
+
+# ORDER 8 DIAGNOSTIC (never merged): the ACH-M-P2 CRASH-BEFORE / PARTIAL retry on real runners, before and after the helper fix, with
+# the outbox rows and pass clocks logged, and a probe of Node's Date.now() against PostgreSQL's now().
+on:
+  push:
+    branches: ['diag/order8-**']
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    name: diag (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, pgbin: 'C:/pgsql17/pgsql/bin' }
+          - { os: ubuntu-24.04, pgbin: '/usr/lib/postgresql/17/bin' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      PGBIN: ${{ matrix.pgbin }}
+      RUNS: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.16.1
+          run_install: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install PostgreSQL 17 (PGDG)
+        if: runner.os == 'Linux'
+        run: |
+          set -eu
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+      - name: Install PostgreSQL 17 (EDB binaries)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri https://get.enterprisedb.com/postgresql/postgresql-17.6-1-windows-x64-binaries.zip -OutFile $env:RUNNER_TEMP\pg17.zip
+          Expand-Archive -Path $env:RUNNER_TEMP\pg17.zip -DestinationPath C:\pgsql17
+      - run: pnpm install --frozen-lockfile
+      - run: node tools/build-generated.mjs && pnpm run build
+      - name: Clock probe (Node Date.now vs PostgreSQL now)
+        run: |
+          set -eu
+          mkdir -p diag-out
+          "$PGBIN/initdb" -D "$RUNNER_TEMP/probe" -U postgres -A trust > /dev/null
+          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -o "-p 55432" -l "$RUNNER_TEMP/probe.log" -w start > /dev/null
+          node tools/diag-order8/clock-probe.mjs "$GITHUB_WORKSPACE/packages/persistence/package.json" 55432 150 | tee diag-out/probe.txt
+          "$PGBIN/pg_ctl" -D "$RUNNER_TEMP/probe" -m fast stop > /dev/null
+      - name: BEFORE (database now()) — ACH-M-P2 CRASH-BEFORE and PARTIAL x RUNS
+        working-directory: apps/api
+        env:
+          KAURO_ORDER8_DIAG_FILE: ${{ github.workspace }}/diag-out/before.jsonl
+        run: |
+          bash ../../tools/diag-order8/loop.sh "$RUNS" ../../diag-out/before | tee ../../diag-out/before.txt
+          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/before-analysis.json | head -60
+      - name: AFTER (created_at) — same cells x RUNS
+        working-directory: apps/api
+        env:
+          KAURO_ORDER8_DIAG_FILE: ${{ github.workspace }}/diag-out/after.jsonl
+        run: |
+          git -C ../.. apply tools/diag-order8/after.patch
+          pnpm run build
+          bash ../../tools/diag-order8/loop.sh "$RUNS" ../../diag-out/after | tee ../../diag-out/after.txt
+          node ../../tools/diag-order8/analyze.mjs "$KAURO_ORDER8_DIAG_FILE" | tee ../../diag-out/after-analysis.json | head -60
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diag-order8-${{ matrix.os }}
+          path: diag-out/
+          retention-days: 14
