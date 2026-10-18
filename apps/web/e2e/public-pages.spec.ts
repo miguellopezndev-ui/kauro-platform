@@ -142,8 +142,52 @@ test("keyboard: the skip link is the first stop, visible when focused, and moves
   expect(box).not.toBeNull();
   expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
   expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+  // in front of everything, not merely on the screen: the sticky header must not cover it (independent review R-110-1)
+  expect(await onTop(skip), "the focused skip link is not covered").toBe(true);
   await page.keyboard.press("Enter");
   expect(await page.evaluate(() => document.activeElement?.id)).toBe("kauro-main");
+});
+
+/** Whether the element is what a pointer at its centre would reach: on screen and covered by nothing. */
+async function onTop(locator: ReturnType<Page["locator"]>): Promise<boolean> {
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
+    const hit = document.elementFromPoint(x, y);
+    return hit !== null && (hit === element || element.contains(hit));
+  });
+}
+
+test("navigation: on a short screen (a phone in landscape) every link of the open menu can be reached by keyboard and by pointer (independent review R-110-2)", async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 320 });
+  await page.goto("/pricing");
+  await page.locator(".kauro-site-menu summary").click();
+  const links = page.getByRole("navigation", { name: "Main" }).getByRole("link");
+  const count = await links.count();
+  expect(count).toBeGreaterThan(5);
+  for (let index = 0; index < count; index++) {
+    const link = links.nth(index);
+    await link.focus();
+    expect(await onTop(link), `${await link.textContent()} is reachable`).toBe(true);
+  }
+  await links.last().click();
+  await expect(page).toHaveURL(/\/contact$/);
+});
+
+test("theme preference: the route stores a choice only for a page of this exact origin, scheme included (independent review R-110-3)", async ({ request, baseURL }) => {
+  const own = new URL(baseURL ?? "https://localhost:44300").origin;
+  const other = own.replace(/^https:/, "http:");
+  const post = (headers: Record<string, string>) => request.post("/preferences/theme", { headers, form: { theme: "dark" }, maxRedirects: 0 });
+  const same = await post({ origin: own, "x-kauro-theme": "1" });
+  expect(same.status()).toBe(204);
+  expect(same.headers()["set-cookie"] ?? "").toContain("kauro_theme=dark");
+  for (const headers of [{ origin: other }, { origin: other, "x-kauro-theme": "1" }, { origin: "null" }, { origin: own, "sec-fetch-site": "cross-site" }]) {
+    const refused = await post(headers);
+    expect(refused.status(), JSON.stringify(headers)).toBe(403);
+    expect(refused.headers()["set-cookie"], JSON.stringify(headers)).toBeUndefined();
+  }
 });
 
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {

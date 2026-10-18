@@ -55,3 +55,48 @@ export function returnPath(value: string | null): string {
   if (!value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return "/";
   return value;
 }
+
+/** What the route reads from a request to decide whether the page that sent it is one this site served. */
+export interface RequestOriginFacts {
+  /** The request URL as the server received it (behind the TLS edge its scheme may be http). */
+  readonly url: string;
+  readonly origin: string | null;
+  readonly host: string | null;
+  /** Set by the TLS edge in front of the server; it overwrites anything a client sent. */
+  readonly forwardedProto: string | null;
+  readonly forwardedHost: string | null;
+  readonly fetchSite: string | null;
+}
+
+/**
+ * The origin this request was addressed to, scheme included: the edge's forwarded scheme and host when present, else the request URL's,
+ * so `https://localhost:44400` behind the edge and `http://localhost:3000` without it are each themselves.
+ */
+export function servedOrigin(facts: RequestOriginFacts): string | null {
+  try {
+    const url = new URL(facts.url);
+    const proto = facts.forwardedProto === "https" || facts.forwardedProto === "http" ? `${facts.forwardedProto}:` : url.protocol;
+    const host = facts.forwardedHost ?? facts.host ?? url.host;
+    return new URL(`${proto}//${host}`).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a write came from a page of this site: the Origin, when the browser sends it, must equal the served origin exactly (scheme, host
+ * and port; an opaque "null" origin is another site), and a browser's Sec-Fetch-Site, when sent, must say same-origin. A request with
+ * neither (a client that is not a browser, or an old one) is treated as the site's own; the change it can make is a display preference.
+ */
+export function sameOriginWrite(facts: RequestOriginFacts): boolean {
+  if (facts.fetchSite !== null && facts.fetchSite !== "same-origin") return false;
+  if (facts.origin === null) return true;
+  const served = servedOrigin(facts);
+  if (served === null) return false;
+  try {
+    const origin = new URL(facts.origin);
+    return origin.origin !== "null" && origin.origin === served;
+  } catch {
+    return false;
+  }
+}

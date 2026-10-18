@@ -3,7 +3,7 @@
 // which must never become an open redirect.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_SECONDS, parseTheme, resolveChoice, returnPath, themeCookie, themeOfCookieHeader } from "../src/server/theme.ts";
+import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_SECONDS, parseTheme, resolveChoice, returnPath, sameOriginWrite, servedOrigin, themeCookie, themeOfCookieHeader, type RequestOriginFacts } from "../src/server/theme.ts";
 
 test("A10: a stored value names a theme only when it is exactly light or dark", () => {
   assert.equal(parseTheme("light"), "light");
@@ -41,4 +41,26 @@ test("A10: a choice made without script returns to a path of this site and nowhe
   for (const value of [null, "", "pricing", "//evil.example/", "https://evil.example/", "/\\evil.example", "/a\u0000b", "/a\nb", `/${"a".repeat(600)}`]) {
     assert.equal(returnPath(value), "/", JSON.stringify(value));
   }
+});
+
+test("A10: a write is the site's own only when its Origin equals the served origin whole — scheme, host and port — and a browser's Sec-Fetch-Site says same-origin", () => {
+  // behind the TLS edge: the server sees http, the edge says https
+  const edge: RequestOriginFacts = { url: "http://localhost:3000/preferences/theme", origin: "https://localhost:44400", host: "localhost:44400", forwardedProto: "https", forwardedHost: "localhost:44400", fetchSite: "same-origin" };
+  assert.equal(servedOrigin(edge), "https://localhost:44400");
+  assert.equal(sameOriginWrite(edge), true);
+  // the same host and port under another scheme is another origin (the independent review's reproduction, R-110-3)
+  assert.equal(sameOriginWrite({ ...edge, origin: "http://localhost:44400", fetchSite: null }), false);
+  assert.equal(sameOriginWrite({ ...edge, origin: "https://localhost:44401", fetchSite: null }), false);
+  assert.equal(sameOriginWrite({ ...edge, origin: "https://evil.example", fetchSite: null }), false);
+  assert.equal(sameOriginWrite({ ...edge, origin: "https://www.localhost:44400", fetchSite: null }), false);
+  assert.equal(sameOriginWrite({ ...edge, origin: "null", fetchSite: null }), false, "an opaque origin is another site");
+  assert.equal(sameOriginWrite({ ...edge, origin: "not a url", fetchSite: null }), false);
+  // a browser that says the request crossed sites is refused whatever Origin says
+  for (const site of ["cross-site", "same-site", "none"]) assert.equal(sameOriginWrite({ ...edge, fetchSite: site }), false, site);
+  // without the edge, the request URL is the served origin
+  const direct: RequestOriginFacts = { url: "http://localhost:3000/preferences/theme", origin: "http://localhost:3000", host: "localhost:3000", forwardedProto: null, forwardedHost: null, fetchSite: null };
+  assert.equal(sameOriginWrite(direct), true);
+  assert.equal(sameOriginWrite({ ...direct, origin: "https://localhost:3000" }), false);
+  // a client that sends neither header is the site's own (the change is a display preference)
+  assert.equal(sameOriginWrite({ ...direct, origin: null }), true);
 });

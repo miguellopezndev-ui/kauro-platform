@@ -30,7 +30,8 @@ body:has(> .kauro-site-header) {
   position: absolute;
   inset-block-start: var(--kauro-space-2);
   inset-inline-start: var(--kauro-space-2);
-  z-index: 30;
+  /* above the sticky header (40) and its menu (31) and scrim (20), so the focused link is never covered */
+  z-index: 60;
   padding: var(--kauro-space-2) var(--kauro-space-4);
   border-radius: var(--kauro-radius);
   background: var(--kauro-color-primary);
@@ -2582,7 +2583,12 @@ body:has(> .kauro-site-header) {
   inline-size: min(22rem, calc(100vw - 2 * var(--kauro-site-gutter)));
   border-radius: var(--kauro-radius-large);
   box-shadow: 0 1.75rem 3.5rem -1.25rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent), 0 0 0 1px var(--kauro-color-border);
-  overflow: hidden;
+  /* never taller than the space under its button: on a short screen (a phone in landscape) the card scrolls inside itself, so every
+     link stays reachable by pointer and by keyboard */
+  max-block-size: calc(100dvh - 5.75rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transform-origin: top right;
 }
 .kauro-site-menu[open] .kauro-site-menu-panel {
