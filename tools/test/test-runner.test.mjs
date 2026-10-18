@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { command, normalizePath, summarizeEvents, testTarget } from '../test-runner.mjs';
+import { command, killRunner, normalizePath, runTest, summarizeEvents, testTarget } from '../test-runner.mjs';
 
 test('path normalisation decodes file URLs and percent-encoded paths before resolving Windows aliases', () => {
   const calls = [];
@@ -204,3 +205,51 @@ console.log(result.killFailure);
     }
   });
 }
+
+test('killRunner returns every pid taskkill terminated, in any display language, and refuses a listing without the runner', () => {
+  const run = (stdout, status = 0) => () => ({ status, stdout, stderr: status ? 'ERROR: not found' : '' });
+  const english = 'SUCCESS: The process with PID 3468 (child process of PID 19272) has been terminated.\r\n'
+    + 'SUCCESS: The process with PID 19272 (child process of PID 15400) has been terminated.\r\n';
+  const spanish = 'CORRECTO: se terminó el proceso con PID 3468 (proceso secundario de PID 19272).\r\n'
+    + 'CORRECTO: se terminó el proceso con PID 19272 (proceso secundario de PID 15400).\r\n';
+  for (const stdout of [english, spanish]) assert.deepEqual(killRunner(19272, { platform: 'win32', run: run(stdout) }), [3468, 19272]);
+  assert.throws(() => killRunner(19272, { platform: 'win32', run: run(english.split('\r\n')[0]) }), /did not list runner 19272/);
+  assert.throws(() => killRunner(19272, { platform: 'win32', run: run('', 128) }), /taskkill exited 128/);
+});
+
+// A timed-out run is over only when every process the kill reported has terminated (main 9dd3a3b3, windows: a stress worker
+// outlived the gate because the runner's close was taken as the whole tree's death). The fake worker below stands for a
+// descendant whose termination completes after the runner has closed, or never.
+const HUNG = "import {test} from 'node:test'; test('hang', () => new Promise(() => setInterval(() => {}, 1000)));\n";
+const RUN_TIMEOUT_MS = 500; // the runner's timeout in these two tests
+const LATE_DEATH_MS = 300; // how long after the kill the fake worker's termination completes
+const POST_KILL_BOUND_MS = 1500; // the post-kill bound handed to runTest
+// A hung test file and a separate long-lived process standing for one of the runner's workers; both are gone afterwards.
+async function withLateWorker(body) {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-late-worker-'));
+  writeFileSync(join(root, 'hung.test.mjs'), HUNG);
+  const worker = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  const exited = new Promise((resolve) => worker.once('exit', resolve));
+  try { await body({ compiled: join(root, 'hung.test.mjs'), dir: root }, worker); } finally {
+    worker.kill('SIGKILL');
+    await exited;
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+test('a timed-out run does not return while a worker the kill reported is still terminating', () => withLateWorker(async (target, worker) => {
+  const result = await runTest(target, undefined, { timeoutMs: RUN_TIMEOUT_MS, postKillWaitMs: POST_KILL_BOUND_MS, killer(pid) {
+    const killed = killRunner(pid);
+    setTimeout(() => worker.kill('SIGKILL'), LATE_DEATH_MS);
+    return [...killed, worker.pid];
+  } });
+  assert.equal(result.timedOut, true);
+  assert.equal(result.killFailure, null, result.output);
+  assert.throws(() => process.kill(worker.pid, 0), { code: 'ESRCH' }, `worker ${worker.pid} was alive when runTest returned`);
+}));
+test('a worker the kill reported that never terminates fails the run within the post-kill bound', () => withLateWorker(async (target, worker) => {
+  const result = await runTest(target, undefined, { timeoutMs: RUN_TIMEOUT_MS, postKillWaitMs: POST_KILL_BOUND_MS, killer: (pid) => [...killRunner(pid), worker.pid] });
+  assert.equal(result.timedOut, true);
+  assert.equal(result.status, null);
+  assert.equal(result.killFailure, `worker ${worker.pid} still alive ${POST_KILL_BOUND_MS} ms after kill`);
+  assert.doesNotThrow(() => process.kill(worker.pid, 0), 'the survivor is reported, not killed behind the caller\'s back');
+}));

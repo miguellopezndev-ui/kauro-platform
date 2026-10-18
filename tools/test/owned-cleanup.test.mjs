@@ -48,13 +48,13 @@ function plant(files) {
 test("S088: every recursive delete in tools/** removes a directory its own code created or an allowlisted line; a planted broad delete is refused", () => {
   const whole = census(join(repo, "tools"));
   assert.deepEqual(whole.unresolved, [], "an alias form the census cannot follow fails closed");
-  // The 80 sites are the census of 99266f52; the files of this lane add owned deletes of their own, judged by the same rule below.
+  // The 81 sites are the census of 99266f52 plus withLateWorker in test-runner.test.mjs; the files of this lane add owned deletes of their own, judged by the same rule below.
   const result = { ...whole, sites: whole.sites.filter((s) => !LANE_FILES.includes(s.file)) };
   const literal = result.sites.filter((s) => s.via === "literal");
   const aliased = result.sites.filter((s) => s.via === "alias-param");
-  assert.equal(literal.length, 74, "literal recursive deletes");
+  assert.equal(literal.length, 75, "literal recursive deletes");
   assert.equal(aliased.length, 6, "real-delete callers of withCleanup (default remover = rmSync)");
-  assert.equal(result.sites.length, 80);
+  assert.equal(result.sites.length, 81);
   assert.deepEqual(result.aliasBindings.map((b) => `${b.file}:${b.fn}`), ["test/gate-process.mjs:withCleanup"]);
   assert.equal(result.stubs.length, 7, "stub removers are not sinks");
   assert.ok(result.stubs.every((s) => s.file === "test/gate-process.test.mjs"));

@@ -47,12 +47,26 @@ export function frameOrigin(frame, file) {
   return 'other';
 }
 
-function killRunner(pid) {
-  if (process.platform === 'win32') {
-    const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-    if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`taskkill exited ${result.status}`);
-  } else process.kill(-pid, 'SIGKILL');
+// Kills the runner's tree and returns the pids it terminated. On Windows taskkill /T prints one line per terminated process
+// (leaves first, the runner last); its text is localised, so only the first number of each line, the terminated pid, is read.
+// TerminateProcess only starts a termination, so the runner closing does not prove its workers are gone (main 9dd3a3b3,
+// windows: a timed-out stress worker outlived the gate): runTest waits for every pid listed here. On Linux the group kill
+// is confirmed by the runner's close, as before.
+export function killRunner(pid, { platform = process.platform, run = spawnSync } = {}) {
+  if (platform !== 'win32') { process.kill(-pid, 'SIGKILL'); return []; }
+  const result = run('taskkill', ['/PID', String(pid), '/T', '/F'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`taskkill exited ${result.status}: ${(result.stderr ?? '').trim()}`);
+  const pids = (result.stdout ?? '').split(/\r?\n/).flatMap((line) => /\d+/.exec(line)?.[0] ?? []).map(Number);
+  // A listing without the runner is one this code cannot read: nothing would be confirmed, so the kill counts as failed.
+  if (!pids.includes(pid)) throw new Error(`taskkill did not list runner ${pid}: ${(result.stdout ?? '').trim()}`);
+  return pids;
+}
+
+// How often runTest re-checks the pids a kill reported; how long it may wait is the caller's postKillWaitMs.
+const LIVENESS_POLL_MS = 5;
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; }
 }
 
 function stopTestRunners() {
@@ -323,6 +337,8 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       let error;
       let settled = false;
       let postKillTimer;
+      let runnerClosed = false;
+      let pending = []; // the runner's descendants the kill reported, until each is observed terminated
       const finish = (status, signal, killFailure = null) => {
         if (settled) return;
         settled = true;
@@ -335,14 +351,22 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       };
       const timer = timeoutMs ? setTimeout(() => {
         timedOut = true;
-        try { killer(child.pid); } catch (cause) { error = cause; }
-        postKillTimer = setTimeout(() => finish(null, null,
-          `${error ? `${error.code ?? error.name}: ${error.message}; ` : ''}runner did not close within ${postKillWaitMs} ms after kill`), postKillWaitMs);
+        try { pending = (killer(child.pid) ?? []).filter((pid) => pid !== child.pid); } catch (cause) { error = cause; }
+        // One bound for the whole tree: a runner that does not close, or a worker still alive after it closed, is a kill failure.
+        postKillTimer = setTimeout(() => finish(null, null, `${error ? `${error.code ?? error.name}: ${error.message}; ` : ''}${runnerClosed
+          ? `worker ${pending.join(', ')} still alive ${postKillWaitMs} ms after kill` : `runner did not close within ${postKillWaitMs} ms after kill`}`), postKillWaitMs);
       }, timeoutMs) : undefined;
       child.once("error", (cause) => { error = cause; });
       child.once("close", (status, signal) => {
         runners.delete(child.pid);
-        finish(status, signal);
+        runnerClosed = true;
+        // The run ends when every process the kill reported has terminated, not when the runner alone has.
+        const confirm = () => {
+          if (settled) return;
+          pending = pending.filter(alive); // a pid seen dead is never probed again: the OS reuses pids
+          if (pending.length) setTimeout(confirm, LIVENESS_POLL_MS); else finish(status, signal);
+        };
+        confirm();
       });
     });
     const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled, { classifyMissingApi });
