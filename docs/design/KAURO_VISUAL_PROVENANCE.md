@@ -61,7 +61,8 @@ local environment with its git identity. The code in them was written by Claude.
 | `ea12f987` | 2026-10-18 | miguellopezndev-ui | Claude Opus 5.5 | motion by movement only (text legible at every instant); contact check scoped to main |
 | `7739bbe2` | 2026-10-18 | miguellopezndev-ui | (merge commit) | `main` `66423d92` (Order 8, #109) incorporated once; its file is unchanged |
 
-- Pull request: [#110](https://github.com/miguellopezndev-ui/kauro-platform/pull/110).
+- Pull request: [#110](https://github.com/miguellopezndev-ui/kauro-platform/pull/110). Commits after `7739bbe2` (the UI49 browser test as B12 built
+  it, and wording of the owner-review status) are listed on the pull request, with the same authorship rule.
 - Order 8 compatibility: `apps/api/test/inbound-lane-support.ts`, the only file Order 8 changed, is byte-identical to `main` on this
   branch, and the integration changes nothing in `apps/api`, `apps/control`, `packages/persistence` or `packages/data-plane`.
 - The commit that is finally merged and the CI results of the exact candidate are recorded on the pull request and in the integration

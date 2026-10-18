@@ -5,7 +5,7 @@ branch `design/visual-identity-integration` (cut from `main` ac6340965c098f3d0a1
 (see `CLAUDE.md`).
 
 - Registered screens: **55**. Implemented: **24**. Pending (registered, not built): **31**.
-- Implemented screens on the approved design: **24 of 24**.
+- Implemented screens on the approved design: **24 of 24**: 13 reviewed by the owner, 11 (signed-in app and operations) integrated technically, with the owner's direct visual review pending until there is authenticated access.
 - A pending screen is not a page: it has no route file, and it is not counted as covered. When it is built it follows
   [KAURO_VISUAL_IDENTITY.md](KAURO_VISUAL_IDENTITY.md).
 

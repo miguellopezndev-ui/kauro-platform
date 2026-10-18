@@ -6,6 +6,11 @@ and approved it; Claude (Anthropic's assistant) drew and implemented it (provena
 (`docs/authority/amendments/A10_VISUAL_IDENTITY.md`, §1–§9). This document states the resulting rules. Which screens follow them is listed
 in [KAURO_SCREEN_COVERAGE.md](KAURO_SCREEN_COVERAGE.md).
 
+**What the owner reviewed, and what they have not yet seen.** The owner reviewed the identity on the surfaces they could open: the public
+site, the not-found page and the legal not-published card. The customer application and internal operations screens need a sign-in that
+does not exist yet. On them, Claude extended the same identity technically (the application register of §10). The owner's direct visual
+review of those screens is still pending; the integration does not count as that review.
+
 The identity governs presentation only. It never overrides a security contract (CSP, no inline style, no remote resource), the
 accessibility contract (WCAG 2.2 AA, focus, reduced motion), the copy contract (A3, `PUBLIC_COPY`, the screen catalogues) or any
 functional decision.
@@ -193,13 +198,14 @@ No piece changes size while its content changes, so the page never jumps. A stam
 
 - **Public site:** editorial. A hero object, one point per section, wine leading where a page has one point (How it works head, CLEAN,
   the context band, the contact aside), inverse bands for weight, sunken sections for rhythm.
-- **Customer application:** the same tokens, type and components in a calmer, functional register:
+- **Customer application** (technical extension by Claude; owner visual review pending): the same tokens, type and components in a
+  calmer, functional register:
   - fact lists with hairlines;
   - one h1 and h2 sections;
   - status badges with words;
   - outlined secondary actions and a single primary action;
   - no decorative objects. The product itself is the content.
-- **Internal operations (`/ops`):** the application register, with emphasis on exact values (amounts, references, hashes in mono) and
+- **Internal operations (`/ops`)** (technical extension by Claude; owner visual review pending): the application register, with emphasis on exact values (amounts, references, hashes in mono) and
   on clearly named refusals.
 - **Legal documents:** a reading column, and the not-found card stamped "Not published" while a document is unpublished. The identity
   never changes a legal text or its authority.

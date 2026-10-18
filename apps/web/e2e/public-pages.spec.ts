@@ -165,7 +165,7 @@ test("navigation: the current page is marked in the main navigation, and every l
 
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => {
-    const form = document.querySelector("form[method='post']");
+    const form = document.querySelector("main form[method='post']");
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
 }
@@ -379,14 +379,87 @@ test("pricing: a service the publication does not list says it cannot be bought,
 
 // ---- the pages that refuse ------------------------------------------------------------------------------------------------------------
 
-test("unsubscribe: the page changes nothing, never shows the value in its address, and a link in a message reaches it under any value", async ({ page }) => {
+// UI49 as B12 built it (L-ACT, "UI49 form" and "UI49 submit"): one explicit button posts the RFC 8058 one-click body to the api's opt-out
+// route. The unit tests hold the markup and the request contract; this case holds what only a browser shows: opening the link changes
+// nothing, the press sends once, each answer is said, and the essential notices stay apart, in both themes.
+test("unsubscribe (UI49): opening the link sends nothing and never shows the value; one explicit press sends the one-click body once; failure, limit and success are said; essential notices stay apart; accessible in both themes", async ({ page }) => {
   const token = "abc123-not-a-real-token";
-  const response = await page.goto(`/unsubscribe/${token}`);
-  expect(response?.status()).toBe(200);
-  await expect(page.getByRole("heading", { name: "This page cannot stop messages yet" })).toBeVisible();
-  expect(await page.locator("body").innerText(), "the value is not shown").not.toContain(token);
-  expect(await page.title()).not.toContain(token);
-  await expect(page.locator("main form, main input, main button")).toHaveCount(0);
+  const optOut = `/api/v1/public/outreach/opt-out/${token}`;
+  const posts: Array<{ readonly method: string; readonly body: string; readonly type: string | undefined; readonly cookie: string | undefined }> = [];
+  let status = 500;
+  let held: Promise<void> = Promise.resolve();
+  await page.route(`**${optOut}`, async (route) => {
+    const request = route.request();
+    posts.push({ method: request.method(), body: request.postData() ?? "", type: request.headers()["content-type"], cookie: request.headers()["cookie"] });
+    await held;
+    await route.fulfill({ status, contentType: "application/json", body: "{}" });
+  });
+  const theme = async (name: "light" | "dark"): Promise<void> => {
+    await page.evaluate((value) => {
+      const root = document.documentElement;
+      root.setAttribute("data-theme-switching", "");
+      root.setAttribute("data-theme", value);
+      void getComputedStyle(root).color;
+      root.removeAttribute("data-theme-switching");
+    }, name);
+  };
+
+  // opening the page (a GET, as a mail client's prefetch would) changes nothing
+  const seen = watch(page);
+  await assertDocument(page, await page.goto(`/unsubscribe/${token}`), 200);
+  await hydrated(page);
+  expect(posts, "opening the link sends no opt-out").toEqual([]);
+  expect(seen.problems).toEqual([]);
+  expect(await page.locator("body").innerText(), "the value is not page text").not.toContain(token);
+  expect(await page.title(), "nor the title").not.toContain(token);
+
+  // one explicit action, and the essential notices apart from it
+  const form = page.locator("main form[method='post']");
+  await expect(form).toHaveCount(1);
+  await expect(form).toHaveAttribute("action", optOut);
+  const stop = page.getByRole("button", { name: "Stop optional messages" });
+  await expect(stop).toBeVisible();
+  const essential = page.getByRole("region", { name: "Notices you will still receive" });
+  await expect(essential).toContainText("this page never turns them off");
+  await expect(essential.locator("form, button, input")).toHaveCount(0);
+  await assertAccessible(page);
+  await theme("dark");
+  await assertAccessible(page);
+  await theme("light");
+
+  // a failure is said and the press can be repeated; a limit says to wait
+  await stop.click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("it is safe to repeat");
+  await expect(stop).toBeEnabled();
+  status = 429;
+  await stop.click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("Wait a few minutes");
+
+  // success is said only after the api's 200, and a second press while sending sends nothing
+  status = 200;
+  let release!: () => void;
+  held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const before = posts.length;
+  await stop.click();
+  await expect(stop).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Optional messages stopped" })).toHaveCount(0);
+  await stop.click({ force: true });
+  release();
+  await expect(page.getByRole("heading", { name: "Optional messages stopped" })).toBeVisible();
+  expect(posts.length - before, "one press, one request").toBe(1);
+  for (const post of posts) {
+    expect(post.method).toBe("POST");
+    expect(post.body).toBe("List-Unsubscribe=One-Click");
+    expect(post.type).toContain("application/x-www-form-urlencoded");
+    expect(post.cookie, "no credential is sent").toBeUndefined();
+  }
+  await expect(page.locator("main form[method='post']")).toHaveCount(0);
+  await expect(essential).toBeVisible();
+  await assertAccessible(page);
+  await theme("dark");
+  await assertAccessible(page);
 });
 
 for (const document of ["terms", "privacy", "data-processing"]) {
