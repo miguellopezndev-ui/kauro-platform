@@ -52,7 +52,8 @@ body {
   min-width: 0;
   padding: 0.25rem 0.375rem 0.25rem 0.875rem;
   border: 1px solid var(--kauro-color-border);
-  border-radius: 62.5rem;
+  /* a pill on one line, a soft card when a long agency name wraps */
+  border-radius: 1.25rem;
   background: var(--kauro-color-raised);
 }
 
@@ -259,6 +260,27 @@ body {
   margin: 0;
 }
 
+/* Long values (hashes, references, ids) wrap inside their cell instead of widening the page. */
+.kauro-main :where(dd, td, th) {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.kauro-main :where(code) {
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* A list of terms written straight into the dl (no row wrapper) pairs each term with its value on a wide screen. */
+@media (min-width: 48rem) {
+  .kauro-main :where(dl:not(:has(> div))) {
+    grid-template-columns: minmax(10rem, 1fr) 2fr;
+    align-items: baseline;
+  }
+}
+
 @media (min-width: 48rem) {
   .kauro-main :where(dl > div) {
     grid-template-columns: minmax(10rem, 1fr) 2fr;
@@ -268,6 +290,7 @@ body {
 
 .kauro-main :where(input[type="file"]) {
   display: block;
+  max-inline-size: 100%;
   margin-block-start: var(--kauro-space-2);
   font: inherit;
 }
@@ -287,6 +310,20 @@ body {
   align-items: center;
   gap: var(--kauro-space-3);
   margin-block: var(--kauro-space-5);
+}
+
+/* written as a list: no bullets, each action with its note under it */
+ul.kauro-actions {
+  padding: 0;
+  list-style: none;
+  align-items: flex-start;
+}
+
+ul.kauro-actions > li {
+  display: grid;
+  gap: var(--kauro-space-2);
+  justify-items: start;
+  max-inline-size: 40ch;
 }
 
 /* A shared state, or a refusal: one panel with its heading, its words and its one next step. */

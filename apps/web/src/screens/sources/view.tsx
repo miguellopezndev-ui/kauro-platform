@@ -290,7 +290,7 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
   const editable = file.admitted && props.revision.permittedActions.includes("SelectInputTables");
   return (
     <li>
-      <h4>{message("screen.sources.selection.table.heading")} {safe(name)}</h4>
+      <h3>{message("screen.sources.selection.table.heading")} {safe(name)}</h3>
       <p>
         <StatusBadge tone={table.visibility === "VISIBLE" ? "neutral" : "warning"}>{message(`screen.sources.selection.visibility.${table.visibility}`)}</StatusBadge>
         {table.hasFormulas ? (
@@ -319,7 +319,7 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
           ))}
         </ul>
       )}
-      <h5>{message("screen.sources.selection.columns.heading")}</h5>
+      <h4>{message("screen.sources.selection.columns.heading")}</h4>
       <ol>
         {table.columns.map((column) => (
           <li key={column.ordinal}>{safe(columnLabel(column))}</li>

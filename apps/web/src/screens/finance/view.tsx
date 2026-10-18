@@ -81,7 +81,7 @@ export function CreditQueue({ state, read, onState, onMore, onOpen }: CreditQueu
                 <th scope="col">{message("screen.finance.credit.fee.label")}</th>
                 <th scope="col">{message("screen.finance.credit.rail.label")}</th>
                 <th scope="col">{message("screen.finance.credit.reference.label")}</th>
-                <th scope="col" />
+                <th scope="col">{message("screen.finance.credit.action.label")}</th>
               </tr>
             </thead>
             <tbody>
