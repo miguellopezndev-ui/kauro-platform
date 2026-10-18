@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function interruptedWorker(script, args, root, pidFile, signal, env = {}) {
@@ -36,6 +37,37 @@ export async function withCleanup(root, body, remove = rmSync) {
   try { return await body(); } catch (error) { failed = true; throw error; } finally {
     try { await removeWithRetry(root, remove); } catch (cleanup) { if (!failed) throw cleanup; }
   }
+}
+
+// Run a fixture test, then remove its tree once, without retrying. A removal failure never replaces the test's own error (a
+// try/finally rmSync did: on main 9dd3a3b3, windows, red-proof's "deciding body assertion" test failed after 1.7 s, well short of
+// a full gate run, and only the cleanup EPERM was reported). After a passing body, a tree that cannot be removed fails the test
+// with what was left, since something still holds it.
+export async function removeAfter(root, body, remove = rmSync) {
+  let failed = false;
+  try { return await body(); } catch (error) { failed = true; throw error; } finally {
+    try { remove(root, { recursive: true, force: true }); } catch (cleanup) {
+      const report = `${cleanup.code ?? cleanup.name}: ${cleanup.message}; left: ${leftovers(root).join(', ') || '(none listed)'}`;
+      if (!failed) throw new Error(`fixture removal failed after a passing test: ${report}`, { cause: cleanup });
+      console.error(`fixture removal also failed (the test's own error is reported): ${report}`);
+    }
+  }
+}
+
+function leftovers(root, limit = 20) {
+  const left = [];
+  const walk = (dir) => {
+    let names;
+    try { names = readdirSync(dir); } catch { return; }
+    for (const name of names) {
+      if (left.length >= limit) return;
+      const path = join(dir, name);
+      left.push(relative(root, path) || path);
+      walk(path);
+    }
+  };
+  walk(root);
+  return left;
 }
 
 // Wait until every pid is gone and record it in `confirmed`. A pid still alive after the bound fails with "survived".
