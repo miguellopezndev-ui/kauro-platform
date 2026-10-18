@@ -30,7 +30,13 @@ export function renderComponentCss(): string {
   };
 
   add(sel(CLASS.icon), ["inline-size: 1em", "block-size: 1em", "flex: none"]);
-  add(sel(CLASS.heading), ["margin: 0 0 var(--kauro-space-3)", "line-height: var(--kauro-line-height-heading)", "font-weight: 700"]);
+  add(sel(CLASS.heading), [
+    "margin: 0 0 var(--kauro-space-3)",
+    "font-family: var(--kauro-display-family)",
+    "line-height: var(--kauro-line-height-heading)",
+    "font-weight: 650",
+    "letter-spacing: -0.015em",
+  ]);
   add(`h2${sel(CLASS.heading)}`, ["font-size: 1.5rem"]);
   add(`h3${sel(CLASS.heading)}`, ["font-size: 1.25rem"]);
   add(`h4${sel(CLASS.heading)}`, ["font-size: 1.125rem"]);
@@ -80,12 +86,13 @@ export function renderComponentCss(): string {
     "line-height: var(--kauro-line-height-body)",
     "text-decoration: none",
     "cursor: pointer",
+    "transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease",
   ]);
   add(sel(CLASS.buttonPrimary), [`background: ${color("primary")}`, `color: ${color("on-primary")}`]);
   add(`${sel(CLASS.buttonPrimary)}:hover:not(:disabled)`, [`background: ${color("primary-hover")}`, `border-color: ${color("primary-hover")}`]);
-  add(sel(CLASS.buttonSecondary), [`background: ${color("background")}`, `color: ${color("primary")}`]);
+  add(sel(CLASS.buttonSecondary), [`background: ${color("raised")}`, `color: ${color("primary")}`]);
   add(`${sel(CLASS.buttonSecondary)}:hover:not(:disabled)`, [`background: ${color("surface")}`]);
-  add(sel(CLASS.buttonDanger), [`background: ${color("background")}`, `color: ${color("danger-text")}`, `border-color: ${color("danger-text")}`]);
+  add(sel(CLASS.buttonDanger), [`background: ${color("raised")}`, `color: ${color("danger-text")}`, `border-color: ${color("danger-text")}`]);
   add(`${sel(CLASS.buttonDanger)}:hover:not(:disabled)`, [`background: ${color("danger-surface")}`]);
   add(`${sel(CLASS.button)}:disabled`, [
     `background: ${color("surface")}`,
@@ -113,17 +120,18 @@ export function renderComponentCss(): string {
     "padding: var(--kauro-space-2) var(--kauro-space-3)",
     `border: ${FOCUS_BORDER} ${color("control-border")}`,
     "border-radius: var(--kauro-radius)",
-    `background: ${color("background")}`,
+    `background: ${color("raised")}`,
     `color: ${color("text")}`,
     "font: inherit",
   ]);
+  add(`${sel(CLASS.field)} :is(input, select, textarea):hover`, [`border-color: ${color("text-muted")}`]);
   add(`${sel(CLASS.field)} :is(input, select, textarea)[aria-invalid="true"]`, [`border-color: ${color("danger-text")}`]);
 
   add(sel(CLASS.errorSummary), [
     "margin-block-end: var(--kauro-space-4)",
     "padding: var(--kauro-space-4)",
     `border: ${FOCUS_BORDER} ${color("danger-text")}`,
-    "border-radius: var(--kauro-radius)",
+    "border-radius: var(--kauro-radius-large)",
     `background: ${color("danger-surface")}`,
     `color: ${color("text")}`,
   ]);
@@ -137,16 +145,17 @@ export function renderComponentCss(): string {
     "inline-size: min(40rem, calc(100% - 2 * var(--kauro-space-4)))",
     "max-block-size: calc(100dvh - 2 * var(--kauro-space-4))",
     "overflow: auto",
-    "padding: var(--kauro-space-5)",
-    `border: ${FOCUS_BORDER} ${color("control-border")}`,
-    "border-radius: var(--kauro-radius)",
-    `background: ${color("background")}`,
+    "padding: var(--kauro-space-6)",
+    `border: ${FOCUS_BORDER} ${color("border")}`,
+    "border-radius: var(--kauro-radius-large)",
+    `background: ${color("raised")}`,
     `color: ${color("text")}`,
+    `box-shadow: 0 1.5rem 3rem -1rem color-mix(in srgb, ${color("ink")} 35%, transparent)`,
   ]);
   add(`${sel(CLASS.dialog)}::backdrop`, [`background: color-mix(in srgb, ${color("text")} 60%, transparent)`]);
   add(sel(CLASS.dialogSummary), ["margin-block-end: var(--kauro-space-4)"]);
   add(sel(CLASS.effectList), ["display: grid", "gap: var(--kauro-space-4)", "margin: 0", "padding: 0", "list-style: none"]);
-  add(sel(CLASS.effect), [`border: ${FOCUS_BORDER} ${color("border")}`, "border-radius: var(--kauro-radius)", "padding: var(--kauro-space-4)"]);
+  add(sel(CLASS.effect), [`border: ${FOCUS_BORDER} ${color("border")}`, "border-radius: var(--kauro-radius-large)", "padding: var(--kauro-space-4)"]);
   add(`${sel(CLASS.effectDescription)} p`, ["margin: 0 0 var(--kauro-space-2)"]);
   add(sel(CLASS.effectAcknowledge), ["display: flex", "align-items: flex-start", "gap: var(--kauro-space-3)"]);
   add(`${sel(CLASS.effectAcknowledge)} input`, ["flex: none", "inline-size: 1.5rem", "block-size: 1.5rem", "margin: 0"]);
@@ -155,14 +164,14 @@ export function renderComponentCss(): string {
   // Tables.
   add(sel(CLASS.tableRegion), ["max-inline-size: 100%", "overflow-x: auto"]);
   add(sel(CLASS.table), ["inline-size: 100%", "border-collapse: collapse"]);
-  add(sel(CLASS.tableCaption), ["padding-block-end: var(--kauro-space-2)", "text-align: start", "font-weight: 700"]);
+  add(sel(CLASS.tableCaption), ["padding-block-end: var(--kauro-space-3)", "text-align: start", "font-family: var(--kauro-display-family)", "font-weight: 650"]);
   add(`${sel(CLASS.table)} :is(th, td)`, [
-    "padding: var(--kauro-space-2) var(--kauro-space-3)",
+    "padding: var(--kauro-space-3)",
     "text-align: start",
     "vertical-align: top",
     `border-block-end: ${FOCUS_BORDER} ${color("border")}`,
   ]);
-  add(`${sel(CLASS.table)} thead th`, [`background: ${color("surface")}`]);
+  add(`${sel(CLASS.table)} thead th`, [`background: ${color("surface")}`, `color: ${color("text-muted")}`, "font-size: var(--kauro-font-size-dense)", "font-weight: 600"]);
   add(`${sel(CLASS.table)} :is(th, td)${sel(CLASS.tableEnd)}`, ["text-align: end", "font-variant-numeric: tabular-nums"]);
   add(sel(CLASS.tableEmpty), [`color: ${color("text-muted")}`]);
   add(sel(CLASS.sortButton), [
@@ -187,9 +196,9 @@ export function renderComponentCss(): string {
     "display: inline-flex",
     "align-items: center",
     "gap: var(--kauro-space-1)",
-    "padding: var(--kauro-space-1) var(--kauro-space-2)",
+    "padding: 0.125rem var(--kauro-space-3) 0.125rem var(--kauro-space-2)",
     "border: var(--kauro-border-width) solid currentColor",
-    "border-radius: var(--kauro-radius)",
+    "border-radius: 62.5rem",
     "font-size: var(--kauro-font-size-dense)",
     "font-weight: 600",
   ]);
@@ -197,9 +206,10 @@ export function renderComponentCss(): string {
     "display: flex",
     "align-items: flex-start",
     "gap: var(--kauro-space-3)",
-    "padding: var(--kauro-space-3) var(--kauro-space-4)",
+    "padding: var(--kauro-space-4)",
     "border: var(--kauro-border-width) solid currentColor",
-    "border-radius: var(--kauro-radius)",
+    "border-inline-start-width: 0.25rem",
+    "border-radius: var(--kauro-radius-large)",
   ]);
   add(sel(CLASS.bannerBody), ["flex: 1", "min-inline-size: 0", `color: ${color("text")}`]);
   add(sel(CLASS.bannerTitle), ["margin: 0 0 var(--kauro-space-1)", "font-weight: 700"]);
@@ -218,11 +228,11 @@ export function renderComponentCss(): string {
   add(sel(CLASS.phaseFailed), [`color: ${color("danger-text")}`]);
 
   // The count panel.
-  add(sel(CLASS.countPanel), [`border: ${FOCUS_BORDER} ${color("border")}`, "border-radius: var(--kauro-radius)", "padding: var(--kauro-space-4)"]);
+  add(sel(CLASS.countPanel), [`border: ${FOCUS_BORDER} ${color("border")}`, "border-radius: var(--kauro-radius-large)", "padding: var(--kauro-space-5)", `background: ${color("raised")}`]);
   add(sel(CLASS.measures), ["display: grid", "grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr))", "gap: var(--kauro-space-4)", "margin: 0"]);
-  add(`${sel(CLASS.measure)} dt`, ["font-weight: 700"]);
+  add(`${sel(CLASS.measure)} dt`, ["font-weight: 600"]);
   add(`${sel(CLASS.measure)} dd`, ["margin: 0"]);
-  add(sel(CLASS.measureValue), ["font-size: 1.5rem", "font-variant-numeric: tabular-nums"]);
+  add(sel(CLASS.measureValue), ["font-family: var(--kauro-display-family)", "font-size: 1.75rem", "font-weight: 600", "letter-spacing: -0.02em", "font-variant-numeric: tabular-nums"]);
   add(sel(CLASS.measureDefinition), [`color: ${color("text-muted")}`, "font-size: var(--kauro-font-size-dense)"]);
   add(sel(CLASS.outputFiles), ["margin: 0", "padding: 0", "list-style: none", "font-size: var(--kauro-font-size-body)"]);
   add(`${sel(CLASS.outputFiles)} li`, ["display: flex", "justify-content: space-between", "gap: var(--kauro-space-3)"]);

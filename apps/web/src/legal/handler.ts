@@ -3,6 +3,7 @@
 // serve its own document and no other.
 import { renderTokenCss } from "@kauro/ui";
 import { NONCE_REQUEST_HEADER } from "../server/security-headers.ts";
+import { themeOfCookieHeader } from "../server/theme.ts";
 import { parseOperatorFacts, type OperatorFacts } from "./facts.ts";
 import shipped from "./operator-facts.json" with { type: "json" };
 import { renderLegal, type LegalKey } from "./render.ts";
@@ -19,6 +20,6 @@ export function legalHandler(key: LegalKey, facts: OperatorFacts = OPERATOR_FACT
     const nonce = request.headers.get(NONCE_REQUEST_HEADER);
     // a page written without its nonce would run without its policy: refuse it, as the root layout does (D-SEC-1)
     if (nonce === null || !NONCE_PATTERN.test(nonce)) throw new Error("CSP_NONCE_MISSING");
-    return legalResponse(renderLegal(key, facts), { nonce, css: STYLESHEET });
+    return legalResponse(renderLegal(key, facts), { nonce, css: STYLESHEET, theme: themeOfCookieHeader(request.headers.get("cookie")) });
   };
 }

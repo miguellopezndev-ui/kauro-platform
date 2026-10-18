@@ -9,6 +9,7 @@
 import { type ComponentType, type ReactElement, type ReactNode, useEffect, useRef } from "react";
 import { message } from "../copy/en.ts";
 import { Main, SkipLink } from "./landmarks.tsx";
+import { ThemeControl } from "./theme-control.tsx";
 import type { RefusedAction, ShellView } from "./view.ts";
 
 export interface AnchorProps {
@@ -86,9 +87,17 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
               </Link>
             )}
             {view.signOut ? (
-              <button type="button" className="kauro-button" onClick={actions.signOut}>
-                {message("shell.sign-out.label")}
-              </button>
+              <>
+                <ThemeControl
+                  mode="button"
+                  className="kauro-shell-theme"
+                  returnTo={null}
+                  labels={{ toDark: message("shell.theme.dark.label"), toLight: message("shell.theme.light.label"), toggle: message("shell.theme.toggle.label") }}
+                />
+                <button type="button" className="kauro-button" onClick={actions.signOut}>
+                  {message("shell.sign-out.label")}
+                </button>
+              </>
             ) : null}
           </div>
         )}

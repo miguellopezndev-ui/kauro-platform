@@ -148,6 +148,8 @@ test("keyboard: the skip link is the first stop, visible when focused, and moves
 
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
   await page.goto("/pricing");
+  // the main navigation is folded into the header's menu (amendment A10): open it, as a visitor does
+  await page.locator(".kauro-site-menu summary").click();
   const main = page.getByRole("navigation", { name: "Main" });
   await expect(main.locator('a[aria-current="page"]')).toHaveText("Pricing");
   await expect(main.locator('a[aria-current="page"]')).toHaveCount(1);

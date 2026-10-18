@@ -1,14 +1,15 @@
 # @kauro/ui
 
-The design system of the web surfaces (B11 D-DS-1): the colour, type, spacing and focus tokens of the interface contract, the
-stylesheet rendered from them, and the accessible React 19 primitives built on both. Private to this repository; the
+The design system of the web surfaces (B11 D-DS-1, amendment A10): the colour, type, spacing and focus tokens — the Kauro palette in a
+light and a dark theme, and the inverse and wine bands — the stylesheet rendered from them, and the accessible React 19 primitives built
+on both. Private to this repository; the
 application (`apps/web`) is the only consumer.
 
 ## What is here
 
 | Part | Where |
 |---|---|
-| Tokens and the WCAG 2.2 AA contrast checks that bind them | `src/tokens.ts` |
+| Tokens of both themes and the bands, and the WCAG 2.2 AA contrast checks that bind every palette | `src/tokens.ts` |
 | The component stylesheet (every rule reads a token) | `src/styles.ts`, written into `tokens.css` by `renderTokenCss()` |
 | Number, money and deadline formatting | `src/format.ts` |
 | Primitives | `src/components/*.tsx`, all exported from `src/index.ts` |

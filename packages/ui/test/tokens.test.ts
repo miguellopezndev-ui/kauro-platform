@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { COLOR, FOCUS, NON_TEXT_PAIRS, TEXT_PAIRS, TYPOGRAPHY, contrastRatio, relativeLuminance, renderTokenCss } from "../src/index.js";
+import { BRAND, COLOR, COLOR_DARK, FOCUS, NON_TEXT_PAIRS, TEXT_PAIRS, THEMES, TYPOGRAPHY, contrastRatio, relativeLuminance, renderTokenCss } from "../src/index.js";
 
 // dist/test/tokens.test.js -> the package root
 const packageRoot = join(import.meta.dirname, "..", "..");
@@ -12,12 +12,18 @@ test("D-DS-1: tokens.css is exactly the rendering of TOKENS, so the stylesheet t
   assert.equal(onDisk, renderTokenCss());
 });
 
-test("D-DS-1: the interface contract's fixed values — text #17212B on white, primary #0B6463 with white text, focus #005FCC, body 16px/1.5, dense text never below 14px, a two-pixel focus indicator with spacing, system-ui with no external font", () => {
-  assert.equal(COLOR.text, "#17212B");
-  assert.equal(COLOR.background, "#FFFFFF");
-  assert.equal(COLOR.primary, "#0B6463");
-  assert.equal(COLOR.onPrimary, "#FFFFFF");
-  assert.equal(COLOR.focus, "#005FCC");
+test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcelain, wine primary with porcelain text, clay as the dark theme's primary on carbon, body 16px/1.5, dense text never below 14px, a two-pixel focus indicator with spacing, system-ui with no external font", () => {
+  assert.deepEqual({ ...BRAND }, { carbon: "#242426", porcelain: "#F8F6F3", wine: "#653A46", clay: "#C4A693" });
+  assert.equal(COLOR.text, BRAND.carbon);
+  assert.equal(COLOR.background, BRAND.porcelain);
+  assert.equal(COLOR.primary, BRAND.wine);
+  assert.equal(COLOR.onPrimary, BRAND.porcelain);
+  assert.equal(COLOR.focus, COLOR.primary);
+  assert.equal(COLOR_DARK.background, BRAND.carbon);
+  assert.equal(COLOR_DARK.primary, BRAND.clay);
+  assert.equal(COLOR_DARK.onPrimary, BRAND.carbon);
+  assert.equal(COLOR_DARK.focus, COLOR_DARK.primary);
+  assert.deepEqual(Object.keys(COLOR_DARK), Object.keys(COLOR), "the dark theme defines every token, so no rule falls back to a light value");
   assert.equal(TYPOGRAPHY.bodySizePx, 16);
   assert.equal(TYPOGRAPHY.bodyLineHeight, 1.5);
   assert.ok(TYPOGRAPHY.denseSizePx >= 14);
@@ -27,19 +33,36 @@ test("D-DS-1: the interface contract's fixed values — text #17212B on white, p
   assert.doesNotMatch(renderTokenCss(), /url\(|@import|@font-face/, "no external font or resource request");
 });
 
-test("D-DS-1: every text pair reaches 4.5:1 and every non-text indicator 3:1 (WCAG 2.2 SC 1.4.3, 1.4.11)", () => {
-  for (const [fg, bg] of TEXT_PAIRS) {
-    const ratio = contrastRatio(COLOR[fg], COLOR[bg]);
-    assert.ok(ratio >= 4.5, `${fg} on ${bg}: ${ratio.toFixed(2)}:1 < 4.5:1`);
-  }
-  for (const [fg, bg] of NON_TEXT_PAIRS) {
-    const ratio = contrastRatio(COLOR[fg], COLOR[bg]);
-    assert.ok(ratio >= 3, `${fg} against ${bg}: ${ratio.toFixed(2)}:1 < 3:1`);
+test("D-DS-1: in both themes every text pair reaches 4.5:1 and every non-text indicator 3:1 (WCAG 2.2 SC 1.4.3, 1.4.11)", () => {
+  for (const [theme, palette] of Object.entries(THEMES)) {
+    for (const [fg, bg] of TEXT_PAIRS) {
+      const ratio = contrastRatio(palette[fg], palette[bg]);
+      assert.ok(ratio >= 4.5, `${theme}: ${fg} on ${bg}: ${ratio.toFixed(2)}:1 < 4.5:1`);
+    }
+    for (const [fg, bg] of NON_TEXT_PAIRS) {
+      const ratio = contrastRatio(palette[fg], palette[bg]);
+      assert.ok(ratio >= 3, `${theme}: ${fg} against ${bg}: ${ratio.toFixed(2)}:1 < 3:1`);
+    }
   }
 });
 
-test("D-DS-2: the focus colour is not distinguishable against the primary fill (below 3:1), which is why the focus ring is an offset outline drawn over the surface, never adjacent to the fill", () => {
+test("A10: the dark theme applies when the document asks for it, or when the system asks and the document does not say light; the light theme is the default", () => {
+  const css = renderTokenCss();
+  assert.match(css, /^:root \{\n {2}color-scheme: light;\n {2}--kauro-color-text: #242426;/m);
+  assert.match(css, /@media \(prefers-color-scheme: dark\) \{\n {2}:root:not\(\[data-theme="light"\]\) \{\n {4}color-scheme: dark;\n {4}--kauro-color-text: #F1ECE6;/);
+  assert.match(css, /^:root\[data-theme="dark"\] \{\n {2}color-scheme: dark;\n {2}--kauro-color-text: #F1ECE6;/m);
+  const blocks = [...css.matchAll(/^( *)(:root[^{\n]*|\.kauro-(?:inverse|wine)|:root[^{\n]* \.kauro-inverse) \{\n([\s\S]*?)^\1\}$/gm)].filter((match) => (match[3] ?? "").includes("--kauro-color-"));
+  assert.equal(blocks.length, 7, "light, system dark, chosen dark, the inverse band in light, in system dark and in chosen dark, and the wine band");
+  const property = (name: string): string => `--kauro-color-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}:`;
+  for (const block of blocks) for (const name of Object.keys(COLOR)) assert.ok((block[3] ?? "").includes(property(name)), `${block[2]} defines ${name}`);
+  assert.match(css, /^\.kauro-inverse \{\n {2}color-scheme: dark;/m);
+  assert.match(css, /^\.kauro-wine \{\n {2}color-scheme: dark;/m);
+  for (const palette of Object.values(THEMES)) assert.deepEqual(Object.keys(palette).sort(), Object.keys(COLOR).sort(), "every palette defines every token");
+});
+
+test("D-DS-2: in each theme the focus colour is the primary fill's own colour (below 3:1 against it), which is why the focus ring is an offset outline drawn over the surface, never adjacent to the fill", () => {
   assert.ok(contrastRatio(COLOR.focus, COLOR.primary) < 3);
+  assert.ok(contrastRatio(COLOR_DARK.focus, COLOR_DARK.primary) < 3);
   const css = renderTokenCss();
   assert.match(css, /:focus-visible \{\n {2}outline: var\(--kauro-focus-width\) solid var\(--kauro-color-focus\);\n {2}outline-offset: var\(--kauro-focus-offset\);/);
   assert.match(css, /@media \(forced-colors: active\)/, "the outline survives forced colours (high contrast)");

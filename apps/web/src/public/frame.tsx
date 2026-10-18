@@ -1,9 +1,9 @@
-// The frame every public page shares (UI01-UI08, UI48, UI49): a skip link, the site header with its navigation and the sign-in link, the
-// main region every page renders into, and a footer with the service links and the one-line limit of what Kauro does.
+// The frame every public page shares (UI01-UI08, UI48, UI49): a skip link, the site header with its navigation, the theme control and the
+// sign-in link, the main region every page renders into, and a footer with the name, the one-line limit of what Kauro does and the service links.
 //
-// Pure markup with no router: the navigation that marks the current page is handed in (the client component src/app/(public)/main-nav.tsx
-// reads the path), so node:test renders this whole frame. Classes are all kauro-site-*: this frame and W3's application shell never share a
-// selector. The main region's id is the one the application shell also uses for its skip link.
+// Pure markup with no router: the navigation that marks the current page and the theme control are handed in (the client components of
+// src/app/(public)/ read the path), so node:test renders this whole frame. Classes are all kauro-site-*: this frame and W3's application shell
+// never share a selector. The main region's id is the one the application shell also uses for its skip link.
 import type { ReactElement, ReactNode } from "react";
 import { PUBLIC_COPY, type PublicCopyId } from "../copy/public.ts";
 import { FOOTER_NAV, ROUTE, type NavItem } from "./site.ts";
@@ -39,12 +39,14 @@ export interface SiteFrameProps {
   readonly signInHref: string;
   /** The header navigation. */
   readonly nav: ReactNode;
+  /** The colour theme control (a client component); none in a render that has no browser. */
+  readonly themeControl?: ReactNode;
   /** The footer navigation; the plain list when not given. */
   readonly footerNav?: ReactNode;
   readonly children: ReactNode;
 }
 
-export function SiteFrame({ signInHref, nav, footerNav, children }: SiteFrameProps): ReactElement {
+export function SiteFrame({ signInHref, nav, themeControl, footerNav, children }: SiteFrameProps): ReactElement {
   return (
     <>
       <a className="kauro-site-skip" href={`#${MAIN_ID}`}>
@@ -56,9 +58,12 @@ export function SiteFrame({ signInHref, nav, footerNav, children }: SiteFramePro
             {PUBLIC_COPY["site.name"]}
           </a>
           {nav}
-          <a className="kauro-site-signin" href={signInHref}>
-            {PUBLIC_COPY["nav.signin.label"]}
-          </a>
+          <div className="kauro-site-header-actions">
+            {themeControl}
+            <a className="kauro-site-signin" href={signInHref}>
+              {PUBLIC_COPY["nav.signin.label"]}
+            </a>
+          </div>
         </div>
       </header>
       <main id={MAIN_ID} className="kauro-site-main" tabIndex={-1}>
@@ -66,8 +71,16 @@ export function SiteFrame({ signInHref, nav, footerNav, children }: SiteFramePro
       </main>
       <footer className="kauro-site-footer">
         <div className="kauro-site-footer-inner">
-          {footerNav ?? <NavList items={FOOTER_NAV} current={null} label="site.nav.footer.label" />}
-          <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
+          <div className="kauro-site-footer-lead">
+            <p className="kauro-site-footer-name" aria-hidden="true">
+              {PUBLIC_COPY["site.name"]}
+            </p>
+            <p className="kauro-site-footer-tagline">{PUBLIC_COPY["site.footer.tagline"]}</p>
+          </div>
+          <div className="kauro-site-footer-meta">
+            {footerNav ?? <NavList items={FOOTER_NAV} current={null} label="site.nav.footer.label" />}
+            <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
+          </div>
         </div>
       </footer>
     </>
