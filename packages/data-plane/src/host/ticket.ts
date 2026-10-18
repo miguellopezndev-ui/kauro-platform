@@ -90,6 +90,8 @@ export function readAttemptTicket(bytes: Uint8Array, expectedDigest: string): At
   } catch {
     return refuse("TICKET_NOT_CANONICAL");
   }
+  // one spelling only: the bytes are exactly the canonical form of what they parse to
+  if (Buffer.compare(Buffer.from(canonicalBytes(doc)), Buffer.from(bytes)) !== 0) return refuse("TICKET_NOT_CANONICAL");
   const wrapper = doc as { readonly domain?: unknown; readonly version?: unknown; readonly payload?: unknown } | null;
   if (wrapper === null || typeof wrapper !== "object" || Object.keys(wrapper).sort().join() !== "domain,payload,version") return refuse("TICKET_NOT_A_WRAPPER");
   if (wrapper.domain !== ATTEMPT_TICKET_DOMAIN || wrapper.version !== 1) return refuse("TICKET_FOREIGN_DOMAIN");

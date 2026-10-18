@@ -4,7 +4,8 @@
 // broker. The report's inputs are the platform-binding inputs of the assembler's tests (synthetic, consistent; the control plane's
 // suite reads the same bindings from PostgreSQL 17). The package the worker must deliver is the one the core's own validation of the
 // same plan binding produced in this process first — so a delivered report also proves the worker's run reproduced it byte for byte.
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -111,16 +112,16 @@ export interface LocalRig {
   dispose(): Promise<void>;
 }
 
-export function localRig(options: { readonly hooks?: LocalProcessHostHooks; readonly maxWallClockMs?: number; readonly workerHeapMegabytes?: number; readonly coreHeapMegabytes?: number; readonly terminationGraceMs?: number } = {}): LocalRig {
+export function localRig(options: { readonly root?: string; readonly workerEntry?: string; readonly hooks?: LocalProcessHostHooks; readonly maxWallClockMs?: number; readonly workerHeapMegabytes?: number; readonly coreHeapMegabytes?: number; readonly terminationGraceMs?: number } = {}): LocalRig {
   if (BROWSER === null) throw new Error("no Chromium-family browser (set KAURO_PDF_BROWSER)");
-  const root = mkdtempSync(join(tmpdir(), "kauro-b14a-"));
+  const root = options.root ?? mkdtempSync(join(tmpdir(), "kauro-b14a-"));
   const hostRoot = join(root, "host");
   const scratchRoot = join(root, "scratch");
   const storage = new ContractFakeObjectStorage();
   const reads: LocalRig["reads"] = new Map();
   const make = (): LocalProcessWorkerHost =>
     new LocalProcessWorkerHost({
-      workerEntry: WORKER_ENTRY,
+      workerEntry: options.workerEntry ?? WORKER_ENTRY,
       codeRoots: [REPO_ROOT],
       hostRoot,
       scratchRoot,
@@ -159,7 +160,7 @@ export function localRig(options: { readonly hooks?: LocalProcessHostHooks; read
     },
     async dispose() {
       for (const h of hosts) await h.stop();
-      rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      if (options.root === undefined) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 }
@@ -176,4 +177,40 @@ export async function readsFor(rig: LocalRig, planted: Planted, edit: (inputs: A
 }
 
 export const hasWorkerEntry = existsSync(WORKER_ENTRY);
-export { dirname };
+/** The hostile worker (support/hostile-worker.ts), compiled beside this file. */
+export const HOSTILE_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "hostile-worker.js");
+
+/**
+ * The pids of the processes whose command line names `marker` (an attempt's scratch directory: the worker's own flags, the core child's
+ * call directory and the browser's profile all name it). Linux reads /proc; Windows asks CIM for every process's command line.
+ */
+export function processesReferencing(marker: string): number[] {
+  if (process.platform === "linux") {
+    const out: number[] = [];
+    for (const name of readdirSync("/proc")) {
+      if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
+      try {
+        if (readFileSync(`/proc/${name}/cmdline`, "utf8").includes(marker)) out.push(Number(name));
+      } catch {
+        // gone
+      }
+    }
+    return out;
+  }
+  if (process.platform === "win32") {
+    const escaped = marker.replace(/'/g, "''");
+    const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('${escaped}') } | ForEach-Object { $_.ProcessId }`], { encoding: "utf8", windowsHide: true });
+    return String(r.stdout ?? "").split(/\s+/).filter((x) => /^\d+$/.test(x)).map(Number).filter((pid) => pid !== process.pid);
+  }
+  return [];
+}
+
+/** Polls until `check` holds or `timeoutMs` passes (a process appearing or disappearing; never an interleaving). */
+export async function eventually(check: () => boolean | Promise<boolean>, timeoutMs = 20_000, everyMs = 100): Promise<boolean> {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    if (await check()) return true;
+    if (Date.now() > until) return false;
+    await new Promise((r) => setTimeout(r, everyMs));
+  }
+}
