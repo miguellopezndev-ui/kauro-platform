@@ -416,7 +416,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       hardScratchBytes: spec.limits.hardScratchBytes,
     };
     this.#persist(record);
-    const env: Record<string, string> = process.env["KAURO_WORKER_DEBUG_STACK"] === "1" ? { KAURO_WORKER_DEBUG_STACK: "1" } : {};
+    const env: Record<string, string> = {};
     // Windows resolves its system libraries through SystemRoot; nothing else of the host's environment reaches the worker
     const systemRoot = process.env["SystemRoot"];
     if (systemRoot !== undefined) env["SystemRoot"] = systemRoot;

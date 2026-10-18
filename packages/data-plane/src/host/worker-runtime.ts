@@ -56,8 +56,7 @@ export interface AttemptWorkerOptions {
 export function diagnosticOf(error: unknown): string {
   if (!(error instanceof Error)) return `non-error ${typeof error}`;
   const code = (error as { code?: unknown }).code;
-  return `${error.name}${typeof code === "string" ? ` ${code}` : ""}: ${error.message.slice(0, 500)}` + (process.env["KAURO_WORKER_DEBUG_STACK"] === "1" ? `
-${error.stack ?? ""}` : "");
+  return `${error.name}${typeof code === "string" ? ` ${code}` : ""}: ${error.message.slice(0, 500)}`;
 }
 
 const sameScope = (a: ReportScope, b: ReportScope): boolean => a.agencyId === b.agencyId && a.projectId === b.projectId && a.jobId === b.jobId && a.attemptId === b.attemptId;

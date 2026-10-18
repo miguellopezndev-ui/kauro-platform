@@ -1,0 +1,42 @@
+{
+  "$comment": "B14-A contract: the inline policy of one attempt's role kauro-attempt-<attemptId>, created by the launcher with the launch intent and deleted by STAGING_JANITOR. Exactly the attempt's capability (D8-STG-1): its ticket, its sealed generations (one statement per object and version), its own prefix and its protocol keys. No list, no delete, no other prefix.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadTicket",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/tickets/kauro-attempt-${ATTEMPT_ID}"
+    },
+    {
+      "Sid": "ReadSealedGeneration1",
+      "Effect": "Allow",
+      "Action": "s3:GetObjectVersion",
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/${SEALED_OBJECT_NAME_1}",
+      "Condition": { "StringEquals": { "s3:VersionId": "${SEALED_GENERATION_1}" } }
+    },
+    {
+      "Sid": "WriteOwnKeysOnce",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": [
+        "arn:aws:s3:::${OBJECT_BUCKET}/staging/${AGENCY_ID}/${PROJECT_ID}/${JOB_ID}/${ATTEMPT_ID}/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/claims/kauro-attempt-${ATTEMPT_ID}",
+        "arn:aws:s3:::${OBJECT_BUCKET}/results/kauro-attempt-${ATTEMPT_ID}"
+      ],
+      "Condition": { "Null": { "s3:if-none-match": "false" } }
+    },
+    {
+      "Sid": "Heartbeat",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/heartbeat/kauro-attempt-${ATTEMPT_ID}"
+    },
+    {
+      "Sid": "ReadBackOwnPrefix",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/staging/${AGENCY_ID}/${PROJECT_ID}/${JOB_ID}/${ATTEMPT_ID}/*"
+    }
+  ]
+}

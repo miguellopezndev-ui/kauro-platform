@@ -183,8 +183,9 @@ until its OWNER or ADMIN records one.
 
 ## 9. Still blocked until B14/B15
 
-- Binding `ReportingExecutionEnvelope` and `PlatformReportInputs` in a deployment (B14's worker host and composition root; how the worker
-  reaches the control plane's read); a deployment-pinned browser.
+- Binding `ReportingExecutionEnvelope` and `PlatformReportInputs` in a deployment. Order 9 (B14-A) built the local composition: the
+  control plane reads the inputs at launch into the worker's attempt ticket, so the worker reaches no database
+  ([B14-A-worker-executor.md](B14-A-worker-executor.md) §3); the cloud host is qualified on documentation only.
 - Cloud object storage, the fiscal issuance route and its provider (B15); the real fiscal issuer row.
 - The branding UI (CMD008, its media pipeline and the stored logo: order 7, docs/design/B13-branding.md).
 - Replacement of a delivered package (`AVAILABLE → RETIRED`), a product decision.

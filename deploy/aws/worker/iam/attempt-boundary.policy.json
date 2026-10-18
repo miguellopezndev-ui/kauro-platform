@@ -1,0 +1,19 @@
+{
+  "$comment": "B14-A contract: the permissions boundary every attempt role carries (the launcher's iam:CreateRole is allowed only with it). The most any attempt role can ever do: read tickets, accepted objects and staging, and write staging and the protocol keys of the platform bucket. Never IAM, never another service, never a deletion.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AttemptCeiling",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"],
+      "Resource": [
+        "arn:aws:s3:::${OBJECT_BUCKET}/tickets/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/accepted/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/staging/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/claims/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/results/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/heartbeat/*"
+      ]
+    }
+  ]
+}

@@ -5,7 +5,9 @@
  * `WorkerHostPort` runs one processing attempt as one provider job keyed by the attempt's deterministic identity
  * `kauro-attempt-<attemptId>`, recorded before launch (07 "deterministic provider job identity"; 10 "Provider adapter contract"):
  * launch creates by identity (ALREADY_EXISTS adopts), a timeout is AMBIGUOUS and nothing is created again until `observe`
- * answers, and only NOT_FOUND after the host's creation horizon proves no effect. The real host is B14's (Cloud Batch); tests bind
+ * answers, and only NOT_FOUND after the host's creation horizon proves no effect. The hosts are B14's: LocalProcessWorkerHost of
+ * @kauro/data-plane (B14-A, EXECUTED_LOCAL) and, under A9, Amazon ECS RunTask on Fargate (qualified on documentation only,
+ * docs/design/B14-A-aws-host-qualification.md); tests bind
  * the labelled ContractFakeWorkerHost (`@kauro/data-plane/testing/worker-host`, D8-FAKE-1). Every answer carries `evidenceClass`:
  * EXECUTED_PROVIDER only from a cloud provider's real answer, EXECUTED_LOCAL from the local process host of B14-A (a real isolated
  * process on this machine, never a provider), SIMULATED from a contract fake.

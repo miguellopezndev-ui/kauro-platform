@@ -13,7 +13,7 @@ export interface CoreTimers {
 
 /**
  * The timers of a process clock injected by the composition (B05 D5-2, CK3): the cores read no process clock of their own; the
- * product's process clocks are its four injection points (apps/control composition.ts controlClock among them).
+ * product's process clocks are its five injection points (apps/control composition.ts controlClock and the migration worker's workerClock among them).
  */
 export const coreTimersOf = (clock: { nowMs(): number }): CoreTimers => ({
   nowMs: () => clock.nowMs(),
