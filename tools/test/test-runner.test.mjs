@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { command, normalizePath, summarizeEvents, testTarget } from '../test-runner.mjs';
+import { command, killRunner, normalizePath, runTest, summarizeEvents, testTarget } from '../test-runner.mjs';
+import { assertDead, killUnconfirmed } from './gate-process.mjs';
 
 test('path normalisation decodes file URLs and percent-encoded paths before resolving Windows aliases', () => {
   const calls = [];
@@ -167,7 +169,7 @@ test('testTarget canonicalises repository and test paths without allowing a sibl
 });
 
 for (const code of ['EPERM', 'ESRCH']) {
-  test(`a ${code} killer cannot leave runTest waiting forever`, () => {
+  test(`a ${code} killer cannot leave runTest waiting forever`, async () => {
     const root = mkdtempSync(join(tmpdir(), 'kauro-kill-failure-'));
     const runner = join(root, 'gate.mjs');
     const compiled = join(root, 'hung.test.mjs');
@@ -190,17 +192,83 @@ assert.ok(result.durationMs < 2000);
 console.log(result.killFailure);
 `);
     let pid;
+    // The gate's exit hook kills the runner it could not stop. Signalling that pid again afterwards, unconditionally, could hit
+    // another process the OS has given it (ADV-24): it was 2 taskkill calls on a dead pid per tools-suite round on windows-latest.
+    const confirmed = new Set();
     try {
       const result = command(process.execPath, [runner], root);
       pid = Number(readFileSync(join(root, 'pid'), 'utf8'));
       assert.equal(result.status, 0, result.output);
       assert.match(result.output, new RegExp(code));
+      await assertDead([pid], 'runner', 'its gate exiting', confirmed);
     } finally {
-      if (pid) {
-        if (process.platform === 'win32') command('taskkill', ['/PID', String(pid), '/T', '/F'], root);
-        else { try { process.kill(-pid, 'SIGKILL'); } catch { /* already terminated */ } }
-      }
+      if (pid) killUnconfirmed([pid], confirmed, process.platform === 'win32'
+        ? (unconfirmed) => command('taskkill', ['/PID', String(unconfirmed), '/T', '/F'], root) : (unconfirmed) => process.kill(-unconfirmed, 'SIGKILL'));
       rmSync(root, {recursive: true, force: true});
     }
   });
+}
+
+test('killRunner returns every pid taskkill terminated, in any display language, and refuses a listing without the runner', () => {
+  const run = (stdout, status = 0) => () => ({ status, stdout, stderr: status ? 'ERROR: not found' : '' });
+  const english = 'SUCCESS: The process with PID 3468 (child process of PID 19272) has been terminated.\r\n'
+    + 'SUCCESS: The process with PID 19272 (child process of PID 15400) has been terminated.\r\n';
+  const spanish = 'CORRECTO: se terminó el proceso con PID 3468 (proceso secundario de PID 19272).\r\n'
+    + 'CORRECTO: se terminó el proceso con PID 19272 (proceso secundario de PID 15400).\r\n';
+  for (const stdout of [english, spanish]) assert.deepEqual(killRunner(19272, { platform: 'win32', run: run(stdout) }), [3468, 19272]);
+  assert.throws(() => killRunner(19272, { platform: 'win32', run: run(english.split('\r\n')[0]) }), /did not list runner 19272/);
+  assert.throws(() => killRunner(19272, { platform: 'win32', run: run('', 128) }), /taskkill exited 128/);
+});
+
+// A timed-out run is over only when every process the kill reported has terminated (main 9dd3a3b3, windows: a stress worker
+// outlived the gate because the runner's close was taken as the whole tree's death). The fake worker below stands for a
+// descendant whose termination completes after the runner has closed, or never.
+const HUNG = "import {test} from 'node:test'; test('hang', () => new Promise(() => setInterval(() => {}, 1000)));\n";
+const RUN_TIMEOUT_MS = 500; // the runner's timeout in these two tests
+const LATE_DEATH_MS = 300; // how long after the kill the fake worker's termination completes
+const POST_KILL_BOUND_MS = 1500; // the post-kill bound handed to runTest
+// A hung test file and a separate long-lived process standing for one of the runner's workers; both are gone afterwards.
+async function withLateWorker(body) {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-late-worker-'));
+  writeFileSync(join(root, 'hung.test.mjs'), HUNG);
+  const worker = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  const exited = new Promise((resolve) => worker.once('exit', resolve));
+  try { await body({ compiled: join(root, 'hung.test.mjs'), dir: root }, worker); } finally {
+    worker.kill('SIGKILL');
+    await exited;
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+test('a timed-out run does not return while a worker the kill reported is still terminating', () => withLateWorker(async (target, worker) => {
+  const result = await runTest(target, undefined, { timeoutMs: RUN_TIMEOUT_MS, postKillWaitMs: POST_KILL_BOUND_MS, killer(pid) {
+    const killed = killRunner(pid);
+    setTimeout(() => worker.kill('SIGKILL'), LATE_DEATH_MS);
+    return [...killed, worker.pid];
+  } });
+  assert.equal(result.timedOut, true);
+  assert.equal(result.killFailure, null, result.output);
+  assert.throws(() => process.kill(worker.pid, 0), { code: 'ESRCH' }, `worker ${worker.pid} was alive when runTest returned`);
+}));
+test('a worker the kill reported that never terminates fails the run within the post-kill bound', () => withLateWorker(async (target, worker) => {
+  const result = await runTest(target, undefined, { timeoutMs: RUN_TIMEOUT_MS, postKillWaitMs: POST_KILL_BOUND_MS, killer: (pid) => [...killRunner(pid), worker.pid] });
+  assert.equal(result.timedOut, true);
+  assert.equal(result.status, null);
+  assert.equal(result.killFailure, `worker ${worker.pid} still alive ${POST_KILL_BOUND_MS} ms after kill`);
+  assert.doesNotThrow(() => process.kill(worker.pid, 0), 'the survivor is reported, not killed behind the caller\'s back');
+}));
+// Codex R-112-1: a kill that failed or could not be read confirms nothing, even when the runner itself then closes.
+for (const [mode, fake, reason] of [
+  ['a taskkill listing without the runner', (worker) => ({ status: 0, stdout: `SUCCESS: The process with PID ${worker} (child process of PID 1) has been terminated.\r\n` }), /did not list runner \d+/],
+  ['a taskkill that failed for part of the tree', (worker) => ({ status: 1, stdout: `SUCCESS: The process with PID ${worker} (child process of PID 1) has been terminated.\r\n`, stderr: 'ERROR: one process could not be terminated.' }), /taskkill exited 1: ERROR: one process could not be terminated\./],
+]) {
+  test(`${mode} is a kill failure even though the runner closes`, () => withLateWorker(async (target, worker) => {
+    const result = await runTest(target, undefined, { timeoutMs: RUN_TIMEOUT_MS, postKillWaitMs: POST_KILL_BOUND_MS, killer(pid) {
+      killRunner(pid); // the runner really dies and closes
+      return killRunner(pid, { platform: 'win32', run: () => fake(worker.pid) }); // but what the kill reports cannot be confirmed
+    } });
+    assert.equal(result.timedOut, true);
+    assert.match(result.killFailure ?? '', reason);
+    assert.match(result.killFailure, /the runner closed but its tree's termination is unconfirmed$/);
+    assert.doesNotThrow(() => process.kill(worker.pid, 0), 'the unconfirmed worker is reported, not assumed dead');
+  }));
 }

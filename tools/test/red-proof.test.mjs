@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { command, requireCommand } from "../test-runner.mjs";
-import { interruptedWorker, withCleanup } from './gate-process.mjs';
+import { interruptedWorker, removeAfter, withCleanup } from './gate-process.mjs';
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../red-proof.mjs");
 const file = "packages/cell/test/value.test.ts";
@@ -73,7 +73,7 @@ for (const [name, expected, verdict, failedWithoutFix, passedAtHead] of [
 ]) {
   test(name, () => {
     const f = fixture(expected);
-    try {
+    return removeAfter(f.parent, () => {
       const result = command(process.execPath, [script, f.base, f.head, "--tests", file], f.root, { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1" } });
       assert.equal(result.status, verdict === "PASS" ? 0 : 1, result.output);
       const report = JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8"));
@@ -95,13 +95,13 @@ for (const [name, expected, verdict, failedWithoutFix, passedAtHead] of [
       assert.equal(f.git("worktree", "list", "--porcelain").match(/^worktree /gm).length, 1);
       assert.equal(f.git("rev-parse", "HEAD"), f.head);
       assert.equal(f.git("status", "--porcelain"), "", "caller tree must remain unchanged");
-    } finally { rmSync(f.parent, { recursive: true, force: true }); }
+    });
   });
 }
 
 test("every named test must fail red, including a test that is green in both phases", () => {
   const f = fixture();
-  try {
+  return removeAfter(f.parent, () => {
     const green = "packages/cell/test/green.test.ts";
     f.put(green, "import {test} from 'node:test'; test('always green', () => {});\n");
     f.git("add", green);
@@ -113,23 +113,23 @@ test("every named test must fail red, including a test that is green in both pha
     assert.equal(report.verdict, "FAIL");
     assert.deepEqual(report.tests.map((row) => [row.failedWithoutFix, row.passedAtHead]), [[true, true], [false, true]]);
     assert.deepEqual(readdirSync(f.scratch), []);
-  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+  });
 });
 
 test("invalid revision and missing test are usage errors; temporary files are cleaned", () => {
   const f = fixture();
-  try {
+  return removeAfter(f.parent, () => {
     for (const args of [[], ["missing-revision", f.head, "--tests", file], [f.base, f.head, "--tests", "packages/cell/test/missing.test.ts"]]) {
       const result = command(process.execPath, [script, ...args], f.root, { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1" } });
       assert.equal(result.status, 2, result.output);
       assert.deepEqual(readdirSync(f.scratch), []);
     }
-  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+  });
 });
 
 test("R2-114: a build failure is not counted as a failing assertion and still cleans up", () => {
   const f = fixture();
-  try {
+  return removeAfter(f.parent, () => {
     f.put("packages/cell/build.mjs", "throw new Error('broken build');\n");
     f.git("add", ".");
     f.git("commit", "-qm", "broken build");
@@ -141,12 +141,12 @@ test("R2-114: a build failure is not counted as a failing assertion and still cl
     assert.equal(report.tests[0].passedAtHead, false);
     assert.match(report.errors.join("\n"), /broken build/);
     assert.deepEqual(readdirSync(f.scratch), []);
-  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+  });
 });
 
 test("R2-114: a test whose import only exists at head is INCONCLUSIVE, not red", () => {
   const f = fixture();
-  try {
+  return removeAfter(f.parent, () => {
     const only = "packages/cell/test/export.test.ts";
     f.put("packages/cell/src/value.ts", "export const value = 2;\nexport const headOnly = 1;\n");
     f.put(only, "import assert from 'node:assert/strict'; import {test} from 'node:test'; import {headOnly} from '../src/value.js';\ntest('uses head export', () => assert.equal(headOnly, 1));\n");
@@ -160,12 +160,12 @@ test("R2-114: a test whose import only exists at head is INCONCLUSIVE, not red",
     assert.equal(report.tests[0].failedWithoutFix, false);
     assert.match(report.inconclusive.join("\n"), /failed to load/);
     assert.deepEqual(readdirSync(f.scratch), []);
-  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+  });
 });
 
 test("a diff that touches no reverted path is refused with exit 2", () => {
   const f = fixture();
-  try {
+  return removeAfter(f.parent, () => {
     f.put(file, "import {test} from 'node:test'; test('only a test changed', () => {});\n");
     f.git("add", ".");
     f.git("commit", "-qm", "test only");
@@ -175,7 +175,7 @@ test("a diff that touches no reverted path is refused with exit 2", () => {
     assert.match(result.output, /nothing to revert/);
     assert.equal(JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8")).verdict, "INCONCLUSIVE");
     assert.deepEqual(readdirSync(f.scratch), []);
-  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+  });
 });
 
 const HEAD = "import assert from 'node:assert/strict'; import {test, describe, before} from 'node:test'; import {value} from '../src/value.js';\n";
@@ -192,7 +192,7 @@ for (const [name, baseSource, headSource, body, redNames] of [
 ]) {
   test(name, () => {
     const f = fixture(2, baseSource);
-    try {
+    return removeAfter(f.parent, () => {
       f.put('packages/cell/src/value.ts', headSource);
       f.put(file, HEAD + body);
       f.git('add', '.'); f.git('commit', '-qm', name);
@@ -204,7 +204,7 @@ for (const [name, baseSource, headSource, body, redNames] of [
       assert.deepEqual(report.tests[0].baseFailedNames, redNames);
       if (name.startsWith('a mixed')) assert.match(report.tests[0].firstFailingAssertion, /AssertionError.*GENUINE RED/);
       assert.deepEqual(readdirSync(f.scratch), []);
-    } finally { rmSync(f.parent, {recursive: true, force: true}); }
+    });
   });
 }
 // ADV-18: decide by where the TypeError was thrown. A test-code frame means the API is absent (INCONCLUSIVE);
@@ -229,7 +229,7 @@ for (const [name, body, extra, reason] of [
 ]) {
   test(name, () => {
     const f = fixture(2, extra.base ?? LEDGER_BASE, extra.baseFiles);
-    try {
+    return removeAfter(f.parent, () => {
       f.put('packages/cell/src/value.ts', LEDGER_HEAD);
       if (extra.helper) f.put('packages/cell/test/helper.ts', extra.helper);
       if (extra.support) f.put('packages/cell/test/test-support/helper.ts', extra.support);
@@ -242,12 +242,12 @@ for (const [name, body, extra, reason] of [
       assert.equal(report.verdict, 'INCONCLUSIVE');
       assert.equal(report.tests[0].failedWithoutFix, false);
       assert.match(report.inconclusive.join('\n'), reason);
-    } finally { rmSync(f.parent, {recursive: true, force: true}); }
+    });
   });
 }
 test('a TypeError thrown inside product code stays RED even when called from a helper', () => {
   const f = fixture(2, 'export const value = 1; export class Ledger { post() { const hook = undefined; return hook(); } }');
-  try {
+  return removeAfter(f.parent, () => {
     f.put('packages/cell/src/value.ts', 'export const value = 2; export class Ledger { post() { return "posted"; } }');
     f.put('packages/cell/test/helper.ts', "import {Ledger} from '../src/value.js'; export function run() { return new Ledger().post(); }\n");
     f.put(file, NO_VALUE("import {run} from './helper.js'; test('posts', () => assert.equal(run(), 'posted'));"));
@@ -258,7 +258,7 @@ test('a TypeError thrown inside product code stays RED even when called from a h
     assert.equal(report.verdict, 'PASS');
     assert.deepEqual(report.tests[0].baseFailedNames, ['posts']);
     assert.match(report.tests[0].firstFailingAssertion, /hook is not a function/);
-  } finally { rmSync(f.parent, {recursive: true, force: true}); }
+  });
 });
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGKILL']) {
   test(`interrupting red-proof gate with ${signal} kills its worker`, { skip: (signal === 'SIGKILL' ? process.platform !== 'win32' : process.platform !== 'linux') && (signal === 'SIGKILL' ? 'Windows job-object test; Linux signals are tested separately' : 'Linux signal test; Windows has its own gate-kill test') }, async () => {
@@ -274,7 +274,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGKILL']) {
 }
 test("red proof records the deciding body assertion ahead of a failing hook", () => {
   const f = fixture();
-  try {
+  return removeAfter(f.parent, () => {
     f.put(file, HEAD + `describe('fixture with a broken hook', () => {
   before(() => { if (value === 1) assert.fail('HOOK DECOY'); });
   test('blocked by hook', () => {});
@@ -291,7 +291,7 @@ test('actual regression', () => assert.equal(value, 2, 'BODY REGRESSION'));
     assert.deepEqual(report.tests[0].baseFailedNames, ["actual regression"]);
     assert.match(report.tests[0].firstFailingAssertion, /AssertionError.*BODY REGRESSION/);
     assert.doesNotMatch(report.tests[0].firstFailingAssertion, /HOOK DECOY/);
-  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+  });
 });
 
 test("a timed-out red-proof worker is dead before head runs and the gate returns", async () => {
@@ -367,7 +367,7 @@ for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason,
 ]) {
   test(name, () => {
     const f = fixture();
-    try {
+    return removeAfter(f.parent, () => {
       f.put(file, HEAD + body);
       f.git("add", ".");
       f.git("commit", "-qm", "scenario");
@@ -381,6 +381,6 @@ for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason,
       if (expectedPaths) assert.deepEqual(report.tests[0].baseFailedPaths, expectedPaths);
       if (reason) assert.match(report.inconclusive.join("\n"), reason);
       assert.deepEqual(readdirSync(f.scratch), []);
-    } finally { rmSync(f.parent, { recursive: true, force: true }); }
+    });
   });
 }

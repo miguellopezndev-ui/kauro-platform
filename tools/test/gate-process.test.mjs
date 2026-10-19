@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assertDead, hasTerminated, interruptedWorker, killUnconfirmed, withCleanup } from './gate-process.mjs';
+import { assertDead, hasTerminated, interruptedWorker, killUnconfirmed, removeAfter, withCleanup } from './gate-process.mjs';
 
 test('cleanup failure never replaces the primary assertion error', async () => {
   const primary = new Error('worker survived');
@@ -80,4 +80,23 @@ test('a pid that vanishes between the liveness probe and the /proc read counts a
   assert.equal(hasTerminated(1, 'linux', () => '1 (node) S 0'), false);
   assert.equal(hasTerminated(1, 'win32', enoent), false, 'only Linux consults /proc');
   assert.throws(() => hasTerminated(1, 'linux', () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
+});
+
+test('removeAfter removes once, keeps a failing test error primary, and fails a passing test whose tree is still held', async () => {
+  const calls = [];
+  await removeAfter('dir', () => 'body result', (path, options) => { calls.push([path, options]); });
+  assert.deepEqual(calls, [['dir', { recursive: true, force: true }]], 'one removal, no retry options');
+  const held = (path) => { calls.push(path); throw Object.assign(new Error('EPERM, Permission denied'), { code: 'EPERM' }); };
+  calls.length = 0;
+  const primary = new Error('gate exited 1');
+  await assert.rejects(removeAfter('x', () => { throw primary; }, held), (error) => error === primary);
+  assert.deepEqual(calls, ['x'], 'not retried after a failing body either');
+  const root = mkdtempSync(join(tmpdir(), 'kauro-remove-after-'));
+  mkdirSync(join(root, 'repo'));
+  writeFileSync(join(root, 'repo', 'red-proof.json'), '{}');
+  calls.length = 0;
+  await assert.rejects(removeAfter(root, () => {}, held), (error) => error.message === `fixture removal failed after a passing test: EPERM: EPERM, Permission denied; left: repo, ${join('repo', 'red-proof.json')}` && error.cause.code === 'EPERM');
+  assert.deepEqual(calls, [root]);
+  await removeAfter(root, () => {});
+  assert.equal(existsSync(root), false);
 });
