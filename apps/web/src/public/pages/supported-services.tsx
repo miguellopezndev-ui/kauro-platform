@@ -85,11 +85,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
   return (
     <>
       <PageHead eyebrow={PUBLIC_COPY["nav.services.label"]} accent={3} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} size="compact" />
-      <Section
-        id="services-availability"
-        heading={PUBLIC_COPY["services.availability.heading"]}
-        headExtra={publication.kind === "READ" ? <p className="kauro-site-observed">{copy("services.availability.observed", { time: formatInstant(publication.observedAt) })}</p> : undefined}
-      >
+      <Section id="services-availability" heading={PUBLIC_COPY["services.availability.heading"]}>
         {publication.kind === "READ" ? (
           modes.length === 0 ? <p className="kauro-site-callout">{PUBLIC_COPY["services.availability.none"]}</p> : null
         ) : (

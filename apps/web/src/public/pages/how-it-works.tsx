@@ -1,10 +1,12 @@
 // UI02 How it works: six steps in one ordered list (A3 3.2: the check is free, bounded and never promised as immediate; approval and the quote
 // are named; the import is the team's own), then where the team's responsibility starts. The head is wine and carries a card of who acts at
 // each step, so the page shows at a glance that the decisions and the import stay with the customer and the preparation is Kauro's (A10
-// §8). Each step sits beside a fragment of the product as it looks at that step (artifacts.tsx), from the synthetic sample and the policy.
+// §8). Each step sits beside a fragment of the product as it looks at that step (artifacts.tsx), from the synthetic sample and the policy; on a
+// wide screen the fragments become one window that is brought up to date as the reader walks down the steps (how-flow.tsx).
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { Approval, Counts, FileChips, ImportOrder, MarginNote, Pane, Reconcile } from "../artifacts.tsx";
+import { HowFlow } from "../how-flow.tsx";
 import { LinkButton, PageHead, PriceFigure, Section } from "../parts.tsx";
 import { formatUsd, startingPrice } from "../pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
@@ -126,20 +128,18 @@ export function HowItWorksPage(): ReactElement {
           </ul>
         }
       >
-        <ol className="kauro-site-timeline kauro-steps">
-          {STEPS.map((step) => (
-            <li key={step.key} className={`kauro-site-timeline-step kauro-site-timeline-step--${step.actor} kauro-step`}>
-              <div className="kauro-step-text">
-                <p className="kauro-site-actor">{PUBLIC_COPY[ACTOR_LABEL[step.actor]]}</p>
-                <h3>{PUBLIC_COPY[step.heading]}</h3>
-                <p>{PUBLIC_COPY[step.body]}</p>
-              </div>
-              <div className="kauro-step-pane">
-                <StepPane step={step.key} />
-              </div>
-            </li>
-          ))}
-        </ol>
+        <HowFlow
+          brand={PUBLIC_COPY["site.name"]}
+          project={PUBLIC_COPY["home.app.project.name"]}
+          steps={STEPS.map((step) => ({
+            key: step.key,
+            actor: step.actor,
+            actorLabel: PUBLIC_COPY[ACTOR_LABEL[step.actor]],
+            heading: PUBLIC_COPY[step.heading],
+            body: PUBLIC_COPY[step.body],
+            pane: <StepPane step={step.key} />,
+          }))}
+        />
       </Section>
       <Section id="how-responsibility" heading={PUBLIC_COPY["how.responsibility.heading"]} layout="split" tone="inverse" variant="kauro-site-band-grain">
         <p className="kauro-site-statement">{PUBLIC_COPY["how.responsibility.body"]}</p>

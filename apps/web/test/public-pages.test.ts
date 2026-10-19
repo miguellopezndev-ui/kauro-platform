@@ -254,7 +254,8 @@ test("Supported services: CLEAN stands beside HubSpot and Salesforce as one of t
   assert.deepEqual(h3, ["CLEAN", "HubSpot", "Salesforce"]);
   assert.equal(count(html, "<article"), 3);
   for (const name of ["CLEAN", "HubSpot", "Salesforce"]) assert.match(card(html, name), /Available for new projects/);
-  assert.match(textOf(html), /Read from the capability publication at 2026-10-02 09:30 UTC\./);
+  // the read time is not shown on this page (owner review, Order 10); Service status keeps it
+  assert.doesNotMatch(textOf(html), /Read from the capability publication at/);
   assert.match(card(html, "HubSpot"), /Publication version 2026\.10\.0, available since 2026-10-01 15:00 UTC\./);
   assert.match(card(html, "CLEAN"), /Kauro qualifies imports only for HubSpot and Salesforce\./);
   assert.match(card(html, "HubSpot"), /marketing-contact status and paid enrichment stay switched off/);

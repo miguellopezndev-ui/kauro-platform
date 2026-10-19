@@ -209,7 +209,6 @@ export const PUBLIC_COPY = {
   "services.title": "Check your files and target before you start.",
   "services.lead": "This page reads the publication that decides which projects Kauro accepts. A service that is not listed as available cannot be bought, whatever an older page or a cached copy says.",
   "services.availability.heading": "Availability now",
-  "services.availability.observed": "Read from the capability publication at {time}.",
   "services.availability.unknown": "The capability publication cannot be read right now, so no service is shown as available. Nothing here is a statement that a service is running or that it is stopped.",
   "services.availability.none": "The capability publication lists no service as available for new projects right now.",
   "services.mode.available": "Available for new projects",
