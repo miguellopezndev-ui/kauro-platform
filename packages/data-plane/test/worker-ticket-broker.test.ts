@@ -7,7 +7,7 @@ import { test } from "node:test";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { ContractFakeObjectStorage } from "@kauro/application/testing";
 import { stagedArtifactObjectNameOf } from "@kauro/application";
-import { AttemptStorageBroker, BrokerRefusal, attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, readAttemptTicket, type AttemptTicket, type WorkerCall } from "../src/index.js";
+import { AttemptStorageBroker, BrokerRefusal, workerResultProblem, attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, readAttemptTicket, type AttemptTicket, type WorkerCall } from "../src/index.js";
 import { attemptFixture, collect, holderOf, sha } from "./support/attempt.js";
 import { hostLimits, plantedAttempt } from "./support/local-host.js";
 
@@ -239,4 +239,21 @@ test("B14-A broker (review round 16, R16-1): what an attempt makes the host hold
   await new Promise((r) => setImmediate(r));
   held.splice(0).forEach((release) => release());
   await again;
+});
+
+test("B14-A broker and protocol (review round 17, R17-1): nothing a worker sends is kept unbounded — an unknown operation is recorded as UNKNOWN, never as its own string, and a result outside the closed, bounded shape is no result", async () => {
+  const storage = new ContractFakeObjectStorage();
+  const ticket = ticketOf(storage, 6);
+  const broker = new AttemptStorageBroker({ capability: ticket.capability, storage, uploads: holderOf(storage), origin: "https://app.kauro.test", maxObjectBytes: 1 << 20 });
+  const huge = "x".repeat(1 << 20);
+  await assert.rejects(broker.handle({ op: huge } as unknown as WorkerCall), (e: unknown) => e instanceof BrokerRefusal);
+  assert.deepEqual(broker.refusals().at(-1), { op: "UNKNOWN", code: "OUTSIDE_CAPABILITY" });
+  const ok = { state: "SUCCEEDED", cause: null, manifest: { objectName: "x", generation: "12" }, refusal: null, peakScratchBytes: 1, peakMemoryBytes: 2 };
+  assert.equal(workerResultProblem(ok), null);
+  assert.equal(workerResultProblem({ ...ok, refusal: huge }), "RESULT_REFUSAL");
+  assert.equal(workerResultProblem({ ...ok, extra: 1 }), "RESULT_FIELDS");
+  assert.equal(workerResultProblem({ ...ok, manifest: { objectName: "x", generation: "12", sha256: huge } }), "RESULT_MANIFEST");
+  assert.equal(workerResultProblem({ ...ok, cause: huge }), "RESULT_CAUSE");
+  assert.equal(workerResultProblem({ ...ok, state: "DONE" }), "RESULT_STATE");
+  assert.equal(workerResultProblem({ ...ok, peakMemoryBytes: -1 }), "RESULT_PEAKS");
 });

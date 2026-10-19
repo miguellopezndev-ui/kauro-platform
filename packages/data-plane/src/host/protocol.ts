@@ -27,6 +27,9 @@ export type WorkerCall =
   | { readonly op: "storage.cancelSession"; readonly handle: string; readonly timeoutMs: number }
   | { readonly op: "upload.writeChunk"; readonly handle: string; readonly chunk: Uint8Array; readonly final: boolean };
 
+/** Every call a worker may make, closed: anything else is refused and recorded as UNKNOWN (never as the worker's own string). */
+export const WORKER_CALL_OPS = ["stage", "storage.readOpen", "storage.readNext", "storage.readClose", "storage.stat", "storage.createSession", "storage.cancelSession", "upload.writeChunk"] as const;
+
 /** A refusal or failure as it crosses the channel: a token, a message without customer values, and whether a retry may help. */
 export interface WorkerCallError {
   readonly code: string;
@@ -42,6 +45,32 @@ export interface WorkerResultReport {
   readonly refusal: string | null;
   readonly peakScratchBytes: number;
   readonly peakMemoryBytes: number;
+}
+
+const TOKEN = /^[A-Z][A-Z0-9_]{0,63}$/;
+/** The longest refusal a result may carry (a token, or a test's hostile observations); anything longer makes the result malformed. */
+export const MAX_RESULT_REFUSAL_CHARS = 8_192;
+
+/**
+ * Why a worker's result is not one the host may keep (null when it is): the closed shape only, every string bounded, so a worker can
+ * neither forge a field the host does not know nor make the host hold or record an unbounded value (review round 17, R17-1).
+ */
+export function workerResultProblem(result: unknown): string | null {
+  if (result === null || typeof result !== "object") return "RESULT_NOT_AN_OBJECT";
+  const r = result as Record<string, unknown>;
+  if (r["state"] !== "SUCCEEDED" && r["state"] !== "FAILED") return "RESULT_STATE";
+  if (r["cause"] !== null && (typeof r["cause"] !== "string" || !TOKEN.test(r["cause"]))) return "RESULT_CAUSE";
+  if (r["refusal"] !== null && (typeof r["refusal"] !== "string" || r["refusal"].length > MAX_RESULT_REFUSAL_CHARS)) return "RESULT_REFUSAL";
+  for (const name of ["peakScratchBytes", "peakMemoryBytes"]) if (!Number.isSafeInteger(r[name]) || (r[name] as number) < 0) return "RESULT_PEAKS";
+  const manifest = r["manifest"];
+  if (manifest !== null) {
+    if (typeof manifest !== "object") return "RESULT_MANIFEST";
+    const m = manifest as Record<string, unknown>;
+    if (Object.keys(m).some((k) => k !== "objectName" && k !== "generation")) return "RESULT_MANIFEST";
+    if (typeof m["objectName"] !== "string" || m["objectName"].length > 1024 || typeof m["generation"] !== "string" || !/^[0-9]{1,32}$/.test(m["generation"])) return "RESULT_MANIFEST";
+  }
+  if (Object.keys(r).some((k) => !["state", "cause", "manifest", "refusal", "peakScratchBytes", "peakMemoryBytes"].includes(k))) return "RESULT_FIELDS";
+  return null;
 }
 
 /** host -> worker */

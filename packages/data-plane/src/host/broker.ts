@@ -17,7 +17,7 @@
  */
 import { isObjectName } from "@kauro/domain";
 import type { AttemptCapability, ObjectStoragePort, ResumableUploadPort, StorageLocation } from "@kauro/application";
-import type { BrokeredZone, SessionAnswer, StatAnswer, WorkerCall, WorkerCallError } from "./protocol.js";
+import { WORKER_CALL_OPS, type BrokeredZone, type SessionAnswer, type StatAnswer, type WorkerCall, type WorkerCallError } from "./protocol.js";
 
 const GENERATION = /^[1-9][0-9]{0,19}$/;
 /** The largest piece of a read the broker hands over at once (the worker pulls the next one when it has written this one). */
@@ -139,7 +139,9 @@ export class AttemptStorageBroker {
       reserved = true;
       return await this.#dispatch(call);
     } catch (error) {
-      if (error instanceof BrokerRefusal && this.#refusals.length < MAX_REFUSALS_KEPT) this.#refusals.push({ op: typeof call?.op === "string" ? call.op : ("unknown" as WorkerCall["op"]), code: error.code });
+      // the operation as one of the protocol's own tokens: a worker's own string is never kept (review round 17, R17-1)
+      const op = (WORKER_CALL_OPS as readonly unknown[]).includes(call?.op) ? call.op : ("UNKNOWN" as WorkerCall["op"]);
+      if (error instanceof BrokerRefusal && this.#refusals.length < MAX_REFUSALS_KEPT) this.#refusals.push({ op, code: error.code });
       throw error;
     } finally {
       if (reserved) {

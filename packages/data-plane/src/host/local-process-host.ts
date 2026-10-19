@@ -53,10 +53,10 @@ import { attemptScratchDirectoryOf } from "../attempt/scratch-store.js";
 import type { AuthorizedReportInputs } from "../report/facts.js";
 import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
-import { AttemptStorageBroker, callErrorOf } from "./broker.js";
+import { AttemptStorageBroker, BrokerRefusal, callErrorOf } from "./broker.js";
 import { killProcessTree, linuxAttemptProcesses, linuxProcessOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 import { SUPERVISOR_READY, readVerdict, standDownOrVerdict, type SupervisorConfig } from "./supervisor.js";
-import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
+import { WORKER_PROTOCOL_VERSION, WORKER_STAGES, workerResultProblem, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
 
 export const LOCAL_PROCESS_HOST = "kauro-local-process-host";
@@ -728,7 +728,9 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       return;
     }
     if (message.t === "result") {
-      if (live.result === null) live.result = message.result;
+      // a result outside the protocol's closed, bounded shape is kept as a worker error, never as what it says (review R17-1)
+      const problem = workerResultProblem(message.result);
+      if (live.result === null) live.result = problem === null ? message.result : { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: problem, peakScratchBytes: 0, peakMemoryBytes: 0 };
       return;
     }
     if (message.t !== "call" || typeof message.id !== "number") return;
@@ -736,7 +738,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const call = message.call;
     try {
       let value: unknown = null;
-      if (call?.op === "stage") await this.#o.hooks?.atStage?.(record.identity, call.stage);
+      if (call?.op === "stage") {
+        if (!(WORKER_STAGES as readonly unknown[]).includes(call.stage)) throw new BrokerRefusal("MALFORMED_CALL", "no such stage");
+        await this.#o.hooks?.atStage?.(record.identity, call.stage);
+      }
       else {
         await this.#o.hooks?.beforeCall?.(record.identity, call);
         value = await live.broker.handle(call);
