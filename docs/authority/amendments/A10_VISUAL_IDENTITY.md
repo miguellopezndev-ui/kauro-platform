@@ -168,18 +168,25 @@ recorded in `docs/design/KAURO_VISUAL_PROVENANCE.md`. This amendment remains the
 ## 11. The agreed faces implemented on the web (Order 10, 2026-10-19)
 
 The owner's typography decision of 2026-10-18 (recorded in KAURO_VISUAL_IDENTITY.md §3) replaced the system families of §1–§10 with
-Inter and JetBrains Mono. The printed report already used them; Order 10 implements them on the public web, without a new brand
-decision.
+Inter and JetBrains Mono. The printed report already used them; Order 10 implements them on the web, without a new brand decision.
 
-- **Faces:** Inter 4.1 (variable, roman and italic) and JetBrains Mono 2.304 (400, 500, 600, 700). Official release files, licences and
-  provenance are in `apps/web/src/fonts`. Three files are byte-identical to the report's.
-- **Serving:** by `next/font/local` from Kauro's own origin. Only Inter's roman is preloaded, with a metric-adjusted fallback so text
-  does not reflow. No CDN, nothing fetched elsewhere, CSP `font-src 'self'`.
-- **Tokens:** `packages/ui/src/tokens.ts` names the faces (`--kauro-face-*`) before a system stack. Headings use the same Inter, whose
-  optical size axis gives large sizes their display cut.
+- **Faces:** Inter 4.1 (variable roman, italic 400) and JetBrains Mono 2.304 (400, 500, 600, 700). The official release files, licences
+  and provenance are in `apps/web/public/fonts`; three files are byte-identical to the report's.
+- **Serving:** `apps/web/src/server/faces.ts` declares the faces once, served from Kauro's own origin at stable versioned paths
+  (`/fonts/inter-4.1/…`, `/fonts/jetbrains-mono-2.304/…`).
+  - Every document carries the declaration, inlined under the request's nonce: the root layout and the legal pages, whose route handler
+    writes its own document.
+  - Only Inter's roman is preloaded.
+  - "Inter Fallback" is the local Arial with Inter's metrics, so body text does not reflow when Inter arrives. JetBrains Mono falls back to
+    the system mono, so a few technical lines move slightly on arrival (layout shift measured at 0.03 or less).
+  - There is no CDN, and the CSP keeps `font-src 'self'`.
+- **Tokens:** `packages/ui/src/tokens.ts` names "Inter", "Inter Fallback" and "JetBrains Mono" before a system stack. Headings use the
+  same Inter, whose optical size axis gives large sizes their display cut.
 - **Notes:** the editor's notes are set in Inter Italic; the Georgia serif of §1 is retired. No third family remains.
+- **Scope:** the faces apply to every document the web serves, so the implemented application screens (§10, owner review pending) are set
+  in Inter too, as the identity requires. No private screen was built or changed in structure.
 - **Wordmark:** "Kauro" is set in Inter. No reproducible artifact of a custom "a" exists in the repository, so none was invented; any
   custom letterform awaits the owner's visual review.
 
-What the wider face changed on narrow screens, and how it was corrected, is recorded in the Order 10 evidence (gallery and word-break
-audit) and in KAURO_VISUAL_IDENTITY.md §3 and §5. The rules of §1–§10 otherwise stand unchanged.
+The wider face exposed words breaking inside narrow columns on phones. The corrections are recorded in KAURO_VISUAL_IDENTITY.md §3
+("Narrow screens") and in the Order 10 evidence (the word-break audit and the gallery). The rules of §1–§10 otherwise stand unchanged.

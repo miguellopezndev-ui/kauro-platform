@@ -68,11 +68,9 @@ KAURO_VISUAL_IDENTITY.md.
 Out of scope are documents produced by third parties: the fiscal invoice, credit and debit notes (e-invoicing provider), payment
 receipts and bank evidence.
 
-## 4. Typography: discrepancy recorded
+## 4. Typography
 
 - **Agreed identity:** Inter for the brand, headings and text; JetBrains Mono for technical information; no third face.
-- **The web today** still uses system families (`packages/ui/tokens.css`: system-ui and Segoe UI Variable Display, ui-monospace; a
-  Georgia serif in the visual identity document). The agreed identity is therefore not yet implemented on the web. Changing the web's
-  fonts is a separate visual integration, with its own tests.
-- **The report today** asks for system faces and prints on the Linux server, where they do not exist. The redesign embeds Inter and
-  JetBrains Mono in the document (see `REPORT-REDESIGN-PROPOSAL.md`).
+- **The report** embeds Inter and JetBrains Mono (`packages/reports/assets/fonts`, see `REPORT-REDESIGN-PROPOSAL.md`).
+- **The web** serves the same faces since Order 10 (2026-10-19; `apps/web/public/fonts`, A10 §11). The discrepancy recorded here on
+  2026-10-18 is closed.

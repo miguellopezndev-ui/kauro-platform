@@ -5375,10 +5375,7 @@ body:has(> .kauro-site-header) {
   text-overflow: ellipsis;
 }
 @media (max-width: 39.99rem) {
-  .kauro-walk-row {
-    grid-template-columns: 1.5rem minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
-  }
-  /* the sheet's column heads fit their cells */
+  /* the sheet keeps its three phone columns (main's rule above); its column heads fit their cells */
   .kauro-walk-row--head .kauro-walk-cell {
     font-size: 0.625rem;
     letter-spacing: 0.02em;
@@ -5443,6 +5440,7 @@ body:has(> .kauro-site-header) {
     text-align: end;
   }
   .kauro-site-table--stack tbody td::before {
+    content: attr(data-label); /* a browser without alternative text for content still shows the label */
     content: attr(data-label) / "";
     color: var(--kauro-color-text-muted);
     font-size: 0.75rem;

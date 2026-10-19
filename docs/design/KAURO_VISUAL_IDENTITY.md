@@ -99,16 +99,22 @@ The custom "a" of the wordmark is never applied to running text.
 | Editor's note | Inter Italic (`--kauro-note-family`) | margin notes and quiet asides only |
 
 **How the faces are served:**
-- the official files and their provenance are in `apps/web/src/fonts`, and `next/font/local` serves them from Kauro's own origin
+- the official files and their provenance are in `apps/web/public/fonts`, served from Kauro's own origin at stable, versioned paths
   (`font-src 'self'`), with no font CDN;
+- `apps/web/src/server/faces.ts` declares them once, and every document inlines that declaration under its nonce (the root layout and
+  the legal pages alike);
 - only Inter's roman is preloaded; the italic and the mono weights load when a page uses them;
-- the fallback is metric-adjusted to Inter so text does not reflow on arrival, and every stack ends in a system stack.
+- "Inter Fallback" carries Inter's metrics, so body text does not reflow on arrival; mono text may move slightly; every stack ends in a
+  system stack;
+- the faces apply to every document of the web, the implemented application screens included.
 
 **The wordmark:** it is "Kauro" set in Inter. The custom "a" mentioned above has no reproducible artifact in the repository, so it is not
 drawn; it awaits the owner's review.
 
 **Narrow screens:** a table of four columns or more is laid out row by row below 40 rem, each value beside its column's name (`DataTable`),
 so no word breaks inside a narrow column.
+
+**Type roles:**
 - **Headline in two weights:** the last words of an h1 are set light in the primary colour (`PageHead accent`, `Headline`). The text is
   the registry's own sentence, unchanged.
 - **Figures:** prices and counts are display at weight 300, with tabular numbers. A currency code is set small and raised (`PriceFigure`).

@@ -117,48 +117,50 @@ test("every page reflows to one column at 320 CSS pixels with no horizontal scro
   expect(summary.scroll, "the error summary reflows").toBeLessThanOrEqual(summary.client);
 });
 
-test("the agreed faces really load from Kauro's own origin and are applied: Inter for text and headings, Inter Italic for notes, JetBrains Mono for technical text; no font is requested elsewhere (Order 10)", async ({ page, baseURL }) => {
-  const fonts: string[] = [];
-  page.on("request", (r) => {
-    if (r.resourceType() === "font") fonts.push(r.url());
+// Run on a page of the root layout and on a legal page (whose route handler writes its own document): the faces are Kauro's own files,
+// downloaded from this origin and applied, whatever the machine running the test has installed.
+for (const route of ["/sample-delivery", "/legal/terms"]) {
+  test(`the agreed faces really load from Kauro's own origin and are applied (${route}): Inter for text and headings, JetBrains Mono for technical text, Inter Italic for notes; no font is requested elsewhere (Order 10)`, async ({ page, baseURL }) => {
+    const fonts: string[] = [];
+    page.on("request", (r) => {
+      if (r.resourceType() === "font") fonts.push(r.url());
+    });
+    await page.goto(route);
+    await page.evaluate(() => document.fonts.ready);
+    const facts = await page.evaluate(() => {
+      const style = (selector: string): CSSStyleDeclaration | null => {
+        const el = document.querySelector(selector);
+        return el === null ? null : getComputedStyle(el);
+      };
+      const loaded: string[] = [];
+      document.fonts.forEach((f) => {
+        if (f.status === "loaded") loaded.push(`${f.family} ${f.style}`);
+      });
+      return {
+        body: style("body")?.fontFamily ?? null,
+        h1: style("h1")?.fontFamily ?? null,
+        note: style(".kauro-site-margin")?.fontFamily ?? null,
+        noteStyle: style(".kauro-site-margin")?.fontStyle ?? null,
+        mono: style(".kauro-site-table-region--files tbody th")?.fontFamily ?? null,
+        loaded,
+      };
+    });
+    expect(facts.body).toMatch(/^Inter, "Inter Fallback"/);
+    expect(facts.h1).toMatch(/^Inter, "Inter Fallback"/);
+    expect(facts.loaded).toContain("Inter normal");
+    if (route === "/sample-delivery") {
+      expect(facts.note).toMatch(/^Inter, "Inter Fallback"/);
+      expect(facts.noteStyle).toBe("italic");
+      expect(facts.mono).toMatch(/^"JetBrains Mono"/);
+      expect(facts.loaded).toEqual(expect.arrayContaining(["Inter italic", "JetBrains Mono normal"]));
+    }
+    expect(fonts.length).toBeGreaterThan(0);
+    for (const url of fonts) {
+      expect(new URL(url).origin, url).toBe(new URL(baseURL as string).origin);
+      expect(new URL(url).pathname, url).toMatch(/^\/fonts\/(inter-4\.1|jetbrains-mono-2\.304)\/[A-Za-z-]+\.woff2$/);
+    }
   });
-  await page.goto("/sample-delivery");
-  await page.evaluate(() => document.fonts.ready);
-  const facts = await page.evaluate(() => {
-    const family = (selector: string): string => getComputedStyle(document.querySelector(selector) as Element).fontFamily;
-    const used = (selector: string): string => {
-      const el = document.querySelector(selector) as HTMLElement;
-      const cs = getComputedStyle(el);
-      // the first face of the stack is the one that must have arrived (the fallback faces behind it are never downloaded)
-      return `${cs.fontStyle} ${cs.fontWeight} 16px ${cs.fontFamily.split(",")[0] as string}`;
-    };
-    return {
-      body: family("body"),
-      h1: family("h1"),
-      note: family(".kauro-site-margin"),
-      mono: family(".kauro-site-table-region--files tbody th"),
-      loaded: ((): string[] => {
-        const names: string[] = [];
-        document.fonts.forEach((f) => {
-          if (f.status === "loaded") names.push(f.family);
-        });
-        return names;
-      })(),
-      textLoaded: document.fonts.check(used("body")),
-      monoLoaded: document.fonts.check(used(".kauro-site-table-region--files tbody th")),
-      noteLoaded: document.fonts.check(used(".kauro-site-margin")),
-    };
-  });
-  expect(facts.body).toMatch(/^interFace\b/);
-  expect(facts.h1).toMatch(/^interFace\b/);
-  expect(facts.note).toMatch(/^interItalicFace\b/);
-  expect(facts.mono).toMatch(/^monoFace\b/);
-  expect(facts.loaded).toEqual(expect.arrayContaining(["interFace", "interItalicFace", "monoFace"]));
-  expect([facts.textLoaded, facts.monoLoaded, facts.noteLoaded]).toEqual([true, true, true]);
-  expect(fonts.length).toBeGreaterThan(0);
-  for (const url of fonts) expect(new URL(url).origin, url).toBe(new URL(baseURL as string).origin);
-  expect(fonts.every((url) => /\/_next\/static\/media\/(InterVariable|JetBrainsMono)[^/]*\.woff2$/.test(new URL(url).pathname)), fonts.join(", ")).toBe(true);
-});
+}
 
 test("the pages give the same reading twice in a row: the publication is read on every request, never cached", async ({ page }) => {
   api.publish([["CLEAN", "AVAILABLE"]]);

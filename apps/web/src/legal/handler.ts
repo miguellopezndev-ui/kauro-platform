@@ -2,6 +2,7 @@
 // Each route file under src/app/(public)/legal/<document>/ is two exported lines that call legalHandler with its own key, so a route can
 // serve its own document and no other.
 import { renderTokenCss } from "@kauro/ui";
+import { FACE_CSS } from "../server/faces.ts";
 import { NONCE_REQUEST_HEADER } from "../server/security-headers.ts";
 import { themeOfCookieHeader } from "../server/theme.ts";
 import { parseOperatorFacts, type OperatorFacts } from "./facts.ts";
@@ -12,7 +13,9 @@ import { LEGAL_CSS, NONCE_PATTERN, legalResponse } from "./response.ts";
 /** The facts the owner has provided, read strictly at load: today every fact is null, so no document is published (BLOCKED_OWNER). */
 export const OPERATOR_FACTS: OperatorFacts = parseOperatorFacts(shipped);
 
-const STYLESHEET = `${renderTokenCss()}${LEGAL_CSS}`;
+// the faces (Order 10) are part of the page's one stylesheet, as in the root layout
+const STYLESHEET = `${FACE_CSS}
+${renderTokenCss()}${LEGAL_CSS}`;
 
 /** The GET handler of one document. Synchronous: nothing it reads is remote. It refuses a request the proxy did not give a nonce. */
 export function legalHandler(key: LegalKey, facts: OperatorFacts = OPERATOR_FACTS): (request: Request) => Response {

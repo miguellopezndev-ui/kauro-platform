@@ -24,7 +24,7 @@ for the next review.
 | Surface | Piece | Status |
 | --- | --- | --- |
 | Whole site | Palette, light and dark themes, theme switch, typography and weight contrast | approved |
-| Whole site | The agreed faces on the web: Inter, Inter Italic for notes, JetBrains Mono (Order 10); tables of four columns stacked on phones; narrow-screen fixes of the hero window, the document pile and the journey sheet | implemented 2026-10-19, owner visual review pending (Order 10 gallery) |
+| Whole site | The agreed faces on the web, every document including the legal pages and the implemented application screens: Inter, Inter Italic for notes, JetBrains Mono (Order 10); tables of four columns stacked on phones; narrow-screen fixes of the hero window, the document pile and the journey sheet's heads | implemented 2026-10-19, owner visual review pending (Order 10 gallery) |
 | Whole site | Header with the menu card (no numbers, quiet type, dimmed page) | revised |
 | Whole site | Footer (small wordmark, tagline, links) | approved |
 | Whole site | Motion: first impression, arrival, response; alternating card tilts | revised |
