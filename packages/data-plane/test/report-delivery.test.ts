@@ -10,7 +10,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { readStagedManifest, type ObjectStoragePort, type StagedArtifact } from "@kauro/application";
-import { generateReportPdf, buildReportModel, readMigrationPackage, type Branding, type PdfEngine, type ReportPdf } from "@kauro/reports";
+import { generateReportPdf, buildReportModel, readMigrationPackage, ReportModelError, type Branding, type PdfEngine, type ReportPdf } from "@kauro/reports";
+import { printFailureOf } from "../src/report/stage.js";
 import {
   AttemptEnvelopeFailure,
   ChromiumPdfEngine,
@@ -281,6 +282,15 @@ describe("B13xB08 the PDF: a failed or invalid generation stages nothing", () =>
       assert.deepEqual(reportObjects(r.writer.artifacts()), []);
       assert.equal((await objectsOf(r)).length, ORACLE[CLEAN].files);
     }
+  });
+
+  it("the report's faces missing where the worker runs is the worker's error (retried), never a refusal; a refused report stays a refusal", () => {
+    const missing = printFailureOf(new ReportModelError([{ code: "FONT_UNAVAILABLE", subject: "InterVariable.woff2", detail: "not where the package ships it" }]));
+    assert.ok(missing instanceof ReportStageError && missing.code === "PDF_ENGINE_FAILED" && missing.problems.includes("FONT_UNAVAILABLE"));
+    const refused = printFailureOf(new ReportModelError([{ code: "BRANDING_UNSAFE", subject: "logo", detail: "not the stored logo" }]));
+    assert.ok(refused instanceof ReportStageError && refused.code === "PDF_FAILED");
+    const other = new Error("unrelated");
+    assert.equal(printFailureOf(other), other);
   });
 
   it("an engine that returns garbage or a truncated PDF ends the attempt REFUSED with no report object", async () => {

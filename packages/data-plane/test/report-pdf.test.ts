@@ -10,8 +10,8 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { generateReportPdf, renderReportHtml, ReportModelError, ReportPdfError } from "@kauro/reports";
-import type { PdfEngine, VerifiedReport } from "@kauro/reports";
+import { copyText, generateReportPdf, renderReportHtml, ReportModelError, ReportPdfError } from "@kauro/reports";
+import type { CopyKey, PdfEngine, VerifiedReport } from "@kauro/reports";
 import { ChromiumPdfEngine, findChromiumExecutable } from "../src/index.js";
 import { reportOf } from "./support/report-fixtures.js";
 import { readPdf, squash } from "./support/pdf-reader.js";
@@ -120,6 +120,15 @@ describe("report PDF — real engine", { skip: needsBrowser }, () => {
       const lost = texts.filter((t) => !flat.includes(squash(t).toLowerCase()));
       assert.deepEqual(lost, [], "text of the document missing from the PDF's extracted text");
       assert.ok(read.pages.some((p) => p.text.includes(`Page 1 of ${read.pages.length}`)), "the running footer numbers the pages");
+      // every figure reads in the PDF as a word beside its label (a short number like "4" is found inside any hash, so a search of the
+      // flattened text would not notice a figure missing from the text layer)
+      const words = ` ${read.pages.map((p) => p.text).join(" ").replace(/\s+/g, " ")} `;
+      const said = (label: string, value: number): boolean => words.includes(` ${label} ${value.toLocaleString("en-US")} `);
+      for (const [key, figure] of Object.entries(report.model.counts)) assert.ok(said(copyText("en-US", `counts.${key}` as CopyKey), figure.value), `figure ${key}=${figure.value} missing from the PDF's text`);
+      for (const [object, figure] of Object.entries(report.model.deliveredByObject)) assert.ok(said(object, figure.value), `records of ${object} missing from the PDF's text`);
+      for (const key of ["delivered", "leftover", "unresolved", "deduplicated"] as const) assert.ok(said(copyText("en-US", `relationships.${key}`), report.model.relationships[key].value), `relationships ${key} missing from the PDF's text`);
+      // labels set in capitals with tracking still read as words
+      for (const label of [copyText("en-US", "doc.stamp"), copyText("en-US", "glance.heading"), copyText("en-US", "table.measure")]) assert.ok(words.toLowerCase().includes(` ${label.toLowerCase()} `), `label "${label}" does not read as words`);
       const raw = Buffer.from(pdf.bytes).toString("latin1");
       const faces = [...raw.matchAll(/\/FontName\s*\/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/g)].map((m) => m[1] as string);
       assert.ok(faces.some((f) => f.startsWith("Inter")), `no embedded Inter face: ${faces.join(", ")}`);

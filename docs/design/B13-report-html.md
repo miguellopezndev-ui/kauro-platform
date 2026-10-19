@@ -7,7 +7,8 @@ engine, its pinned version and the stored PDF are B's (worker), not this package
 ## 1. Contract
 
 `renderReportHtml(report: VerifiedReport, { pageSize: "LETTER" | "A4", locale, logo: Uint8Array | null }) -> { html, sha256 }`.
-Pure and deterministic: the same report, page size, locale and logo give the same bytes; no clock, no randomness, no I/O.
+Deterministic: the same report, page size, locale and logo give the same bytes; no clock, no randomness, no network. Since template 2 its
+only read is of the pinned font files the package ships (§2); everything else it is handed.
 `sha256` is over the UTF-8 bytes of `html`; the footer names the package digest, manifest hash, core version, `modelHash` and
 renderer version, so a printed report identifies its exact inputs.
 

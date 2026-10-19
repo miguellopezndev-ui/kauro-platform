@@ -93,7 +93,8 @@ function checkedLogo(report: VerifiedReport, bytes: Uint8Array | null): string |
  * in docs/design/KAURO_VISUAL_IDENTITY.md). The agency's logo or name leads the cover and Kauro is the issuer line only (R2-070). Inter for
  * the text and JetBrains Mono for paths, hashes and numbering, embedded as data: fonts. The Kauro palette is used by context: carbon text,
  * porcelain panels and table bands, wine for the verdict, the numbering and the source rows total, a clay tint for the counts notice.
- * Contextual alternates are off: their glyphs do not survive text extraction from the PDF.
+ * Contextual alternates and tabular figures are off, and labels are tracked lightly: otherwise the PDF's text loses glyphs or reads as
+ * spaced letters.
  */
 export const REPORT_TEMPLATE = "kauro-report-template/2";
 
@@ -107,7 +108,7 @@ const SANS = '"Inter", sans-serif';
 const MONO = '"JetBrains Mono", monospace';
 
 /** A CSS string literal for catalogue text (the page footer): every character outside a plain set is a CSS escape. */
-const cssString = (text: string): string => `"${text.replace(/[^A-Za-z0-9 .,:;()-]/g, (c) => `\\${(c.codePointAt(0) as number).toString(16)} `)}"`;
+const cssString = (text: string): string => `"${text.replace(/[^A-Za-z0-9 .,:;()-]/gu, (c) => `\\${(c.codePointAt(0) as number).toString(16)} `)}"`;
 
 /** "Page {page} of {pages}" as CSS content: the catalogue's words around the page counters. */
 function pageNumberContent(template: string): string {
@@ -133,7 +134,7 @@ const STYLE = (page: string, title: string, pageNumber: string): string =>
     ".brand { display: flex; align-items: center; min-height: 14mm; margin: 0 0 9mm; }",
     ".logo { display: block; max-height: 14mm; max-width: 62mm; object-fit: contain; object-position: left center; }",
     ".wordmark { font-size: 15pt; font-weight: 650; letter-spacing: -0.015em; }",
-    `.verdict { margin: 0 0 3mm; color: ${WINE}; font-size: 7.5pt; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }`,
+    `.verdict { margin: 0 0 3mm; color: ${WINE}; font-size: 7.5pt; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }`,
     "h1 { margin: 0 0 3.5mm; font-size: 29pt; font-weight: 650; letter-spacing: -0.028em; line-height: 1.05; }",
     `.status { max-width: 132mm; color: ${MUTED}; font-size: 11.5pt; line-height: 1.45; }`,
     ".attribution { display: flex; flex-direction: column; gap: 0.8mm; margin-top: 5mm; font-size: 7.75pt; }",
@@ -141,10 +142,10 @@ const STYLE = (page: string, title: string, pageNumber: string): string =>
     `.attribution .issuer { color: ${MUTED}; }`,
     // at a glance: the three denominators first (R2-065) and the rows unified with approval; an unbound notice closes the panel
     `section.glance { margin: 0 0 8mm; padding: 4.5mm 6mm 5mm; overflow: hidden; border-radius: 2mm; background: ${PORCELAIN}; break-inside: avoid; }`,
-    `.label { margin: 0 0 3.5mm; color: ${MUTED}; font-size: 6.75pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }`,
+    `.label { margin: 0 0 3.5mm; color: ${MUTED}; font-size: 6.75pt; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }`,
     "dl.figures { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 6mm; margin: 0; }",
     `dl.figures dt { color: ${MUTED}; font-size: 7.5pt; line-height: 1.3; }`,
-    'dl.figures dd { margin: 1mm 0 0; font-size: 24pt; font-weight: 300; letter-spacing: -0.03em; line-height: 1; font-feature-settings: "tnum"; }',
+    "dl.figures dd { margin: 1mm 0 0; font-size: 24pt; font-weight: 300; letter-spacing: -0.03em; line-height: 1; }",
     `.notice { margin: 4.5mm -6mm -5mm; padding: 2.6mm 6mm; background: ${CLAY_TINT}; color: ${CARBON}; font-size: 7.75pt; }`,
     // numbered sections
     "h2 { counter-increment: section; display: flex; align-items: baseline; gap: 3mm; margin: 10mm 0 3.5mm; font-size: 12.5pt; font-weight: 650; letter-spacing: -0.012em; break-after: avoid; }",
@@ -159,14 +160,14 @@ const STYLE = (page: string, title: string, pageNumber: string): string =>
     "table { width: 100%; border-collapse: collapse; margin: 0; table-layout: fixed; }",
     "thead { display: table-header-group; }",
     "tr { break-inside: avoid; }",
-    `th { padding: 0 2.2mm 1.6mm; border-bottom: 0.75pt solid ${CARBON}; color: ${MUTED}; font-size: 6.5pt; font-weight: 600; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; vertical-align: bottom; }`,
+    `th { padding: 0 2.2mm 1.6mm; border-bottom: 0.75pt solid ${CARBON}; color: ${MUTED}; font-size: 6.5pt; font-weight: 600; letter-spacing: 0.05em; text-align: left; text-transform: uppercase; vertical-align: bottom; }`,
     "td { padding: 1.3mm 2.2mm; text-align: left; vertical-align: top; }",
     `tbody tr:nth-child(even) td { background: ${PORCELAIN}; }`,
     "td.k { font-weight: 550; }",
     "th.n, td.n { text-align: right; }",
-    'td.n { font-size: 9pt; font-weight: 500; font-feature-settings: "tnum"; white-space: nowrap; }',
+    "td.n { font-size: 9pt; font-weight: 500; white-space: nowrap; }",
     `td.def { color: ${MUTED}; font-size: 7.75pt; }`,
-    "td.p { font-size: 6.9pt; font-weight: 500; overflow-wrap: break-word; }",
+    "td.p { font-size: 6.9pt; font-weight: 500; overflow-wrap: anywhere; }",
     ".seg { white-space: nowrap; }",
     `.dir { color: ${QUIET}; font-weight: 400; }`,
     `td.h { color: ${MUTED}; font-size: 6.1pt; line-height: 1.45; overflow-wrap: anywhere; }`,
@@ -187,7 +188,7 @@ const STYLE = (page: string, title: string, pageNumber: string): string =>
     "ol.guide li { display: grid; grid-template-columns: 8mm 1fr 58mm; column-gap: 4mm; padding: 2mm 2.2mm; break-inside: avoid; counter-increment: step; }",
     `ol.guide li:nth-child(even) { background: ${PORCELAIN}; }`,
     `ol.guide li::before { content: counter(step, decimal-leading-zero); grid-row: 1 / 3; color: ${WINE}; font-family: ${MONO}; font-size: 8pt; font-weight: 500; line-height: 1.5; }`,
-    "ol.guide .p { grid-column: 2; font-size: 7.6pt; font-weight: 500; overflow-wrap: break-word; }",
+    "ol.guide .p { grid-column: 2; font-size: 7.6pt; font-weight: 500; overflow-wrap: anywhere; }",
     `ol.guide .meta { grid-column: 2; margin-top: 0.6mm; color: ${MUTED}; font-size: 7.75pt; }`,
     `ol.guide .meta > span + span::before { content: "\\b7"; margin: 0 2mm; color: ${QUIET}; }`,
     `ol.guide .h { grid-column: 3; grid-row: 1 / 3; align-self: center; color: ${MUTED}; font-size: 6.1pt; line-height: 1.45; overflow-wrap: anywhere; }`,
@@ -207,8 +208,8 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
   const t = (key: CopyKey, values: Readonly<Record<string, string>> = {}): string => escapeHtml(copyText(locale, key, values));
   const n = (f: Figure): string => escapeHtml(f.value.toLocaleString("en-US"));
   const e = (v: string | number): string => escapeHtml(String(v));
-  // a package path: its folders lighter than the file name, a line break allowed only after a slash
-  const seg = (s: string): string => `<span class="seg">${escapeHtml(s)}</span>`;
+  // a package path: its folders lighter than the file name, a line break after a slash (a segment longer than a column may break inside)
+  const seg = (s: string): string => (s.length <= 40 ? `<span class="seg">${escapeHtml(s)}</span>` : escapeHtml(s));
   const path = (p: string): string => {
     const parts = p.split("/");
     const file = parts.pop() as string;

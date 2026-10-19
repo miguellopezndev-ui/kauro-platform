@@ -3,7 +3,16 @@
 2026-10-18. This is a visual proposal for the B13 package report, for the owner's approval.
 
 **Status:** the owner approved it on 2026-10-18, and phase B implemented it as report template 2 (`packages/reports/src/html.ts`,
-`kauro-report-template/2`). The text below records the proposal as it was approved.
+`kauro-report-template/2`). The text below records the proposal as it was approved, with these corrections from the independent
+review of phase B:
+
+- **Figures:** the prototype set figures with tabular digits (`tnum`), whose glyphs have no character mapping in the PDF. The figures
+  showed on the page but were missing from its text. The phase A check (§5) did not notice, because it searched the flattened text,
+  where a short number is found inside any hash. Template 2 sets proportional figures. The real-engine test now requires each figure
+  as a word beside its label, and it failed on the old setting before the fix.
+- **Labels:** labels are tracked by 0.06 em instead of 0.12 to 0.14 em, so they extract as words.
+- **Paths:** a path segment longer than 40 characters may break inside itself rather than overflow its column.
+- **Not done in phase B (deferred):** a long table can still start with a single row at the foot of a page (§6).
 
 - **Renderer untouched:** the real renderer (`packages/reports/src/html.ts`) is unchanged.
 - **What the proposal is:** a prototype run over the real verified model of the five sample packages, using the existing copy catalogue.

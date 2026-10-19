@@ -2,8 +2,8 @@
 
 B13 "Reports and package experience": the verified report model (design `docs/design/B13-report-model.md`).
 
-Pure TypeScript over `@kauro/contracts` only. It reads bytes it is handed and never touches a filesystem, network or clock;
-HTML and PDF are rendered in the worker over the model this package builds.
+TypeScript over `@kauro/contracts` only. The model is built from bytes it is handed, with no filesystem, network or clock. The HTML
+renderer's one read is of the pinned faces it ships (`assets/fonts`, checked by SHA-256); the worker prints that HTML to PDF.
 
 ## Modules
 

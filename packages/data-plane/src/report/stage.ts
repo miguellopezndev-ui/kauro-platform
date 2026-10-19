@@ -102,12 +102,7 @@ export async function produceStagedReport(request: ProduceStagedReportRequest): 
   try {
     pdf = await generateReportPdf(report, { pageSize: request.render.pageSize, locale: request.render.locale, logo }, request.engine);
   } catch (error) {
-    // the browser failing to print (a crash, a timeout, no executable) may be temporary: it is the worker's error, retried by a takeover
-    // within B08's attempt budget; an output that is not a PDF is a refusal
-    if (error instanceof ReportPdfError && error.code === "ENGINE_FAILED") throw new ReportStageError("PDF_ENGINE_FAILED", "the PDF engine could not print the report", { problems: [error.code], cause: error });
-    if (error instanceof ReportPdfError) throw new ReportStageError("PDF_FAILED", `the PDF could not be produced (${error.code})`, { problems: [error.code], cause: error });
-    if (error instanceof ReportModelError) throw new ReportStageError("PDF_FAILED", "the report was refused for printing", { problems: codesOf(error), cause: error });
-    throw error;
+    throw printFailureOf(error);
   }
 
   await proceed(request.cancellation, "staging the PDF");
@@ -118,6 +113,20 @@ export async function produceStagedReport(request: ProduceStagedReportRequest): 
     binding: { reportId: reportIdOf(scope), packageId: reportPackageIdOf(scope), packageDigest: report.model.package.packageDigest, manifestSha256: report.model.package.manifestSha256, modelHash: report.modelHash },
   });
   return { staged: await publisher.publish(pdf), report };
+}
+
+/**
+ * What a failure to produce the PDF means for the attempt. The browser failing to print (a crash, a timeout, no executable) may be
+ * temporary: it is the worker's error, retried by a takeover within B08's attempt budget. So is the report's faces missing or altered where
+ * the worker runs (FONT_UNAVAILABLE), a fault of the deployment and not of the report. An output that is not a PDF, or a report refused for
+ * printing, is a refusal. Anything else is passed on unchanged.
+ */
+export function printFailureOf(error: unknown): unknown {
+  if (error instanceof ReportPdfError && error.code === "ENGINE_FAILED") return new ReportStageError("PDF_ENGINE_FAILED", "the PDF engine could not print the report", { problems: [error.code], cause: error });
+  if (error instanceof ReportPdfError) return new ReportStageError("PDF_FAILED", `the PDF could not be produced (${error.code})`, { problems: [error.code], cause: error });
+  if (error instanceof ReportModelError && codesOf(error).includes("FONT_UNAVAILABLE")) return new ReportStageError("PDF_ENGINE_FAILED", "the report's faces are not available where the worker runs", { problems: codesOf(error), cause: error });
+  if (error instanceof ReportModelError) return new ReportStageError("PDF_FAILED", "the report was refused for printing", { problems: codesOf(error), cause: error });
+  return error;
 }
 
 // --- reading the package the core staged ----------------------------------------------------------------------------------------

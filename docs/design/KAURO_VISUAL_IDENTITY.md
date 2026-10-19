@@ -256,6 +256,8 @@ comes from the document's model, never computed by the layout.
 
 1. **Typography:**
    - Inter for all text and JetBrains Mono for paths, hashes, references and numbering;
+   - proportional figures (no `tnum`) and labels tracked by at most 0.06 em: tabular figures and wide tracking make the PDF's text
+     lose the digits or read as spaced letters;
    - both embedded in the document from pinned, licensed official files (version, licence and SHA-256 recorded), never taken from the
      host's installed fonts and never fetched;
    - contextual alternates and stylistic sets off (`font-variant-ligatures: no-contextual; font-feature-settings: "calt" 0`), so the
@@ -301,7 +303,8 @@ comes from the document's model, never computed by the layout.
    - the document has a language, a title and a heading order;
    - a logo has the agency's name as its alternative text.
 10. **Evidence and safety:**
-    - the document names its template (`<meta name="generator">`) and its inputs (package, manifest, model and renderer hashes);
+    - the HTML document names its template (`<meta name="generator">`), the PDF's identity records that document's SHA-256, and the
+      document names its inputs (package, manifest, model and renderer version); a new template deploys with a new `rendererVersion`;
     - it is inert (no script, no event handler, no inline style attribute, no URL other than its embedded `data:` image and fonts) under
       a restrictive CSP;
     - a content check proves that every text of the document survives into the PDF's extracted text, in the embedded faces only.

@@ -7,7 +7,7 @@ those bytes to the model, the HTML and the package. It stores nothing and publis
 
 | piece | package (layer) | why |
 |---|---|---|
-| `PdfEngine` port, `generateReportPdf`, `ReportPdf`, `ReportPdfIdentity`, `ReportPdfPublisher` (interface only), `ReportPdfError` | `@kauro/reports` (application) | pure: renders the HTML, checks the engine's answer, hashes the bytes |
+| `PdfEngine` port, `generateReportPdf`, `ReportPdf`, `ReportPdfIdentity`, `ReportPdfPublisher` (interface only), `ReportPdfError` | `@kauro/reports` (application) | renders the HTML (whose only read is the pinned faces), checks the engine's answer, hashes the bytes |
 | `ChromiumPdfEngine`, `findChromiumExecutable` | `@kauro/data-plane` (adapter) | the only code that launches a browser; `playwright-core` 1.63.0 (already in the lockfile through `apps/web`) is its one new runtime dependency |
 
 No new package, app or service. `pdfjs-dist` 5.6.205 is a devDependency of `@kauro/data-plane`, used only by tests to read PDFs back.

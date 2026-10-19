@@ -1370,6 +1370,13 @@ body:has(> .kauro-site-header) {
 .kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td):is(:first-child, :last-child) {
   padding-inline: var(--kauro-space-3);
 }
+@media (max-width: 39.99rem) {
+  /* on a phone the four columns keep their words: the bands need only a hairline of inset */
+  .kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td),
+  .kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td):is(:first-child, :last-child) {
+    padding-inline: var(--kauro-space-1);
+  }
+}
 
 .kauro-site-sum {
   display: grid;
