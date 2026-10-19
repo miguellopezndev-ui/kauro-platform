@@ -434,7 +434,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       if (this.#cancel(identity)) return answer("NOT_FOUND");
       // a create took the name first: what it created is ended like any other job
       record = this.#existing(identity);
-      if (record === null) return answer("NOT_FOUND");
+      // the name is taken, by a job that cannot be read as one: no answer can be given on it
+      if (record === null) throw new HostRecordUnreadable(identity, new Error("the identity's name is taken by no readable job"));
       const created = this.#live.get(identity);
       if (created !== undefined) {
         if (TERMINAL.has(created.record.state)) return answer("ALREADY_TERMINAL");
@@ -1085,18 +1086,21 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    */
   #cancel(identity: string): boolean {
     const jobDir = this.#jobDir(identity);
-    if (existsSync(jobDir)) return this.#cancelled(identity);
+    if (this.#present(identity, jobDir)) return this.#cancelled(identity);
     const stamp = this.#o.clock.nowMs();
     const record: LocalJobRecord = { host: LOCAL_PROCESS_HOST, identity, ticketDigest: "0".repeat(64), instance: this.instance, state: "TERMINATED", pid: null, createdAtMs: stamp, startedAtMs: null, endedAtMs: stamp, lastHeartbeatMs: null, cause: null, note: CANCELLED_BEFORE_CREATE, manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, flags: [], hardMemoryBytes: 0, hardScratchBytes: 0 };
     const prepared = join(this.#hostRoot, "jobs", `.cancelling-${identity}-${process.pid}-${++this.#creations}`);
-    mkdirSync(prepared);
-    writeFileSync(join(prepared, "end.json"), JSON.stringify(record));
-    writeFileSync(join(prepared, "record.json"), JSON.stringify(record));
     try {
+      mkdirSync(prepared);
+      writeFileSync(join(prepared, "end.json"), JSON.stringify(record));
+      writeFileSync(join(prepared, "record.json"), JSON.stringify(record));
       renameSync(prepared, jobDir);
       return true;
-    } catch {
+    } catch (error) {
       rmSync(prepared, { recursive: true, force: true });
+      // the name was taken by a create or another cancellation: that is the answer. Taken by nobody, the cancellation itself failed,
+      // and no absence may be answered on it (review round 12, R12-1): the host's transient failure
+      if (!this.#present(identity, jobDir)) throw new HostRecordUnreadable(identity, error);
       return this.#cancelled(identity);
     }
   }

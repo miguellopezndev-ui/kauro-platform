@@ -936,3 +936,17 @@ test("B14-A RACE (review round 11, R11-3; Linux): a job directory the host canno
     await rig.dispose();
   }
 });
+
+test("B14-A RACE (review round 12, R12-1; Linux): a cancellation that cannot take the identity's name answers no absence — terminate fails transiently, and a later create is not prevented by a NOT_FOUND that was never true", { skip: process.platform !== "linux" || process.getuid?.() === 0 }, async () => {
+  const rig = localRig();
+  const jobs = join(rig.hostRoot, "jobs");
+  try {
+    const spec = plantedAttempt(rig.storage, 50).fixture.spec(1);
+    // the jobs directory readable and searchable, not writable: the tombstone cannot be made
+    chmodSync(jobs, 0o500);
+    await assert.rejects(rig.restart().terminate(spec.identity), (e: unknown) => (e as { transient?: unknown }).transient === true);
+  } finally {
+    chmodSync(jobs, 0o700);
+    await rig.dispose();
+  }
+});
