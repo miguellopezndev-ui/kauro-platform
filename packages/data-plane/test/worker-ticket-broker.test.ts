@@ -7,7 +7,7 @@ import { test } from "node:test";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { ContractFakeObjectStorage } from "@kauro/application/testing";
 import { stagedArtifactObjectNameOf } from "@kauro/application";
-import { AttemptStorageBroker, BrokerRefusal, workerResultProblem, attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, readAttemptTicket, type AttemptTicket, type WorkerCall } from "../src/index.js";
+import { AttemptStorageBroker, BrokerRefusal, normalizeWorkerMessage, workerResultProblem, attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, readAttemptTicket, type AttemptTicket, type WorkerCall } from "../src/index.js";
 import { attemptFixture, collect, holderOf, sha } from "./support/attempt.js";
 import { hostLimits, plantedAttempt } from "./support/local-host.js";
 
@@ -256,4 +256,20 @@ test("B14-A broker and protocol (review round 17, R17-1): nothing a worker sends
   assert.equal(workerResultProblem({ ...ok, cause: huge }), "RESULT_CAUSE");
   assert.equal(workerResultProblem({ ...ok, state: "DONE" }), "RESULT_STATE");
   assert.equal(workerResultProblem({ ...ok, peakMemoryBytes: -1 }), "RESULT_PEAKS");
+});
+
+test("B14-A protocol (review round 18, R18-1): the host keeps only the protocol's own fields of a call, each bounded, and a chunk in bytes of its own — padding and the frame a chunk arrived in are not held while the call waits", () => {
+  const frame = new Uint8Array(1 << 20);
+  const chunk = frame.subarray(0, 4);
+  const padded = { t: "call", id: 7, call: { op: "upload.writeChunk", handle: "session-1", chunk, final: false, padding: new Uint8Array(1 << 20) }, extra: "x".repeat(1 << 16) };
+  const kept = normalizeWorkerMessage(padded);
+  assert.ok(kept !== null && kept.t === "call" && kept.call.op === "upload.writeChunk");
+  assert.deepEqual(Object.keys(kept.call).sort(), ["chunk", "final", "handle", "op"]);
+  assert.equal(kept.call.chunk.buffer.byteLength, 4, "the chunk's bytes are its own, not the frame's");
+  assert.notEqual(kept.call.chunk.buffer, frame.buffer);
+  assert.deepEqual(normalizeWorkerMessage({ t: "call", id: 8, call: { op: "storage.stat", zone: "STAGING", objectName: "x".repeat(4096) } }), { t: "invalid", id: 8, problem: "MALFORMED_CALL" });
+  assert.deepEqual(normalizeWorkerMessage({ t: "call", id: 9, call: { op: "x".repeat(1 << 16) } }), { t: "invalid", id: 9, problem: "MALFORMED_CALL" });
+  assert.equal(normalizeWorkerMessage({ t: "call", id: "nine", call: {} }), null, "no answerable id: ignored");
+  const result = normalizeWorkerMessage({ t: "result", result: { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, padding: 1 } });
+  assert.deepEqual(result, { t: "result", result: { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: "RESULT_FIELDS", peakScratchBytes: 0, peakMemoryBytes: 0 } });
 });

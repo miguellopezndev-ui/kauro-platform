@@ -205,7 +205,9 @@ test("B14-A DENY (confinement, hostile worker): a worker started exactly as the 
     if (process.platform === "linux") assert.equal(seen["procEnvironOfHost"], "ERR_ACCESS_DENIED");
     for (const key of ["netConnect", "fetch", "dnsLookup"]) assert.equal(seen[key], "KAURO_NETWORK_REFUSED", key);
     assert.equal(connections, 0, "no byte reached the listening socket");
-    for (const key of ["brokerForeignSource", "brokerForeignPrefix", "brokerDelivery"]) assert.equal(seen[key], "OUTSIDE_CAPABILITY", key);
+    for (const key of ["brokerForeignSource", "brokerForeignPrefix"]) assert.equal(seen[key], "OUTSIDE_CAPABILITY", key);
+    // a zone outside the protocol's two is refused before the broker sees the call (review round 18, R18-1)
+    assert.equal(seen["brokerDelivery"], "MALFORMED_CALL");
     // the process allowlist (worker-preload.ts): no native program, no shell, no Node child without a permission at most the worker's
     // own, no NODE_OPTIONS — each refused before a process exists; the one Node child it admits still cannot read the secret
     const refusedChildren = ["nodeChildPlain", "nodeChildWiderPermission", "nodeChildOwnPermission", "nodeChildNodeOptions", "nativeChild", "shellExec", "asyncSpawn"];
@@ -215,7 +217,7 @@ test("B14-A DENY (confinement, hostile worker): a worker started exactly as the 
     refusedChildren.push("permissionTamperedCoreChild");
     assert.equal(seen["commandSpecExported"], "undefined");
     for (const key of refusedChildren) assert.equal(seen[key], "KAURO_PROCESS_REFUSED", key);
-    assert.deepEqual(hostile.refusals(spec.identity).map((r) => r.code), ["OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY"]);
+    assert.deepEqual(hostile.refusals(spec.identity).map((r) => r.code), ["OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY", "MALFORMED_CALL"]);
     await hostile.stop();
   } finally {
     delete process.env["KAURO_TEST_SECRET_DATABASE_URL"];

@@ -73,6 +73,80 @@ export function workerResultProblem(result: unknown): string | null {
   return null;
 }
 
+/** The largest chunk a call may carry (as the broker's own bound). */
+const MAX_CALL_CHUNK_BYTES = 64 * 1024 * 1024;
+
+/** A message the host can answer only with a refusal: its id (when it has one it can be answered by) and why. */
+export interface InvalidWorkerMessage {
+  readonly t: "invalid";
+  readonly id: number;
+  readonly problem: "MALFORMED_CALL";
+}
+
+const boundedString = (v: unknown, max: number): v is string => typeof v === "string" && v.length <= max;
+const timeoutOf = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+/**
+ * What the host keeps of a message from a worker (review round 18, R18-1): a fresh object of the closed protocol's own fields, each of
+ * its type and bounded, and a chunk copied into bytes of its own — so nothing else the worker sent, and not the frame it arrived in,
+ * is held while the call waits. Null for a message the host ignores (no answerable id); an invalid call is answered with a refusal.
+ */
+export function normalizeWorkerMessage(raw: unknown): WorkerMessage | InvalidWorkerMessage | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const m = raw as Record<string, unknown>;
+  if (m["t"] === "beat") return { t: "beat" };
+  if (m["t"] === "result") {
+    const r = m["result"] as Record<string, unknown> | null;
+    const problem = workerResultProblem(r);
+    if (problem !== null || r === null) return { t: "result", result: { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: problem ?? "RESULT_NOT_AN_OBJECT", peakScratchBytes: 0, peakMemoryBytes: 0 } };
+    const manifest = r["manifest"] as { objectName: string; generation: string } | null;
+    return {
+      t: "result",
+      result: {
+        state: r["state"] as WorkerResultReport["state"],
+        cause: r["cause"] as WorkerFailureCause | null,
+        manifest: manifest === null ? null : { objectName: manifest.objectName, generation: manifest.generation },
+        refusal: r["refusal"] as string | null,
+        peakScratchBytes: r["peakScratchBytes"] as number,
+        peakMemoryBytes: r["peakMemoryBytes"] as number,
+      },
+    };
+  }
+  if (m["t"] !== "call" || !Number.isSafeInteger(m["id"]) || (m["id"] as number) < 0) return null;
+  const id = m["id"] as number;
+  const invalid: InvalidWorkerMessage = { t: "invalid", id, problem: "MALFORMED_CALL" };
+  const c = m["call"];
+  if (c === null || typeof c !== "object") return invalid;
+  const call = c as Record<string, unknown>;
+  const zone = call["zone"];
+  const zoneOk = zone === "ACCEPTED" || zone === "STAGING";
+  switch (call["op"]) {
+    case "stage":
+      return (WORKER_STAGES as readonly unknown[]).includes(call["stage"]) ? { t: "call", id, call: { op: "stage", stage: call["stage"] as WorkerStage } } : invalid;
+    case "storage.readOpen":
+      return zoneOk && boundedString(call["objectName"], 1024) && boundedString(call["generation"], 64) ? { t: "call", id, call: { op: "storage.readOpen", zone, objectName: call["objectName"], generation: call["generation"] } } : invalid;
+    case "storage.readNext":
+    case "storage.readClose":
+      return Number.isSafeInteger(call["streamId"]) ? { t: "call", id, call: { op: call["op"], streamId: call["streamId"] as number } } : invalid;
+    case "storage.stat":
+      return zoneOk && boundedString(call["objectName"], 1024) ? { t: "call", id, call: { op: "storage.stat", zone, objectName: call["objectName"] } } : invalid;
+    case "storage.createSession":
+      return zoneOk && boundedString(call["objectName"], 1024) && Number.isSafeInteger(call["declaredBytes"]) && boundedString(call["contentType"], 128)
+        ? { t: "call", id, call: { op: "storage.createSession", zone, objectName: call["objectName"], declaredBytes: call["declaredBytes"] as number, contentType: call["contentType"], timeoutMs: timeoutOf(call["timeoutMs"]) } }
+        : invalid;
+    case "storage.cancelSession":
+      return boundedString(call["handle"], 64) ? { t: "call", id, call: { op: "storage.cancelSession", handle: call["handle"], timeoutMs: timeoutOf(call["timeoutMs"]) } } : invalid;
+    case "upload.writeChunk": {
+      const chunk = call["chunk"];
+      if (!boundedString(call["handle"], 64) || !(chunk instanceof Uint8Array) || chunk.byteLength > MAX_CALL_CHUNK_BYTES || typeof call["final"] !== "boolean") return invalid;
+      // bytes of its own: the frame the chunk was read out of is not kept alive by it
+      return { t: "call", id, call: { op: "upload.writeChunk", handle: call["handle"], chunk: new Uint8Array(chunk), final: call["final"] } };
+    }
+    default:
+      return invalid;
+  }
+}
+
 /** host -> worker */
 export type HostMessage =
   | { readonly t: "ticket"; readonly protocol: string; readonly bytes: Uint8Array }

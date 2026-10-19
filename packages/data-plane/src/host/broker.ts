@@ -126,6 +126,11 @@ export class AttemptStorageBroker {
     if (this.#revoked !== null) throw new BrokerRefusal("REVOKED", `the attempt's capability was revoked (${this.#revoked})`);
   }
 
+  /** Keeps, as evidence, a call the host refused before it reached the broker (not one of the protocol's). */
+  noteMalformed(): void {
+    if (this.#refusals.length < MAX_REFUSALS_KEPT) this.#refusals.push({ op: "UNKNOWN" as WorkerCall["op"], code: "MALFORMED_CALL" });
+  }
+
   /** Answers one call, or throws: a BrokerRefusal for what the capability does not admit, the provider's error for what failed there. */
   async handle(call: WorkerCall): Promise<unknown> {
     const bytes = call?.op === "upload.writeChunk" && call.chunk instanceof Uint8Array ? call.chunk.byteLength : 0;
