@@ -117,55 +117,34 @@ test("every page reflows to one column at 320 CSS pixels with no horizontal scro
   expect(summary.scroll, "the error summary reflows").toBeLessThanOrEqual(summary.client);
 });
 
-// Run on a page of the root layout and on a legal page (whose route handler writes its own document): the faces are Kauro's own files,
-// downloaded from this origin and applied, whatever the machine running the test has installed.
+// The web keeps the system families it was designed and reviewed with (owner, 2026-10-19; Inter is the printed report's face only): no page
+// downloads a font, body and headings use the system stacks, and the notes use the Georgia stack. Checked on a root-layout page and a legal page.
 for (const route of ["/sample-delivery", "/legal/terms"]) {
-  test(`the agreed faces really load from Kauro's own origin and are applied (${route}): Inter for text and headings, JetBrains Mono for technical text, Inter Italic for notes; no font is requested elsewhere (Order 10)`, async ({ page, baseURL }) => {
+  test(`the web serves no font and keeps its system families (${route}) (owner's decision, 2026-10-19)`, async ({ page }) => {
     const fonts: string[] = [];
-    const caching: string[] = [];
     page.on("request", (r) => {
       if (r.resourceType() === "font") fonts.push(r.url());
-    });
-    page.on("response", (r) => {
-      if (r.request().resourceType() === "font") caching.push(r.headers()["cache-control"] ?? "");
     });
     await page.goto(route);
     await page.evaluate(() => document.fonts.ready);
     const facts = await page.evaluate(() => {
-      const style = (selector: string): CSSStyleDeclaration | null => {
+      const family = (selector: string): string | null => {
         const el = document.querySelector(selector);
-        return el === null ? null : getComputedStyle(el);
+        return el === null ? null : getComputedStyle(el).fontFamily;
       };
-      const loaded: string[] = [];
-      document.fonts.forEach((f) => {
-        if (f.status === "loaded") loaded.push(`${f.family} ${f.style}`);
-      });
-      return {
-        body: style("body")?.fontFamily ?? null,
-        h1: style("h1")?.fontFamily ?? null,
-        note: style(".kauro-site-margin")?.fontFamily ?? null,
-        noteStyle: style(".kauro-site-margin")?.fontStyle ?? null,
-        mono: style(".kauro-site-table-region--files tbody th")?.fontFamily ?? null,
-        loaded,
-      };
+      return { body: family("body"), h1: family("h1"), note: family(".kauro-site-margin"), faces: ((): number => {
+        let count = 0;
+        document.fonts.forEach(() => {
+          count += 1;
+        });
+        return count;
+      })() };
     });
-    expect(facts.body).toMatch(/^Inter, "Inter Fallback"/);
-    expect(facts.h1).toMatch(/^Inter, "Inter Fallback"/);
-    expect(facts.loaded).toContain("Inter normal");
-    if (route === "/sample-delivery") {
-      expect(facts.note).toMatch(/^Inter, "Inter Fallback"/);
-      expect(facts.noteStyle).toBe("italic");
-      expect(facts.mono).toMatch(/^"JetBrains Mono"/);
-      expect(facts.loaded).toEqual(expect.arrayContaining(["Inter italic", "JetBrains Mono normal"]));
-    }
-    expect(fonts.length).toBeGreaterThan(0);
-    // a face lives under a versioned path, so it is cached as immutable
-    expect(caching.length).toBeGreaterThan(0);
-    for (const value of caching) expect(value).toBe("public, max-age=31536000, immutable");
-    for (const url of fonts) {
-      expect(new URL(url).origin, url).toBe(new URL(baseURL as string).origin);
-      expect(new URL(url).pathname, url).toMatch(/^\/fonts\/(inter-4\.1|jetbrains-mono-2\.304)\/[A-Za-z-]+\.woff2$/);
-    }
+    expect(fonts).toEqual([]);
+    expect(facts.faces).toBe(0);
+    expect(facts.body).toMatch(/^system-ui,/);
+    expect(facts.h1).toMatch(/^"Segoe UI Variable Display", system-ui,|^system-ui,/);
+    if (route === "/sample-delivery") expect(facts.note).toMatch(/^Georgia,/);
   });
 }
 

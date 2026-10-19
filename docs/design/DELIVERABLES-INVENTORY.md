@@ -70,7 +70,5 @@ receipts and bank evidence.
 
 ## 4. Typography
 
-- **Agreed identity:** Inter for the brand, headings and text; JetBrains Mono for technical information; no third face.
-- **The report** embeds Inter and JetBrains Mono (`packages/reports/assets/fonts`, see `REPORT-REDESIGN-PROPOSAL.md`).
-- **The web** serves the same faces since Order 10 (2026-10-19; `apps/web/public/fonts`, A10 §11). The discrepancy recorded here on
-  2026-10-18 is closed.
+- **Printed documents** use Inter and JetBrains Mono, embedded (`packages/reports/assets/fonts`; see `REPORT-REDESIGN-PROPOSAL.md`).
+- **The web** keeps its system families, by the owner's decision of 2026-10-19 (A10 §11). The two are deliberately different.

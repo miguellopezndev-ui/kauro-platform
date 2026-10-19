@@ -30,10 +30,6 @@ child.on("exit", (code, signal) => {
     const target = join(server, ".next", "static");
     rmSync(target, { recursive: true, force: true });
     cpSync(join(app, ".next", "static"), target, { recursive: true });
-    // the public files (the faces of Order 10) are served by the standalone server from its own public/ folder
-    const publicTarget = join(server, "public");
-    rmSync(publicTarget, { recursive: true, force: true });
-    if (existsSync(join(app, "public"))) cpSync(join(app, "public"), publicTarget, { recursive: true });
   }
   process.exit(code ?? 1);
 });

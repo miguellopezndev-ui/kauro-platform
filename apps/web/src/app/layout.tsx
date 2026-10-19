@@ -3,7 +3,6 @@ import "../shell/shell.css";
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
-import { FACE_CSS, PRELOADED_FACE } from "../server/faces";
 import { NONCE_REQUEST_HEADER } from "../server/security-headers";
 import { THEME_COOKIE, parseTheme } from "../server/theme";
 
@@ -26,17 +25,11 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { readonly children: ReactNode }) {
   // A document rendered without the proxy's nonce would run without its policy: refuse it (D-SEC-1).
-  const nonce = (await headers()).get(NONCE_REQUEST_HEADER);
-  if (nonce === null) throw new Error("CSP_NONCE_MISSING");
+  if ((await headers()).get(NONCE_REQUEST_HEADER) === null) throw new Error("CSP_NONCE_MISSING");
   // The stored display preference (A10); with none, the stylesheet follows the system's preference.
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <html lang="en" data-theme={theme ?? undefined}>
-      <head>
-        {/* the agreed faces (Order 10), declared once for every document, from Kauro's own origin */}
-        <link rel="preload" href={PRELOADED_FACE} as="font" type="font/woff2" crossOrigin="anonymous" />
-        <style nonce={nonce}>{FACE_CSS}</style>
-      </head>
       <body>{children}</body>
     </html>
   );

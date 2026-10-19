@@ -1,7 +1,7 @@
 /**
  * The design tokens of the Kauro web surfaces (reference UI_STATE_AND_COPY_CONTRACT "Visual and interaction tokens", as amended by
  * docs/authority/amendments/A10_VISUAL_IDENTITY.md: the Kauro palette — carbon #242426, porcelain #F8F6F3, wine #653A46 and clay #C4A693 — in a light theme
- * and a dark theme; the agreed faces (Inter, JetBrains Mono) served from Kauro's own origin and no external font request; body text 16px with 1.5 line height; dense secondary table
+ * and a dark theme; system-ui typography and no external font request; body text 16px with 1.5 line height; dense secondary table
  * metadata never below 14px; a visible two-pixel focus indicator with spacing; status uses text or icon plus colour; manual 11 "Design
  * system": colour is never the only signal; WCAG 2.2 AA in both themes).
  *
@@ -141,18 +141,16 @@ export const THEMES = Object.freeze({ light: COLOR, dark: COLOR_DARK, inverse: C
 export type ThemeName = keyof typeof THEMES;
 
 /**
- * The agreed faces (owner, 2026-10-18; Order 10 implements them on the web): Inter for the brand, headings and text, JetBrains Mono for
- * technical information, Inter Italic for the editor's notes; no third family. The web declares the official files once, from its own origin
- * (apps/web/src/server/faces.ts); each stack names the face, Inter's metric-matched fallback, then a system stack, so text stays readable
- * before a face has arrived.
+ * The web's families (owner, 2026-10-19): the system faces the site was designed and reviewed with, kept by the owner's decision after
+ * comparing them with Inter (which stays the face of the printed B13 report). No web font is served.
  */
 export const TYPOGRAPHY = Object.freeze({
-  fontFamily: '"Inter", "Inter Fallback", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  /** Headlines and figures: the same Inter, whose optical size axis gives large sizes their display cut. */
-  displayFamily: '"Inter", "Inter Fallback", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  monoFamily: '"JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace',
-  /** The editor's notes: Inter Italic (it replaces the Georgia serif of v1.0); the note rules set font-style: italic. */
-  noteFamily: '"Inter", "Inter Fallback", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
+  fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  /** Headlines: the optical display cut of the system face where the platform has one by name, else the same system face. */
+  displayFamily: '"Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  monoFamily: 'ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace',
+  /** The editor's notes (margin notes and quiet asides), set in italic by their rules. */
+  noteFamily: 'Georgia, "Iowan Old Style", "Times New Roman", serif',
   bodySizePx: 16,
   bodyLineHeight: 1.5,
   denseSizePx: 14,

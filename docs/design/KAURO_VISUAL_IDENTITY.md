@@ -80,39 +80,30 @@ Bands:
 
 ## 3. Typography
 
-**Agreed direction (owner, 2026-10-18):**
-- a wordmark set in type only ("Kauro", no symbol);
-- **Inter** for the brand, headings and text;
-- **JetBrains Mono** for technical information where it helps legibility;
-- no third face, and no serif.
+**Decision (owner, 2026-10-19): the web keeps its system families.**
+- On 2026-10-18 the owner agreed Inter and JetBrains Mono, believing the web already used them.
+- When Order 10 put Inter on the web, the owner compared the two and kept the families the site had been designed and reviewed with:
+  they read better, and that decides.
+- **Inter and JetBrains Mono remain the faces of printed documents** (the B13 report, §13), which embed them.
+- The web serves no font. Its families are the system faces below.
+- The wordmark is "Kauro" in the display family. No custom letterform is drawn.
 
-The custom "a" of the wordmark is never applied to running text.
-
-**Implemented on the web (Order 10, 2026-10-19).** Until then the web used system families and a Georgia note; that discrepancy, recorded on
-2026-10-18, is closed. The decision record is A10 §11. Printed documents use the same files, embedded (§13).
+The record of the decision is A10 §11.
 
 | Role | Family (token) | Notes |
 | --- | --- | --- |
-| Body | Inter (`--kauro-font-family`) | 16 px, line height 1.5; dense metadata never below 14 px |
-| Display (headings, figures, wordmark) | Inter (`--kauro-display-family`), its optical size axis giving large sizes their display cut | tight tracking (−0.02 to −0.05 em), weights 300 to 700 |
-| Mono (file names, hashes, references, counters) | JetBrains Mono (`--kauro-mono-family`), 400 to 700 | 0.6875–0.875 rem; hashes break anywhere |
-| Editor's note | Inter Italic (`--kauro-note-family`) | margin notes and quiet asides only |
+| Body | `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` (`--kauro-font-family`) | 16 px, line height 1.5; dense metadata never below 14 px |
+| Display (headings, figures, wordmark) | `"Segoe UI Variable Display", system-ui, …` (`--kauro-display-family`) | tight tracking (−0.02 to −0.05 em), weights 300 to 700 |
+| Mono (file names, hashes, references, counters) | `ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, …` (`--kauro-mono-family`) | 0.6875–0.875 rem; hashes break anywhere |
+| Editor's note | `Georgia, "Iowan Old Style", "Times New Roman", serif`, italic (`--kauro-note-family`) | margin notes and quiet asides only |
 
-**How the faces are served:**
-- the official files and their provenance are in `apps/web/public/fonts`, served from Kauro's own origin at stable, versioned paths
-  (`font-src 'self'`), with no font CDN;
-- `apps/web/src/server/faces.ts` declares them once, and every document inlines that declaration under its nonce (the root layout and
-  the legal pages alike);
-- only Inter's roman is preloaded; the italic and the mono weights load when a page uses them;
-- "Inter Fallback" carries Inter's metrics, so body text does not reflow on arrival; mono text may move slightly; every stack ends in a
-  system stack;
-- the faces apply to every document of the web, the implemented application screens included.
+There are no web fonts and no font request to another origin (`font-src 'self'`).
 
-**The wordmark:** it is "Kauro" set in Inter. The custom "a" mentioned above has no reproducible artifact in the repository, so it is not
-drawn; it awaits the owner's review.
-
-**Narrow screens:** a table of four columns or more is laid out row by row below 40 rem, each value beside its column's name (`DataTable`),
-so no word breaks inside a narrow column.
+**Narrow screens (Order 10):**
+- A table of four columns or more is laid out row by row below 40 rem, each value beside its column's name (`DataTable`), so no word
+  breaks inside a narrow column.
+- The hero window, the report pile, the journey sheet's heads and the sign-in control have their own narrow-screen rules.
+- These corrections were kept with the system families.
 
 **Type roles:**
 - **Headline in two weights:** the last words of an h1 are set light in the primary colour (`PageHead accent`, `Headline`). The text is

@@ -12,7 +12,7 @@ test("D-DS-1: tokens.css is exactly the rendering of TOKENS, so the stylesheet t
   assert.equal(onDisk, renderTokenCss());
 });
 
-test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcelain, wine primary with porcelain text, clay as the dark theme's primary on carbon, body 16px/1.5, dense text never below 14px, a two-pixel focus indicator with spacing, and the agreed faces (Inter, JetBrains Mono, Inter Italic for notes; Order 10) named by family, with Inter's metric-matched fallback and a system stack behind each and no font resource in the tokens", () => {
+test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcelain, wine primary with porcelain text, clay as the dark theme's primary on carbon, body 16px/1.5, dense text never below 14px, a two-pixel focus indicator with spacing, and the web's system families (owner, 2026-10-19: the faces the site was reviewed with; Inter stays the printed report's) with Georgia for notes and no font resource", () => {
   assert.deepEqual({ ...BRAND }, { carbon: "#242426", porcelain: "#F8F6F3", wine: "#653A46", clay: "#C4A693" });
   assert.equal(COLOR.text, BRAND.carbon);
   assert.equal(COLOR.background, BRAND.porcelain);
@@ -29,12 +29,12 @@ test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcel
   assert.ok(TYPOGRAPHY.denseSizePx >= 14);
   assert.equal(FOCUS.widthPx, 2);
   assert.ok(FOCUS.offsetPx >= 2, "the focus indicator has spacing");
-  assert.ok(TYPOGRAPHY.fontFamily.startsWith('"Inter", "Inter Fallback", system-ui,'), TYPOGRAPHY.fontFamily);
-  assert.equal(TYPOGRAPHY.displayFamily, TYPOGRAPHY.fontFamily, "one family: headings are Inter too");
-  assert.ok(TYPOGRAPHY.monoFamily.startsWith('"JetBrains Mono", ui-monospace,'), TYPOGRAPHY.monoFamily);
-  assert.ok(TYPOGRAPHY.noteFamily.startsWith('"Inter", "Inter Fallback", system-ui,'), TYPOGRAPHY.noteFamily);
-  // no third family: no serif face anywhere in the stacks
-  for (const stack of [TYPOGRAPHY.fontFamily, TYPOGRAPHY.displayFamily, TYPOGRAPHY.monoFamily, TYPOGRAPHY.noteFamily]) assert.doesNotMatch(stack.replace(/sans-serif/g, ""), /serif|Georgia|Times|Iowan/, stack);
+  assert.match(TYPOGRAPHY.fontFamily, /^system-ui,/);
+  assert.match(TYPOGRAPHY.displayFamily, /^"Segoe UI Variable Display", system-ui,/);
+  assert.match(TYPOGRAPHY.monoFamily, /^ui-monospace,/);
+  assert.match(TYPOGRAPHY.noteFamily, /^Georgia,/);
+  // no web font: no face is named that a visitor would not have
+  for (const stack of [TYPOGRAPHY.fontFamily, TYPOGRAPHY.displayFamily, TYPOGRAPHY.monoFamily]) assert.doesNotMatch(stack, /Inter|JetBrains/, stack);
   assert.doesNotMatch(renderTokenCss(), /url\(|@import|@font-face/, "no external font or resource request");
 });
 

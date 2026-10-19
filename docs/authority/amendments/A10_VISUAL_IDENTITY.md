@@ -165,29 +165,20 @@ The rules decided in §1–§9 are consolidated as identity version 1.0 in `docs
 authority for new work. The screens that follow it are listed in `docs/design/KAURO_SCREEN_COVERAGE.md`. Who directed and who built it is
 recorded in `docs/design/KAURO_VISUAL_PROVENANCE.md`. This amendment remains the record of how each decision was reached.
 
-## 11. The agreed faces implemented on the web (Order 10, 2026-10-19)
+## 11. Typography on the web: the system families kept (Order 10, 2026-10-19)
 
-The owner's typography decision of 2026-10-18 (recorded in KAURO_VISUAL_IDENTITY.md §3) replaced the system families of §1–§10 with
-Inter and JetBrains Mono. The printed report already used them; Order 10 implements them on the web, without a new brand decision.
+- **The confusion:** on 2026-10-18 the owner agreed Inter and JetBrains Mono, believing the web already used them. In fact the web had
+  always used the system families of §1–§10, and those are what the owner designed and approved.
+- **The comparison:** Order 10 implemented Inter on the web (PR #117, commits up to f3147b05). The owner compared that candidate with the
+  previous web and decided to **keep the previous families**, because they read better.
+- **What changed:**
+  - the web serves no font again; the tokens name the system stacks;
+  - the editor's notes keep Georgia italic, now named by a token (`--kauro-note-family`) instead of four repeated declarations;
+  - Inter and JetBrains Mono remain the faces of the printed B13 report, which embeds them (KAURO_VISUAL_IDENTITY.md §13), unchanged.
+- **What was kept from the Inter attempt:** the narrow-screen corrections it exposed. They were checked again with the system families,
+  and they fix defects that existed before: tables stacked on phones; the hero window; the report pile; the journey sheet's heads; the
+  sign-in control. They are recorded in KAURO_VISUAL_IDENTITY.md §3, "Narrow screens".
+- **The wordmark** stays "Kauro" in the display family; no custom glyph is invented.
 
-- **Faces:** Inter 4.1 (variable roman, italic 400) and JetBrains Mono 2.304 (400, 500, 600, 700). The official release files, licences
-  and provenance are in `apps/web/public/fonts`; three files are byte-identical to the report's.
-- **Serving:** `apps/web/src/server/faces.ts` declares the faces once, served from Kauro's own origin at stable versioned paths
-  (`/fonts/inter-4.1/…`, `/fonts/jetbrains-mono-2.304/…`).
-  - Every document carries the declaration, inlined under the request's nonce: the root layout and the legal pages, whose route handler
-    writes its own document.
-  - Only Inter's roman is preloaded.
-  - "Inter Fallback" is the local Arial with Inter's metrics, so body text does not reflow when Inter arrives. JetBrains Mono falls back to
-    the system mono, so a few technical lines and the blocks around them move slightly on arrival (layout shift measured with fonts
-    delayed 1.5 s: at most 0.034, on Sample delivery at 375 px; the threshold for good is 0.1).
-  - There is no CDN, and the CSP keeps `font-src 'self'`. The face files are cached for a year as immutable: a new release is a new path.
-- **Tokens:** `packages/ui/src/tokens.ts` names "Inter", "Inter Fallback" and "JetBrains Mono" before a system stack. Headings use the
-  same Inter, whose optical size axis gives large sizes their display cut.
-- **Notes:** the editor's notes are set in Inter Italic; the Georgia serif of §1 is retired. No third family remains.
-- **Scope:** the faces apply to every document the web serves, so the implemented application screens (§10, owner review pending) are set
-  in Inter too, as the identity requires. No private screen was built or changed in structure.
-- **Wordmark:** "Kauro" is set in Inter. No reproducible artifact of a custom "a" exists in the repository, so none was invented; any
-  custom letterform awaits the owner's visual review.
-
-The wider face exposed words breaking inside narrow columns on phones. The corrections are recorded in KAURO_VISUAL_IDENTITY.md §3
-("Narrow screens") and in the Order 10 evidence (the word-break audit and the gallery). The rules of §1–§10 otherwise stand unchanged.
+From this order on, every visual decision is reviewed by the owner in a running review environment (`tools/review/serve.mjs`, local only,
+outside the product build) before it is merged.
