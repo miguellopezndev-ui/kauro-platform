@@ -13,10 +13,13 @@ renderer version, so a printed report identifies its exact inputs.
 
 ## 2. Safety (S069)
 
-- No `<script>`, no event-handler attribute, no inline `style=` attribute, and no URL other than the logo's own embedded
-  `data:` image (review PR21-6: the doc now says what the code does). One `<style>` element and a CSP
-  meta: `default-src 'none'; style-src 'unsafe-inline'; img-src data:` (the worker's PDF engine must also run with scripts
+- No `<script>`, no event-handler attribute, no inline `style=` attribute, and no URL other than embedded `data:` resources: the
+  logo's image and, since template 2, the pinned faces (review PR21-6). One `<style>` element and a CSP meta:
+  `default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:` (the worker's PDF engine must also run with scripts
   and network off; requested of B).
+- The faces (template 2) are the official Inter 4.1 and JetBrains Mono 2.304 files shipped with the package
+  (`packages/reports/assets/fonts`, licences and `PROVENANCE.json` beside them). `fonts.ts` reads each once and refuses it
+  (`FONT_UNAVAILABLE`) unless its SHA-256 is the pinned one. This is the renderer's only read.
 - Every string is escaped for text and double-quoted attribute context (`& < > " '`). Model strings are from closed vocabularies
   except the agency's file names (`UntrustedText`), which are escaped and isolated in `<bdi>`, and printed only in
   SECURE_DETAIL / INTERNAL_EVIDENCE reports.
@@ -40,6 +43,22 @@ file with its use ("Evidence, not for import" …). Source files.
 `@page { size: letter | A4 }` is the only difference between the two sizes (tested byte for byte). Table headers repeat on each
 page, rows do not split, headings stay with their content, hashes and paths wrap. Text is text (no image of text), so it stays
 selectable and readable by assistive technology in the PDF. Whether the PDF engine honours these rules is the worker's test.
+
+### Template 2 (owner-approved 2026-10-18; `REPORT_TEMPLATE = "kauro-report-template/2"`)
+
+- **Layout:** the proposal approved in phase A (`docs/design/REPORT-REDESIGN-PROPOSAL.md`), following the printed-document criteria
+  of KAURO_VISUAL_IDENTITY.md §13:
+  - the cover is led by the agency's brand, then the verdict label, the title and status, the attribution;
+  - a summary panel with the three denominators and the rows unified with approval (the unbound notice closes it);
+  - the counts as the outcomes of the source rows over their total, then the other measures, each with its definition;
+  - records by object and relationships side by side;
+  - the import guide as banded steps;
+  - exceptions with their common use said once and a differing use under the file's name;
+  - a running footer with "Page n of m".
+- **Facts:** every fact of template 1 is kept, and each figure keeps its one `data-figure`. The data-plane real-engine test checks that
+  every text of the document reaches the PDF's extracted text and that only the pinned faces are embedded.
+- **Versioning:** a report issued under template 1 keeps its stored PDF and hashes. A new report records the template in
+  `<meta name="generator">` and through the deployment's `rendererVersion`, which should change when template 2 is deployed.
 
 ## 5. Copy (A3, R-E3)
 

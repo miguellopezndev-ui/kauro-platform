@@ -1,6 +1,9 @@
 # Report redesign: phase A proposal
 
-2026-10-18. This is a visual proposal for the B13 package report, for the owner's approval. **Nothing here is implemented.**
+2026-10-18. This is a visual proposal for the B13 package report, for the owner's approval.
+
+**Status:** the owner approved it on 2026-10-18, and phase B implemented it as report template 2 (`packages/reports/src/html.ts`,
+`kauro-report-template/2`). The text below records the proposal as it was approved.
 
 - **Renderer untouched:** the real renderer (`packages/reports/src/html.ts`) is unchanged.
 - **What the proposal is:** a prototype run over the real verified model of the five sample packages, using the existing copy catalogue.
