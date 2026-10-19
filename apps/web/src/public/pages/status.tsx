@@ -1,33 +1,35 @@
-// UI08 Service status: what the capability publication says right now and when it was read, or an honest unavailable state. A publication
-// that cannot be read shows no service and says neither "running normally" nor "down"; a service the publication does not list is not on the
-// page. There is no incident feed yet, and the page says so without implying that no incident is open. The services read are one panel in
-// the product's own form, a lamp beside each state (A10 §8).
+// UI08 Service status: what the capability publication says right now, or an honest unavailable state. A publication that cannot be read
+// shows no service and says neither "running normally" nor "down"; a service the publication does not list is not on the page. There is no
+// incident feed yet, and the page says so without implying that no incident is open.
+//
+// The page is one card of the product, as the not-found page is (Order 10, owner review): the status board, set in the middle of the page
+// and tilted like a sheet left on a desk, a lamp beside each service, the incidents line and the way to ask for help on the same card. It
+// straightens when it is pointed at.
 import type { ReactElement } from "react";
-import { PUBLIC_COPY, copy } from "../../copy/public.ts";
-import { availabilityOf, formatInstant, publishedModes, type Publication } from "../capabilities.ts";
+import { PUBLIC_COPY } from "../../copy/public.ts";
+import { availabilityOf, publishedModes, type Publication } from "../capabilities.ts";
 import { modeName } from "../estimate-text.ts";
-import { LinkButton, PageHead, Section, stateText } from "../parts.tsx";
+import { stateText } from "../parts.tsx";
 import { ROUTE } from "../site.ts";
 
 export function StatusPage({ publication }: { readonly publication: Publication }): ReactElement {
   const modes = publishedModes(publication);
   return (
-    <>
-      <PageHead size="compact" accent={1} eyebrow={PUBLIC_COPY["nav.status.label"]} title={PUBLIC_COPY["status.title"]}>
-        {publication.kind === "READ" ? <p className="kauro-site-observed">{copy("status.observed.body", { time: formatInstant(publication.observedAt) })}</p> : null}
-      </PageHead>
-      {publication.kind === "READ" ? (
-        <>
-          <Section id="status-published" heading={PUBLIC_COPY["status.published.heading"]} layout="split">
-            {modes.length === 0 ? (
-              <p className="kauro-site-callout">{PUBLIC_COPY["status.none.body"]}</p>
-            ) : (
-              <div className="kauro-status-panel kauro-paper">
-                <p className="kauro-status-bar" aria-hidden="true">
-                  <span className="kauro-status-brand">{PUBLIC_COPY["site.name"]}</span>
-                  <span className="kauro-status-title">{PUBLIC_COPY["nav.status.label"]}</span>
-                </p>
-                <ul className="kauro-site-status-list">
+    <section className="kauro-cardpage" aria-labelledby="status-title">
+      <div className="kauro-cardsheet kauro-paper">
+        <p className="kauro-cardsheet-bar" aria-hidden="true">
+          <span className="kauro-cardsheet-brand">{PUBLIC_COPY["site.name"]}</span>
+          <span className="kauro-cardsheet-title">{PUBLIC_COPY["nav.status.label"]}</span>
+        </p>
+        <div className="kauro-cardsheet-body">
+          <h1 id="status-title">{PUBLIC_COPY["status.title"]}</h1>
+          {publication.kind === "READ" ? (
+            <>
+              <h2 className="kauro-cardsheet-label">{PUBLIC_COPY["status.published.heading"]}</h2>
+              {modes.length === 0 ? (
+                <p className="kauro-cardsheet-empty">{PUBLIC_COPY["status.none.body"]}</p>
+              ) : (
+                <ul className="kauro-site-status-list kauro-cardsheet-list">
                   {modes.map((published) => {
                     const availability = availabilityOf(publication, published.mode);
                     return (
@@ -37,24 +39,32 @@ export function StatusPage({ publication }: { readonly publication: Publication 
                     );
                   })}
                 </ul>
+              )}
+              <div className="kauro-cardsheet-note">
+                <h2 className="kauro-cardsheet-label">{PUBLIC_COPY["status.incidents.heading"]}</h2>
+                <p>{PUBLIC_COPY["status.incidents.body"]}</p>
               </div>
-            )}
-          </Section>
-          <Section id="status-incidents" heading={PUBLIC_COPY["status.incidents.heading"]} layout="split">
-            <p className="kauro-site-muted">{PUBLIC_COPY["status.incidents.body"]}</p>
-          </Section>
-        </>
-      ) : (
-        <Section id="status-unavailable" heading={PUBLIC_COPY["status.unavailable.heading"]}>
-          <p className="kauro-site-callout">{PUBLIC_COPY["status.unavailable.body"]}</p>
-        </Section>
-      )}
-      <Section id="status-help" heading={PUBLIC_COPY["status.help.heading"]} layout="split" tone="sunken" variant="kauro-site-band-compact">
-        <p>{PUBLIC_COPY["status.help.body"]}</p>
-        <div className="kauro-site-actions">
-          <LinkButton href={ROUTE.contact}>{PUBLIC_COPY["status.help.cta"]}</LinkButton>
+            </>
+          ) : (
+            <>
+              <h2 className="kauro-cardsheet-label">{PUBLIC_COPY["status.unavailable.heading"]}</h2>
+              <p className="kauro-cardsheet-empty">{PUBLIC_COPY["status.unavailable.body"]}</p>
+              <div className="kauro-cardsheet-blank" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+            </>
+          )}
         </div>
-      </Section>
-    </>
+        <div className="kauro-cardsheet-foot">
+          <h2 className="kauro-cardsheet-label">{PUBLIC_COPY["status.help.heading"]}</h2>
+          <p>{PUBLIC_COPY["status.help.body"]}</p>
+          <a className="kauro-site-arrow" href={ROUTE.contact}>
+            {PUBLIC_COPY["status.help.cta"]}
+          </a>
+        </div>
+      </div>
+    </section>
   );
 }

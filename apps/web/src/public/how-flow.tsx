@@ -71,9 +71,9 @@ function Bar({ count, label, run }: { readonly count: number; readonly label: st
       <span className="kauro-scene-bar-label">{label}</span>
       <span className="kauro-scene-bar-share">{share}</span>
       {/* the bar is the share of the file, drawn against the largest finding */}
-      <span className="kauro-scene-bar-track">
-        <span className="kauro-scene-bar-fill" style={{ inlineSize: `${Math.round((count / countOf("sample.report.company")) * 100)}%` }} />
-      </span>
+      <svg className="kauro-scene-bar-track" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+        <rect className="kauro-scene-bar-fill" width={Math.round((count / countOf("sample.report.company")) * 100)} height="4" />
+      </svg>
     </li>
   );
 }
@@ -233,7 +233,7 @@ export function HowFlow({ steps, brand, project }: { readonly steps: readonly Fl
         ))}
       </ol>
       {ready ? (
-        <div ref={track} className="kauro-flow-track" style={{ ["--kauro-flow-steps" as string]: steps.length }}>
+        <div ref={track} className="kauro-flow-track">
           <div className="kauro-flow-stage" aria-hidden="true">
             <ol className="kauro-flow-line">
               {steps.map((step, index) => (

@@ -472,9 +472,10 @@ test("Contact: a labelled fit form with the buyer-type question, the api's vocab
 
 // ---- Service status -------------------------------------------------------------------------------------------------------------------
 
-test("Service status: the published services and the time observed, or an honest unavailable state that claims neither running nor down", () => {
+test("Service status: the published services, or an honest unavailable state that claims neither running nor down", () => {
   const read = textOf(page("status").html(ALL));
-  assert.match(read, /Observed at 2026-10-02 09:30 UTC\. Reload this page for a new reading; it does not update on a schedule\./);
+  // the read time is not shown (owner review, Order 10)
+  assert.doesNotMatch(read, /Observed at/);
   assert.match(read, /CLEAN.*Available for new projects.*HubSpot.*Available for new projects.*Salesforce.*Available for new projects/);
   assert.match(read, /No incident summary is published on this page yet\. That is not a statement that none is open\./);
   const limited = textOf(page("status").html(publication(entry("CLEAN", "AVAILABLE_LIMITED"))));

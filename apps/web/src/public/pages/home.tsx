@@ -217,14 +217,12 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
           ))}
         </ul>
       </div>
-      <Section id="home-process" heading={PUBLIC_COPY["home.process.heading"]} eyebrow={PUBLIC_COPY["nav.how.label"]} tone="inverse" variant="kauro-site-process">
-        <Journey />
-        <p className="kauro-site-links">
-          <LinkButton href={ROUTE.how} kind="text">
-            {PUBLIC_COPY["nav.how.label"]}
-          </LinkButton>
-        </p>
-      </Section>
+      {/* How it works is one composition: its heading belongs to the held scene, not above it (journey.tsx) */}
+      <section id="home-process" className="kauro-site-section kauro-inverse kauro-site-tone-band kauro-site-process" aria-labelledby="home-process-heading">
+        <div className="kauro-site-wrap">
+          <Journey eyebrow={PUBLIC_COPY["nav.how.label"]} heading={PUBLIC_COPY["home.process.heading"]} headingId="home-process-heading" />
+        </div>
+      </section>
       <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]} variant="kauro-site-buyer-section">
         <Audience />
       </Section>

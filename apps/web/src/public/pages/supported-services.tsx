@@ -1,13 +1,17 @@
 // UI03 Supported services (A3 3.3): the capability publication shown as it is. CLEAN stands beside HubSpot and Salesforce as one of three
 // peers; each card says whether its service can be bought now, and a service the publication does not list is never described as if it
 // were open. CLEAN names as qualified only the destinations the publication lists, and no card claims compatibility with another CRM.
+//
+// Order 10, owner review: the head carries the availability as the product shows it, one row a service with its state, each row taking
+// the reader to that service; each service is then a spread, what it delivers beside the piece of the product that shows it; the limits of
+// a project are a sheet of figures.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy } from "../../copy/public.ts";
 import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Availability, type Publication } from "../capabilities.ts";
 import { FileChips, ImportOrder, Pane, Settings } from "../artifacts.tsx";
 import { INPUT_LIMITS } from "../limits.ts";
 import { MANIFEST_FILES } from "../sample-data.ts";
-import { LinkButton, MODE_ORDER, PageHead, Section, ServiceState, rich } from "../parts.tsx";
+import { LinkButton, MODE_ORDER, PageHead, Section, ServiceState, rich, stateText } from "../parts.tsx";
 import type { ServiceMode } from "../pricing-bands.ts";
 import { ROUTE } from "../site.ts";
 
@@ -60,12 +64,38 @@ function Details({ mode, publication }: { readonly mode: ServiceMode; readonly p
   }
 }
 
+/** The availability as the product shows it: one row a service, its state beside it; a row takes the reader to that service. */
+function Availability({ publication }: { readonly publication: Publication }): ReactElement {
+  return (
+    <div className="kauro-choose kauro-paper">
+      <p className="kauro-choose-bar" aria-hidden="true">
+        <span className="kauro-choose-brand">{PUBLIC_COPY["site.name"]}</span>
+        <span className="kauro-choose-title">{PUBLIC_COPY["services.availability.heading"]}</span>
+      </p>
+      <ul className="kauro-choose-list">
+        {MODE_ORDER.map((mode) => {
+          const availability = availabilityOf(publication, mode);
+          return (
+            <li key={mode}>
+              <a className={`kauro-choose-row kauro-choose-row--${availability.toLowerCase()}`} href={`#${CARD_ID[mode]}`}>
+                <span className="kauro-choose-name">{CARD_NAME[mode]}</span>
+                <span className={`kauro-site-state kauro-site-state--${availability.toLowerCase()}`}>{stateText(availability)}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function ServiceCard({ mode, publication }: { readonly mode: ServiceMode; readonly publication: Publication }): ReactElement {
   const availability: Availability = availabilityOf(publication, mode);
   const listed = publishedModes(publication).find((entry) => entry.mode === mode);
   const headingId = `${CARD_ID[mode]}-heading`;
   return (
     <article
+      id={CARD_ID[mode]}
       className={`kauro-site-card kauro-site-service kauro-site-service--${availability.toLowerCase()}${mode === "CLEAN" && (availability === "AVAILABLE" || availability === "LIMITED") ? " kauro-site-service--lead kauro-wine" : ""}`}
       aria-labelledby={headingId}
     >
@@ -84,14 +114,14 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
   const someClosed = publication.kind === "READ" && MODE_ORDER.some((mode) => availabilityOf(publication, mode) === "CLOSED");
   return (
     <>
-      <PageHead eyebrow={PUBLIC_COPY["nav.services.label"]} accent={3} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} size="compact" />
+      <PageHead eyebrow={PUBLIC_COPY["nav.services.label"]} accent={3} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} size="compact" aside={<Availability publication={publication} />} />
       <Section id="services-availability" heading={PUBLIC_COPY["services.availability.heading"]}>
         {publication.kind === "READ" ? (
           modes.length === 0 ? <p className="kauro-site-callout">{PUBLIC_COPY["services.availability.none"]}</p> : null
         ) : (
           <p className="kauro-site-callout">{PUBLIC_COPY["services.availability.unknown"]}</p>
         )}
-        <div className="kauro-site-cards kauro-site-cards--three">
+        <div className="kauro-site-spreads">
           {MODE_ORDER.map((mode) => (
             <ServiceCard key={mode} mode={mode} publication={publication} />
           ))}
@@ -113,7 +143,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
         <p className="kauro-site-statement kauro-site-statement--small">{PUBLIC_COPY["services.scope.unsupported"]}</p>
       </Section>
       <Section id="services-limits" heading={PUBLIC_COPY["services.limits.heading"]} layout="split">
-        <ul className="kauro-site-specs">
+        <ul className="kauro-site-specs kauro-site-specs--plate">
           <li>{PUBLIC_COPY["services.limits.formats"]}</li>
           <li>{rich("services.limits.files", { files: INPUT_LIMITS.files, fileSize: INPUT_LIMITS.fileSize })}</li>
           <li>{rich("services.limits.set", { setSize: INPUT_LIMITS.setSize, columns: INPUT_LIMITS.columns })}</li>
