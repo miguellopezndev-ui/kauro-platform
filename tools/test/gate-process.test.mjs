@@ -78,7 +78,7 @@ test('cleanup retries a Windows EPERM only on an established fact, printed, and 
   assert.deepEqual(asked, [[file]], 'Restart Manager is asked once, about the files left');
   assert.equal(existsSync(root), false);
   assert.equal(lines.length, 2);
-  assert.match(lines[0], /: EPERM; Restart Manager names no holder of its 1 remaining files; retrying for at most 5000 ms$/);
+  assert.match(lines[0], /: EPERM; Restart Manager names no holder of its 1 remaining files \(answered in \d+ ms\); retrying for at most 5000 ms$/);
   assert.match(lines[1], /: removed at retry 3, \d+ ms after the first failure$/);
   // a holder Restart Manager names is never retried, and the failure names it with what is left
   const held = mkdtempSync(join(tmpdir(), 'kauro-with-cleanup-'));

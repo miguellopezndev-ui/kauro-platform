@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
-import { HOLD_BOUND_MS, entries, removeTemp, restartManagerHolders } from "../temp-removal.mjs";
+import { HOLD_BOUND_MS, QUERY_BOUND_MS, entries, removeTemp, restartManagerHolders } from "../temp-removal.mjs";
 
 const repo = join(import.meta.dirname, "..", "..");
 const windows = process.platform === "win32";
@@ -75,11 +75,11 @@ test("a hold that outlasts the bound fails with what is left and the retries mad
       sleep: () => { clock += 1000; }, fs: { unlink: () => { unlinks++; throw eperm(); }, rmdir: rmdirSync } });
     let calls = 0;
     assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, options),
-      (error) => error.message === `EPERM, Permission denied; still held ${HOLD_BOUND_MS} ms after the first failure (5 retries); left: held.txt`
+      (error) => error.message === `EPERM, Permission denied; still held ${HOLD_BOUND_MS} ms after the retries began (5 retries); left: held.txt`
         && error.code === "EPERM" && error.cause.code === "EPERM");
     assert.equal(calls, 1, "the recursive removal is never repeated");
     assert.equal(unlinks, 5, "five retries, one clock second apart");
-    assert.deepEqual(asked, [HOLD_BOUND_MS], "the query is given what is left of the bound");
+    assert.deepEqual(asked, [QUERY_BOUND_MS], "the query has its own bound");
     assert.equal(lines.length, 1, "the retry was announced; no success line");
     calls = 0;
     const unknown = quiet({ holders: () => { throw new Error("powershell.exe not found"); } });
@@ -118,21 +118,39 @@ test("an entry a retry removed that comes back stops the retry: it is not remove
   } finally { unlinkSync(join(root, "old.txt")); rmdirSync(root); }
 });
 
-// R114-2 (Codex, PR #114 round 1): at 03d1a0c3 the bound was checked only after a failed retry, so a query that outlasted it was
-// followed by a removal, and the query itself had no timeout.
-test("no retry starts once the bound has passed, however long the query took", () => {
+// R114-2 (Codex, PR #114 round 1): at 03d1a0c3 the bound was checked only after a failed retry, so a retry could start past it,
+// and the query itself had no timeout.
+test("no retry starts once the hold bound has passed: the bound is checked before every retry", () => {
   const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
   writeFileSync(join(root, "old.txt"), "x");
   try {
     let clock = 0;
-    const { lines, options } = quiet({ now: () => clock, holders: () => { clock += HOLD_BOUND_MS; return []; }, fs: { unlink: () => assert.fail("no retry after the bound"), rmdir: () => assert.fail("no retry after the bound") } });
+    let unlinks = 0;
+    const { lines, options } = quiet({ now: () => clock, holders: () => [], sleep: () => { clock += HOLD_BOUND_MS; },
+      fs: { unlink: () => { unlinks++; throw eperm(); }, rmdir: () => assert.fail("the file is never removed") } });
     let calls = 0;
     assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, options),
-      { message: `EPERM, Permission denied; still held ${HOLD_BOUND_MS} ms after the first failure (0 retries); left: old.txt` });
+      { message: `EPERM, Permission denied; still held ${HOLD_BOUND_MS} ms after the retries began (1 retries); left: old.txt` });
     assert.equal(calls, 1);
+    assert.equal(unlinks, 1, "the sleep took the clock to the bound, so no second retry");
     assert.equal(lines.length, 1);
     assert.equal(existsSync(join(root, "old.txt")), true);
   } finally { unlinkSync(join(root, "old.txt")); rmdirSync(root); }
+});
+
+// main a193dcc0 (windows-latest, run 39249788249): the query shared the 5 s hold bound, and a Restart Manager answer slower than
+// 5 s under the suite's load was read as unknown. The query has its own bound; the hold bound starts once the fact is known.
+test("a slow Restart Manager answer does not use up the hold bound: the query has its own, and the hold is counted after it", () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
+  writeFileSync(join(root, "old.txt"), "x");
+  let clock = 0;
+  const given = [];
+  const { lines, options } = quiet({ now: () => clock, holders: (files, { timeoutMs }) => { given.push(timeoutMs); clock += HOLD_BOUND_MS + 1_000; return []; } });
+  removeTemp(root, () => { throw eperm(); }, options);
+  assert.deepEqual(given, [QUERY_BOUND_MS]);
+  assert.equal(existsSync(root), false);
+  assert.equal(lines[0], `temp removal: ${root}: EPERM; Restart Manager names no holder of its 1 remaining files (answered in ${HOLD_BOUND_MS + 1_000} ms); retrying for at most ${HOLD_BOUND_MS} ms`);
+  assert.equal(lines[1], `temp removal: ${root}: removed at retry 1, ${HOLD_BOUND_MS + 1_000} ms after the first failure`);
 });
 
 test("a Restart Manager query is given a timeout, and one that does not answer in time is an unknown answer, never no holder", () => {
@@ -142,7 +160,7 @@ test("a Restart Manager query is given a timeout, and one that does not answer i
     { message: "Restart Manager query did not answer within 1234 ms; powershell.exe 77 was stopped" });
   assert.equal(given, 1234);
   restartManagerHolders(["a.txt"], { run: (file, args, options) => { given = options.timeout; return { status: 0, stdout: "[]" }; } });
-  assert.equal(given, HOLD_BOUND_MS, "never unbounded, even called on its own");
+  assert.equal(given, QUERY_BOUND_MS, "never unbounded, even called on its own");
 });
 
 test("Windows: a live process whose current directory is in the tree keeps it, and the retry ends at the bound naming it", { skip: WINDOWS_ONLY }, async () => {
@@ -154,7 +172,7 @@ test("Windows: a live process whose current directory is in the tree keeps it, a
     const { lines, options } = quiet({ platform: process.platform, boundMs: 300, sleep: undefined });
     // the caller's own removal, entry by entry: Windows refuses the directory with EBUSY while it is a process's current directory
     const remove = () => { try { unlinkSync(join(root, "a.txt")); } catch (error) { if (error.code !== "ENOENT") throw error; } rmdirSync(join(root, "repository")); rmdirSync(root); };
-    assert.throws(() => removeTemp(root, remove, options), (error) => /^EBUSY: .*; still held 300 ms after the first failure \(\d+ retries\); left: repository$/.test(error.message));
+    assert.throws(() => removeTemp(root, remove, options), (error) => /^EBUSY: .*; still held 300 ms after the retries began \(\d+ retries\); left: repository$/.test(error.message));
     assert.match(lines[0], /: EBUSY; only directories remain \(1 below the root\), no file; retrying for at most 300 ms$/);
     assert.equal(existsSync(join(root, "repository")), true);
   } finally {
@@ -222,7 +240,7 @@ test("Windows: a Restart Manager query that outlasts its timeout is stopped, and
     });
     assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
     let calls = 0;
-    assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, { boundMs: 1, log: () => assert.fail("nothing is retried") }),
+    assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, { queryBoundMs: 1, log: () => assert.fail("nothing is retried") }),
       (error) => /^EPERM, Permission denied; not retried: who holds its 1 remaining files is unknown \(Restart Manager query did not answer within 1 ms; powershell\.exe \d+ was stopped\); left: a\.txt$/.test(error.message));
     assert.equal(calls, 1);
     assert.equal(existsSync(file), true);
@@ -261,7 +279,7 @@ for (const [file, prefix, pattern] of [
     const r = underFault({ prefix, left: null }, ["--test", "--test-reporter=spec", `--test-name-pattern=${pattern}`, join("tools", "test", file)]);
     assert.equal(r.status, 0, r.output);
     assert.match(r.output, /ℹ pass 1/);
-    assert.match(r.output, new RegExp(`${prefix}\\w+: EPERM; Restart Manager names no holder of its \\d+ remaining files; retrying`));
+    assert.match(r.output, new RegExp(`${prefix}\\w+: EPERM; Restart Manager names no holder of its \\d+ remaining files \\(answered in \\d+ ms\\); retrying`));
     assert.match(r.output, new RegExp(`${prefix}\\w+: removed at retry 1, `));
   });
 }
