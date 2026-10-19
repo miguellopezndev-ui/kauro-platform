@@ -5,7 +5,8 @@
  *   - when the host dies (its pipe to the supervisor closes) — even a worker stuck in synchronous work, whose own disconnect handler
  *     cannot run, is ended;
  *   - at the attempt's deadline plus a grace, whether or not the host still lives;
- *   - when the tree's resident memory passes the attempt's hard memory (Linux: the tree's VmRSS from /proc, Chromium and every native
+ *   - when the attempt's resident memory passes its hard memory (Linux: the VmRSS from /proc of the worker's tree, of every process
+ *     seen in it before and of every process the attempt's directories mark; Chromium and every native
  *     allocation included), or the attempt's directories pass its hard scratch (any write, the browser's profile and temporary files
  *     included, and on Linux the files the tree still holds open after removing their names).
  *
@@ -20,7 +21,7 @@
  */
 import { lstatSync, readdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { killProcessTree, linuxDescendantsOf, linuxStartOf, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxStartOf, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
 export const SUPERVISOR_VERDICTS = ["HOST_LOST", "DEADLINE", "MEMORY_EXHAUSTED", "SCRATCH_EXHAUSTED"] as const;
 export type SupervisorVerdict = (typeof SUPERVISOR_VERDICTS)[number];
@@ -42,11 +43,11 @@ export interface SupervisorConfig {
   readonly pollMs: number;
 }
 
-/** The tree's resident memory on Linux (VmRSS of the worker and its descendants); null elsewhere. */
-export function treeResidentBytes(pid: number, platform: NodeJS.Platform = process.platform): number | null {
+/** The resident memory of processes on Linux (the sum of their VmRSS); null elsewhere. */
+export function residentBytesOf(pids: readonly number[], platform: NodeJS.Platform = process.platform): number | null {
   if (platform !== "linux") return null;
   let total = 0;
-  for (const p of linuxDescendantsOf(pid)) {
+  for (const p of new Set(pids)) {
     try {
       const kb = /^VmRSS:\s+(\d+)\s+kB/m.exec(readFileSync(`/proc/${p}/status`, "utf8"))?.[1];
       if (kb !== undefined) total += Number(kb) * 1024;
@@ -172,16 +173,21 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
   setInterval(() => {
     // the worker is gone: a host that died with it (on Windows its job object ends the tree with the host) is still recorded
     if (!isWorker()) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
+    // the attempt's processes (Linux): the worker's tree as it stands, every process seen in it before whose start still matches (one
+    // re-parented when its parent ended), and every process the attempt's directories mark (review round 5, R5-3)
+    const owned = new Set<number>();
     if (process.platform === "linux") {
       for (const p of linuxDescendantsOf(pid)) {
+        owned.add(p);
         const start = linuxStartOf(p);
         if (p !== pid && start !== null && !known.has(p)) known.set(p, start);
       }
+      for (const [p, start] of known) if (linuxStartOf(p) === start) owned.add(p);
+      for (const p of linuxAttemptProcesses(config.scratchDirs)) owned.add(p);
     }
-    const rss = treeResidentBytes(pid);
+    const rss = residentBytesOf([...owned]);
     if (rss !== null && rss > config.hardMemoryBytes) return end("MEMORY_EXHAUSTED", { residentBytes: rss });
-    const tree = process.platform === "linux" ? linuxDescendantsOf(pid) : [];
-    const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0) + openDeletedBytes(tree);
+    const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0) + openDeletedBytes([...owned]);
     if (scratch > config.hardScratchBytes) return end("SCRATCH_EXHAUSTED", { scratchBytes: scratch });
     return undefined;
   }, config.pollMs);

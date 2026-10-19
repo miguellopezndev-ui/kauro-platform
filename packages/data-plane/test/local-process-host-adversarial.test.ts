@@ -706,3 +706,28 @@ test("B14-A limits (review round 4, R4-1): no worker runs its attempt unsupervis
     await rig.dispose();
   }
 });
+
+test("B14-A RACE (review round 5, R5-1): a creator paused between its create and its start, then judged lost, never starts the job another instance has ended — the start is claimed once, and the end recorded stands", async () => {
+  const pause = gate();
+  const resumed = gate();
+  const rig = localRig({ hooks: { afterCreate: async () => (pause.open(), await resumed.promise) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 39);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    const launching = rig.host.launch(spec);
+    await pause.promise;
+    // a second instance whose clock runs a minute ahead judges the creator lost: the queued job, no pid, is ended for good
+    const ahead = rig.restart({ now: () => toUtcInstant(Date.now() + 60_000), nowMs: () => Date.now() + 60_000 });
+    const seen = await ahead.observe(spec.identity);
+    assert.equal(seen.state, "FAILED");
+    resumed.open();
+    assert.equal((await launching).outcome, "LAUNCHED", "the job was created");
+    assert.deepEqual([rig.host.record(spec.identity)?.state, rig.host.record(spec.identity)?.note], ["FAILED", "HOST_RESTARTED"], "the end recorded stands");
+    assert.equal(rig.host.running().length, 0, "the creator started nothing");
+    assert.equal(existsSync(attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId)), false, "no worker ever ran");
+  } finally {
+    resumed.open();
+    await rig.dispose();
+  }
+});
