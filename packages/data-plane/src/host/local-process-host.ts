@@ -292,19 +292,29 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (existsSync(jobDir)) return this.#cancelled(identity) ? answer("REFUSED", "IDENTITY_TERMINATED") : answer("ALREADY_EXISTS", null);
     // the creation is pending, durably, from here (review round 7, R7-1): its prepared directory exists before anything is read, so an
     // instance that would answer the identity absent past the creation horizon sees it, and takes the identity's name first (#absent)
-    const prepared = join(this.#hostRoot, "jobs", `${PENDING_PREFIX}${identity}-${process.pid}-${++this.#creations}`);
-    mkdirSync(prepared);
-    // when it began, on this instance's clock: the creation horizon runs from here
-    writeFileSync(join(prepared, PENDING_FILE), String(this.#o.clock.nowMs()));
+    const n = ++this.#creations;
+    const prepared = join(this.#hostRoot, "jobs", `${PENDING_PREFIX}${identity}-${process.pid}-${n}`);
+    // made aside with its stamp (when it began, on this instance's clock: the horizon runs from here), then renamed into view, so a
+    // pending creation is never visible without its stamp (review round 8, R8-3)
+    const stamping = join(this.#hostRoot, "jobs", `.stamping-${identity}-${process.pid}-${n}`);
+    const began = this.#o.clock.nowMs();
+    mkdirSync(stamping);
+    writeFileSync(join(stamping, PENDING_FILE), String(began));
+    try {
+      renameSync(stamping, prepared);
+    } catch (error) {
+      rmSync(stamping, { recursive: true, force: true });
+      throw error;
+    }
     let published = false;
     try {
-      return await this.#create(spec, prepared, answer, () => (published = true));
+      return await this.#create(spec, prepared, began, answer, () => (published = true));
     } finally {
       if (!published) rmSync(prepared, { recursive: true, force: true });
     }
   }
 
-  async #create(spec: WorkerLaunchSpec, prepared: string, answer: (outcome: WorkerLaunchResult["outcome"], reason: string | null) => WorkerLaunchResult, publish: () => void): Promise<WorkerLaunchResult> {
+  async #create(spec: WorkerLaunchSpec, prepared: string, began: number, answer: (outcome: WorkerLaunchResult["outcome"], reason: string | null) => WorkerLaunchResult, publish: () => void): Promise<WorkerLaunchResult> {
     const identity = spec.identity;
     const jobDir = this.#jobDir(identity);
 
@@ -316,7 +326,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     pendingOfIdentity.add(pending);
     this.#launching.set(identity, pendingOfIdentity);
     const boundMs = Math.floor((this.creationHorizonSeconds * 1000) / 2);
-    const startedMs = this.#o.clock.nowMs();
+    // the bound runs from the launch's own beginning, stamped before anything: a creator resuming late cannot start a new bound
+    const startedMs = began;
     let reads: AttemptTicketReads;
     try {
       reads = await new Promise<AttemptTicketReads>((resolve, reject) => {
@@ -1009,15 +1020,20 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     }
     const now = this.#o.clock.nowMs();
     const expired = pending.some((name) => {
+      const dir = join(this.#hostRoot, "jobs", name);
       try {
-        return now - Number(readFileSync(join(this.#hostRoot, "jobs", name, PENDING_FILE), "utf8")) > this.creationHorizonSeconds * 1000;
+        const began = Number(readFileSync(join(dir, PENDING_FILE), "utf8"));
+        // a stamp that cannot be read as an instant is taken for an expired one (review round 8, R8-3)
+        return !Number.isFinite(began) || now - began > this.creationHorizonSeconds * 1000;
       } catch {
-        // published or abandoned meanwhile, or not yet stamped (then within its horizon)
-        return false;
+        // published or abandoned meanwhile (its directory gone): the reconciliation below finds a published job; a directory still
+        // there without a readable stamp is taken for an expired one
+        return existsSync(dir);
       }
     });
-    if (expired && !this.#cancel(identity)) return this.#existing(identity);
-    return null;
+    if (expired) this.#cancel(identity);
+    // whatever the scan saw, a job published meanwhile is answered as it stands (review round 8, R8-1)
+    return this.#existing(identity);
   }
 
   /** A record that is a job's (a cancelled identity's tombstone is no job: the identity was never created). */

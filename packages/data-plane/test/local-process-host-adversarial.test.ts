@@ -824,3 +824,41 @@ test("B14-A limits (review round 7, R7-2): a supervisor's verdict written before
     await rig.dispose();
   }
 });
+
+test("B14-A RACE (review round 8, R8-1, R8-3): a pending creation whose stamp cannot be read is taken for an expired one — the absence answered takes the identity's name first, so no creator can publish it afterwards", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 45);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    // what a creator that died mid-way would leave: a pending directory with a stamp that is no instant
+    mkdirSync(join(rig.hostRoot, "jobs", `.creating-${spec.identity}-0-0`));
+    writeFileSync(join(rig.hostRoot, "jobs", `.creating-${spec.identity}-0-0`, "pending.json"), "not an instant");
+    assert.equal((await rig.host.observe(spec.identity)).state, "NOT_FOUND");
+    const late = await rig.restart().launch(spec);
+    assert.deepEqual([late.outcome, late.reason], ["REFUSED", "IDENTITY_TERMINATED"]);
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A limits (review round 8, R8-2): a supervisor file that cannot be read as a verdict or as the host's standing down is never permission to accept a result — the attempt ends FAILED with no manifest", { skip }, async () => {
+  const atManifest = gate();
+  const released = gate();
+  const rig = localRig({ hooks: { atStage: async (_id, stage) => (stage === "MANIFEST" ? (atManifest.open(), await released.promise) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 46);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await atManifest.promise;
+    // a verdict whose writing was cut short
+    writeFileSync(join(rig.hostRoot, "jobs", spec.identity, "supervisor.json"), '{"verdict":"SCR', { flag: "wx" });
+    released.open();
+    const ended = await rig.host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.manifest], ["FAILED", null]);
+  } finally {
+    released.open();
+    await rig.dispose();
+  }
+});

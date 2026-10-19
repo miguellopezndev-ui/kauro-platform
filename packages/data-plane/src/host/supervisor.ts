@@ -19,7 +19,7 @@
  * and every process the attempt's directories mark (sweepAttemptProcesses) — and leaves only once none is left, or after a bounded
  * number of sweeps.
  */
-import { lstatSync, readdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
+import { linkSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxStartOf, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
@@ -118,22 +118,45 @@ export function openDeletedBytes(pids: readonly number[], platform: NodeJS.Platf
  * verdict came second ends nothing.
  */
 export function recordVerdict(jobDir: string, verdict: SupervisorVerdict, detail: Record<string, number>): boolean {
+  return publishOnce(join(jobDir, SUPERVISOR_FILE), JSON.stringify({ verdict, ...detail }));
+}
+
+/**
+ * Publishes a complete file at `path` once: written aside, then hard-linked into place, which fails if the path exists. A reader never
+ * sees it half written (review round 8, R8-2). True when this call published it.
+ */
+export function publishOnce(path: string, content: string): boolean {
+  const aside = `${path}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
-    writeFileSync(join(jobDir, SUPERVISOR_FILE), JSON.stringify({ verdict, ...detail }), { flag: "wx" });
+    writeFileSync(aside, content, { flag: "wx" });
+    linkSync(aside, path);
     return true;
   } catch {
     return false;
+  } finally {
+    try {
+      unlinkSync(aside);
+    } catch {
+      // never written
+    }
   }
 }
 
-/** The host stands its supervisor down for good, unless a verdict came first: then that verdict (null when the host's came first). */
+/**
+ * The host stands its supervisor down for good, unless a verdict came first: then that verdict (null when the host's came first). A
+ * file there that is no verdict and not the host's own standing down cannot be read as either: it is taken for an exhaustion, never
+ * for permission to accept a result.
+ */
 export function standDownOrVerdict(jobDir: string): SupervisorVerdict | null {
+  if (publishOnce(join(jobDir, SUPERVISOR_FILE), JSON.stringify({ verdict: "STOOD_DOWN" }))) return null;
+  const read = readVerdict(jobDir);
+  if (read !== null) return read.verdict;
   try {
-    writeFileSync(join(jobDir, SUPERVISOR_FILE), JSON.stringify({ verdict: "STOOD_DOWN" }), { flag: "wx" });
-    return null;
+    if ((JSON.parse(readFileSync(join(jobDir, SUPERVISOR_FILE), "utf8")) as { verdict?: unknown }).verdict === "STOOD_DOWN") return null;
   } catch {
-    return readVerdict(jobDir)?.verdict ?? null;
+    // unreadable
   }
+  return "SCRATCH_EXHAUSTED";
 }
 
 export function readVerdict(jobDir: string): { readonly verdict: SupervisorVerdict } | null {
