@@ -23,11 +23,11 @@
  *     its own attempt), the network preload, the V8 heap cap; its channel is a pipe on fd 3 in the protocol's own frames (framing.ts).
  *   - The channel: the host holds at most CALLS_HELD calls from the moment it reads one until its reply has left the process, and
  *     reads nothing more meanwhile; a frame outside the protocol ends the attempt, never this process.
- *   - Its end: only this host signals the worker, while it is this host's unreaped child (process-tree.ts) — at a termination, at the
- *     deadline, on a protocol violation, at stop. If this host dies, the kernel ends the worker: on Windows it is in this process's
- *     kill-on-close job object; on Linux it is started under a parent-death signal (util-linux `setpriv --pdeathsig KILL`). What the
- *     worker started ends with it (Windows: the worker's own job object) or when it next finds its parent's pipe closed (the core's
- *     child at its next report, the browser on its debugging pipe).
+ *   - Its end: each attempt's whole process tree is held by an operating-system boundary (attempt-scope.ts: a PID namespace on
+ *     Linux, kill-on-close job objects on Windows), which the host proves on this machine before it opens. The host ends the tree by
+ *     ending its own unreaped child — at a termination, at the deadline, on a protocol violation, at stop — and the kernel ends it
+ *     when the host itself ends. No process is ever known or signalled by its number.
+ *   - The ticket only after the worker's `hello`: a worker whose host was already gone when it started never receives one.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Socket } from "node:net";
@@ -63,7 +63,7 @@ import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
 import { encodeFrame, FrameDecoder } from "./framing.js";
 import { CANCELLED_BEFORE_CREATE, JobJournal, LOCAL_PROCESS_HOST, TERMINAL, type LocalJobRecord } from "./job-journal.js";
-import { killProcessTree } from "./process-tree.js";
+import { qualifyAttemptScope, type AttemptScope } from "./attempt-scope.js";
 import { WORKER_PROTOCOL_VERSION, normalizeWorkerMessage, type HostMessage, type InvalidWorkerMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { acquireHostRootLock, type HostRootLock } from "./root-lock.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
@@ -161,6 +161,8 @@ interface Live {
   held: number;
   /** The cancellation state last mirrored to the worker (each state is written once). */
   signalled: "CANCELLED" | "FENCED" | null;
+  /** The ticket, until the worker's `hello` (then sent, once). */
+  ticket: Uint8Array | null;
 }
 
 interface PendingLaunch {
@@ -182,7 +184,7 @@ function isInside(root: string, path: string): boolean {
   return r === "" || (!r.startsWith("..") && !isAbsolute(r));
 }
 
-/** Whether the worker is still this host's unreaped child: only then are its pid and its group its own (process-tree.ts). */
+/** Whether the scope's first process is still this host's unreaped child (only then is a signal to it surely its own). */
 function unreaped(child: ChildProcess): boolean {
   return child.pid !== undefined && child.exitCode === null && child.signalCode === null;
 }
@@ -191,12 +193,7 @@ interface Roots {
   readonly hostRoot: string;
   readonly scratchRoot: string;
   readonly codeRoots: readonly string[];
-  /** Linux: the program that starts the worker under a parent-death signal (null on Windows, where the job object does it). */
-  readonly setpriv: string | null;
 }
-
-/** Where util-linux's setpriv is found on Linux. */
-const SETPRIV = ["/usr/bin/setpriv", "/bin/setpriv"];
 
 /** Refuses an incomplete or unsafe configuration before anything is opened (B14-A §5); answers the roots as real paths. */
 function configured(options: LocalProcessWorkerHostOptions): Roots {
@@ -210,8 +207,6 @@ function configured(options: LocalProcessWorkerHostOptions): Roots {
   if (problems.length === 0 && !existsSync(options.workerEntry)) problems.push("the worker entry does not exist");
   if (problems.length === 0 && !existsSync(options.chromiumExecutable)) problems.push("the browser executable does not exist");
   if (!/^https:\/\/[a-z0-9.-]+$/.test(options.sessionOrigin ?? "")) problems.push("sessionOrigin is not an https origin");
-  const setpriv = process.platform === "linux" ? (SETPRIV.find((p) => existsSync(p)) ?? null) : null;
-  if (process.platform === "linux" && setpriv === null) problems.push("setpriv (util-linux) is missing: a worker's end could not be bound to its host's");
   if (typeof options.corePackageHash !== "string" || !/^[0-9a-f]{64}$/.test(options.corePackageHash)) problems.push("corePackageHash is not a SHA-256 hex digest");
   const horizon = options.creationHorizonSeconds ?? 60;
   if (!Number.isSafeInteger(horizon) || horizon < 1) problems.push("creationHorizonSeconds is a positive whole number");
@@ -234,7 +229,14 @@ function configured(options: LocalProcessWorkerHostOptions): Roots {
   if (process.platform !== "win32" && Buffer.byteLength(scratchRoot) > BROWSER_SOCKET_ROOT_MAX_BYTES) {
     throw new TypeError(`${LOCAL_PROCESS_HOST}: scratchRoot is longer than ${BROWSER_SOCKET_ROOT_MAX_BYTES} bytes, too long for the browser's socket path`);
   }
-  return { hostRoot, scratchRoot, codeRoots, setpriv };
+  // the worker reads the browser's directories too (flagsOf): they may hold neither private root, nor lie inside one
+  const browserDirs = [dirname(options.chromiumExecutable), dirname(realpathSync.native(options.chromiumExecutable))];
+  for (const dir of browserDirs) {
+    for (const [name, private_] of [["hostRoot", hostRoot], ["scratchRoot", scratchRoot]] as const) {
+      if (isInside(dir, private_) || isInside(private_, dir)) throw new TypeError(`${LOCAL_PROCESS_HOST}: ${name} overlaps the browser's directory the worker reads`);
+    }
+  }
+  return { hostRoot, scratchRoot, codeRoots };
 }
 
 export class LocalProcessWorkerHost implements WorkerHostPort {
@@ -244,6 +246,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   readonly #o: LocalProcessWorkerHostOptions;
   readonly #roots: Roots;
   readonly #lock: HostRootLock;
+  readonly #scope: AttemptScope;
   readonly #journal: JobJournal;
   readonly #live = new Map<string, Live>();
   readonly #pending = new Map<string, PendingLaunch>();
@@ -253,30 +256,34 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   #stopped = false;
 
   /**
-   * Opens a host over its roots: refuses an incomplete or unsafe configuration, takes the root's lock (HostRootInUse while another
-   * live host holds it), reads the root's records and ends the previous host's unfinished jobs (HOST_RESTARTED).
+   * Opens a host over its roots: refuses an incomplete or unsafe configuration, proves the attempts' process boundary on this machine
+   * (AttemptScopeUnavailable otherwise), takes the root's lock (HostRootInUse while another live host holds it), reads the root's
+   * records and ends the previous host's unfinished jobs (HOST_RESTARTED).
    */
   static async open(options: LocalProcessWorkerHostOptions): Promise<LocalProcessWorkerHost> {
     const roots = configured(options);
+    const scope = await qualifyAttemptScope();
     const lock = await acquireHostRootLock(roots.hostRoot);
     try {
-      return new LocalProcessWorkerHost(options, roots, lock, new JobJournal(join(roots.hostRoot, "jobs")));
+      return new LocalProcessWorkerHost(options, roots, lock, scope, new JobJournal(join(roots.hostRoot, "jobs")));
     } catch (error) {
       await lock.release();
       throw error;
     }
   }
 
-  private constructor(options: LocalProcessWorkerHostOptions, roots: Roots, lock: HostRootLock, journal: JobJournal) {
+  private constructor(options: LocalProcessWorkerHostOptions, roots: Roots, lock: HostRootLock, scope: AttemptScope, journal: JobJournal) {
     this.#o = options;
     this.#roots = roots;
     this.#lock = lock;
+    this.#scope = scope;
     this.#journal = journal;
     this.creationHorizonSeconds = options.creationHorizonSeconds ?? 60;
     this.#workerHeap = options.workerHeapMegabytes ?? 1024;
     this.#coreHeap = options.coreHeapMegabytes ?? 2048;
     this.#browserReserve = options.browserReserveBytes ?? 1024 * MIB;
-    // the previous holder of the root is gone (its lock is released only by its end): what it left unfinished ends here
+    // the previous holder of the root is gone (its lock is released only by its end), and its attempts' trees with it (their
+    // boundary ends with the host that made it): what it left unfinished ends here
     for (const record of journal.unfinished()) {
       record.state = "FAILED";
       record.cause = "WORKER_CRASHED";
@@ -562,8 +569,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     // is a directory when the process starts (the worker's scratch store then empties and re-creates it)
     mkdirSync(attemptScratchDirectoryOf(this.#roots.scratchRoot, spec.capability.attemptId), { recursive: true });
     mkdirSync(browserTempDirectoryOf(this.#roots.scratchRoot, spec.capability.attemptId), { recursive: true, mode: 0o700 });
-    // Linux: setpriv sets the parent-death signal and executes Node in place (the pid stays the worker's)
-    const [command, args] = this.#roots.setpriv === null ? [process.execPath, record.flags] : [this.#roots.setpriv, ["--pdeathsig", "KILL", "--", process.execPath, ...record.flags]];
+    // the worker inside its attempt's boundary (attempt-scope.ts); this host's child is that boundary's first process
+    const [command, args] = this.#scope.command(record.flags);
     const child = spawn(command, args, {
       // the scratch root, which the worker cannot read: on Windows a process's working directory cannot be removed, and the worker
       // removes its attempt's directory when the attempt ends
@@ -572,8 +579,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       // fd 3: the worker's channel, a plain pipe the host reads in its own frames (never Node's IPC). Windows: an overlapped pipe, or
       // the worker's pending read would hold its own writes back (synchronous I/O on one pipe handle is serialized)
       stdio: ["ignore", "ignore", "pipe", process.platform === "win32" ? "overlapped" : "pipe"],
-      // POSIX: the worker leads its own process group, which this host ends while the worker is its unreaped child. Windows: not
-      // detached, so the worker is in this process's kill-on-close job object and ends with it
+      // Windows: not detached, so the worker is in this process's kill-on-close job object (attempt-scope.ts). POSIX: a session of its
+      // own, so no terminal signal meant for the host reaches it (its end is the PID namespace's, not a signal's)
       detached: process.platform !== "win32",
       windowsHide: true,
     });
@@ -584,7 +591,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const channel = (child.stdio[3] ?? null) as Socket | null;
     const broker = new AttemptStorageBroker({ capability: spec.capability, storage: this.#o.storage, uploads: this.#o.uploads, origin: this.#o.sessionOrigin, maxObjectBytes: spec.limits.hardScratchBytes });
     let exited: () => void = () => undefined;
-    const live: Live = { record, child, channel, decoder: new FrameDecoder(), broker, result: null, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, held: 0, signalled: null };
+    const live: Live = { record, child, channel, decoder: new FrameDecoder(), broker, result: null, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, held: 0, signalled: null, ticket: null };
     this.#live.set(spec.identity, live);
     record.pid = child.pid;
     record.state = "RUNNING";
@@ -607,15 +614,6 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     // the worker's end, once what it wrote before it exited has been read (its channel closed, or after CHANNEL_DRAIN_MS: a process it
     // started may hold the pipe and cannot hold the end back)
     child.on("exit", () => {
-      // the worker is reaped now: what it left in its process group goes (POSIX). Its group's number stays its own while any member
-      // lives; it could name another group only once every member is gone and the number has been reused (B14-A-recovery.md §8)
-      if (process.platform !== "win32" && child.pid !== undefined) {
-        try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {
-          // no member left
-        }
-      }
       if (channel === null || channel.destroyed || channel.readableEnded) return this.#exited(live, exited);
       const drained = setTimeout(() => channel.destroy(), CHANNEL_DRAIN_MS);
       channel.once("close", () => {
@@ -629,7 +627,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const until = Math.min(Date.parse(spec.subject.executionDeadlineAt) - this.#o.clock.nowMs(), wall) + (this.#o.terminationGraceMs ?? 5_000);
     live.timer = setTimeout(() => this.#end(live, "DEADLINE"), Math.max(0, Math.min(until, 2_147_483_647)));
     live.timer.unref();
-    this.#write(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes });
+    live.ticket = bytes;
   }
 
   /**
@@ -649,7 +647,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       // normalized at once: only the protocol's own fields are kept while a call waits
       const message = normalizeWorkerMessage(raw);
       if (message === null) return this.#violation(live);
-      if (message.t === "beat") this.#heartbeat(live);
+      if (message.t === "hello") {
+        // the worker runs, inside its boundary: its ticket, once
+        if (live.ticket !== null) this.#write(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes: live.ticket });
+        live.ticket = null;
+      } else if (message.t === "beat") this.#heartbeat(live);
       else if (message.t === "result") live.result ??= message.result;
       else {
         live.held += 1;
@@ -727,15 +729,15 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   /**
-   * The host ends a job: the broker refuses everything at once, the worker's whole tree is killed at once (it is still this host's
-   * unreaped child), the end is recorded, and only then is the provider's side cleaned (bounded, in the background).
+   * The host ends a job: the broker refuses everything at once, the attempt's boundary is ended at once (its first process is still
+   * this host's unreaped child; the kernel ends the rest of the tree with it), the end is recorded, and only then is the provider's side
+   * cleaned (bounded, in the background).
    */
   #end(live: Live, how: EndReason): void {
     if (live.ended !== null || TERMINAL.has(live.record.state)) return;
     live.ended = how;
     live.broker.close(how === "DEADLINE" ? "DEADLINE_EXCEEDED" : "TERMINATED_BY_HOST");
     if (unreaped(live.child)) {
-      killProcessTree(live.child.pid as number);
       try {
         live.child.kill("SIGKILL");
       } catch {

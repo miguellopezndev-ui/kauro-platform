@@ -26,7 +26,6 @@ import {
   coreConfigHashOf,
   coreTimersOf,
   findChromiumExecutable,
-  killProcessTree,
   readReportPdfRecord,
   reportRecordProblems,
   type AuthorizedReportInputs,
@@ -306,8 +305,9 @@ test("B14-A recovery (a worker killed mid-run, S075): the host observes the cras
   const p = await purchase("b14a-crash");
   const { jobId, identity } = await launchedOn(rig, p);
   await atCore;
-  // the worker dies without a word (killed from outside its host, as an out-of-memory kill or a lost machine would)
-  killProcessTree(rig.exec.host.record(identity)!.pid!);
+  // the attempt dies without a word (killed from outside its host, as an out-of-memory kill would): the host's child — the worker on
+  // Windows, its PID namespace's first process on Linux — ends, and the attempt's boundary ends the rest of its tree with it
+  process.kill(rig.exec.host.record(identity)!.pid!, "SIGKILL");
   const dead = await rig.exec.host.settled(identity);
   assert.deepEqual([dead?.state, dead?.cause], ["FAILED", "WORKER_CRASHED"]);
   // one step per job per pass (D8-CEX-3): the crash abandons the attempt, the next pass takes the lease over, the next launches it

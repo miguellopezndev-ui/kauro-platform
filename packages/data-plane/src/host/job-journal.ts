@@ -7,9 +7,14 @@
  * disk is always a complete version, the new one or the previous; a temporary file left by a host that died mid-write is discarded at
  * the next opening (its rename never happened, so the change it carried was never acted on). A record that cannot be read at opening
  * is no proof of anything: its identity answers only the host's transient failure (HostRecordUnreadable), never absent, never ended.
+ *
+ * Durability: against the end of a process (the host's or the worker's), at every step. Against the loss of the machine's power, on
+ * Linux (the file and its directory entry are flushed); on Windows the renamed file is flushed, but Node offers no way to flush a
+ * directory or to rename with write-through, so a power loss there is not covered by the local host (the cloud host's records are
+ * the store's conditional objects, B14-A-aws-host-qualification.md).
  */
-import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { Sha256Hex } from "@kauro/contracts";
 import { isAttemptIdentity, type WorkerFailureCause, type WorkerManifestReference } from "@kauro/application";
 
@@ -57,6 +62,25 @@ export class HostRecordUnreadable extends Error {
   }
 }
 
+function syncDirectory(dir: string): void {
+  if (process.platform !== "linux") return;
+  const fd = openSync(dir, "r");
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function syncFile(path: string): void {
+  const fd = openSync(path, "r+");
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 const SUFFIX = ".json";
 const TEMPORARY = ".tmp";
 
@@ -66,14 +90,22 @@ function recordOf(identity: string, text: string): LocalJobRecord {
   return record;
 }
 
+/** How the journal writes bytes to a descriptor (the operating system's, unless a test injects a fault). */
+export type JournalWrite = (fd: number, bytes: Uint8Array, offset: number, length: number) => number;
+
 export class JobJournal {
   readonly #dir: string;
+  readonly #writeBytes: JournalWrite;
   readonly #records = new Map<string, LocalJobRecord>();
   readonly #unreadable = new Map<string, unknown>();
 
   /** Reads every record of the root; temporary files of a host that died mid-write are discarded. */
-  constructor(dir: string) {
+  constructor(dir: string, writeBytes: JournalWrite = (fd, bytes, offset, length) => writeSync(fd, bytes, offset, length)) {
+    this.#writeBytes = writeBytes;
+    const made = !existsSync(dir);
     mkdirSync(dir, { recursive: true });
+    // a journal directory made here is itself durable before any record is written in it (Linux)
+    if (made) syncDirectory(dirname(dir));
     this.#dir = dir;
     for (const name of readdirSync(dir)) {
       if (name.endsWith(TEMPORARY)) {
@@ -112,9 +144,15 @@ export class JobJournal {
     const path = join(this.#dir, `${record.identity}${SUFFIX}`);
     const temporary = `${path}${TEMPORARY}`;
     try {
+      const bytes = Buffer.from(JSON.stringify(record), "utf8");
       const fd = openSync(temporary, "w");
       try {
-        writeSync(fd, JSON.stringify(record));
+        // every byte, or no record: a write that makes partial progress is continued, one that makes none fails
+        for (let at = 0; at < bytes.byteLength; ) {
+          const wrote = this.#writeBytes(fd, bytes, at, bytes.byteLength - at);
+          if (wrote <= 0) throw new Error(`${LOCAL_PROCESS_HOST}: a record write made no progress`);
+          at += wrote;
+        }
         fsyncSync(fd);
       } finally {
         closeSync(fd);
@@ -124,15 +162,9 @@ export class JobJournal {
       rmSync(temporary, { force: true });
       throw error;
     }
-    if (process.platform === "linux") {
-      // the rename itself, durable: the directory's entry is flushed too
-      const dirFd = openSync(this.#dir, "r");
-      try {
-        fsyncSync(dirFd);
-      } finally {
-        closeSync(dirFd);
-      }
-    }
+    // the rename itself, durable: Linux flushes the directory's entry; Windows flushes the renamed file (see the module's note)
+    if (process.platform === "linux") syncDirectory(this.#dir);
+    else syncFile(path);
     this.#records.set(record.identity, record);
   }
 }

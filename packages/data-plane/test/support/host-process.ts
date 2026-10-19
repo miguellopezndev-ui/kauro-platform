@@ -27,8 +27,8 @@ if (hostile === undefined) await readsFor(rig, planted);
 else rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
 const spec = planted.fixture.spec(1);
 const launch = await rig.host.launch(spec);
-if (hostile === undefined) await reached;
-// a hostile worker reports no stage: it is running once the host has started it, and stuck once its ticket has reached it
+if (hostile === undefined || hostile === "hostile-tree") await reached;
+// any other hostile worker reports no stage: it is running once the host has started it, and stuck once its ticket has reached it
 else {
   while (rig.host.record(spec.identity)?.state !== "RUNNING") await new Promise((r) => setTimeout(r, 50));
   await new Promise((r) => setTimeout(r, 1_000));

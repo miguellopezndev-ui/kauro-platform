@@ -3,9 +3,9 @@
  * worker process it started, over the worker's channel — a plain pipe on its fd 3, in the protocol's own frames (framing.ts), so bytes
  * travel as bytes and nothing but these messages crosses it.
  *
- * The channel is the worker's only way to storage. It carries the ticket in, the worker's stage reports and heartbeats, its calls to
- * the attempt's storage broker (each answered by the host after the broker checked it against the attempt's capability), and its one
- * result. A resumable session's bearer reference never crosses it: the worker holds an opaque handle the broker maps.
+ * The channel is the worker's only way to storage. The worker says `hello` once it runs; only then does the host send the ticket. It
+ * carries the ticket in, the worker's stage reports and heartbeats, its calls to the attempt's storage broker (each answered by the
+ * host after the broker checked it against the attempt's capability), and its one result. A resumable session's bearer reference never crosses it: the worker holds an opaque handle the broker maps.
  */
 import type { ObjectObservation, WorkerFailureCause, WorkerManifestReference } from "@kauro/application";
 import { FRAME_MAX_BODY_BYTES } from "./framing.js";
@@ -98,6 +98,7 @@ export function normalizeWorkerMessage(raw: unknown): WorkerMessage | InvalidWor
   if (raw === null || typeof raw !== "object") return null;
   const m = raw as Record<string, unknown>;
   if (m["t"] === "beat") return { t: "beat" };
+  if (m["t"] === "hello") return { t: "hello" };
   if (m["t"] === "result") {
     const r = m["result"] as Record<string, unknown> | null;
     const problem = workerResultProblem(r);
@@ -159,6 +160,7 @@ export type HostMessage =
 
 /** worker -> host */
 export type WorkerMessage =
+  | { readonly t: "hello" }
   | { readonly t: "call"; readonly id: number; readonly call: WorkerCall }
   | { readonly t: "beat" }
   | { readonly t: "result"; readonly result: WorkerResultReport };

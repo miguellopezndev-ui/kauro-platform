@@ -7,10 +7,11 @@
  *   2. runAttemptWorker runs the attempt (Migration Core, the report, the staged manifest) through the host's broker;
  *   3. the one result goes back on the channel, and the worker exits.
  *
- * If its host's channel closes, the worker ends itself and everything it started (killOwnTree): a worker never outlives the host that
+ * It says `hello` first; the host sends the ticket only then. If its host's channel closes, the worker exits, and its attempt's boundary
+ * ends everything it started with it (a PID namespace on Linux, its kill-on-close job on Windows): a worker never outlives the host that
  * observes it. The process clock below is the worker's one injection point (CK3).
  */
-import { diagnosticOf, killOwnTree, openWorkerChannel, readAttemptTicket, runAttemptWorker, WORKER_PROTOCOL_VERSION, WorkerRpc, type HostMessage, type WorkerChannel, type WorkerResultReport } from "@kauro/data-plane";
+import { diagnosticOf, openWorkerChannel, readAttemptTicket, runAttemptWorker, WORKER_PROTOCOL_VERSION, WorkerRpc, type HostMessage, type WorkerChannel, type WorkerResultReport } from "@kauro/data-plane";
 import { parseWorkerArguments } from "./arguments.js";
 
 /** The worker's one process clock (CK3 injection point). */
@@ -31,7 +32,7 @@ const channel: WorkerChannel | null = openWorkerChannel(
     // the host's end closed (or spoke outside the protocol): nothing observes this worker any more
     if (finishing) process.exit(0);
     rpc?.close("the host's channel closed");
-    killOwnTree();
+    process.exit(70);
   },
 );
 
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
   }
   const calls = new WorkerRpc((message) => channel.send(message));
   rpc = calls;
+  channel.send({ t: "hello" });
   // a sign of life between the core's cancellation checks too (the lease's heartbeat is the host's observation, D8-ATT-2)
   setInterval(() => {
     try {

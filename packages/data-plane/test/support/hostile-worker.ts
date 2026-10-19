@@ -2,17 +2,19 @@
 // exactly as the real worker is (the same permission flags, the same empty environment, the same channel on fd 3 and broker), it tries
 // what a misbehaving or compromised worker would and reports what happened, as the `refusal` of its one result (a JSON of observations;
 // never a customer value). Its ticket's locale picks the behaviour: "hostile-probe" (files, network, environment, broker, and the local
-// limit: a native child), "hostile-allocate" (memory), "hostile-spin" (stuck), or one of the channel's misuses ("hostile-garbage",
-// "hostile-huge", "hostile-header", "hostile-message", "hostile-nodrain").
-import { spawnSync } from "node:child_process";
+// limit: a native child), "hostile-allocate" (memory), "hostile-spin" (stuck), "hostile-tree" (a stuck Node child and a browser in a
+// session of its own, as Playwright starts one), or one of the channel's misuses ("hostile-garbage", "hostile-huge", "hostile-header",
+// "hostile-message", "hostile-nodrain").
+import { spawn, spawnSync } from "node:child_process";
 import dns from "node:dns";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { dirname, join } from "node:path";
 import { FrameDecoder, WorkerRpc, encodeFrame, type HostMessage, type WorkerMessage, type WorkerResultReport } from "../../src/index.js";
 
 const args = process.argv.slice(2);
 const scratchRoot = args[args.indexOf("--scratch-root") + 1] as string;
+const chromium = args[args.indexOf("--chromium") + 1] as string;
 const socket = new net.Socket({ fd: 3, readable: true, writable: true });
 const send = (m: WorkerMessage, written?: () => void): void => void socket.write(encodeFrame(m), () => written?.());
 const rpc = new WorkerRpc((m) => send(m));
@@ -124,6 +126,9 @@ function misuse(locale: string, ticket: { capability: { stagingPrefix: string } 
   }
 }
 
+/** Playwright's Chromium driver, as the PDF engine loads it. */
+const chromiumOf = async (): Promise<{ launch(options: Record<string, unknown>): Promise<unknown> }> => (await import("playwright-core")).chromium as never;
+
 const decoder = new FrameDecoder();
 socket.on("data", (bytes: Buffer) => {
   decoder.push(bytes);
@@ -140,6 +145,23 @@ socket.on("data", (bytes: Buffer) => {
       const hoard: number[][] = [];
       for (;;) hoard.push(new Array<number>(1_000_000).fill(hoard.length + 0.5));
     }
+    if (locale === "hostile-tree") {
+      // a tree like the real one's, each process naming the attempt's directory: a Node child stuck in synchronous work (the core's
+      // child, hung), and the browser in a session of its own (POSIX), kept alive by its debugging pipe — then the stage the test holds
+      const attemptDir = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`);
+      spawn(process.execPath, ["-e", "for (;;) Math.sqrt(Math.random())", attemptDir], { stdio: "ignore", windowsHide: true });
+      // the browser as the PDF engine starts it (Playwright: on POSIX in a session of its own), its profile inside the attempt's directory
+      const profiles = join(attemptDir, "hostile-browser");
+      mkdirSync(profiles, { recursive: true });
+      for (const name of ["TMPDIR", "TMP", "TEMP", "HOME"]) process.env[name] = profiles;
+      void chromiumOf().then((c) => c.launch({ executablePath: chromium, headless: true, chromiumSandbox: true, env: { ...process.env } as Record<string, string> })).then(
+        () => void rpc.stage("CORE_STARTED"),
+        (error: unknown) => process.stderr.write(`hostile-tree: the browser did not start: ${String(error)}
+`),
+      );
+      setInterval(() => undefined, 1_000);
+      return;
+    }
     if (locale === "hostile-spin") {
       // stuck in synchronous work: no handler of its own can run any more
       for (;;) Math.sqrt(Math.random());
@@ -152,3 +174,5 @@ socket.on("data", (bytes: Buffer) => {
   }
 });
 socket.on("close", () => process.exit(0));
+// the host sends the ticket only once the worker says it runs
+send({ t: "hello" });

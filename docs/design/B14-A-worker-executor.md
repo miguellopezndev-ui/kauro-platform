@@ -72,9 +72,12 @@ listed in [B14-A-recovery.md §6](B14-A-recovery.md) and belongs to the cloud ta
 4. **Inside the worker,** the core runs in its own child with narrower flags (B05) — the permission model *without* the right to
    start processes, so it is a real boundary for the code that parses customer files. Chromium runs with its own sandbox, offline,
    with JavaScript off and every request aborted (B13).
-5. **The worker's life is bound to its host's by the kernel**: on Windows it is in the host's kill-on-close job object; on Linux it is
-   started under a parent-death signal (`setpriv --pdeathsig KILL`). Only the host that spawned it ever signals it, while it is that
-   host's unreaped child.
+5. **The attempt's whole process tree is held by an operating-system boundary** (`host/attempt-scope.ts`): on Linux a PID namespace
+   whose first process is the worker (util-linux `setpriv --pdeathsig KILL -- unshare --user --map-current-user --pid --fork
+   --kill-child=SIGKILL`); on Windows kill-on-close job objects (the host's holds the worker, the worker's holds its children). The
+   kernel ends the whole tree — the core's child, the browser and the browser's own processes included — when the host ends the
+   boundary's first process (its own unreaped child) or when the host itself ends. No process is known or signalled by its number. The
+   host proves the boundary on the machine before it opens, and does not open without it.
 6. **On AWS** (qualification §4), the task, its container and its per-attempt IAM role are the operating-system boundary, with the
    task's memory and ephemeral-storage limits. The worker's code is the same.
 
@@ -151,9 +154,11 @@ design, and what it replaced, are in [B14-A-recovery.md](B14-A-recovery.md).
   (`CANCELLED_BEFORE_CREATE`: `observe` answers `NOT_FOUND`, a launch `REFUSED IDENTITY_TERMINATED`), so the `NOT_FOUND` it answers
   stays true on this host and on the next (review R12-1).
 - **Configuration refused before it exists.** No stated trust model, relative paths, a missing entry or browser, no code roots, a host
-  or scratch root that overlaps a code root the worker can read, overlapping host and scratch roots, a non-https session origin, a
-  malformed core hash, Linux without `setpriv`, or a platform other than Windows and Linux. At launch, the two heaps plus the
-  browser's reserve must fit in the attempt's hard memory.
+  or scratch root that overlaps a code root or a browser directory the worker can read (review R8), overlapping host and scratch roots,
+  a non-https session origin, a malformed core hash, a platform other than Windows and Linux, or a machine where the attempt boundary
+  cannot be made (`ATTEMPT_SCOPE_UNAVAILABLE`: Linux, the runner user cannot make a user and PID namespace — on Ubuntu 23.10 and later
+  an AppArmor profile granting `userns` to util-linux `unshare`, as `tools/ci/prepare-worker-scope.sh` loads on CI; Windows, a probe's
+  child outlives the probe). At launch, the two heaps plus the browser's reserve must fit in the attempt's hard memory.
 - **Limits (enforced locally).**
   - Memory: `--max-old-space-size` on the worker and `heapMegabytes` on the core child (V8 ends a heap past its cap; the host records
     `MEMORY_EXHAUSTED`); with the browser's reserve, they must fit inside the attempt's `hardMemoryBytes`.
@@ -167,15 +172,15 @@ design, and what it replaced, are in [B14-A-recovery.md](B14-A-recovery.md).
 - **Limits not enforced locally** (B14-A-recovery.md §6). Hard memory and disk against code that bypasses the in-process quotas
   (native allocations, writes outside AttemptScratchStore, a native child). The earlier polling supervisor never made them hard
   either (reviews R2, R3-3, R13-1, R14-1, R15-1); they are the cloud task's limits.
-- **Termination** closes the broker at once, kills the worker's whole tree at once — the host's own unreaped child: Linux, the
-  descendants found through `/proc` from that pinned pid, then its process group; Windows, `taskkill /T` from that pinned pid, the
-  worker's own children also in its kill-on-close job — and records the end. Only then are the provider's sessions cancelled and reads
-  released, each bounded, in the background (reviews R5, R6). On the worker's own exit (POSIX) the host ends what is left of its
-  group.
-- **Host death.** Windows: the worker is in the host's kill-on-close job object. Linux: the worker runs under the parent-death signal
-  `KILL`. Either way the kernel ends the worker, even one stuck in synchronous work (review R7). What it started ends with it
-  (Windows: its own job object) or when it next finds its parent's pipe closed (the core's child at its next report; the browser on its
-  debugging pipe). The worker also ends its own group when its channel closes.
+- **Termination** closes the broker at once, ends the attempt's boundary at once — one signal to the host's own unreaped child (Linux:
+  `unshare`, whose death ends the namespace's first process and with it the namespace; Windows: the worker, whose job object ends its
+  children) — and records the end. Only then are the provider's sessions cancelled and reads released, each bounded, in the background
+  (reviews R5, R6). Nothing is walked through `/proc`, no group number is signalled, nothing is found by its pid.
+- **Host death.** Linux: `unshare` dies of its parent-death signal, the namespace's first process of its own, and the kernel ends the
+  namespace. Windows: the host's kill-on-close job object ends the worker, the worker's ends its children. Either way the whole tree
+  ends, even with every process in it stuck in synchronous work (reviews R3, R7). The ticket is sent only after the worker's `hello`, so
+  a worker whose host died before the parent-death signal was set (review R2) never receives one: it waits at most 30 s for it, or ends
+  at once on its channel's end, and its namespace with it. The worker exits when its channel closes.
 
 ## 6. B13 inside the worker
 
@@ -208,7 +213,7 @@ Windows with Google Chrome required (`KAURO_REQUIRE_PDF_ENGINE=1`).
 |---|---|---|
 | Ticket, broker and frames, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 10: digest, canonical bytes, closed shape (18 refusals); broker OK; broker DENY (14 refusals and revocation); a session landing after revocation is cancelled; the session cap under concurrent requests; one chunk at a time per session; unknown operations and malformed results kept bounded; messages normalized to the protocol's own bounded fields; frames decoded one at a time, a 4 GiB declaration refused from its prefix, non-JSON headers and misplaced bodies refused |
 | Local executor, happy path | `packages/data-plane/test/local-process-host.test.ts` | 1: real Migration Core and Chromium in a worker process; the manifest names the package, the PDF and its record; scratch removed; one complete record per identity |
-| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 20: concurrent and duplicate launches, a second host refused while the first lives (HOST_ROOT_IN_USE), adoption after a restart; lost answer and failed read; configuration refused (no stated trust model among them); hostile worker (environment, files, writes, socket, fetch, DNS, broker, and the local limit — a native child reads outside, RESIDUAL_LOCAL); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (the kernel ends the worker; the next host ends the job HOST_RESTARTED at once); control-plane death with a worker stuck in synchronous work; missing legal identity; altered and forged sealed generations; launches abandoned during their read and a read past its bound, with a tombstone that outlives its host; termination while a storage call never answers; unreadable, unfinished and half-written records at opening; four channel violations (no frame, a 4 GiB declaration, a non-JSON header, a message outside the protocol); a worker that stops reading its channel (the host holds CALLS_HELD calls and no more) |
+| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 23: a tree holding a Node child stuck in synchronous work and a browser in a session of its own, ended whole by its termination and by its host's death (OS-checked, each process seen running first); a record written whole or not at all (short writes continued, no progress refused); concurrent and duplicate launches, a second host refused while the first lives (HOST_ROOT_IN_USE), adoption after a restart; lost answer and failed read; configuration refused (no stated trust model, a browser directory holding a private root); hostile worker (environment, files, writes, socket, fetch, DNS, broker, and the local limit — a native child reads outside, RESIDUAL_LOCAL); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (the kernel ends the worker; the next host ends the job HOST_RESTARTED at once); control-plane death with a worker stuck in synchronous work; missing legal identity; altered and forged sealed generations; launches abandoned during their read and a read past its bound, with a tombstone that outlives its host; termination while a storage call never answers; unreadable, unfinished and half-written records at opening; four channel violations (no frame, a 4 GiB declaration, a non-JSON header, a message outside the protocol); a worker that stops reading its channel (the host holds CALLS_HELD calls and no more) |
 | End to end, PostgreSQL 17 | `apps/control/test/b14a-local-executor.test.ts` | 5: OK (package AVAILABLE, job READY, entitlement DELIVERED, verification VALID EXECUTED_LOCAL 3.0.0, delivered manifest = the receipt's, janitor CLEANED with REPORTED resources); S056 lost answer adopted through B08; CMD037 during the run; worker killed, then takeover at fence 2 delivers; no legal identity → FAILED REFUSED |
 | Regressions | data-plane, control, persistence, application suites; `pnpm run verify` | B05 adapter (with F1), B08 control plane, B13 report suites unchanged and green |
 
@@ -293,13 +298,13 @@ construction (B14-A-recovery.md §2), or assigned to the cloud task (§6); the r
 | D14A-1 | The local executor is a `WorkerHostPort` of its own (EXECUTED_LOCAL). The port's evidence class widens to `WorkerHostEvidenceClass` = provider classes + EXECUTED_LOCAL; the janitor's rule (EXECUTED_PROVIDER only from a provider host and provider storage) is unchanged. |
 | D14A-2 | The worker reads nothing of the platform but its ticket. The report's inputs are read at launch by the control plane (§3). |
 | D14A-3 | Storage is brokered locally; on AWS it is per-attempt IAM (qualification §4). The same object names and preconditions apply in both. |
-| D14A-4 | The host creates by an exclusive directory per identity (locally) or by `clientToken` plus a conditional claim object (AWS). Neither relies on a provider's search by name. |
+| D14A-4 | The host creates by a durable record per identity, written by the root's one live host before its worker exists (locally; review R9 of the recovery), or by `clientToken` plus a conditional claim object (AWS). Neither relies on a provider's search by name. |
 | D14A-5 | The worker's clock is the product's fifth process-clock injection point (CK3, `apps/migration-worker/src/main.ts` `workerClock`). |
 | D14A-6 | `BrokeredObjectStorage` is a real implementer of `ObjectStoragePort` (a client of the broker, not a fake). The B07 single-fake check lists it explicitly. |
 | D14A-7 | The new areas (`apps/migration-worker/**`, `deploy/**`) are attributed to B08 and B13 in the acceptance ledger: a change to them re-touches both. |
 | D14A-8 | (recovery) The local host's trust model is single-tenant qualification of the platform's own code, stated in its configuration. It is no boundary against a compromised worker; that containment and the hard memory and disk limits are the cloud task's, pending its qualification. |
 | D14A-9 | (recovery) One live host per root, by an OS lock the kernel releases at the holder's death; the host's state is one thread's, its records a write-through journal read only at opening. No liveness inference, no cross-process coordination through files. |
-| D14A-10 | (recovery) Only the spawning host signals a worker, while it is that host's unreaped child; the kernel ends the worker with its host (Windows job object, Linux parent-death signal). |
+| D14A-10 | (recovery) Every attempt runs inside an operating-system boundary that holds its whole tree (Linux PID namespace, Windows kill-on-close job objects), proved on the machine before the host opens; the host ends it by one signal to its own unreaped child, the kernel ends it with the host. No process is signalled by its number. |
 | D14A-11 | (recovery) The worker's channel is the protocol's own frames on fd 3; one invariant (at most CALLS_HELD calls held until their replies leave, reading paused meanwhile) bounds what a worker can make the host hold. |
 
 ## 11. Still blocked (needs AWS, the legal identity, or another service)

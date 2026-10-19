@@ -129,7 +129,7 @@ export { BROKERED_STORAGE_PROVIDER, BrokeredObjectStorage, BrokeredUploads, Work
 export { BROWSER_TEMP_DIRECTORY, WORKER_SESSION_ORIGIN, diagnosticOf, runAttemptWorker, type AttemptWorkerOptions } from "./host/worker-runtime.js";
 export { encodeFrame, FRAME_MAX_BODY_BYTES, FRAME_MAX_HEADER_BYTES, FrameDecoder, FrameViolation } from "./host/framing.js";
 export { openWorkerChannel, WORKER_CHANNEL_FD, type WorkerChannel } from "./host/worker-channel.js";
-export { killOwnTree, killProcessTree, linuxDescendantsOf, processExists } from "./host/process-tree.js";
+export { AttemptScopeUnavailable, qualifyAttemptScope, type AttemptScope } from "./host/attempt-scope.js";
 export { HostRootInUse, acquireHostRootLock, rootLockNameOf, type HostRootLock } from "./host/root-lock.js";
 export { CANCELLED_BEFORE_CREATE, HostRecordUnreadable, JobJournal } from "./host/job-journal.js";
 export {

@@ -37,7 +37,7 @@ Classification of the 54 findings of rounds 1–21 (verified against the Codex s
 | Family | Findings | Status in the target architecture |
 |---|---|---|
 | 1. Isolation inside the restricted realm | R1, R2-1, R2-2, R2-3, R3-1, R4-3 (6) | The allowlist is removed. Containment of a compromised worker is **not** a property of the local host; it is the cloud task's, pending AWS qualification (§6). The local limit is shown by a test, not hidden. |
-| 2. Identity and termination by pid | R7, R2-5, R3-2, R4-2, R5-2, R6-2, R9-2, R10-1, R11-1, R11-2, R13-2 (11) | Gone by construction: only the host that spawned a worker ever signals it, through its own unreaped child (whose pid and process group the kernel cannot reuse). No supervisor, no foreign termination, no `/proc` identity. |
+| 2. Identity and termination by pid | R7, R2-5, R3-2, R4-2, R5-2, R6-2, R9-2, R10-1, R11-1, R11-2, R13-2 (11) | Gone by construction: each attempt's whole tree is inside an OS boundary (Linux PID namespace, Windows kill-on-close job objects) that the host ends by one signal to its own unreaped child, and the kernel ends with the host. No supervisor, no foreign termination, no `/proc` walk, no group number, no pid read back. (The first version of the recovery still walked `/proc` and signalled a reaped leader's group; the recovery's review round 1, §9, found it.) |
 | 3. File coordination races | R3, R4, R2-4, R5-1, R6-1, R6-3, R7-1, R7-2, R8-1, R8-2, R8-3, R9-1, R10-2, R11-3, R12-1 (15) | Gone by construction: one live host per root, held by an OS lock the kernel releases at the holder's death; all decisions in one thread's memory; files are a write-through journal read only at start. |
 | 4. Polled hard limits | R2, R2-6, R3-3, R4-1, R5-3, R13-1, R14-1, R15-1 (8) | The supervisor is removed. Enforced locally: V8 heap caps, the attempt's scratch quota and the core's byte ledger (in-process, for the platform's own code), the deadline (host timer + OS kill). Hard memory and disk against hostile code: the task's limits on AWS (§6). |
 | 5. Node IPC as an untrusted channel | R16-1, R17-1, R18-1, R19-1, R20-1, R21-1, R21-2 (7) | Node IPC is replaced by the protocol's own frames on a plain pipe (the round-21 WIP, kept). One invariant replaces the per-case budgets: the host holds at most 16 calls from the moment it reads one until its reply has left the process, and reads nothing more meanwhile. |
@@ -76,7 +76,7 @@ and disappear with the mechanisms that produced them: the journal is read once, 
 | Supervisor process (`supervisor.ts`), verdict and stand-down files | The host's own timer and kill; on host death, the kernel (Windows: the host's kill-on-close job object; Linux: the worker's parent-death signal, `setpriv --pdeathsig KILL`). |
 | Instance heartbeats, foreign termination by pid, `terminate.request` | One live host per root (an OS lock released at process death). A new host finalises the previous one's unfinished jobs at start. |
 | Pending-creation stamps, tombstone renames, `start.claim`, `ticket.claim`, `end.json` hard links | One thread's in-memory state; atomic write-through records (temporary file, `fsync`, rename). |
-| `/proc` and CIM identity checks, attempt-marked process sweeps | Unneeded: no process is signalled except the host's own unreaped child and its group. |
+| `/proc` and CIM identity checks, attempt-marked process sweeps, `taskkill /T`, group kills | The attempt boundary (`attempt-scope.ts`): no process is signalled except the host's own unreaped child; the kernel ends the rest. |
 
 ## 6. Guarantees that wait for AWS (pending real qualification)
 
@@ -108,8 +108,9 @@ JavaScript off. It does not claim to contain a compromised worker.
 | One host per root | Windows named pipe / Linux abstract socket, exclusive, released by the kernel at the holder's death | OS |
 | Creation by identity, ALREADY_EXISTS, REFUSED creates nothing, NOT_FOUND stays true | One thread decides; the record is written (temp, fsync, rename) before the worker exists; a termination of an absent identity leaves a tombstone; a launch's read is bounded by half the creation horizon | Single-owner state |
 | Restart and recovery | The new owner (lock acquired = previous owner dead) finalises unfinished jobs `FAILED WORKER_CRASHED HOST_RESTARTED`; B08 takes over at fence + 1. A worker without its host has no broker, so it can produce no effect | OS + B08 |
-| Termination of the whole tree | Linux: `kill(-pgid)` of the host's unreaped child's group; Windows: the worker's handle, its children in its kill-on-close job | OS |
-| Host death | The kernel ends the worker, even one stuck in synchronous work. Windows: the host's kill-on-close job object (and the worker's own job ends its children). Linux: the worker's parent-death signal; its core child ends at its next report on the closed pipe, Chromium when its debugging pipe closes | OS |
+| Termination of the whole tree | One signal to the host's own unreaped child; the boundary ends the rest — Linux: a PID namespace (`unshare --pid --fork --kill-child`), Windows: kill-on-close job objects | OS |
+| Host death | The kernel ends the whole tree, every process in it stuck or not: Linux, `unshare`'s parent-death signal ends the namespace; Windows, the host's job ends the worker and the worker's its children. The ticket waits for the worker's `hello`, so a worker started just as its host died never gets one | OS |
+| The boundary itself | Proved on the machine when the host opens (Linux: a probe must be pid 1 of a new namespace; Windows: a probe's child must end with the probe); the host refuses to open otherwise | OS, fail-closed |
 | Storage capability | The broker in the host; the worker holds no credential, no session reference | Real boundary |
 | No credentials | Empty environment; no database connection | Real boundary |
 | Files | Node permission model (C++): worker reads code, browser, own attempt; writes own attempt. The core child has no child-process permission | Real for JS; see §6 for native children |
@@ -129,12 +130,33 @@ on this machine or on the Windows CI leg, and Chromium's sandbox inside a contai
   on Linux, verified in CI). Abstract sockets are per network namespace: one machine, one namespace (stated).
 - Windows: the worker's channel must be an overlapped pipe; with a synchronous one the worker's pending read holds its own writes back
   (found while building this, before any review).
-- Linux: Playwright starts Chromium in a session of its own, outside the worker's group. A termination reaches it through the
-  worker's live process tree (`/proc` parent links from the host's pinned child); after a host death it relies on Chromium closing
-  when its debugging pipe closes. The parent-death signal needs util-linux `setpriv` (present on Ubuntu; the host refuses to open
-  without it). The termination and host-death tests check, at the OS, that no process of the attempt survives on both platforms.
+- Linux: the boundary needs util-linux `setpriv` and `unshare`, and a runner user allowed to make a user namespace with capabilities
+  (Ubuntu 23.10 and later restrict that through AppArmor; CI loads a profile for `unshare` alone, never the global sysctl). Playwright
+  starts Chromium in a session of its own: inside the namespace that changes nothing. Chromium's own sandbox then makes nested
+  namespaces, which its own AppArmor profile allows.
+- Windows: libuv does not report a failed job assignment (review R4 of the recovery); the host proves the nesting when it opens.
+- Records are durable against the end of any process on both platforms, and against power loss on Linux. On Windows, Node offers no
+  directory flush or write-through rename, so power loss is not covered locally (stated in `job-journal.ts`; the cloud host's records
+  are the store's conditional objects).
+- The termination and host-death tests check, at the OS, that no process of the attempt survives on both platforms, with a tree that
+  holds a stuck Node child and a browser in its own session.
 - Windows: the job-object chain (host → worker → core child and browser) is libuv's; the same OS checks cover it.
-- Residual (POSIX): the post-exit sweep of the worker's group signals a group whose leader has been reaped. The number cannot be
-  reused while any member lives; it could be reused only after every member has gone and the pid space has wrapped — stated.
 - The B08 and B13 suites, the PDF template of PR #113 and the end-to-end suite on PostgreSQL 17 are re-run unchanged.
 - PR #114 (Windows EPERM in tools) is not touched; a Windows gate flake of that kind is reported, not patched here.
+
+## 9. The recovery's own review, round 1 (Codex, candidate 663e483e)
+
+Verdict REJECT, with this assessment: the single-owner, brokered architecture is sound for its stated trust model; families 1, 3, 4
+and 5 are gone; family 2 was not yet removed by construction. The answer is the attempt boundary above, not one fix per finding:
+
+| # | Finding | Answer |
+|---|---|---|
+| R1 | Descendant pids from `/proc`, and a reaped leader's group number, were still signalled. | The attempt boundary: one signal to the host's own unreaped child; `/proc` walks and group kills removed (process-tree.ts deleted). |
+| R2 | The host could die between spawning `setpriv` and its parent-death signal, leaving a worker with a queued ticket. | The ticket only after the worker's `hello`; a worker without a ticket ends on its channel's end or after 30 s, and its namespace with it. |
+| R3 | A Linux core child had no bound once its host and worker died. | Inside the PID namespace, the kernel ends it with the namespace's first process. A test holds a stuck child and a browser through a host's death. |
+| R4 | libuv may silently skip the kill-on-close job assignment on Windows. | The host proves the nesting on the machine before it opens and refuses otherwise. |
+| R5 | A short write could publish a truncated record. | Every byte is written (partial progress continued, none refused) before the rename; a fault-injection test. |
+| R6 | A rename on Windows is not made durable against power loss. | The renamed file is flushed; power loss on Windows is stated as not covered locally (Node has no directory flush); Linux flushes the new journal directory too. |
+| R7 | The core-stage tests ran before the core child existed. | Their names now say what they hold; whole-tree termination and host death are proved with a real tree (a stuck Node child, a browser in its own session, each process seen running first). |
+| R8 | A browser directory could hold a private root the worker then reads. | Refused at configuration; a test. |
+| R9 | D14A-4 described the removed directory claim. | Updated. |

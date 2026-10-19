@@ -5,13 +5,14 @@
 // Processes are observed through the operating system (Linux /proc, Windows CIM), never through the host's own word.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { BROWSER_SOCKET_ROOT_MAX_BYTES, CALLS_HELD, HostRecordUnreadable, HostRootInUse, LOCAL_HOST_ISOLATION, LocalProcessWorkerHost, attemptScratchDirectoryOf, removeAttemptScratch, type LocalProcessWorkerHostOptions } from "../src/index.js";
+import { writeSync as writeSyncOf } from "node:fs";
+import { BROWSER_SOCKET_ROOT_MAX_BYTES, CALLS_HELD, HostRecordUnreadable, HostRootInUse, JobJournal, LOCAL_HOST_ISOLATION, LocalProcessWorkerHost, attemptScratchDirectoryOf, removeAttemptScratch, type LocalJobRecord, type LocalProcessWorkerHostOptions } from "../src/index.js";
 import { collect, sha } from "./support/attempt.js";
 import { BROWSER, BROWSER_REQUIRED, HOSTILE_ENTRY, REPO_ROOT, eventually, hostLimits, localRig, plantedAttempt, processesReferencing, readsFor, type LocalRig, type LocalRigOptions, type Planted } from "./support/local-host.js";
 
@@ -121,6 +122,11 @@ test("B14-A DENY (incomplete or unsafe configuration): a spec that is not one at
     await refused({ ...base, scratchRoot: join(REPO_ROOT, "scratch-inside-code") }, /scratchRoot overlaps a code root/);
     await refused({ ...base, hostRoot: join(rig.root, "s2", "host") }, /overlap/);
     await refused({ ...base, chromiumExecutable: join(rig.root, "no-browser.exe") }, /browser executable does not exist/);
+    // the browser's directory is read by the worker too (review R8): it may not hold a private root
+    const nested = join(rig.root, "browser-holds-roots");
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(join(nested, "chrome.exe"), "");
+    await refused({ ...base, chromiumExecutable: join(nested, "chrome.exe"), hostRoot: join(nested, "h3"), scratchRoot: join(rig.root, "s3") }, /hostRoot overlaps the browser's directory/);
     await refused({ ...base, codeRoots: [] }, /codeRoots/);
     await refused({ ...base, sessionOrigin: "http://plain" }, /sessionOrigin/);
     await refused({ ...base, corePackageHash: "unknown" as never }, /corePackageHash/);
@@ -278,7 +284,7 @@ async function terminatedAt(stage: "CORE_STARTED" | "PDF_STARTED" | "MANIFEST", 
   }
 }
 
-test("B14-A terminate during processing (S075): terminating the identity while the core runs kills the worker and the core's child, revokes the broker, leaves no manifest and the attempt's scratch for the janitor", { skip }, () => terminatedAt("CORE_STARTED", 11));
+test("B14-A terminate during processing (S075): terminating the identity as the core's stage begins ends the worker, revokes the broker, leaves no manifest and the attempt's scratch for the janitor (a tree with a hung child and a browser of its own: the boundary cases below)", { skip }, () => terminatedAt("CORE_STARTED", 11));
 test("B14-A terminate during the PDF: terminating while Chromium prints kills the browser with the worker; no report is staged", { skip }, () => terminatedAt("PDF_STARTED", 12));
 test("B14-A terminate during publication: terminating before the manifest is written leaves the staged package and report unpublishable (no manifest)", { skip }, () => terminatedAt("MANIFEST", 13));
 
@@ -312,10 +318,33 @@ test("B14-A cancellation (D8-CANCEL-1): the host's mirror of the lease reaches t
   }
 });
 
+test("B14-A terminate (review R1, R3, R7): the attempt's whole tree ends with its boundary — a worker holding a Node child stuck in synchronous work and a browser started in a session of its own (as Playwright starts one) is terminated, and every process of the attempt, each observed running first, is gone (OS-checked); no process is signalled by its number", { skip }, async () => {
+  const reached = gate();
+  const rig = await hostileRig("hostile-tree", "x", { hooks: { atStage: (_id, s) => (s === "CORE_STARTED" ? (reached.open(), never()) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 56);
+    plainReads(rig, planted);
+    const spec = planted.fixture.spec(1);
+    const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await reached.promise;
+    // the worker, its stuck child, and the browser with at least one process of its own
+    assert.ok(await eventually(() => processesReferencing(attemptDir).length >= 4, 20_000), `the tree runs: ${processesReferencing(attemptDir).length} processes`);
+    const before = processesReferencing(attemptDir);
+    assert.equal((await rig.host.terminate(spec.identity)).outcome, "TERMINATED");
+    assert.ok(await eventually(() => processesReferencing(attemptDir).length === 0, 20_000), `every process of the attempt ended: ${processesReferencing(attemptDir).length} of ${before.length} left`);
+  } finally {
+    reached.open();
+    await rig.dispose();
+  }
+});
+
 /** Runs support/host-process.js over `root` (a control plane in a process of its own) and answers what it launched once it holds. */
-async function dyingHost(root: string, hostile?: string): Promise<{ readonly child: ReturnType<typeof spawn>; readonly started: { outcome: string; identity: string; pid: number; attemptDir: string; spec: Parameters<LocalProcessWorkerHost["launch"]>[0] } }> {
+async function dyingHost(root: string, hostile?: string): Promise<{ readonly child: ReturnType<typeof spawn>; readonly dead: Promise<unknown>; readonly started: { outcome: string; identity: string; pid: number; attemptDir: string; spec: Parameters<LocalProcessWorkerHost["launch"]>[0] } }> {
   const script = join(dirname(fileURLToPath(import.meta.url)), "support", "host-process.js");
   const child = spawn(process.execPath, [script, root, ...(hostile === undefined ? [] : [hostile])], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env } });
+  // the host's process gone (reaped): only then has the kernel released its root's lock
+  const dead = new Promise((resolve) => child.once("exit", resolve));
   const line = await new Promise<string>((resolve, reject) => {
     let buffer = "";
     child.stdout!.on("data", (chunk: Buffer) => {
@@ -325,17 +354,18 @@ async function dyingHost(root: string, hostile?: string): Promise<{ readonly chi
     });
     child.on("exit", (code) => reject(new Error(`the host process exited early (${code})`)));
   });
-  return { child, started: JSON.parse(line) as never };
+  return { child, dead, started: JSON.parse(line) as never };
 }
 
 test("B14-A recovery (the control plane dies): the host process is killed while its worker runs; the operating system ends the worker with it, and the next host over the same roots — free to open the moment the dead one is gone — answers the identity from its durable record: FAILED WORKER_CRASHED (HOST_RESTARTED), never NOT_FOUND, adopts a relaunch (ALREADY_EXISTS) without running it again, and terminates nothing twice", { skip }, async () => {
   const root = mkdtempSync(join(tmpdir(), "kauro-b14a-restart-"));
-  const { child, started } = await dyingHost(root);
+  const { child, dead, started } = await dyingHost(root);
   try {
     assert.equal(started.outcome, "LAUNCHED");
     assert.ok(processesReferencing(started.attemptDir).length > 0, "the worker runs");
     // the control plane dies: its process alone, never its tree
     child.kill("SIGKILL");
+    await dead;
     assert.ok(await eventually(() => processesReferencing(started.attemptDir).length === 0, 30_000), "the worker and what it started ended with their host");
     const rig = await localRig({ root });
     try {
@@ -354,12 +384,33 @@ test("B14-A recovery (the control plane dies): the host process is killed while 
   }
 });
 
+test("B14-A recovery (review R2, R3, R7): the host dies while its attempt's tree holds a Node child stuck in synchronous work and a browser in a session of its own; the kernel ends the whole tree with the host, and the next host answers FAILED WORKER_CRASHED (HOST_RESTARTED)", { skip }, async () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-b14a-tree-"));
+  const { child, dead, started } = await dyingHost(root, "hostile-tree");
+  try {
+    assert.ok(await eventually(() => processesReferencing(started.attemptDir).length >= 4, 20_000), "the tree runs");
+    child.kill("SIGKILL");
+    await dead;
+    assert.ok(await eventually(() => processesReferencing(started.attemptDir).length === 0, 30_000), "the whole tree ended with its host");
+    const rig = await localRig({ root });
+    try {
+      assert.deepEqual([rig.host.record(started.identity)?.state, rig.host.record(started.identity)?.note], ["FAILED", "HOST_RESTARTED"]);
+    } finally {
+      await rig.dispose();
+    }
+  } finally {
+    child.kill("SIGKILL");
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
+
 test("B14-A recovery (review R7): the host dies while its worker is stuck in synchronous work — no handler of the worker can run — and the kernel ends the worker all the same (Windows: the host's kill-on-close job object; Linux: the worker's parent-death signal); the next host answers FAILED WORKER_CRASHED (HOST_RESTARTED)", async () => {
   const root = mkdtempSync(join(tmpdir(), "kauro-b14a-spin-"));
-  const { child, started } = await dyingHost(root, "hostile-spin");
+  const { child, dead, started } = await dyingHost(root, "hostile-spin");
   try {
     assert.ok(await eventually(() => processesReferencing(started.attemptDir).length > 0));
     child.kill("SIGKILL");
+    await dead;
     assert.ok(await eventually(() => processesReferencing(started.attemptDir).length === 0, 30_000), "the stuck worker ended with its host");
     const rig = await localRig({ root });
     try {
@@ -517,6 +568,25 @@ test("B14-A records (review R9-1, R10-2, R11-3, the later audit): the next host 
     assert.equal((await next.observe(unfinished.fixture.identity)).state, "FAILED");
   } finally {
     await rig.dispose();
+  }
+});
+
+test("B14-A records (review R5): a record is written whole or not at all — a write that makes partial progress is continued to the last byte; one that makes none fails, leaving the previous version as it was", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kauro-b14a-journal-"));
+  try {
+    const identity = "kauro-attempt-0192b000-0000-7000-8000-000000000001";
+    const record: LocalJobRecord = { host: "kauro-local-process-host", identity, ticketDigest: "0".repeat(64) as never, state: "QUEUED", pid: null, createdAtMs: 1, startedAtMs: null, endedAtMs: null, lastHeartbeatMs: null, cause: null, note: null, manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, flags: ["--permission"], hardMemoryBytes: 1, hardScratchBytes: 1 };
+    // three bytes at a time: every write a short one
+    const short = new JobJournal(dir, (fd, bytes, offset, length) => writeSyncOf(fd, bytes, offset, Math.min(3, length)));
+    short.write(record);
+    assert.deepEqual(JSON.parse(readFileSync(join(dir, `${identity}.json`), "utf8")), record);
+    // no progress: the write fails, and the version on disk is the previous one, whole
+    const stuck = new JobJournal(dir, () => 0);
+    assert.throws(() => stuck.write({ ...record, state: "RUNNING" }), /made no progress/);
+    assert.equal(JSON.parse(readFileSync(join(dir, `${identity}.json`), "utf8")).state, "QUEUED");
+    assert.deepEqual(readdirSync(dir), [`${identity}.json`], "no temporary file left");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
