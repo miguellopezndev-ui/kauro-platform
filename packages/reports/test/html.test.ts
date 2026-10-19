@@ -2,8 +2,9 @@
 // The renderer is pure: it returns the HTML document and its SHA-256; the worker prints it to PDF.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { buildReportModel, copyText, resolveLocale, readMigrationPackage, renderReportHtml, REPORT_COPY, ReportModelError } from "../src/index.js";
+import { buildReportModel, copyText, resolveLocale, readMigrationPackage, renderReportHtml, REPORT_COPY, REPORT_FACES, REPORT_TEMPLATE, ReportModelError } from "../src/index.js";
 import type { ProblemCode, VerifiedReport } from "../src/index.js";
 import { facts, fileText, forge, loadPackage, manifestOf, writeManifest } from "./support/fixtures.js";
 import type { CaseName } from "./support/fixtures.js";
@@ -44,8 +45,9 @@ describe("the document is self-contained and inert (S069)", () => {
       assert.ok(!/<script/i.test(html));
       assert.ok(!/\son[a-z]+\s*=/i.test(html));
       assert.ok(!/\sstyle\s*=/i.test(html));
-      assert.ok(!/(https?:)?\/\/[a-z0-9]/i.test(html.replace(/<!DOCTYPE html>/, "")));
-      assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">/);
+      // the embedded faces are base64, which can hold "//"; their bytes are pinned by hash in the template 2 tests
+      assert.ok(!/(https?:)?\/\/[a-z0-9]/i.test(html.replace(/<!DOCTYPE html>/, "").replace(/url\(data:font\/woff2;base64,[A-Za-z0-9+/=]+\)/g, "")));
+      assert.match(html, /<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">/);
       assert.match(html, /<html lang="en-US">/);
     }
   });
@@ -249,6 +251,31 @@ describe("R-E3: English by default from a catalog keyed by locale", () => {
       const fromModel = modelText.includes(t.replace(/,/g, "")) || /^[0-9,]+$/.test(t);
       assert.ok(fromCatalog || fromModel, `hard-coded text: ${t}`);
     }
+  });
+});
+
+describe("template 2: the pinned faces, the template marker and text that survives extraction", () => {
+  const faces = (html: string): { family: string; sha256: string }[] =>
+    [...html.matchAll(/@font-face \{ font-family: "([^"]+)";[^}]*url\(data:font\/woff2;base64,([A-Za-z0-9+/=]+)\)/g)].map((m) => ({ family: m[1] as string, sha256: sha(Buffer.from(m[2] as string, "base64")) }));
+  it("embeds exactly the pinned Inter and JetBrains Mono files, and every url() of the style is one of them", () => {
+    const { html } = renderReportHtml(report("D-hubspot"), { pageSize: "LETTER", locale: "en-US", logo: null });
+    assert.deepEqual(faces(html), REPORT_FACES.map((f) => ({ family: f.family, sha256: f.sha256 })));
+    assert.equal([...html.matchAll(/url\(/g)].length, REPORT_FACES.length);
+  });
+  it("the provenance record names the same files and hashes as the renderer, and the shipped files match them", () => {
+    const provenance = JSON.parse(readFileSync(new URL("../../assets/fonts/PROVENANCE.json", import.meta.url), "utf8")) as { families: { files: { file: string; sha256: string }[] }[] };
+    const recorded = provenance.families.flatMap((fam) => fam.files.map((x) => [x.file, x.sha256] as const));
+    assert.deepEqual(recorded, REPORT_FACES.map((f) => [f.file, f.sha256] as const));
+    for (const [file, hash] of recorded) assert.equal(sha(readFileSync(new URL(`../../assets/fonts/${file}`, import.meta.url))), hash, file);
+  });
+  it("names its template, turns off the alternates whose glyphs do not extract, and numbers pages from the catalogue", () => {
+    const { html } = renderReportHtml(report("D-hubspot"), { pageSize: "A4", locale: "en-US", logo: null });
+    assert.ok(html.includes(`<meta name="generator" content="${REPORT_TEMPLATE}">`));
+    assert.equal(REPORT_TEMPLATE, "kauro-report-template/2");
+    assert.ok(html.includes("font-variant-ligatures: no-contextual; font-feature-settings: \"calt\" 0;"));
+    assert.ok(!/cv11|ss01/.test(html));
+    assert.ok(html.includes(`@bottom-right { content: "Page " counter(page) " of " counter(pages);`));
+    assert.ok(html.includes(`@bottom-left { content: "Import package report";`));
   });
 });
 

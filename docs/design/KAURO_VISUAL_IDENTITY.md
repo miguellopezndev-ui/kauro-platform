@@ -80,6 +80,18 @@ Bands:
 
 ## 3. Typography
 
+**Agreed direction (owner, 2026-10-18):**
+- a wordmark set in type only ("Kauro", no symbol);
+- **Inter** for the brand, headings and text;
+- **JetBrains Mono** for technical information where it helps legibility;
+- no third face, and no serif.
+
+The custom "a" of the wordmark is never applied to running text.
+
+**Discrepancy recorded:** the web still uses the system families in the table below, so the agreed faces are **not yet implemented on
+the web**. Changing the web's fonts is a separate visual integration, with its own tests. Printed documents already use the agreed
+faces, embedded (§13).
+
 | Role | Family | Notes |
 | --- | --- | --- |
 | Body | `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` | 16 px, line height 1.5; dense metadata never below 14 px |
@@ -231,3 +243,68 @@ No piece changes size while its content changes, so the page never jumps. A stam
    pending" until the owner reviews it.
 6. A change to the palette, the typography, the motion language or the structure of a surface is an evolution of the identity: it needs
    the owner's authorisation and a new version of this document.
+
+## 13. Printed documents
+
+These criteria were set by the owner's scope decision for deliverables (2026-10-18). Their first application is the B13 package report,
+template 2 (`packages/reports/src/html.ts`; proposal and review in `docs/design/REPORT-REDESIGN-PROPOSAL.md`). They apply to a document
+Kauro generates for a person (PDF or printed HTML).
+
+**They are not retroactive.** A document already issued keeps its stored bytes and hashes; a new template or renderer version gives new
+hashes and a new identity, and never rewrites an earlier one. They never change a document's facts: if a layout needs a figure, the figure
+comes from the document's model, never computed by the layout.
+
+1. **Typography:**
+   - Inter for all text and JetBrains Mono for paths, hashes, references and numbering;
+   - proportional figures (no `tnum`) and labels tracked by at most 0.06 em: tabular figures and wide tracking make the PDF's text
+     lose the digits or read as spaced letters;
+   - both embedded in the document from pinned, licensed official files (version, licence and SHA-256 recorded), never taken from the
+     host's installed fonts and never fetched;
+   - contextual alternates and stylistic sets off (`font-variant-ligatures: no-contextual; font-feature-settings: "calt" 0`), so the
+     document's text extracts and searches exactly as written.
+2. **Hierarchy:**
+   - the brand that leads, then the verdict as a quiet label, then one h1 and the status sentence, then the attribution;
+   - numbered h2 sections;
+   - figures light and large where they summarise, medium in tables;
+   - the first page lets a reader understand the result without removing anything from later pages.
+3. **Spacing and composition:**
+   - space, not lines, separates groups;
+   - each element sits closer to what it belongs to than to its neighbours;
+   - short tables may sit side by side, aligned on one line;
+   - nothing is enlarged beyond its meaning.
+4. **Tables:**
+   - one rule under the head and quiet porcelain bands instead of a grid, with no double rules;
+   - the total under a single rule;
+   - numbers right-aligned in tabular figures;
+   - paths break only after a slash, with the folder lighter than the file name;
+   - hashes break anywhere;
+   - a row with nothing in it is set back, not removed.
+5. **Pagination:**
+   - Letter and A4 differ only in the page rule;
+   - table heads repeat, rows do not split, and headings stay with their content;
+   - every page carries a running footer with the document title and "Page n of m".
+6. **Palette, used by context, not by fixed proportions:**
+   - carbon for text;
+   - porcelain for panels and bands;
+   - wine for the verdict, numbering and the one total that matters;
+   - a light clay tint for a notice.
+
+   No colour carries a meaning that the words do not also carry.
+7. **The agency's identity:**
+   - on a document an agency hands on, the agency's logo, or its display name set as a wordmark, leads the cover;
+   - customisation is limited to the name and logo the platform admits;
+   - Kauro's palette and type are the document's frame, never a competing mark.
+8. **Kauro's attribution:** the issuer's legal identity always appears as a line of text from the terms facts (R2-070), never drawn as a
+   brand and never replaced by white label. A document presented as delivered by Kauro itself (none exists yet) may carry the Kauro
+   wordmark; it still follows these criteria.
+9. **Accessibility:**
+   - text is text, never an image of text;
+   - contrast meets WCAG AA on the printed colours;
+   - the document has a language, a title and a heading order;
+   - a logo has the agency's name as its alternative text.
+10. **Evidence and safety:**
+    - the HTML document names its template (`<meta name="generator">`), the PDF's identity records that document's SHA-256, and the
+      document names its inputs (package, manifest, model and renderer version); a new template deploys with a new `rendererVersion`;
+    - it is inert (no script, no event handler, no inline style attribute, no URL other than its embedded `data:` image and fonts) under
+      a restrictive CSP;
+    - a content check proves that every text of the document survives into the PDF's extracted text, in the embedded faces only.

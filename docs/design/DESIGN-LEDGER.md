@@ -40,7 +40,8 @@ for the next review.
 | How it works | Wine head with the "who acts" card, steps beside their panes, carbon closing band | revised |
 | Supported services | Compact head, three equal cards with CLEAN on wine, scope, limits, wine band | revised |
 | Pricing | Ladder, band table, units, estimator, discounts | designed in passes 3–4; not yet reviewed in detail |
-| Sample delivery | Clay head with the report cover on rock, the report, the manifest, the guide | designed in passes 3–4; not yet reviewed in detail |
+| Sample delivery | Clay head with the report cover on rock, the report, the manifest, the guide | designed in passes 3–4; not yet reviewed in detail. The report sheet and its cover follow report template 2 (2026-10-18). |
+| Package report (PDF) | Template 2: the agency's brand leads, verdict label, summary panel, counts as outcomes over their total, banded tables, running footer; Inter and JetBrains Mono embedded (`packages/reports/src/html.ts`, `docs/design/REPORT-REDESIGN-PROPOSAL.md`) | approved by the owner as a visual proposal (2026-10-18); implemented in phase B |
 | Data handling | Carbon head with the index, the "Not found" answer, the redacted file, the retention table | designed in pass 4; not yet reviewed in detail |
 | Contact | Wine "what happens next" aside, form fields in pairs | revised |
 | Status | One panel with a lamp beside each state | revised |
@@ -77,8 +78,10 @@ list as "implemented, owner review pending".
 
 ## 3. Not designed yet (planned next)
 
-- **The deliverables**: the report as HTML and PDF (`packages/reports/src/html.ts`, `pdf.ts`; `docs/design/B13-report-pdf.md`), the
-  CSV files and the package manifest (`packages/reports`), and the import steps.
+- **The package files** written by the Migration Core 3.0.0 (CSV, Markdown, JSON): audited for structure only, with no change
+  (`docs/design/DELIVERABLES-STRUCTURE-AUDIT.md`). Any change is a future core release, decided by the owner.
+- **Deliverables specified but not implemented** (`docs/design/DELIVERABLES-INVENTORY.md` §2): not to be built under the 2026-10-18
+  scope decision. If built later, they follow KAURO_VISUAL_IDENTITY.md §13.
 - **Outgoing messages**: emails and notifications (`apps/api/src/outreach`, `apps/control/src/consumers`).
 
 ## 4. Done for future work

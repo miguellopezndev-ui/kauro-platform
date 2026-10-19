@@ -10,8 +10,8 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { generateReportPdf, renderReportHtml, ReportModelError, ReportPdfError } from "@kauro/reports";
-import type { PdfEngine, VerifiedReport } from "@kauro/reports";
+import { copyText, generateReportPdf, renderReportHtml, ReportModelError, ReportPdfError } from "@kauro/reports";
+import type { CopyKey, PdfEngine, VerifiedReport } from "@kauro/reports";
 import { ChromiumPdfEngine, findChromiumExecutable } from "../src/index.js";
 import { reportOf } from "./support/report-fixtures.js";
 import { readPdf, squash } from "./support/pdf-reader.js";
@@ -100,6 +100,51 @@ describe("report PDF — real engine", { skip: needsBrowser }, () => {
     const flat = squash(read.pages.map((p) => p.text).join(" "));
     for (const art of [...report.model.exceptions, ...report.model.artifacts]) assert.ok(flat.includes(squash(art.path)), `missing ${art.path}`);
   });
+
+  // template 2 embeds its faces and keeps its text extractable: every text of the HTML document is in the PDF's text (whitespace ignored, and
+  // case, because column heads are set in capitals), and the PDF carries the pinned faces rather than whatever the host has installed
+  for (const name of ["D-salesforce", "A-clean-multi-object"] as const) {
+    it(`${name}: every text of the document survives into the PDF, in the embedded Inter and JetBrains Mono`, async () => {
+      const report = reportOf(name);
+      const { html } = renderReportHtml(report, LETTER);
+      const pdf = await generateReportPdf(report, LETTER, engine());
+      if (evidenceDir !== null) {
+        mkdirSync(evidenceDir, { recursive: true });
+        writeFileSync(join(evidenceDir, `report-${name}-LETTER.pdf`), pdf.bytes);
+      }
+      const read = await readPdf(pdf.bytes);
+      const flat = squash(read.pages.map((p) => p.text).join(" ")).toLowerCase();
+      const unescape = (s: string): string => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+      const texts = [...html.slice(html.indexOf("<body>")).matchAll(/>([^<]+)</g)].map((m) => unescape(m[1] as string).trim()).filter((t) => t.length > 0);
+      assert.ok(texts.length > 100);
+      const lost = texts.filter((t) => !flat.includes(squash(t).toLowerCase()));
+      assert.deepEqual(lost, [], "text of the document missing from the PDF's extracted text");
+      assert.ok(read.pages.some((p) => p.text.includes(`Page 1 of ${read.pages.length}`)), "the running footer numbers the pages");
+      // every figure reads in the PDF as a word beside its label (a short number like "4" is found inside any hash, so a search of the
+      // flattened text would not notice a figure missing from the text layer)
+      const words = ` ${read.pages.map((p) => p.text).join(" ").replace(/\s+/g, " ")} `;
+      const said = (label: string, value: number): boolean => words.includes(` ${label} ${value.toLocaleString("en-US")} `);
+      for (const [key, figure] of Object.entries(report.model.counts)) assert.ok(said(copyText("en-US", `counts.${key}` as CopyKey), figure.value), `figure ${key}=${figure.value} missing from the PDF's text`);
+      for (const [object, figure] of Object.entries(report.model.deliveredByObject)) assert.ok(said(object, figure.value), `records of ${object} missing from the PDF's text`);
+      for (const key of ["delivered", "leftover", "unresolved", "deduplicated"] as const) assert.ok(said(copyText("en-US", `relationships.${key}`), report.model.relationships[key].value), `relationships ${key} missing from the PDF's text`);
+      // the per-file figures too: expected records in the guide, and the records of every exception and package file after its name
+      // (and its use, where the table prints one)
+      for (const step of report.model.importGuide) assert.ok(said(copyText("en-US", "guide.records"), step.records.value), `expected records of ${step.path} missing from the PDF's text`);
+      for (const a of [...report.model.exceptions, ...report.model.artifacts]) {
+        if (a.records === null) continue;
+        const name = a.path.slice(a.path.lastIndexOf("/") + 1);
+        const use = copyText("en-US", `artifacts.use.${a.use}`);
+        assert.ok(said(name, a.records.value) || said(`${name} ${use}`, a.records.value), `records of ${a.path} missing from the PDF's text`);
+      }
+      // labels set in capitals with tracking read as words, in capitals (so a mixed-case row of the same words cannot stand in for them)
+      for (const label of [copyText("en-US", "doc.stamp"), copyText("en-US", "glance.heading"), copyText("en-US", "table.measure")]) assert.ok(words.includes(` ${label.toUpperCase()} `), `label "${label}" does not read as words`);
+      const raw = Buffer.from(pdf.bytes).toString("latin1");
+      const faces = [...raw.matchAll(/\/FontName\s*\/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/g)].map((m) => m[1] as string);
+      assert.ok(faces.some((f) => f.startsWith("Inter")), `no embedded Inter face: ${faces.join(", ")}`);
+      assert.ok(faces.some((f) => f.startsWith("JetBrainsMono")), `no embedded JetBrains Mono face: ${faces.join(", ")}`);
+      assert.ok(faces.every((f) => f.startsWith("Inter") || f.startsWith("JetBrainsMono")), `a face other than the pinned ones: ${faces.join(", ")}`);
+    });
+  }
 
   it("paginates a very long table and repeats its header on each page", async () => {
     const rows = Array.from({ length: 400 }, (_, i) => `<tr><td>row-${i}</td><td>${(i * 7919) % 10007}</td></tr>`).join("");

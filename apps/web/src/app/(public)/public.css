@@ -1350,6 +1350,33 @@ body:has(> .kauro-site-header) {
 .kauro-site-sheet .kauro-site-table thead th {
   background: transparent;
 }
+/* The sample report reads like the printed report (report template 2): one rule under the head, quiet bands instead of a line under every
+   row, the measure in medium weight and the numbers in tabular figures. */
+.kauro-site-sheet .kauro-site-table :is(th, td) {
+  border-block-start: 0;
+}
+.kauro-site-sheet .kauro-site-table thead th {
+  border-block-end: 1px solid var(--kauro-color-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.kauro-site-sheet .kauro-site-table tbody tr:nth-child(even) :is(th, td) {
+  background: var(--kauro-color-surface);
+}
+.kauro-site-sheet .kauro-site-table tbody th {
+  font-weight: 550;
+}
+.kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td),
+.kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td):is(:first-child, :last-child) {
+  padding-inline: var(--kauro-space-3);
+}
+@media (max-width: 39.99rem) {
+  /* on a phone the four columns keep their words: the bands need only a hairline of inset */
+  .kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td),
+  .kauro-site-main .kauro-site-sheet .kauro-site-table :is(th, td):is(:first-child, :last-child) {
+    padding-inline: var(--kauro-space-1);
+  }
+}
 
 .kauro-site-sum {
   display: grid;
@@ -2392,17 +2419,17 @@ body:has(> .kauro-site-header) {
   box-shadow: 0 2rem 4rem -2rem color-mix(in srgb, var(--kauro-color-ink) 65%, transparent), 0.5rem -0.5rem 0 -1px var(--kauro-color-raised), 0.5rem -0.5rem 0 0 var(--kauro-color-border);
   transform: rotate(3deg);
 }
+/* The cover follows the printed report: the heading as its quiet wine label, the figure light in the text colour. */
 .kauro-site-main p.kauro-site-cover-kicker {
-  padding-block-end: 0.75rem;
-  border-block-end: 2px solid var(--kauro-color-primary);
-  font-family: var(--kauro-display-family);
-  font-size: 1.125rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  color: var(--kauro-color-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .kauro-site-main p.kauro-site-cover-figure {
   margin-block-start: auto;
-  color: var(--kauro-color-primary);
+  color: var(--kauro-color-text);
   font-family: var(--kauro-display-family);
   font-size: 3.5rem;
   font-weight: 300;
