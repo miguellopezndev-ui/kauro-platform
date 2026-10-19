@@ -16,7 +16,11 @@ const config: NextConfig = {
   // (08 "Quarantine and malware boundaries"; GHSA-2xp9-vwfh-vxw4 was an unauthenticated RCE in the optimizer).
   images: { unoptimized: true },
   async headers() {
-    return [{ source: "/:path*", headers: STATIC_SECURITY_HEADERS.map(({ key, value }) => ({ key, value })) }];
+    return [
+      { source: "/:path*", headers: STATIC_SECURITY_HEADERS.map(({ key, value }) => ({ key, value })) },
+      // the faces (Order 10) live under versioned paths (/fonts/inter-4.1/…): a new release is a new path, so a file never changes in place
+      ...["/fonts/inter-4.1/:file", "/fonts/jetbrains-mono-2.304/:file"].map((source) => ({ source, headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] })),
+    ];
   },
 };
 

@@ -122,8 +122,12 @@ test("every page reflows to one column at 320 CSS pixels with no horizontal scro
 for (const route of ["/sample-delivery", "/legal/terms"]) {
   test(`the agreed faces really load from Kauro's own origin and are applied (${route}): Inter for text and headings, JetBrains Mono for technical text, Inter Italic for notes; no font is requested elsewhere (Order 10)`, async ({ page, baseURL }) => {
     const fonts: string[] = [];
+    const caching: string[] = [];
     page.on("request", (r) => {
       if (r.resourceType() === "font") fonts.push(r.url());
+    });
+    page.on("response", (r) => {
+      if (r.request().resourceType() === "font") caching.push(r.headers()["cache-control"] ?? "");
     });
     await page.goto(route);
     await page.evaluate(() => document.fonts.ready);
@@ -155,6 +159,9 @@ for (const route of ["/sample-delivery", "/legal/terms"]) {
       expect(facts.loaded).toEqual(expect.arrayContaining(["Inter italic", "JetBrains Mono normal"]));
     }
     expect(fonts.length).toBeGreaterThan(0);
+    // a face lives under a versioned path, so it is cached as immutable
+    expect(caching.length).toBeGreaterThan(0);
+    for (const value of caching) expect(value).toBe("public, max-age=31536000, immutable");
     for (const url of fonts) {
       expect(new URL(url).origin, url).toBe(new URL(baseURL as string).origin);
       expect(new URL(url).pathname, url).toMatch(/^\/fonts\/(inter-4\.1|jetbrains-mono-2\.304)\/[A-Za-z-]+\.woff2$/);

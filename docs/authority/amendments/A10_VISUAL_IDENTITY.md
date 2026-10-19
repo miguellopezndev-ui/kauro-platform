@@ -178,8 +178,9 @@ Inter and JetBrains Mono. The printed report already used them; Order 10 impleme
     writes its own document.
   - Only Inter's roman is preloaded.
   - "Inter Fallback" is the local Arial with Inter's metrics, so body text does not reflow when Inter arrives. JetBrains Mono falls back to
-    the system mono, so a few technical lines move slightly on arrival (layout shift measured at 0.03 or less).
-  - There is no CDN, and the CSP keeps `font-src 'self'`.
+    the system mono, so a few technical lines and the blocks around them move slightly on arrival (layout shift measured with fonts
+    delayed 1.5 s: at most 0.034, on Sample delivery at 375 px; the threshold for good is 0.1).
+  - There is no CDN, and the CSP keeps `font-src 'self'`. The face files are cached for a year as immutable: a new release is a new path.
 - **Tokens:** `packages/ui/src/tokens.ts` names "Inter", "Inter Fallback" and "JetBrains Mono" before a system stack. Headings use the
   same Inter, whose optical size axis gives large sizes their display cut.
 - **Notes:** the editor's notes are set in Inter Italic; the Georgia serif of §1 is retired. No third family remains.
