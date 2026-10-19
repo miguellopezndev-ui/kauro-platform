@@ -21,7 +21,7 @@
  */
 import { linkSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxStartOf, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxProcessOf, linuxStartOf, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
 export const SUPERVISOR_VERDICTS = ["HOST_LOST", "DEADLINE", "MEMORY_EXHAUSTED", "SCRATCH_EXHAUSTED"] as const;
 export type SupervisorVerdict = (typeof SUPERVISOR_VERDICTS)[number];
@@ -174,23 +174,35 @@ const SWEEPS = 20;
 export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream, exit: (code: number) => void, ready: () => void = () => undefined): void {
   let done = false;
   const pid = config.workerPid;
-  // the pid is the worker's while it runs and (Linux) its start is the one recorded at the spawn; a reused pid is never signalled
-  // (Linux without a recorded start: never — the pid is then never signalled, walked or measured; review round 9, R9-2)
-  const isWorker = (): boolean => processRunning(pid) && (process.platform !== "linux" || (config.workerStart !== null && linuxStartOf(pid) === config.workerStart));
-  // the worker's group is swept while the pid is the worker's or names no process at all (a pid in use as a group id is not reused)
-  const groupOf = (): number | null => (isWorker() || !processExists(pid) ? pid : null);
+  // what the pid is now: the worker (running, and on Linux with the start recorded at the spawn), GONE, OTHER (reused), or UNKNOWN
+  // (its /proc entry could not be read, or no start was recorded: review rounds 9 and 11, R9-2, R11-2). Only WORKER is ever signalled,
+  // walked or measured; UNKNOWN keeps the supervisor watching and never lets it leave
+  const seen = (): "WORKER" | "GONE" | "OTHER" | "UNKNOWN" => {
+    if (process.platform !== "linux") return processRunning(pid) ? "WORKER" : "GONE";
+    const p = linuxProcessOf(pid);
+    if (p.state !== "RUNNING") return p.state;
+    if (config.workerStart === null) return "UNKNOWN";
+    return p.start === config.workerStart ? "WORKER" : "OTHER";
+  };
   // every process seen in the worker's tree, with its start (Linux): one re-parented after its parent died is still the attempt's
   const known = new Map<number, string>();
-  const sweep = (left: number): void => {
-    if (sweepAttemptProcesses(groupOf(), config.scratchDirs, known).length === 0 || left <= 1) return exit(0);
-    setTimeout(() => sweep(left - 1), config.pollMs);
+  // after its end: the tree it decided to end is ended again while the pid is still the worker's, the worker's group is swept while
+  // the pid is the worker's or names no process (a pid in use as a group id is not reused), and the supervisor leaves only once the pid
+  // is known not to be the worker's and nothing it marks is left (after a bounded number of sweeps if something cannot be ended)
+  const sweep = (killing: boolean, left: number): void => {
+    const now = seen();
+    if (killing && now === "WORKER") killProcessTree(pid);
+    const leftover = sweepAttemptProcesses(now === "WORKER" || now === "GONE" ? pid : null, config.scratchDirs, known);
+    const settled = now === "GONE" || now === "OTHER";
+    if (settled && (leftover.length === 0 || left <= 1)) return exit(0);
+    setTimeout(() => sweep(killing, settled ? left - 1 : left), config.pollMs);
   };
   const end = (verdict: SupervisorVerdict | null, detail: Record<string, number> = {}): void => {
     if (done) return;
     done = true;
     // a verdict ends the tree only when it was written first (the host may have stood the supervisor down already)
-    if (verdict !== null && recordVerdict(config.jobDir, verdict, detail) && isWorker()) killProcessTree(pid);
-    sweep(SWEEPS);
+    const killing = verdict !== null && recordVerdict(config.jobDir, verdict, detail);
+    sweep(killing, SWEEPS);
   };
   let hostGone = false;
   let buffered = "";
@@ -209,7 +221,10 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
   setTimeout(() => end("DEADLINE"), Math.max(0, Math.min(config.deadlineInMs, 2_147_483_647)));
   setInterval(() => {
     // the worker is gone: a host that died with it (on Windows its job object ends the tree with the host) is still recorded
-    if (!isWorker()) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
+    const now = seen();
+    // unreadable: watched again at the next poll, never taken for an end
+    if (now === "UNKNOWN") return undefined;
+    if (now !== "WORKER") return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
     // the attempt's processes (Linux): the worker's tree as it stands, every process seen in it before whose start still matches (one
     // re-parented when its parent ended), and every process the attempt's directories mark (review round 5, R5-3)
     const owned = new Set<number>();

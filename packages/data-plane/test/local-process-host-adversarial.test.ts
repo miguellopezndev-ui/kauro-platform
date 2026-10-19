@@ -5,7 +5,7 @@
 // system (Linux /proc, Windows CIM), never through the host's own word.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -922,4 +922,17 @@ test("B14-A (review round 10, R10-1; Linux): /proc tells a process gone from one
   const own = linuxProcessOf(process.pid);
   assert.equal(own.state, "RUNNING");
   assert.equal(own.state === "RUNNING" ? own.start : null, linuxStartOf(process.pid));
+});
+
+test("B14-A RACE (review round 11, R11-3; Linux): a job directory the host cannot look into is no absence — observe fails transiently", { skip: process.platform !== "linux" || process.getuid?.() === 0 }, async () => {
+  const rig = localRig();
+  const jobs = join(rig.hostRoot, "jobs");
+  try {
+    const spec = plantedAttempt(rig.storage, 49).fixture.spec(1);
+    chmodSync(jobs, 0o400);
+    await assert.rejects(rig.restart().observe(spec.identity), (e: unknown) => (e as { transient?: unknown }).transient === true);
+  } finally {
+    chmodSync(jobs, 0o700);
+    await rig.dispose();
+  }
 });

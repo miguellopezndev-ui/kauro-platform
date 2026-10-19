@@ -989,7 +989,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       if (who === "UNKNOWN") return false;
       if (who === "WORKER") killProcessTree(pid);
       const left = sweepAttemptProcesses(who === "WORKER" || who === "GONE" ? pid : null, dirs);
-      if (left.length === 0 && this.#workerIdentity(record) !== "WORKER") {
+      // ended only when the pid is known not to be the worker's: UNKNOWN is no end (review round 11, R11-1)
+      const after = this.#workerIdentity(record);
+      if (after === "UNKNOWN") return false;
+      if (left.length === 0 && (after === "GONE" || after === "OTHER")) {
         this.#removeBrowserTemp(record.identity.slice("kauro-attempt-".length));
         return true;
       }
@@ -1098,6 +1101,17 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     }
   }
 
+  /** Whether a path exists: false only for ENOENT; any other failure to look is the host's transient failure (HostRecordUnreadable). */
+  #present(identity: string, path: string): boolean {
+    try {
+      statSync(path);
+      return true;
+    } catch (error) {
+      if ((error as { code?: unknown }).code === "ENOENT") return false;
+      throw new HostRecordUnreadable(identity, error);
+    }
+  }
+
   #instanceFile(instance: string): string {
     return join(this.#hostRoot, "instances", instance.replace(/[^a-z0-9-]/g, "_"));
   }
@@ -1117,11 +1131,12 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (live !== undefined) return live.record;
     if (!isAttemptIdentity(identity)) return null;
     const dir = this.#jobDir(identity);
-    if (!existsSync(dir)) return null;
+    // absent only when the filesystem says so (ENOENT); any other failure is the host's, never an absence (review round 11, R11-3)
+    if (!this.#present(identity, dir)) return null;
     let record: LocalJobRecord;
     try {
       const end = join(dir, "end.json");
-      record = JSON.parse(readFileSync(existsSync(end) ? end : join(dir, "record.json"), "utf8")) as LocalJobRecord;
+      record = JSON.parse(readFileSync(this.#present(identity, end) ? end : join(dir, "record.json"), "utf8")) as LocalJobRecord;
     } catch (error) {
       // a record that cannot be read is no proof of anything (review round 9, R9-1): the host's own failure, transient, answered as
       // such and never as an end (a create renames a directory that holds its record, so a host never leaves one without it)
