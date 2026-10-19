@@ -206,3 +206,37 @@ test("B14-A broker (review round 4, R4-4): the session cap holds for concurrent 
   assert.equal(lands.length, 1, "the provider was asked once");
   assert.match(String(((await first) as { handle: string }).handle), /^session-1$/);
 });
+
+test("B14-A broker (review round 16, R16-1): what an attempt makes the host hold is bounded — one chunk at a time per session, and at most a fixed number of calls and bytes waiting at once; past them a call is refused at once, holding nothing", async () => {
+  const storage = new ContractFakeObjectStorage();
+  const ticket = ticketOf(storage, 5);
+  const held: Array<() => void> = [];
+  const real = holderOf(storage);
+  const uploads = {
+    ...real,
+    writeChunk: async (...args: Parameters<typeof real.writeChunk>) => {
+      await new Promise<void>((resolve) => held.push(resolve));
+      return real.writeChunk(...args);
+    },
+  } as typeof real;
+  const broker = new AttemptStorageBroker({ capability: ticket.capability, storage, uploads, origin: "https://app.kauro.test", maxObjectBytes: 1 << 20 });
+  const handles: string[] = [];
+  for (let i = 0; i < 17; i++) {
+    const objectName = `${ticket.capability.stagingPrefix}${String(i).padStart(8, "0")}-0000-8000-8000-000000000000`;
+    const session = (await broker.handle({ op: "storage.createSession", zone: "STAGING", objectName, declaredBytes: 4, contentType: "x", timeoutMs: 1000 })) as { handle: string };
+    handles.push(session.handle);
+  }
+  const chunk = new Uint8Array([1, 2, 3, 4]);
+  const first = broker.handle({ op: "upload.writeChunk", handle: handles[0]!, chunk, final: true });
+  await assert.rejects(broker.handle({ op: "upload.writeChunk", handle: handles[0]!, chunk, final: true }), (e: unknown) => e instanceof BrokerRefusal && e.code === "SESSION_BUSY");
+  const waiting = [first, ...handles.slice(1, 16).map((handle) => broker.handle({ op: "upload.writeChunk", handle, chunk, final: true }))];
+  await assert.rejects(broker.handle({ op: "upload.writeChunk", handle: handles[16]!, chunk, final: true }), (e: unknown) => e instanceof BrokerRefusal && e.code === "TOO_MANY_PENDING");
+  await new Promise((r) => setImmediate(r));
+  held.splice(0).forEach((release) => release());
+  await Promise.allSettled(waiting);
+  // released: the budget is free again
+  const again = broker.handle({ op: "upload.writeChunk", handle: handles[16]!, chunk, final: true });
+  await new Promise((r) => setImmediate(r));
+  held.splice(0).forEach((release) => release());
+  await again;
+});
