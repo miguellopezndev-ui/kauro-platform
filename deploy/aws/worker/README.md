@@ -12,7 +12,7 @@ and no Terraform `apply` or push to ECR happened. The host these contracts are f
 | `run-task.template.json` | One `RunTask` per launch: `clientToken` = the attempt id, `startedBy` = the identity, `overrides.taskRoleArn` = the attempt's own role, and the ticket's key and SHA-256. Never a secret: `DescribeTasks` shows overrides |
 | `iam/attempt-role.policy.template.json` | One attempt's capability as IAM: read its ticket and its sealed object versions; create (If-None-Match) under its prefix and its claim and result keys, the multipart steps that cannot carry the header allowed apart (`s3:ObjectCreationOperation` = false); abort its own multipart uploads; write its heartbeat; read its own prefix back |
 | `iam/attempt-boundary.policy.json` | The ceiling no attempt role can exceed (the launcher may create roles only with it) |
-| `iam/launcher.policy.template.json` | The control plane: run, observe and stop tasks in one cluster; create, pass and delete `kauro-attempts/*` roles within the boundary; write tickets once; read the protocol keys |
+| `iam/launcher.policy.template.json` | The control plane: run, observe and stop tasks in one cluster (tagging a task only as part of its own RunTask, with its two tag keys); create, pass and delete `kauro-attempts/*` roles within the boundary; write tickets once; read the protocol keys |
 | `iam/execution-role.policy.template.json` | ECS's own role: pull the one repository, write the one log group |
 | `bucket-policy.template.json` | TLS only; attempt roles only through the S3 gateway endpoint; no unconditional create of staging, ticket, claim or result keys; attempt roles never delete |
 

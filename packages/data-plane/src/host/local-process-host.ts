@@ -23,7 +23,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, linkSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -55,7 +55,7 @@ import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
 import { killProcessTree, linuxAttemptProcesses, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
-import { SUPERVISOR_READY, readVerdict, type SupervisorConfig } from "./supervisor.js";
+import { SUPERVISOR_READY, readVerdict, standDownOrVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
 
@@ -101,6 +101,8 @@ export interface LocalProcessHostHooks {
   beforeCall?(identity: string, call: WorkerCall): Promise<void> | void;
   /** Awaited between a job's create and its start's claim (a test's pause of a creator; without it the two are one step). */
   afterCreate?(identity: string): Promise<void> | void;
+  /** Awaited between the records' read and the create's publication (a test's pause of a creator; without it they are one step). */
+  beforePublish?(identity: string): Promise<void> | void;
   /** Awaited between the supervisor's word and the ticket's delivery claim (a test's pause of a creator). */
   beforeTicket?(identity: string): Promise<void> | void;
 }
@@ -194,6 +196,10 @@ const CANCELLED_BEFORE_CREATE = "CANCELLED_BEFORE_CREATE";
 const TERMINATION_REQUEST = "terminate.request";
 /** Taken once per job, exclusively: by its creator before the worker is spawned, or by an instance that ends the queued job for good. */
 const START_CLAIM = "start.claim";
+/** A pending creation's prepared directory, beside the jobs: `<prefix><identity>-<pid>-<n>`. */
+const PENDING_PREFIX = ".creating-";
+/** In a pending creation's directory: when the creation began (milliseconds, its creator's clock). */
+const PENDING_FILE = "pending.json";
 /** Taken once per job, exclusively: by its creator before the worker gets its ticket, or by an instance that ends the job before that. */
 const TICKET_CLAIM = "ticket.claim";
 /** How often an instance says it is alive, and how long another instance's silence means it is gone. */
@@ -284,6 +290,23 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (problem !== null) return answer("REFUSED", problem);
     const jobDir = this.#jobDir(identity);
     if (existsSync(jobDir)) return this.#cancelled(identity) ? answer("REFUSED", "IDENTITY_TERMINATED") : answer("ALREADY_EXISTS", null);
+    // the creation is pending, durably, from here (review round 7, R7-1): its prepared directory exists before anything is read, so an
+    // instance that would answer the identity absent past the creation horizon sees it, and takes the identity's name first (#absent)
+    const prepared = join(this.#hostRoot, "jobs", `${PENDING_PREFIX}${identity}-${process.pid}-${++this.#creations}`);
+    mkdirSync(prepared);
+    // when it began, on this instance's clock: the creation horizon runs from here
+    writeFileSync(join(prepared, PENDING_FILE), String(this.#o.clock.nowMs()));
+    let published = false;
+    try {
+      return await this.#create(spec, prepared, answer, () => (published = true));
+    } finally {
+      if (!published) rmSync(prepared, { recursive: true, force: true });
+    }
+  }
+
+  async #create(spec: WorkerLaunchSpec, prepared: string, answer: (outcome: WorkerLaunchResult["outcome"], reason: string | null) => WorkerLaunchResult, publish: () => void): Promise<WorkerLaunchResult> {
+    const identity = spec.identity;
+    const jobDir = this.#jobDir(identity);
 
     // the control plane's records for this attempt, read before anything is created (a failed read creates nothing). The read is
     // bounded well inside the creation horizon, and a launch abandoned meanwhile (its identity terminated, or the bound passed)
@@ -330,15 +353,14 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     // the create: one directory per identity, for good — prepared aside with its ticket and its first record, then renamed into
     // place, so the identity never exists without its record and a second create finds it taken (rename refuses a non-empty target).
     // A termination of the absent identity takes the same name first (#cancel), from this instance or any other: then nothing is created
+    if (this.#o.hooks?.beforePublish !== undefined) await this.#o.hooks.beforePublish(identity);
     const record = this.#firstRecord(spec, bytes);
-    const prepared = join(this.#hostRoot, "jobs", `.creating-${identity}-${process.pid}-${++this.#creations}`);
-    mkdirSync(prepared);
     writeFileSync(join(prepared, "ticket.json"), bytes);
     writeFileSync(join(prepared, "record.json"), JSON.stringify(record));
     try {
       renameSync(prepared, jobDir);
+      publish();
     } catch (error) {
-      rmSync(prepared, { recursive: true, force: true });
       if (existsSync(jobDir)) return this.#cancelled(identity) ? answer("REFUSED", "IDENTITY_TERMINATED") : answer("ALREADY_EXISTS", null);
       throw error;
     }
@@ -361,7 +383,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   observe(identity: string): Promise<WorkerObservation> {
-    const record = this.#existing(identity);
+    const record = this.#existing(identity) ?? this.#absent(identity);
     const observation: WorkerObservation = Object.freeze({
       evidenceClass: EVIDENCE,
       identity,
@@ -411,7 +433,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   resources(identity: string): Promise<WorkerResourceReport> {
-    const record = this.#existing(identity);
+    const record = this.#existing(identity) ?? this.#absent(identity);
     const report: WorkerResourceReport =
       record === null
         ? Object.freeze({ evidenceClass: EVIDENCE, identity, outcome: "NOT_FOUND" as const })
@@ -810,6 +832,19 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   #closeRecord(live: Live): void {
     const record = live.record;
     if (TERMINAL.has(record.state)) return;
+    // the supervisor's verdict and this standing down are one exclusive file (review round 7, R7-2): a verdict written first decides the
+    // end whatever the worker answered (an attempt past its hard limits never succeeds); written first here, no verdict can follow
+    const verdict = standDownOrVerdict(this.#jobDir(record.identity));
+    if (verdict !== null && verdict !== "HOST_LOST") {
+      record.endedAtMs = this.#o.clock.nowMs();
+      record.state = "FAILED";
+      record.cause = verdict === "SCRATCH_EXHAUSTED" ? "SCRATCH_EXHAUSTED" : verdict === "DEADLINE" ? "DEADLINE_EXCEEDED" : "WORKER_CRASHED";
+      record.note = verdict;
+      record.peakScratchBytes = live.result?.peakScratchBytes ?? record.peakScratchBytes;
+      record.peakMemoryBytes = live.result?.peakMemoryBytes ?? record.peakMemoryBytes;
+      this.#persist(record);
+      return;
+    }
     const result = live.result;
     record.endedAtMs = this.#o.clock.nowMs();
     if (result !== null) {
@@ -820,7 +855,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.peakScratchBytes = result.peakScratchBytes;
       record.peakMemoryBytes = result.peakMemoryBytes;
     } else {
-      // no result: a termination another instance asked for; the supervisor's verdict when it ended the tree; else the host's own
+      // no result (and no verdict of exhaustion or deadline, above): a termination another instance asked for; else the host's own
       // reading of the exit
       if (existsSync(join(this.#jobDir(record.identity), TERMINATION_REQUEST))) {
         record.state = "TERMINATED";
@@ -828,9 +863,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
         this.#persist(record);
         return;
       }
-      const verdict = readVerdict(this.#jobDir(record.identity))?.verdict ?? null;
       record.state = "FAILED";
-      record.cause = verdict === "SCRATCH_EXHAUSTED" ? "SCRATCH_EXHAUSTED" : verdict === "DEADLINE" ? "DEADLINE_EXCEEDED" : "WORKER_CRASHED";
+      record.cause = "WORKER_CRASHED";
       record.note = verdict ?? (/heap out of memory|Allocation failed|ERR_WORKER_OUT_OF_MEMORY/i.test(live.stderrTail) ? "MEMORY_EXHAUSTED" : "NO_RESULT");
     }
     this.#persist(record);
@@ -958,6 +992,32 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Called where the identity would be answered absent (observe, resources): a creation still pending past the creation horizon (its
+   * prepared directory older than the horizon) can no longer publish — this instance takes the identity's name for good first, as a
+   * termination does — so the absence answered stays true (review round 7, R7-1). A creation pending within the horizon may still
+   * publish, which is what the horizon allows. Answers null (absent) unless a create took the name meanwhile.
+   */
+  #absent(identity: string): LocalJobRecord | null {
+    let pending: string[];
+    try {
+      pending = readdirSync(join(this.#hostRoot, "jobs")).filter((name) => name.startsWith(`${PENDING_PREFIX}${identity}-`));
+    } catch {
+      return null;
+    }
+    const now = this.#o.clock.nowMs();
+    const expired = pending.some((name) => {
+      try {
+        return now - Number(readFileSync(join(this.#hostRoot, "jobs", name, PENDING_FILE), "utf8")) > this.creationHorizonSeconds * 1000;
+      } catch {
+        // published or abandoned meanwhile, or not yet stamped (then within its horizon)
+        return false;
+      }
+    });
+    if (expired && !this.#cancel(identity)) return this.#existing(identity);
+    return null;
   }
 
   /** A record that is a job's (a cancelled identity's tombstone is no job: the identity was never created). */

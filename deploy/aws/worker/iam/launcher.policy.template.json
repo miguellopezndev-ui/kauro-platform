@@ -1,5 +1,5 @@
 {
-  "$comment": "B14-A contract: what the control plane's role needs to host attempts (EcsFargateWorkerHost and STAGING_JANITOR): RunTask of the one task definition in the one cluster; observation and termination in that cluster; per-attempt roles only under the kauro-attempts path and only with the boundary; tickets written once; the protocol keys read.",
+  "$comment": "B14-A contract: what the control plane's role needs to host attempts (EcsFargateWorkerHost and STAGING_JANITOR): RunTask of the one task definition in the one cluster, with the tags of its own request (ecs:TagResource only as part of that RunTask); observation and termination in that cluster; per-attempt roles only under the kauro-attempts path and only with the boundary; tickets written once; the protocol keys read.",
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -8,6 +8,16 @@
       "Action": "ecs:RunTask",
       "Resource": "${TASK_DEFINITION_ARN_WITHOUT_REVISION}:*",
       "Condition": { "ArnEquals": { "ecs:cluster": "${CLUSTER_ARN}" } }
+    },
+    {
+      "Sid": "TagTasksAtTheirRunTask",
+      "Effect": "Allow",
+      "Action": "ecs:TagResource",
+      "Resource": "arn:aws:ecs:us-east-1:${ACCOUNT_ID}:task/${CLUSTER_NAME}/*",
+      "Condition": {
+        "StringEquals": { "ecs:CreateAction": "RunTask" },
+        "ForAllValues:StringEquals": { "aws:TagKeys": ["kauro:identity", "kauro:environment"] }
+      }
     },
     {
       "Sid": "ObserveAndStop",

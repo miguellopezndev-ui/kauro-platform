@@ -776,3 +776,51 @@ test("B14-A limits (review round 6, R6-3): a supervisor that recorded its verdic
     await rig.dispose();
   }
 });
+
+test("B14-A RACE (review round 7, R7-1): a creator paused past the creation horizon before it publishes cannot create the identity another instance has answered absent — the pending creation is visible, and the absence answered past the horizon takes the identity's name first", async () => {
+  const atPublish = gate();
+  const resumed = gate();
+  const rig = localRig({ hooks: { beforePublish: async () => (atPublish.open(), await resumed.promise) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 42);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    const launching = rig.host.launch(spec);
+    await atPublish.promise;
+    // within the horizon, the identity is absent and may still be created
+    assert.equal((await rig.restart().observe(spec.identity)).state, "NOT_FOUND");
+    // past it (a clock a minute ahead of the 60 s horizon's start), the absence answered is made true for good
+    const ahead = rig.restart({ now: () => toUtcInstant(Date.now() + 61_000), nowMs: () => Date.now() + 61_000 });
+    assert.equal((await ahead.observe(spec.identity)).state, "NOT_FOUND");
+    resumed.open();
+    const result = await launching;
+    assert.deepEqual([result.outcome, result.reason], ["REFUSED", "IDENTITY_TERMINATED"]);
+    assert.equal((await rig.host.observe(spec.identity)).state, "NOT_FOUND");
+    assert.equal(existsSync(attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId)), false, "no worker ever ran");
+    assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")).filter((n) => n.startsWith(".creating-")), [], "the pending creation is gone");
+  } finally {
+    resumed.open();
+    await rig.dispose();
+  }
+});
+
+test("B14-A limits (review round 7, R7-2): a supervisor's verdict written before the worker's end decides it, whatever the worker answered — an attempt past its hard limits never succeeds — and the host's standing down written first leaves no verdict to follow", { skip }, async () => {
+  const atManifest = gate();
+  const released = gate();
+  const rig = localRig({ hooks: { atStage: async (_id, stage) => (stage === "MANIFEST" ? (atManifest.open(), await released.promise) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 43);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await atManifest.promise;
+    // the supervisor's verdict, as it writes it the moment it finds the attempt past its hard scratch (before it kills the tree)
+    writeFileSync(join(rig.hostRoot, "jobs", spec.identity, "supervisor.json"), JSON.stringify({ verdict: "SCRATCH_EXHAUSTED", scratchBytes: 1 }), { flag: "wx" });
+    released.open();
+    const ended = await rig.host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.cause, ended?.note, ended?.manifest], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED", null]);
+  } finally {
+    released.open();
+    await rig.dispose();
+  }
+});

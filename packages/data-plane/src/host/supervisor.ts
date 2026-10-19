@@ -112,12 +112,27 @@ export function openDeletedBytes(pids: readonly number[], platform: NodeJS.Platf
   return total;
 }
 
-/** Writes the supervisor's one verdict; the first verdict stands. */
-export function recordVerdict(jobDir: string, verdict: SupervisorVerdict, detail: Record<string, number>): void {
+/**
+ * Writes the supervisor's one verdict, exclusively: true when it was written. The file is also the host's standing down
+ * (standDownOrVerdict): of a verdict and the host's reading of the worker's end, the first written decides, and a supervisor whose
+ * verdict came second ends nothing.
+ */
+export function recordVerdict(jobDir: string, verdict: SupervisorVerdict, detail: Record<string, number>): boolean {
   try {
     writeFileSync(join(jobDir, SUPERVISOR_FILE), JSON.stringify({ verdict, ...detail }), { flag: "wx" });
+    return true;
   } catch {
-    // a verdict exists already
+    return false;
+  }
+}
+
+/** The host stands its supervisor down for good, unless a verdict came first: then that verdict (null when the host's came first). */
+export function standDownOrVerdict(jobDir: string): SupervisorVerdict | null {
+  try {
+    writeFileSync(join(jobDir, SUPERVISOR_FILE), JSON.stringify({ verdict: "STOOD_DOWN" }), { flag: "wx" });
+    return null;
+  } catch {
+    return readVerdict(jobDir)?.verdict ?? null;
   }
 }
 
@@ -149,10 +164,8 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
   const end = (verdict: SupervisorVerdict | null, detail: Record<string, number> = {}): void => {
     if (done) return;
     done = true;
-    if (verdict !== null) {
-      recordVerdict(config.jobDir, verdict, detail);
-      if (isWorker()) killProcessTree(pid);
-    }
+    // a verdict ends the tree only when it was written first (the host may have stood the supervisor down already)
+    if (verdict !== null && recordVerdict(config.jobDir, verdict, detail) && isWorker()) killProcessTree(pid);
     sweep(SWEEPS);
   };
   let hostGone = false;

@@ -5,7 +5,7 @@
 // storage stays its labelled CONTRACT FAKE (SIMULATED) — no cloud storage exists locally. The effects asserted are what the storage, the
 // host's durable records and the staged manifest hold, and which processes still exist.
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { readStagedManifest } from "@kauro/application";
@@ -61,6 +61,8 @@ ${rig.host.diagnostics(spec.identity)}`);
     assert.ok(record!.flags.includes("--permission"));
     assert.ok(record!.flags.some((f) => f.startsWith("--allow-fs-write=")));
     assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")), [spec.identity]);
+    // the host's reading of the end came first: its supervisor is stood down for good, no verdict can follow (review round 7, R7-2)
+    assert.equal(JSON.parse(readFileSync(join(rig.hostRoot, "jobs", spec.identity, "supervisor.json"), "utf8")).verdict, "STOOD_DOWN");
   } finally {
     await rig.dispose();
   }
