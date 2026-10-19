@@ -160,3 +160,16 @@ and 5 are gone; family 2 was not yet removed by construction. The answer is the 
 | R7 | The core-stage tests ran before the core child existed. | Their names now say what they hold; whole-tree termination and host death are proved with a real tree (a stuck Node child, a browser in its own session, each process seen running first). |
 | R8 | A browser directory could hold a private root the worker then reads. | Refused at configuration; a test. |
 | R9 | D14A-4 described the removed directory claim. | Updated. |
+
+## 10. The recovery's own review, round 2 (Codex, candidate ce274213)
+
+Verdict REJECT with one MAJOR and one MINOR finding; the architecture judged sound for its purpose, the round-1 answers confirmed
+except for one part of R6, and "the findings concern durability implementation and evidence, rather than requiring another
+architectural rebuild".
+
+| # | Finding | Answer |
+|---|---|---|
+| R2-1 | The host made the journal's directory before the journal, so the flush of its entry in the host root never ran. | `makeDurableDirectory` makes every missing directory up to the journal, each flushed in its parent; the journal flushes its directory and the host root at every opening, whoever made them. |
+| R2-2 | The tree tests counted processes naming the attempt, which a browser alone could satisfy. | The tests now capture the whole descendant tree of the host's child from the operating system (marked or not), require the stuck child and the browser each by its own mark, and check every captured instance (pid and start) ends; a process list that cannot be read fails the test, never reads as empty. |
+
+On Ubuntu CI the candidate ce274213 showed the boundary works (the runner restricts user namespaces; the profile for unshare alone was loaded and the probe then passed; host death, the stuck worker and the real browser inside the namespace all passed). Its two tree tests hung there: the hostile browser was started with a temporary directory too long for a POSIX socket and never came up. The hostile worker now starts it as worker-runtime.ts does, an attempt whose tree never comes up ends the test instead of hanging it, and a host process that never reaches its hold is killed after 90 s.

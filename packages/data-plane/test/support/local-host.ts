@@ -217,6 +217,61 @@ export function processesReferencing(marker: string): number[] {
   return [];
 }
 
+/** One process as the operating system lists it: its pid with its start (a pid alone can be reused), its parent and command line. */
+export interface ProcessInstance {
+  readonly pid: number;
+  readonly start: string;
+  readonly ppid: number;
+  readonly command: string;
+}
+
+/** Every process of the machine (Linux /proc, Windows CIM). Throws when the list cannot be read: an empty list is never assumed. */
+export function processSnapshot(): ProcessInstance[] {
+  if (process.platform === "linux") {
+    const out: ProcessInstance[] = [];
+    for (const name of readdirSync("/proc")) {
+      if (!/^\d+$/.test(name)) continue;
+      try {
+        // /proc/<pid>/stat: "pid (comm) state ppid ..." — the fields after the last ")": state is 1st, ppid 2nd, starttime 20th
+        const stat = readFileSync(`/proc/${name}/stat`, "utf8");
+        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+        const command = readFileSync(`/proc/${name}/cmdline`, "utf8").split("\0").join(" ");
+        out.push({ pid: Number(name), ppid: Number(fields[1]), start: String(fields[19]), command });
+      } catch {
+        // ended while it was read
+      }
+    }
+    if (out.length === 0) throw new Error("/proc listed no process");
+    return out;
+  }
+  const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; ppid = $_.ParentProcessId; start = $_.CreationDate.ToString('o'); command = [string]$_.CommandLine } } | ConvertTo-Json -Compress"], { encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0) throw new Error(`the process list could not be read: ${r.stderr}`);
+  const list = JSON.parse(r.stdout) as Array<{ pid: number; ppid: number; start: string; command: string | null }>;
+  if (!Array.isArray(list) || list.length === 0) throw new Error("CIM listed no process");
+  return list.map((p) => ({ pid: p.pid, ppid: p.ppid, start: p.start, command: p.command ?? "" }));
+}
+
+/** The process `rootPid` and all its descendants, as the snapshot shows them (their own command lines need not name anything). */
+export function treeOf(snapshot: readonly ProcessInstance[], rootPid: number): ProcessInstance[] {
+  const tree = snapshot.filter((p) => p.pid === rootPid);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const p of snapshot) {
+      if (!tree.includes(p) && tree.some((t) => t.pid === p.ppid && t.pid !== p.pid)) {
+        tree.push(p);
+        grew = true;
+      }
+    }
+  }
+  return tree;
+}
+
+/** The instances still running: the same pid with the same start. */
+export function stillRunning(instances: readonly ProcessInstance[]): ProcessInstance[] {
+  const now = processSnapshot();
+  return instances.filter((i) => now.some((p) => p.pid === i.pid && p.start === i.start));
+}
+
 /** Polls until `check` holds or `timeoutMs` passes (a process appearing or disappearing; never an interleaving). */
 export async function eventually(check: () => boolean | Promise<boolean>, timeoutMs = 20_000, everyMs = 100): Promise<boolean> {
   const until = Date.now() + timeoutMs;

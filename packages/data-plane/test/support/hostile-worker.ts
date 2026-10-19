@@ -15,6 +15,7 @@ import { FrameDecoder, WorkerRpc, encodeFrame, type HostMessage, type WorkerMess
 const args = process.argv.slice(2);
 const scratchRoot = args[args.indexOf("--scratch-root") + 1] as string;
 const chromium = args[args.indexOf("--chromium") + 1] as string;
+const browserTemp = args[args.indexOf("--browser-temp") + 1] as string;
 const socket = new net.Socket({ fd: 3, readable: true, writable: true });
 const send = (m: WorkerMessage, written?: () => void): void => void socket.write(encodeFrame(m), () => written?.());
 const rpc = new WorkerRpc((m) => send(m));
@@ -149,15 +150,19 @@ socket.on("data", (bytes: Buffer) => {
       // a tree like the real one's, each process naming the attempt's directory: a Node child stuck in synchronous work (the core's
       // child, hung), and the browser in a session of its own (POSIX), kept alive by its debugging pipe — then the stage the test holds
       const attemptDir = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`);
-      spawn(process.execPath, ["-e", "for (;;) Math.sqrt(Math.random())", attemptDir], { stdio: "ignore", windowsHide: true });
-      // the browser as the PDF engine starts it (Playwright: on POSIX in a session of its own), its profile inside the attempt's directory
-      const profiles = join(attemptDir, "hostile-browser");
-      mkdirSync(profiles, { recursive: true });
-      for (const name of ["TMPDIR", "TMP", "TEMP", "HOME"]) process.env[name] = profiles;
-      void chromiumOf().then((c) => c.launch({ executablePath: chromium, headless: true, chromiumSandbox: true, env: { ...process.env } as Record<string, string> })).then(
+      spawn(process.execPath, ["-e", "for (;;) Math.sqrt(Math.random())", attemptDir, "kauro-stuck-child"], { stdio: "ignore", windowsHide: true });
+      // the browser as the PDF engine starts it (Playwright: on POSIX in a session of its own), with the worker's own environment and
+      // the host's short temporary directory (a POSIX socket path is at most 107 bytes), marked on its command line
+      // (as worker-runtime.ts does: the driver's profile in the attempt's own directory, which the worker may write; the browser's own
+      // temporary files in the host's short directory)
+      const own = join(attemptDir, "hostile-tmp");
+      mkdirSync(own, { recursive: true });
+      for (const name of ["TMPDIR", "TMP", "TEMP", "HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"]) process.env[name] = own;
+      const env: Record<string, string> = { ...(process.env as Record<string, string>), TMPDIR: browserTemp, TMP: browserTemp, TEMP: browserTemp };
+      void chromiumOf().then((c) => c.launch({ executablePath: chromium, headless: true, chromiumSandbox: true, args: ["--kauro-hostile-browser"], env })).then(
         () => void rpc.stage("CORE_STARTED"),
-        (error: unknown) => process.stderr.write(`hostile-tree: the browser did not start: ${String(error)}
-`),
+        // never a silent hang: the test sees the attempt end, with the browser's error as its evidence
+        (error: unknown) => finish({ browserFailed: String(error).slice(0, 4000) }),
       );
       setInterval(() => undefined, 1_000);
       return;

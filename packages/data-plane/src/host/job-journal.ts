@@ -62,6 +62,18 @@ export class HostRecordUnreadable extends Error {
   }
 }
 
+/**
+ * Makes `dir` and every missing ancestor, each one's entry flushed in its parent before the next is made (Linux; elsewhere the
+ * directories alone): a directory a record is written in is never lost with the machine's power once a record has been acknowledged.
+ */
+export function makeDurableDirectory(dir: string): void {
+  if (existsSync(dir)) return;
+  const parent = dirname(dir);
+  if (parent !== dir) makeDurableDirectory(parent);
+  mkdirSync(dir);
+  syncDirectory(parent);
+}
+
 function syncDirectory(dir: string): void {
   if (process.platform !== "linux") return;
   const fd = openSync(dir, "r");
@@ -102,10 +114,10 @@ export class JobJournal {
   /** Reads every record of the root; temporary files of a host that died mid-write are discarded. */
   constructor(dir: string, writeBytes: JournalWrite = (fd, bytes, offset, length) => writeSync(fd, bytes, offset, length)) {
     this.#writeBytes = writeBytes;
-    const made = !existsSync(dir);
-    mkdirSync(dir, { recursive: true });
-    // a journal directory made here is itself durable before any record is written in it (Linux)
-    if (made) syncDirectory(dirname(dir));
+    // the journal's directory, and its place in the host root, durable before any record is written in it (Linux), whoever made them
+    makeDurableDirectory(dir);
+    syncDirectory(dirname(dir));
+    syncDirectory(dir);
     this.#dir = dir;
     for (const name of readdirSync(dir)) {
       if (name.endsWith(TEMPORARY)) {

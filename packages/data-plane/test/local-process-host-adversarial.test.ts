@@ -14,7 +14,7 @@ import { test } from "node:test";
 import { writeSync as writeSyncOf } from "node:fs";
 import { BROWSER_SOCKET_ROOT_MAX_BYTES, CALLS_HELD, HostRecordUnreadable, HostRootInUse, JobJournal, LOCAL_HOST_ISOLATION, LocalProcessWorkerHost, attemptScratchDirectoryOf, removeAttemptScratch, type LocalJobRecord, type LocalProcessWorkerHostOptions } from "../src/index.js";
 import { collect, sha } from "./support/attempt.js";
-import { BROWSER, BROWSER_REQUIRED, HOSTILE_ENTRY, REPO_ROOT, eventually, hostLimits, localRig, plantedAttempt, processesReferencing, readsFor, type LocalRig, type LocalRigOptions, type Planted } from "./support/local-host.js";
+import { BROWSER, BROWSER_REQUIRED, HOSTILE_ENTRY, REPO_ROOT, eventually, hostLimits, localRig, plantedAttempt, processSnapshot, processesReferencing, readsFor, stillRunning, treeOf, type LocalRig, type LocalRigOptions, type Planted, type ProcessInstance } from "./support/local-host.js";
 
 const skip = BROWSER === null && !BROWSER_REQUIRED ? "no Chromium-family browser (set KAURO_PDF_BROWSER)" : false;
 
@@ -37,6 +37,20 @@ function plainReads(rig: LocalRig, planted: Planted): void {
 }
 
 const recordFile = (rig: LocalRig, identity: string): string => join(rig.hostRoot, "jobs", `${identity}.json`);
+
+/**
+ * The attempt's tree under the host's child `rootPid`, once it holds both the stuck Node child and the browser (each identified by
+ * its own mark, each observed running): every descendant, marked or not, with its start, so its end is checked instance by instance.
+ */
+async function wholeTree(rootPid: number): Promise<ProcessInstance[]> {
+  let tree: ProcessInstance[] = [];
+  const complete = (): boolean => {
+    tree = treeOf(processSnapshot(), rootPid);
+    return tree.some((p) => p.command.includes("kauro-stuck-child")) && tree.some((p) => p.command.includes("kauro-hostile-browser"));
+  };
+  assert.ok(await eventually(complete, 30_000, 250), `the tree holds the stuck child and the browser: ${tree.map((p) => p.command.slice(0, 80)).join(" | ")}`);
+  return tree;
+}
 
 // --- identity, duplicates, lost answers, one host per root -------------------------------------------------------------------------
 
@@ -327,12 +341,12 @@ test("B14-A terminate (review R1, R3, R7): the attempt's whole tree ends with it
     const spec = planted.fixture.spec(1);
     const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
     assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
-    await reached.promise;
-    // the worker, its stuck child, and the browser with at least one process of its own
-    assert.ok(await eventually(() => processesReferencing(attemptDir).length >= 4, 20_000), `the tree runs: ${processesReferencing(attemptDir).length} processes`);
-    const before = processesReferencing(attemptDir);
+    // the tree is up, or the attempt ended first (then its record says why)
+    await Promise.race([reached.promise, rig.host.settled(spec.identity).then((r) => assert.fail(`the hostile tree never came up: ${JSON.stringify(r)} ${rig.host.diagnostics(spec.identity)}`))]);
+    const tree = await wholeTree(rig.host.record(spec.identity)!.pid!);
     assert.equal((await rig.host.terminate(spec.identity)).outcome, "TERMINATED");
-    assert.ok(await eventually(() => processesReferencing(attemptDir).length === 0, 20_000), `every process of the attempt ended: ${processesReferencing(attemptDir).length} of ${before.length} left`);
+    assert.ok(await eventually(() => stillRunning(tree).length === 0, 20_000), `every process of the tree ended: ${stillRunning(tree).length} of ${tree.length} left`);
+    assert.deepEqual(processesReferencing(attemptDir), []);
   } finally {
     reached.open();
     await rig.dispose();
@@ -346,6 +360,9 @@ async function dyingHost(root: string, hostile?: string): Promise<{ readonly chi
   // the host's process gone (reaped): only then has the kernel released its root's lock
   const dead = new Promise((resolve) => child.once("exit", resolve));
   const line = await new Promise<string>((resolve, reject) => {
+    // bounded: a host that never reaches its hold is killed, and the test fails instead of waiting for ever
+    const timer = setTimeout(() => (child.kill("SIGKILL"), reject(new Error("the host process did not reach its hold within 90 s"))), 90_000);
+    child.once("exit", () => clearTimeout(timer));
     let buffer = "";
     child.stdout!.on("data", (chunk: Buffer) => {
       buffer += chunk.toString("utf8");
@@ -388,10 +405,11 @@ test("B14-A recovery (review R2, R3, R7): the host dies while its attempt's tree
   const root = mkdtempSync(join(tmpdir(), "kauro-b14a-tree-"));
   const { child, dead, started } = await dyingHost(root, "hostile-tree");
   try {
-    assert.ok(await eventually(() => processesReferencing(started.attemptDir).length >= 4, 20_000), "the tree runs");
+    const tree = await wholeTree(started.pid);
     child.kill("SIGKILL");
     await dead;
-    assert.ok(await eventually(() => processesReferencing(started.attemptDir).length === 0, 30_000), "the whole tree ended with its host");
+    assert.ok(await eventually(() => stillRunning(tree).length === 0, 30_000), `the whole tree ended with its host: ${stillRunning(tree).length} of ${tree.length} left`);
+    assert.deepEqual(processesReferencing(started.attemptDir), []);
     const rig = await localRig({ root });
     try {
       assert.deepEqual([rig.host.record(started.identity)?.state, rig.host.record(started.identity)?.note], ["FAILED", "HOST_RESTARTED"]);
