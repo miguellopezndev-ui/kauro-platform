@@ -54,7 +54,7 @@ import type { AuthorizedReportInputs } from "../report/facts.js";
 import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
-import { killProcessTree, linuxAttemptProcesses, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, linuxProcessOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 import { SUPERVISOR_READY, readVerdict, standDownOrVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
@@ -948,12 +948,14 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    */
   #workerIdentity(record: LocalJobRecord): "GONE" | "OTHER" | "WORKER" | "UNKNOWN" {
     if (record.pid === null) return "GONE";
-    if (!processRunning(record.pid)) return "GONE";
     if (process.platform === "linux") {
+      // a /proc entry that cannot be read is UNKNOWN, never GONE (review round 10, R10-1)
+      const seen = linuxProcessOf(record.pid);
+      if (seen.state !== "RUNNING") return seen.state;
       if (record.pidStart == null) return "UNKNOWN";
-      const start = linuxStartOf(record.pid);
-      return start === null ? "GONE" : start === record.pidStart ? "WORKER" : "OTHER";
+      return seen.start === record.pidStart ? "WORKER" : "OTHER";
     }
+    if (!processRunning(record.pid)) return "GONE";
     const line = processCommandLine(record.pid);
     return line === null ? "GONE" : line === undefined ? "UNKNOWN" : line.includes(record.ticketDigest) ? "WORKER" : "OTHER";
   }
@@ -1042,8 +1044,9 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     let pending: string[];
     try {
       pending = readdirSync(join(this.#hostRoot, "jobs")).filter((name) => name.startsWith(`${PENDING_PREFIX}${identity}-`));
-    } catch {
-      return null;
+    } catch (error) {
+      // a scan that failed proves no absence (review round 10, R10-2): the host's own failure, transient
+      throw new HostRecordUnreadable(identity, error);
     }
     const now = this.#o.clock.nowMs();
     const expired = pending.some((name) => {

@@ -5,14 +5,14 @@
 // system (Linux /proc, Windows CIM), never through the host's own word.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { toUtcInstant } from "@kauro/domain";
-import { BROWSER_SOCKET_ROOT_MAX_BYTES, LocalProcessWorkerHost, attemptScratchDirectoryOf, linuxAttemptProcesses, processRunning, removeAttemptScratch, sweepAttemptProcesses, type LocalProcessWorkerHostOptions } from "../src/index.js";
+import { BROWSER_SOCKET_ROOT_MAX_BYTES, LocalProcessWorkerHost, attemptScratchDirectoryOf, linuxAttemptProcesses, linuxProcessOf, linuxStartOf, processRunning, removeAttemptScratch, sweepAttemptProcesses, type LocalProcessWorkerHostOptions } from "../src/index.js";
 import { collect, holderOf, sha } from "./support/attempt.js";
 import { BROWSER, BROWSER_REQUIRED, CORE_PACKAGE_HASH, HOSTILE_ENTRY, RENDER, REPO_ROOT, WALL, WORKER_ENTRY, eventually, hostLimits, localRig, plantedAttempt, processesReferencing, readsFor, type LocalRig } from "./support/local-host.js";
 
@@ -900,4 +900,26 @@ test("B14-A cleanup (review round 9, R9-2; Linux): a supervisor without the work
     bystander.kill("SIGKILL");
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("B14-A RACE (review round 10, R10-2): a scan of pending creations that fails proves no absence — observe fails transiently instead of answering NOT_FOUND", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 48);
+    const spec = planted.fixture.spec(1);
+    // the jobs directory unreadable for the scan (here: not there at all)
+    renameSync(join(rig.hostRoot, "jobs"), join(rig.hostRoot, "jobs-away"));
+    await assert.rejects(rig.host.observe(spec.identity), (e: unknown) => (e as { transient?: unknown }).transient === true);
+    renameSync(join(rig.hostRoot, "jobs-away"), join(rig.hostRoot, "jobs"));
+    assert.equal((await rig.host.observe(spec.identity)).state, "NOT_FOUND");
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A (review round 10, R10-1; Linux): /proc tells a process gone from one it could not read — GONE only for no entry or a zombie, UNKNOWN for any other failure, never taken for an end", { skip: process.platform !== "linux" }, () => {
+  assert.deepEqual(linuxProcessOf(2 ** 22 + 7), { state: "GONE" });
+  const own = linuxProcessOf(process.pid);
+  assert.equal(own.state, "RUNNING");
+  assert.equal(own.state === "RUNNING" ? own.start : null, linuxStartOf(process.pid));
 });

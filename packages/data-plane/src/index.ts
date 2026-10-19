@@ -127,7 +127,7 @@ export { BrokerCallFailed, WORKER_PROTOCOL_VERSION, WORKER_STAGES, type Brokered
 export { AttemptStorageBroker, BROKER_READ_CHUNK_BYTES, BrokerRefusal, callErrorOf, type AttemptStorageBrokerOptions, type BrokerRefusalRecord } from "./host/broker.js";
 export { BROKERED_STORAGE_PROVIDER, BrokeredObjectStorage, BrokeredUploads, WorkerRpc } from "./host/client.js";
 export { BROWSER_TEMP_DIRECTORY, WORKER_SESSION_ORIGIN, diagnosticOf, runAttemptWorker, type AttemptWorkerOptions } from "./host/worker-runtime.js";
-export { groupAlive, killOwnTree, killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./host/process-tree.js";
+export { groupAlive, killOwnTree, killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxProcessOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./host/process-tree.js";
 export {
   BROWSER_SOCKET_ROOT_MAX_BYTES,
   LOCAL_PROCESS_HOST,

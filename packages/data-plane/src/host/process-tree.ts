@@ -116,6 +116,25 @@ function linuxStatOf(pid: number): string[] | null {
   }
 }
 
+/**
+ * Linux: what /proc says of a pid, telling a process that is gone (no such entry, or a zombie) from one that could not be read
+ * (any other failure): RUNNING with its start, GONE, or UNKNOWN — never taken for GONE.
+ */
+export function linuxProcessOf(pid: number): { readonly state: "RUNNING"; readonly start: string } | { readonly state: "GONE" | "UNKNOWN" } {
+  let stat: string;
+  try {
+    stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    return { state: code === "ENOENT" || code === "ESRCH" ? "GONE" : "UNKNOWN" };
+  }
+  const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+  const state = fields[0];
+  const start = fields[19];
+  if (state === "Z" || state === "X") return { state: "GONE" };
+  return state === undefined || start === undefined || !/^\d+$/.test(start) ? { state: "UNKNOWN" } : { state: "RUNNING", start };
+}
+
 /** Linux: a process's start (clock ticks since boot, stat field 22): with the pid, its identity. Null when it is gone. */
 export function linuxStartOf(pid: number): string | null {
   return linuxStatOf(pid)?.[19] ?? null;
