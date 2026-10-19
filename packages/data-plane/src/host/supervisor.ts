@@ -61,13 +61,24 @@ export function residentBytesOf(pids: readonly number[], platform: NodeJS.Platfo
 }
 
 /** The bytes under a directory, never following a link. */
+/** What an entry takes on disk: its length or its allocated blocks, whichever is larger. */
+function allocationOf(st: { readonly size: number; readonly blocks: number }): number {
+  return Math.max(st.size, Number.isFinite(st.blocks) ? st.blocks * 512 : 0);
+}
+
 /**
  * The bytes under a directory, never following a link. A directory or an entry that is gone counts nothing; one that exists and cannot
  * be inspected (a worker may make its own subdirectory unreadable and write on through a descriptor it holds) counts as without
  * bound: Infinity, past any hard scratch (review round 13, R13-1).
  */
 export function directoryBytes(dir: string): number {
-  let total = 0;
+  // the directory's own allocation counts too, the root's included (empty directories take disk; review round 14, R14-1)
+  let total: number;
+  try {
+    total = allocationOf(lstatSync(dir));
+  } catch (error) {
+    return (error as { code?: unknown }).code === "ENOENT" ? 0 : Number.POSITIVE_INFINITY;
+  }
   let entries: string[];
   try {
     entries = readdirSync(dir);
@@ -78,8 +89,7 @@ export function directoryBytes(dir: string): number {
     const path = join(dir, name);
     try {
       const st = lstatSync(path);
-      if (st.isDirectory()) total += directoryBytes(path);
-      else total += Math.max(st.size, Number.isFinite(st.blocks) ? st.blocks * 512 : 0);
+      total += st.isDirectory() ? directoryBytes(path) : allocationOf(st);
     } catch (error) {
       if ((error as { code?: unknown }).code !== "ENOENT") return Number.POSITIVE_INFINITY;
     }

@@ -977,3 +977,19 @@ test("B14-A limits (review round 13, R13-1; Linux): a scratch subdirectory the w
     await rig.dispose();
   }
 });
+
+test("B14-A limits (review round 14, R14-1; Linux): directories take disk too — a worker making only empty directories is ended SCRATCH_EXHAUSTED once their own allocation passes the hard scratch", { skip: process.platform !== "linux" }, async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 52);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-dirs", rendererVersion: "x" }, 256, { supervisorPollMs: 100 });
+    const spec = planted.fixture.spec(1, { ...hostLimits(1 << 20), hardScratchBytes: 4 << 20 });
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED"]);
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});

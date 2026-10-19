@@ -163,6 +163,17 @@ process.on("message", (message: HostMessage) => {
     grow();
     return;
   }
+  if (ticket.render.locale === "hostile-dirs") {
+    // review round 14 (R14-1): empty directories only, each taking its own blocks
+    const base = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`);
+    let n = 0;
+    const grow = (): void => {
+      for (let i = 0; i < 64; i++) mkdirSync(join(base, `d${n++}`));
+      setTimeout(grow, 5);
+    };
+    grow();
+    return;
+  }
   if (ticket.render.locale === "hostile-hidden") {
     // review round 13 (R13-1): its own subdirectory made unreadable, a linked file in it written on through its descriptor
     const hidden = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden");
