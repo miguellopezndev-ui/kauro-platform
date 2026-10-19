@@ -179,8 +179,10 @@ design, and what it replaced, are in [B14-A-recovery.md](B14-A-recovery.md).
   children) — and records the end. Only then are the provider's sessions cancelled and reads released, each bounded, in the background
   (reviews R5, R6). Nothing is walked through `/proc`, no group number is signalled, nothing is found by its pid.
 - **Host death.** Linux: `unshare` dies of its parent-death signal, the namespace's first process of its own, and the kernel ends the
-  namespace. Windows: the host's kill-on-close job object ends the worker, the worker's ends its children. Either way the whole tree
-  ends, even with every process in it stuck in synchronous work (reviews R3, R7). The ticket is sent only after the worker's `hello`, so
+  namespace: the whole tree ends, even with every process in it stuck in synchronous work (reviews R3, R7). Windows: the host's
+  kill-on-close job object ends the worker, the worker's ends the children it has assigned to it; a child created in the instant its
+  parent is killed can escape (per-spawn assignment, B14-A-recovery.md §6), so on Windows the tests are evidence for the trees they
+  exercise, not for every interleaving. The ticket is sent only after the worker's `hello`, so
   a worker whose host died before the parent-death signal was set (review R2) never receives one: it waits at most 30 s for it, or ends
   at once on its channel's end, and its namespace with it. The worker exits when its channel closes.
 
@@ -306,7 +308,7 @@ construction (B14-A-recovery.md §2), or assigned to the cloud task (§6); the r
 | D14A-7 | The new areas (`apps/migration-worker/**`, `deploy/**`) are attributed to B08 and B13 in the acceptance ledger: a change to them re-touches both. |
 | D14A-8 | (recovery) The local host's trust model is single-tenant qualification of the platform's own code, stated in its configuration. It is no boundary against a compromised worker; that containment and the hard memory and disk limits are the cloud task's, pending its qualification. |
 | D14A-9 | (recovery) One live host per root, by an OS lock the kernel releases at the holder's death; the host's state is one thread's, its records a write-through journal read only at opening. No liveness inference, no cross-process coordination through files. |
-| D14A-10 | (recovery) Every attempt runs inside an operating-system boundary that holds its whole tree (Linux PID namespace, Windows kill-on-close job objects), proved on the machine before the host opens; the host ends it by one signal to its own unreaped child, the kernel ends it with the host. No process is signalled by its number. |
+| D14A-10 | (recovery) Every attempt runs inside an operating-system boundary, proved on the machine before the host opens; the host ends it by one signal to its own unreaped child, the kernel ends it with the host. No process is signalled by its number. Linux (PID namespace) holds the whole tree atomically; Windows (kill-on-close job objects) holds it per spawn, and its whole-tree lifetime is pending qualification (B14-A-recovery.md §6). |
 | D14A-11 | (recovery) The worker's channel is the protocol's own frames on fd 3; one invariant (at most CALLS_HELD calls held until their replies leave, reading paused meanwhile) bounds what a worker can make the host hold. |
 
 ## 11. Still blocked (needs AWS, the legal identity, or another service)

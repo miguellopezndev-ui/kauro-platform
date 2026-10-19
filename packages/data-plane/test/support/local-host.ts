@@ -211,7 +211,9 @@ export function processesReferencing(marker: string): number[] {
   }
   if (process.platform === "win32") {
     const escaped = marker.replace(/'/g, "''");
-    const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('${escaped}') } | ForEach-Object { $_.ProcessId }`], { encoding: "utf8", windowsHide: true });
+    // a query that fails is no evidence of absence (review R4-2): it throws, and only a successful query may answer an empty list
+    const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('${escaped}') } | ForEach-Object { $_.ProcessId }`], { encoding: "utf8", windowsHide: true });
+    if (r.error !== undefined || r.status !== 0) throw new Error(`the process list could not be read: ${r.error?.message ?? `exit ${r.status}: ${r.stderr}`}`);
     return String(r.stdout ?? "").split(/\s+/).filter((x) => /^\d+$/.test(x)).map(Number).filter((pid) => pid !== process.pid);
   }
   return [];
@@ -259,7 +261,7 @@ export function processSnapshot(): ProcessInstance[] {
     return out;
   }
   const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; ppid = $_.ParentProcessId; start = $_.CreationDate.ToString('o'); command = [string]$_.CommandLine } } | ConvertTo-Json -Compress"], { encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
-  if (r.status !== 0) throw new Error(`the process list could not be read: ${r.stderr}`);
+  if (r.error !== undefined || r.status !== 0) throw new Error(`the process list could not be read: ${r.error?.message ?? r.stderr}`);
   const list = JSON.parse(r.stdout) as Array<{ pid: number; ppid: number; start: string; command: string | null }>;
   if (!Array.isArray(list) || list.length === 0) throw new Error("CIM listed no process");
   return list.map((p) => ({ pid: p.pid, ppid: p.ppid, start: p.start, command: p.command ?? "" }));
