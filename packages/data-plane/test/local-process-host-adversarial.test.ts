@@ -65,8 +65,10 @@ test("B14-A RACE (duplicate launch, redelivery, a second control plane): three c
     assert.deepEqual(answers.map((a) => a.outcome).sort(), ["ALREADY_EXISTS", "ALREADY_EXISTS", "LAUNCHED"]);
     await assert.rejects(LocalProcessWorkerHost.open(rig.options()), (e: unknown) => e instanceof HostRootInUse, "one live host per root");
     const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
-    const workers = (): number => processesReferencing(attemptDir).filter((pid) => processesReferencing("--ticket-digest").includes(pid)).length;
-    assert.ok(await eventually(() => workers() === 1), "one worker process for the identity");
+    // the worker: the Node process started with the attempt's flags — on Linux not the namespace's launcher (setpriv/unshare), whose
+    // own command line carries the same flags after `--`
+    const workers = (): ProcessInstance[] => processSnapshot().filter((p) => p.command.includes(attemptDir) && p.command.includes("--ticket-digest") && !p.command.includes("--kill-child="));
+    assert.ok(await eventually(() => workers().length === 1), `one worker process for the identity: ${workers().map((p) => p.command.slice(0, 120)).join(" | ")}`);
     hold.open();
     assert.equal((await rig.host.settled(spec.identity))?.state, "SUCCEEDED");
     assert.equal((await rig.host.launch(spec)).outcome, "ALREADY_EXISTS");
