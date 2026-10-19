@@ -56,9 +56,9 @@ After a timeout kill, the runner has at most ten seconds to close. A kill error 
 its reason; red-proof returns INCONCLUSIVE and stress-cells fails, without starting another phase or iteration.
 Temporary trees (red-proof's clone, `command()`'s capture, `runTest`'s events) are removed through `tools/temp-removal.mjs`.
 On Windows an `EPERM`/`EBUSY`/`ENOTEMPTY` removal is retried only when only directories are left, or when Restart Manager
-names no holder of the files left (the query gets what is left of the bound). A retry removes only the entries found at the
-failure, one at a time, so it never deletes one it has not seen; it is printed, starts only within five seconds of the failure,
-and stops if an entry appears or comes back. A named holder, an unanswered query or any other error fails as before, with what
+names no holder of the files left (the query has its own 30 s bound and its answer time is printed). A retry removes only the
+entries found at the failure, one at a time, so it never deletes one it has not seen; it is printed, starts only within five
+seconds of the fact being established, and stops if an entry appears or comes back. A named holder, an unanswered query or any other error fails as before, with what
 is left. red-proof writes its report in every case;
 a tree still held at the bound makes a PASS INCONCLUSIVE and leaves any other verdict as it is.
 
