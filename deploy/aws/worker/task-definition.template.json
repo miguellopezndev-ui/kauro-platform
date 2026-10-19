@@ -23,6 +23,7 @@
         { "name": "KAURO_WORKER_TRANSPORT", "value": "aws-s3" },
         { "name": "KAURO_SCRATCH_ROOT", "value": "/scratch" },
         { "name": "KAURO_CHROMIUM", "value": "/usr/bin/chromium" },
+        { "name": "KAURO_BROWSER_TEMP", "value": "/scratch/kb" },
         { "name": "KAURO_CORE_HEAP_MB", "value": "2048" },
         { "name": "KAURO_BUCKET", "value": "${OBJECT_BUCKET}" }
       ],

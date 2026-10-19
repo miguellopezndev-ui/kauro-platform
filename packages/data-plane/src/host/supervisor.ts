@@ -6,7 +6,8 @@
  *     cannot run, is ended;
  *   - at the attempt's deadline plus a grace, whether or not the host still lives;
  *   - when the tree's resident memory passes the attempt's hard memory (Linux: the tree's VmRSS from /proc, Chromium and every native
- *     allocation included), or the attempt's directory passes its hard scratch (any write, the browser's profile included).
+ *     allocation included), or the attempt's directories pass its hard scratch (any write, the browser's profile and temporary files
+ *     included).
  *
  * It records its one verdict exclusively in the job's directory (`supervisor.json`), which the host reads to classify the worker's end
  * and a later host instance reads as proof that the tree was ended. It reads no clock: every bound is a duration it was handed.
@@ -23,7 +24,8 @@ export const SUPERVISOR_FILE = "supervisor.json";
 export interface SupervisorConfig {
   readonly workerPid: number;
   readonly jobDir: string;
-  readonly attemptDir: string;
+  /** The attempt's directory and the browser's temporary one: their bytes together are the attempt's scratch. */
+  readonly scratchDirs: readonly string[];
   /** From the supervisor's start to the attempt's deadline, plus the grace (milliseconds). */
   readonly deadlineInMs: number;
   readonly hardMemoryBytes: number;
@@ -117,7 +119,7 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
     if (!processExists(config.workerPid)) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
     const rss = treeResidentBytes(config.workerPid);
     if (rss !== null && rss > config.hardMemoryBytes) return end("MEMORY_EXHAUSTED", { residentBytes: rss });
-    const scratch = directoryBytes(config.attemptDir);
+    const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0);
     if (scratch > config.hardScratchBytes) return end("SCRATCH_EXHAUSTED", { scratchBytes: scratch });
     return undefined;
   }, config.pollMs);

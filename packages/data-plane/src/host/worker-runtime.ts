@@ -41,6 +41,11 @@ export interface AttemptWorkerOptions {
   /** The host's scratch root, as a real path: the worker opens only its own attempt's directory under it. */
   readonly scratchRoot: string;
   readonly chromiumExecutable: string;
+  /**
+   * The browser's own temporary directory, which the host made for this attempt and measures and removes with it. It is not the
+   * attempt's directory: on POSIX the browser binds a socket under it, and a socket's path is at most 107 bytes (the host keeps it short).
+   */
+  readonly browserTemp: string;
   /** The worker's injected process clock (the deadline and the core's timers; CK3). */
   readonly clock: { nowMs(): number };
   readonly coreHeapMegabytes: number;
@@ -131,6 +136,10 @@ export async function runAttemptWorker(ticket: AttemptTicket, options: AttemptWo
     mkdirSync(browserTemp);
     // a home and caches of its own too: the browser writes there, and the worker's environment names no other
     for (const name of ["TMPDIR", "TMP", "TEMP", "HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"]) process.env[name] = browserTemp;
+    // the browser's own temporary files (its singleton socket among them) go to the host's short directory; the driver's profile stays here
+    const browserEnvironment: Record<string, string> = {};
+    for (const [name, value] of Object.entries(process.env)) if (value !== undefined) browserEnvironment[name] = value;
+    for (const name of ["TMPDIR", "TMP", "TEMP"]) browserEnvironment[name] = options.browserTemp;
 
     const cancellation: CancellationChannel = {
       check: (): Promise<CancellationState> => {
@@ -149,7 +158,7 @@ export async function runAttemptWorker(ticket: AttemptTicket, options: AttemptWo
       timers: coreTimersOf(clock),
       heapMegabytes: options.coreHeapMegabytes,
     });
-    const engine = reportingEngine(new ChromiumPdfEngine({ executablePath: options.chromiumExecutable, ...(options.printTimeoutMs === undefined ? {} : { timeoutMs: options.printTimeoutMs }) }, "chromium/worker"), rpc);
+    const engine = reportingEngine(new ChromiumPdfEngine({ executablePath: options.chromiumExecutable, environment: browserEnvironment, ...(options.printTimeoutMs === undefined ? {} : { timeoutMs: options.printTimeoutMs }) }, "chromium/worker"), rpc);
     const envelope = new ReportingExecutionEnvelope({ inner: planBound(core, ticket, rpc), storage, inputs: reportInputsOf(ticket), engine, render: ticket.render });
 
     let outcome: ExecutionOutcome | null = null;

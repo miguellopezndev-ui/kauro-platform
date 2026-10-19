@@ -23,8 +23,9 @@ const LANE_FILES = ["test/owned-cleanup.test.mjs", "test/release-candidate.test.
 const PRODUCT_SRC = {
   "packages/data-plane/src/cores/migration-core-adapter.ts": 3,
   "packages/data-plane/src/evaluator/selection-evaluator.ts": 1,
-  // B14-A: a job directory the host prepared itself, removed when another create took the identity first
-  "packages/data-plane/src/host/local-process-host.ts": 1,
+  // B14-A: a job directory the host prepared itself, removed when another create took the identity first; and the browser's
+  // temporary directory the host made for an attempt (browserTempDirectoryOf), removed once that attempt's tree has ended
+  "packages/data-plane/src/host/local-process-host.ts": 2,
   "packages/data-plane/src/inspector/container-inspector.ts": 1,
   "packages/data-plane/src/preview/preview-reader.ts": 1,
   "packages/persistence/src/testing/temporary-postgres.ts": 1,

@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { LocalProcessWorkerHost, attemptScratchDirectoryOf, removeAttemptScratch, type LocalProcessWorkerHostOptions } from "../src/index.js";
+import { BROWSER_SOCKET_ROOT_MAX_BYTES, LocalProcessWorkerHost, attemptScratchDirectoryOf, removeAttemptScratch, type LocalProcessWorkerHostOptions } from "../src/index.js";
 import { collect, holderOf, sha } from "./support/attempt.js";
 import { BROWSER, BROWSER_REQUIRED, CORE_PACKAGE_HASH, HOSTILE_ENTRY, RENDER, REPO_ROOT, WALL, WORKER_ENTRY, eventually, hostLimits, localRig, plantedAttempt, processesReferencing, readsFor, type LocalRig } from "./support/local-host.js";
 
@@ -156,6 +156,8 @@ test("B14-A DENY (incomplete or unsafe configuration): a spec that is not one at
     assert.throws(() => new LocalProcessWorkerHost({ ...base, codeRoots: [] }), /codeRoots/);
     assert.throws(() => new LocalProcessWorkerHost({ ...base, sessionOrigin: "http://plain" }), /sessionOrigin/);
     assert.throws(() => new LocalProcessWorkerHost({ ...base, corePackageHash: "unknown" as never }), /corePackageHash/);
+    // POSIX: the browser binds a socket under the scratch root, and a socket's path is at most 107 bytes
+    if (process.platform !== "win32") assert.throws(() => new LocalProcessWorkerHost({ ...base, scratchRoot: join(rig.root, "s".repeat(BROWSER_SOCKET_ROOT_MAX_BYTES)) }), /too long for the browser's socket path/);
     rmSync(join(REPO_ROOT, "scratch-inside-code"), { recursive: true, force: true });
   } finally {
     await rig.dispose();

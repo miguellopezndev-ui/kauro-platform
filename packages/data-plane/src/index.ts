@@ -129,9 +129,11 @@ export { BROKERED_STORAGE_PROVIDER, BrokeredObjectStorage, BrokeredUploads, Work
 export { BROWSER_TEMP_DIRECTORY, WORKER_SESSION_ORIGIN, diagnosticOf, runAttemptWorker, type AttemptWorkerOptions } from "./host/worker-runtime.js";
 export { killOwnTree, killProcessTree, linuxDescendantsOf, processExists } from "./host/process-tree.js";
 export {
+  BROWSER_SOCKET_ROOT_MAX_BYTES,
   LOCAL_PROCESS_HOST,
   LOCAL_PROCESS_MACHINE_TYPE,
   LocalProcessWorkerHost,
+  browserTempDirectoryOf,
   type AttemptTicketReads,
   type AttemptTicketSource,
   type LocalJobRecord,

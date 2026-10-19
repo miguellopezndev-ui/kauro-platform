@@ -137,7 +137,12 @@ most 1 MiB, so memory stays bounded.
     Windows only the heaps are bounded locally; the cloud task's memory limit is the container's.
   - Disk: the attempt's scratch budget is enforced inside (AttemptScratchStore, the core's byte ledger). The supervisor measures the
     whole attempt directory, so it also counts writes outside those quotas and the browser's profile, and ends the tree past
-    `hardScratchBytes` (`SCRATCH_EXHAUSTED`).
+    `hardScratchBytes` (`SCRATCH_EXHAUSTED`). It also counts the browser's own temporary directory (below).
+  - The browser's temporary directory: `<scratchRoot>/kb-<12 hex of the attempt id's SHA-256>`, made by the host (mode 0700), named
+    to the browser alone as `TMPDIR`/`TMP`/`TEMP`, never granted to the worker, and removed by the host when the worker's tree ends
+    (or by a later instance once it has declared the job ended). The browser binds its singleton socket there, and a socket's path is
+    at most 107 bytes on POSIX: the attempt's own directory is too deep for it (finding F6). So on POSIX the host refuses a scratch
+    root longer than 45 bytes.
   - Time: the worker's own deadline (the adapter's `Operation`); the host's timer at the earlier of the execution deadline and the
     wall clock; and the supervisor's own timer, which still fires if the host has died.
 - **Termination** closes the broker at once, kills the worker's whole tree at once and records the end. Only then are the provider's
@@ -211,6 +216,7 @@ EXECUTED_PROVIDER.**
 | F3 | The real verifier needs `controls.limits`; the pipeline passes none. | `localExecutorOf` binds the verifier with the plane's limits. |
 | F4 | Under Node 24's permission model `fsync` is disabled, and a directory's contents are granted only if the directory exists when the process starts. | The host creates the attempt directory before spawning. `AttemptScratchStore` gains `confined` (no root `mkdir`, no `fsync`; the length on the device is still checked). |
 | F5 | On Windows a process's working directory cannot be removed. | The worker's working directory is the scratch root, which it cannot read. |
+| F6 | On Linux the browser aborted at launch inside the worker (`process_singleton_posix.cc: Socket path too long`): its singleton socket went under the attempt's directory, past the 107-byte limit of a socket path. Windows has no such socket, so only the Ubuntu CI leg showed it. | The browser's own short temporary directory beside the scratch (§5); a scratch root too long for it is refused at configuration. |
 | R1 | (independent review, round 1) A native child of the worker escaped the permission model. | The process allowlist (§2 item 3); the hostile worker's native, shell, wider-permission and `NODE_OPTIONS` children are refused. The narrowed residual is stated in §5. |
 | R2 | Heap caps are not the attempt's hard memory or scratch. | The supervisor measures the tree's resident memory (Linux) and the attempt directory (all platforms). |
 | R3 | A slow record read could create a job after the horizon. | A bounded read; a launch abandoned meanwhile creates nothing. |

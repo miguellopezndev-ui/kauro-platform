@@ -22,6 +22,7 @@
  * Termination kills the worker's whole tree (process-tree.ts) and revokes the broker before anything else.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, linkSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
@@ -69,6 +70,16 @@ const MIB = 1024 * 1024;
  * Files Playwright reads when it loads on Linux (is-wsl, is-inside-container: kernel and container markers, none a secret). Under the
  * permission model an unreadable path makes `existsSync` throw instead of answering false, so the worker may read exactly these.
  */
+/**
+ * A browser's own temporary directory for one attempt, beside the attempts' scratch (the worker never opens it; the browser does). On
+ * POSIX the browser binds its singleton socket at `<this>/<app id>.XXXXXX/SingletonSocket`, and a socket's path is at most 107 bytes:
+ * the name is short, and so must the scratch root be (BROWSER_SOCKET_ROOT_MAX_BYTES).
+ */
+export function browserTempDirectoryOf(scratchRoot: string, attemptId: string): string {
+  return join(scratchRoot, `kb-${createHash("sha256").update(attemptId).digest("hex").slice(0, 12)}`);
+}
+/** 107 bytes less `/kb-<12>` (16), `/<app id>.XXXXXX` (at most 30: org.chromium.Chromium is 29) and `/SingletonSocket` (16). */
+export const BROWSER_SOCKET_ROOT_MAX_BYTES = 45;
 const LINUX_RUNTIME_PROBES = ["/proc/version", "/proc/sys/fs/binfmt_misc/WSLInterop", "/run/WSL", "/run/.containerenv", "/.dockerenv", "/proc/self/cgroup"];
 
 /** What the control plane reads for one launch (its records, never decided here; a missing record is null). */
@@ -224,6 +235,9 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       }
     }
     if (isInside(this.#hostRoot, this.#scratchRoot) || isInside(this.#scratchRoot, this.#hostRoot)) throw new TypeError(`${LOCAL_PROCESS_HOST}: hostRoot and scratchRoot overlap`);
+    if (process.platform !== "win32" && Buffer.byteLength(this.#scratchRoot) > BROWSER_SOCKET_ROOT_MAX_BYTES) {
+      throw new TypeError(`${LOCAL_PROCESS_HOST}: scratchRoot is longer than ${BROWSER_SOCKET_ROOT_MAX_BYTES} bytes, too long for the browser's socket path`);
+    }
     this.creationHorizonSeconds = options.creationHorizonSeconds ?? 60;
     if (!Number.isSafeInteger(this.creationHorizonSeconds) || this.creationHorizonSeconds < 1) throw new TypeError(`${LOCAL_PROCESS_HOST}: creationHorizonSeconds is a positive whole number`);
     this.#workerHeap = options.workerHeapMegabytes ?? 1024;
@@ -429,6 +443,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       this.#scratchRoot,
       "--chromium",
       this.#o.chromiumExecutable,
+      "--browser-temp",
+      browserTempDirectoryOf(this.#scratchRoot, spec.capability.attemptId),
       "--core-heap-mb",
       String(this.#coreHeap),
       "--storage-evidence",
@@ -502,6 +518,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     // is a directory when the process starts (the worker's scratch store then empties and re-creates it)
     const attemptDir = attemptScratchDirectoryOf(this.#scratchRoot, spec.capability.attemptId);
     mkdirSync(attemptDir, { recursive: true });
+    const browserTemp = browserTempDirectoryOf(this.#scratchRoot, spec.capability.attemptId);
+    mkdirSync(browserTemp, { recursive: true, mode: 0o700 });
     const child = spawn(process.execPath, flags, {
       // the scratch root, which the worker cannot read: on Windows a process's working directory cannot be removed, and the worker
       // removes its attempt's directory when the attempt ends
@@ -535,6 +553,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       this.#standDown(live);
       broker.close("WORKER_EXITED");
       this.#closeRecord(live);
+      this.#removeBrowserTemp(spec.capability.attemptId);
       exited();
       void broker.revoke("WORKER_EXITED");
     });
@@ -552,7 +571,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const deadlineInMs = Math.max(0, Math.min(until, 2_147_483_647));
     live.timer = setTimeout(() => this.#end(live, "DEADLINE"), deadlineInMs);
     live.timer.unref();
-    if (child.pid !== undefined) live.supervisor = this.#supervise(live, child.pid, attemptDir, deadlineInMs + 1_000, spec);
+    if (child.pid !== undefined) live.supervisor = this.#supervise(live, child.pid, [attemptDir, browserTemp], deadlineInMs + 1_000, spec);
     this.#send(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes });
   }
 
@@ -606,8 +625,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * The supervisor of one worker (supervisor.ts): a process of its own, outside the worker's confinement, that ends the worker's tree if
    * this host dies, at the deadline whether or not this host lives, and past the attempt's hard memory or scratch.
    */
-  #supervise(live: Live, workerPid: number, attemptDir: string, deadlineInMs: number, spec: WorkerLaunchSpec): ChildProcess {
-    const config: SupervisorConfig = { workerPid, jobDir: this.#jobDir(live.record.identity), attemptDir, deadlineInMs, hardMemoryBytes: spec.limits.hardMemoryBytes, hardScratchBytes: spec.limits.hardScratchBytes, pollMs: this.#o.supervisorPollMs ?? 500 };
+  #supervise(live: Live, workerPid: number, scratchDirs: readonly string[], deadlineInMs: number, spec: WorkerLaunchSpec): ChildProcess {
+    const config: SupervisorConfig = { workerPid, jobDir: this.#jobDir(live.record.identity), scratchDirs, deadlineInMs, hardMemoryBytes: spec.limits.hardMemoryBytes, hardScratchBytes: spec.limits.hardScratchBytes, pollMs: this.#o.supervisorPollMs ?? 500 };
     const env: Record<string, string> = {};
     const systemRoot = process.env["SystemRoot"];
     if (systemRoot !== undefined) env["SystemRoot"] = systemRoot;
@@ -618,6 +637,18 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     supervisor.on("error", () => undefined);
     supervisor.unref();
     return supervisor;
+  }
+
+  /**
+   * The browser's temporary directory, once the attempt's tree is gone (the host's own; the janitor knows only the attempt's scratch). A
+   * browser process still ending may hold a file a moment longer: removal retries, and a later end of the same job tries again.
+   */
+  #removeBrowserTemp(attemptId: string): void {
+    try {
+      rmSync(browserTempDirectoryOf(this.#scratchRoot, attemptId), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // still held: a later answer for the job tries again
+    }
   }
 
   /** The worker ended: its supervisor stands down. */
@@ -748,6 +779,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.note = "HOST_RESTARTED";
       record.endedAtMs = this.#o.clock.nowMs();
       this.#persist(record);
+    }
+    if (TERMINAL.has(record.state) && record.instance !== this.instance) {
+      // the tree has ended: what its browser left in its temporary directory goes (a job ended by its own instance was cleaned there)
+      this.#removeBrowserTemp(identity.slice("kauro-attempt-".length));
     }
     return record;
   }

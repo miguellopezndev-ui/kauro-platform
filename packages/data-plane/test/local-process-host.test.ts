@@ -5,11 +5,11 @@
 // storage stays its labelled CONTRACT FAKE (SIMULATED) — no cloud storage exists locally. The effects asserted are what the storage, the
 // host's durable records and the staged manifest hold, and which processes still exist.
 import assert from "node:assert/strict";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { readStagedManifest } from "@kauro/application";
-import { REPORT_PDF_ROLE, REPORT_RECORD_ROLE, attemptScratchDirectoryOf, readReportPdfRecord, reportRecordProblems } from "../src/index.js";
+import { REPORT_PDF_ROLE, REPORT_RECORD_ROLE, attemptScratchDirectoryOf, browserTempDirectoryOf, readReportPdfRecord, reportRecordProblems } from "../src/index.js";
 import { collect } from "./support/attempt.js";
 import { BROWSER, BROWSER_REQUIRED, localRig, plantedAttempt, readsFor } from "./support/local-host.js";
 
@@ -56,6 +56,8 @@ ${rig.host.diagnostics(spec.identity)}`);
     assert.ok(read.ok);
     // the attempt's scratch is gone with the attempt; the record is the host's durable evidence
     assert.equal(existsSync(attemptScratchDirectoryOf(rig.scratchRoot, planted.fixture.attemptId)), false);
+    // and so is the browser's own temporary directory, which the host made beside it (short: the browser binds a socket there)
+    assert.equal(existsSync(browserTempDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId)), false);
     assert.ok(record!.flags.includes("--permission"));
     assert.ok(record!.flags.some((f) => f.startsWith("--allow-fs-write=")));
     assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")), [spec.identity]);

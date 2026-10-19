@@ -89,6 +89,7 @@ async function main(): Promise<void> {
     rpc,
     scratchRoot: args.scratchRoot,
     chromiumExecutable: args.chromium,
+    browserTemp: args.browserTemp,
     clock: workerClock,
     coreHeapMegabytes: args.coreHeapMegabytes,
     storageEvidenceClass: args.storageEvidence,
