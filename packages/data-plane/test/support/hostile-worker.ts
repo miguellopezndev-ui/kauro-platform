@@ -4,7 +4,7 @@
 // locale picks the behaviour: "hostile-probe" (files, network, environment, broker, child processes) or "hostile-allocate" (memory).
 import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
 import dns from "node:dns";
-import { appendFileSync, openSync, readFileSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import net from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -155,6 +155,20 @@ process.on("message", (message: HostMessage) => {
     // review round 3 (R3-3): a file whose name is removed at once, written through its descriptor past the attempt's hard scratch
     const fd = openSync(join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden.bin"), "w");
     unlinkSync(join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden.bin"));
+    const chunk = Buffer.alloc(1024 * 1024, 7);
+    const grow = (): void => {
+      writeSync(fd, chunk);
+      setTimeout(grow, 5);
+    };
+    grow();
+    return;
+  }
+  if (ticket.render.locale === "hostile-hidden") {
+    // review round 13 (R13-1): its own subdirectory made unreadable, a linked file in it written on through its descriptor
+    const hidden = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden");
+    mkdirSync(hidden);
+    const fd = openSync(join(hidden, "data.bin"), "w");
+    chmodSync(hidden, 0o000);
     const chunk = Buffer.alloc(1024 * 1024, 7);
     const grow = (): void => {
       writeSync(fd, chunk);

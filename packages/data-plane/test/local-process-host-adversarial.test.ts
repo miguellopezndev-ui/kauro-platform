@@ -889,12 +889,14 @@ test("B14-A cleanup (review round 9, R9-2; Linux): a supervisor without the work
   const root = mkdtempSync(join(tmpdir(), "kauro-sup-"));
   const bystander = spawn("/bin/sleep", ["60"], { detached: true, stdio: "ignore" });
   try {
-    const { supervise } = await import("../src/host/supervisor.js");
-    const { PassThrough } = await import("node:stream");
-    const input = new PassThrough();
-    const exited = new Promise<void>((resolve) => supervise({ workerPid: bystander.pid!, workerStart: null, jobDir: root, scratchDirs: [join(root, "none")], deadlineInMs: 60_000, hardMemoryBytes: 1, hardScratchBytes: 1, pollMs: 50 }, input, () => resolve()));
-    input.end();
-    await exited;
+    // the supervisor as the host runs it, told the host is gone at once: without the worker's start it signals nothing at that pid
+    const supervisorJs = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "host", "supervisor.js");
+    const config = { workerPid: bystander.pid!, workerStart: null, ticketDigest: "0".repeat(64), jobDir: root, scratchDirs: [join(root, "none")], deadlineInMs: 60_000, hardMemoryBytes: 1 << 30, hardScratchBytes: 1 << 30, pollMs: 50 };
+    const supervisor = spawn(process.execPath, [supervisorJs, JSON.stringify(config)], { stdio: ["pipe", "ignore", "ignore"] });
+    supervisor.stdin.end();
+    await new Promise((r) => setTimeout(r, 1_500));
+    assert.equal(readFileSync(join(root, "supervisor.json"), "utf8").includes("HOST_LOST"), true, "it judged the host lost");
+    supervisor.kill("SIGKILL");
     assert.equal(processRunning(bystander.pid!), true, "the process at that pid was left alone");
   } finally {
     bystander.kill("SIGKILL");
@@ -947,6 +949,31 @@ test("B14-A RACE (review round 12, R12-1; Linux): a cancellation that cannot tak
     await assert.rejects(rig.restart().terminate(spec.identity), (e: unknown) => (e as { transient?: unknown }).transient === true);
   } finally {
     chmodSync(jobs, 0o700);
+    await rig.dispose();
+  }
+});
+
+test("B14-A limits (review round 13, R13-1; Linux): a scratch subdirectory the worker made unreadable counts as past every bound — the supervisor ends the tree SCRATCH_EXHAUSTED instead of counting it as nothing", { skip: process.platform !== "linux" || process.getuid?.() === 0 }, async () => {
+  const rig = localRig();
+  let hidden: string | null = null;
+  try {
+    const planted = plantedAttempt(rig.storage, 51);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    hidden = join(attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId), "hidden");
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-hidden", rendererVersion: "x" }, 256, { supervisorPollMs: 100 });
+    const spec = planted.fixture.spec(1, { ...hostLimits(1 << 20), hardScratchBytes: 1 << 40 });
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED"]);
+    await host.stop();
+  } finally {
+    if (hidden !== null) {
+      try {
+        chmodSync(hidden, 0o700);
+      } catch {
+        // never made
+      }
+    }
     await rig.dispose();
   }
 });

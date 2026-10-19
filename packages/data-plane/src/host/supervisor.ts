@@ -21,7 +21,7 @@
  */
 import { linkSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxProcessOf, linuxStartOf, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxProcessOf, linuxStartOf, processCommandLine, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
 export const SUPERVISOR_VERDICTS = ["HOST_LOST", "DEADLINE", "MEMORY_EXHAUSTED", "SCRATCH_EXHAUSTED"] as const;
 export type SupervisorVerdict = (typeof SUPERVISOR_VERDICTS)[number];
@@ -33,6 +33,8 @@ export interface SupervisorConfig {
   readonly workerPid: number;
   /** The worker's start (Linux, recorded by the host at spawn): the pid is the worker's only while it matches (review R4-2). */
   readonly workerStart: string | null;
+  /** The worker's ticket digest, which its command line names (Windows: the identity checked before any signal, review R13-2). */
+  readonly ticketDigest: string;
   readonly jobDir: string;
   /** The attempt's directory and the browser's temporary one: their bytes together are the attempt's scratch. */
   readonly scratchDirs: readonly string[];
@@ -59,22 +61,27 @@ export function residentBytesOf(pids: readonly number[], platform: NodeJS.Platfo
 }
 
 /** The bytes under a directory, never following a link. */
+/**
+ * The bytes under a directory, never following a link. A directory or an entry that is gone counts nothing; one that exists and cannot
+ * be inspected (a worker may make its own subdirectory unreadable and write on through a descriptor it holds) counts as without
+ * bound: Infinity, past any hard scratch (review round 13, R13-1).
+ */
 export function directoryBytes(dir: string): number {
   let total = 0;
   let entries: string[];
   try {
     entries = readdirSync(dir);
-  } catch {
-    return 0;
+  } catch (error) {
+    return (error as { code?: unknown }).code === "ENOENT" ? 0 : Number.POSITIVE_INFINITY;
   }
   for (const name of entries) {
     const path = join(dir, name);
     try {
       const st = lstatSync(path);
       if (st.isDirectory()) total += directoryBytes(path);
-      else total += st.size;
-    } catch {
-      // removed meanwhile
+      else total += Math.max(st.size, Number.isFinite(st.blocks) ? st.blocks * 512 : 0);
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "ENOENT") return Number.POSITIVE_INFINITY;
     }
   }
   return total;
@@ -184,13 +191,20 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
     if (config.workerStart === null) return "UNKNOWN";
     return p.start === config.workerStart ? "WORKER" : "OTHER";
   };
+  // before any signal: elsewhere than Linux a running pid is the worker's only if its command line names the worker's ticket digest
+  // (a pid can be reused once the worker is gone; review round 13, R13-2)
+  const confirmed = (): "WORKER" | "GONE" | "OTHER" | "UNKNOWN" => {
+    if (process.platform === "linux") return seen();
+    const line = processCommandLine(pid);
+    return line === null ? "GONE" : line === undefined ? "UNKNOWN" : line.includes(config.ticketDigest) ? "WORKER" : "OTHER";
+  };
   // every process seen in the worker's tree, with its start (Linux): one re-parented after its parent died is still the attempt's
   const known = new Map<number, string>();
   // after its end: the tree it decided to end is ended again while the pid is still the worker's, the worker's group is swept while
   // the pid is the worker's or names no process (a pid in use as a group id is not reused), and the supervisor leaves only once the pid
   // is known not to be the worker's and nothing it marks is left (after a bounded number of sweeps if something cannot be ended)
   const sweep = (killing: boolean, left: number): void => {
-    const now = seen();
+    const now = confirmed();
     if (killing && now === "WORKER") killProcessTree(pid);
     const leftover = sweepAttemptProcesses(now === "WORKER" || now === "GONE" ? pid : null, config.scratchDirs, known);
     const settled = now === "GONE" || now === "OTHER";
@@ -240,7 +254,7 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
     const rss = residentBytesOf([...owned]);
     if (rss !== null && rss > config.hardMemoryBytes) return end("MEMORY_EXHAUSTED", { residentBytes: rss });
     const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0) + openDeletedBytes([...owned]);
-    if (scratch > config.hardScratchBytes) return end("SCRATCH_EXHAUSTED", { scratchBytes: scratch });
+    if (scratch > config.hardScratchBytes) return end("SCRATCH_EXHAUSTED", { scratchBytes: Number.isFinite(scratch) ? scratch : -1 });
     return undefined;
   }, config.pollMs);
   // every watch is set: the host may now give the worker its ticket

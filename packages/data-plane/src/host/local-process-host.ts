@@ -765,6 +765,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const config: SupervisorConfig = {
       workerPid,
       workerStart: live.record.pidStart ?? null,
+      ticketDigest: live.record.ticketDigest,
       jobDir: this.#jobDir(live.record.identity),
       scratchDirs,
       deadlineInMs,
@@ -786,6 +787,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       // one that recorded a verdict may have died before ending the tree (review round 6, R6-3): the host ends it now, and the verdict
       // classifies the worker's exit; without a verdict the supervisor is lost
       if (readVerdict(this.#jobDir(live.record.identity)) !== null) {
+        // still this host's unreaped child (checked above), so the pid is the worker's
         if (live.record.pid !== null) killProcessTree(live.record.pid);
         return;
       }
