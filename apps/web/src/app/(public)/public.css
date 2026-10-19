@@ -5700,12 +5700,14 @@ body:has(> .kauro-site-header) {
     clip-path: inset(0);
   }
 }
+/* the measuring line crosses the pane and is gone once the counts are written */
 @keyframes kauro-scan {
   from {
     transform: translateX(0);
   }
   to {
     transform: translateX(100%);
+    visibility: hidden;
   }
 }
 @keyframes kauro-ask {
