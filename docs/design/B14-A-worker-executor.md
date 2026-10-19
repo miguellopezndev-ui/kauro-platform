@@ -63,10 +63,16 @@ Boundaries, from the outside in:
    a termination, a deadline or the result, it is revoked.
 3. **The process is confined.** The Node permission model lets the worker read only the code, the browser's directory and its own
    attempt directory, and write only that directory. The network entry points are refused (the sandbox preload). **Its process
-   allowlist** (`host/worker-preload.ts`) lets it start only the core's Node child, under a permission no wider than its own, and the
-   named browser without any flag that turns a sandbox layer off; every other program, every shell and every `NODE_OPTIONS` is
-   refused before a process exists. The permission model already refuses `process.binding`, workers, addons and WASI, so
-   `child_process` is the only way to a process. The heap is bounded, and so are the scratch quota and the wall clock.
+   allowlist** (`host/worker-preload.ts`) lets it start only two programs. One is the core's Node child, exactly as
+   `core-child-runner.ts` starts it: a closed command line (`--permission`, read grants and one write grant within the worker's own,
+   `--disallow-code-generation-from-strings`, a heap no larger than the worker's `--core-heap-mb`, the network preload, the fs preload
+   and the core child's entry, nothing after it), no environment but `SystemRoot`, not detached. So a negation such as
+   `--no-permission`, an `-e` script, another entry or a child without the network preload is refused (review R2-1, R2-2). The
+   other is the named browser without any flag that turns a sandbox layer off. Every other program, every `shell` option of the
+   synchronous exports, every shell command line and `process.execve` is refused before a process exists (R2-3); on Windows nothing
+   is started detached, so every child stays in the worker's kill-on-close job. The permission model already refuses
+   `process.binding`, workers, addons and WASI, so `child_process` is the only way to a process. The heap is bounded, and so are the
+   scratch quota and the wall clock.
 4. **A supervisor beside it** (`host/supervisor.ts`), outside the confinement and holding no customer data, ends the worker's whole
    tree without the worker's cooperation: when the host dies (its pipe closes), at the deadline whether or not the host lives, and
    when the tree's resident memory (Linux) or the attempt directory passes the attempt's hard limits.
@@ -122,7 +128,10 @@ most 1 MiB, so memory stays bounded.
   `jobs/<identity>`. A rename refuses a non-empty target, so the identity never exists without its record, and a second launch, a
   concurrent one, a redelivery or another host instance over the same root answers `ALREADY_EXISTS`.
 - **No late create.** The control plane's records are read before the create, under a bound of half the creation horizon. A launch
-  whose read outlasts that bound, or whose identity is terminated meanwhile, creates nothing when the read lands (review R3).
+  whose read outlasts that bound, or whose identity is terminated meanwhile, creates nothing when the read lands (review R3). A
+  termination of an absent identity takes its name for good, by the same rename a create uses (a tombstone that observe still answers
+  `NOT_FOUND`): every pending launch, of any instance over the root, then finds the name taken and answers `REFUSED`
+  (`IDENTITY_TERMINATED`), so the `NOT_FOUND` it answered stays true (review R2-4).
 - **One end, for good.** The durable record (`record.json`, written atomically) holds state, pid, instants, cause, manifest
   reference, refusal, peaks and the exact command line, never a customer value. A job's end is `end.json`, created exclusively (a
   hard link that fails if the end exists): of a result, a termination, a deadline and another instance's verdict, the first end
@@ -149,10 +158,22 @@ most 1 MiB, so memory stays bounded.
   sessions cancelled and reads released, each bounded, in the background, so no provider call can hold a termination or a deadline
   back (review R6). A session or a read that lands after the closing is cancelled and never handed over (review R5). On Linux the kill
   walks `/proc` and then kills the worker's process group; on Windows it uses `taskkill /T /F`.
+- **The worker's end is not the attempt's** (review R2-6). Before the host records a worker's end or removes the browser's directory,
+  it sweeps what the worker may have left (`sweepAttemptProcesses`, Linux): the worker's process group, and every process of the user
+  that the attempt's directories mark — a working directory inside the attempt's, or an environment value naming it or the browser's
+  directory (the browser runs in a session of its own) — and records the end only once none is left, or after a bounded wait, when
+  the supervisor sweeps on. The supervisor also keeps every process it has seen in the worker's tree, by pid and start, and sweeps
+  them with the marked ones whenever the worker is gone. On Windows every child is in the worker's kill-on-close job, which ends with
+  the worker; the browser's own children end with the browser.
 - **Restart and other instances.** Each host instance renews an `instances/<id>` file every 5 s. Another instance answers a job by
-  its record as it stands (`RUNNING`) while the owning instance is alive. It may terminate that job by pid, since the job is a live
-  instance's child. It declares the job `FAILED WORKER_CRASHED` (`HOST_RESTARTED`) only once the owner has been silent for 30 s
-  **and** the tree is known to have ended: the supervisor's verdict (`HOST_LOST`) or a pid that no longer exists (review R4, R7). A
+  its record as it stands (`RUNNING`) while the owning instance is alive. It declares the job `FAILED WORKER_CRASHED`
+  (`HOST_RESTARTED`) only once the owner has been silent for 30 s **and** the tree is known to have ended: the supervisor's verdict
+  (`HOST_LOST`), or a pid that no longer exists or now names another process, and (Linux) no process the attempt marks (review R4,
+  R7). A silent owner is never proof that its worker is dead (review R2-5): another instance terminates a job, live or lost owner
+  alike, by the worker's pid once the pid is proved the job's (its command line, from /proc or CIM, names the job's ticket digest),
+  sweeps the attempt's marked processes and records `TERMINATED` only once the tree is gone. If it cannot tell (the command line
+  cannot be read, or the tree outlives the bound) it answers `UNCERTAIN` and changes nothing. It leaves a `terminate.request` in the
+  job's directory first, so the owner, reading the worker's exit without a result, records the same termination. A
   worker whose host's channel closes also ends itself (`killOwnTree`), and a worker stuck in synchronous work is ended by its
   supervisor. On Windows the operating system does it first: libuv puts a process's children in a kill-on-close job object, so the
   worker's whole tree ends with the host; the supervisor is started detached, outside that job, and records `HOST_LOST`. B08 then abandons the attempt and takes it over at fence + 1.
@@ -196,7 +217,7 @@ Windows with Google Chrome required (`KAURO_REQUIRE_PDF_ENGINE=1`).
 |---|---|---|
 | Ticket and broker, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 5: a session landing after revocation is cancelled; digest, canonical bytes, closed shape (18 refusals), broker OK, broker DENY (14 refusals and revocation) |
 | Local executor, happy path | `packages/data-plane/test/local-process-host.test.ts` | 1: real Migration Core and Chromium in a confined process; the manifest names the package, the PDF and its record; scratch removed |
-| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 20: two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
+| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 23: a launch pending on one instance cancelled through another; a stale owner whose worker lives (killed by a pid proved the job's); the sweep of an attempt's orphans (Linux); two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
 | End to end, PostgreSQL 17 | `apps/control/test/b14a-local-executor.test.ts` | 5: OK (package AVAILABLE, job READY, entitlement DELIVERED, verification VALID EXECUTED_LOCAL 3.0.0, delivered manifest = the receipt's, janitor CLEANED with REPORTED resources); S056 lost answer adopted through B08; CMD037 during the run; worker killed, then takeover at fence 2 delivers; no legal identity → FAILED REFUSED |
 | Regressions | data-plane, control, persistence, application suites; `pnpm run verify` | B05 adapter (with F1), B08 control plane, B13 report suites unchanged and green |
 
@@ -225,6 +246,11 @@ EXECUTED_PROVIDER.**
 | R6 | Termination waited on provider cleanup; an exit could overwrite a termination. | Synchronous close, kill and record, with cleanup afterwards; the first end stands. |
 | R7 | A worker stuck in synchronous work outlived its dead host. | The supervisor ends the tree when the host's pipe closes. |
 | R8–R10 | The AWS document claimed a guaranteed 900 s horizon and permanent single creation, inferred an end from absence, and blocked multipart uploads. | The verdict became `SELECTED_NOT_QUALIFIED`; the token's guaranteed hour, a recorded ARN, no end from absence; the multipart steps are allowed by `s3:ObjectCreationOperation`. |
+| R2-1, R2-2 | (round 2) A Node child could follow `--permission` with `--no-permission`, or run an `-e` script without the network preload. | The core child's closed command line is the only Node child (§2 item 3); the hostile worker's negation and network children are refused. |
+| R2-3 | The synchronous exports' `shell` option became a shell behind an allowed program. | The option is refused in both wrappers; asynchronous shells already reach the guard as the shell's own command line; `process.execve` is removed. |
+| R2-4 | A termination abandoned only the last pending launch of one instance. | Every pending launch is abandoned, and the identity's name is taken for good by the same rename a create uses, across instances. |
+| R2-5 | A stale owner made another instance record a termination without killing. | The pid is proved the job's and killed; the end is recorded only once the tree is gone, else `UNCERTAIN`. |
+| R2-6 | A child surviving the worker escaped supervision. | The host and the supervisor sweep the attempt's processes (group, seen, marked) before the end is recorded. |
 
 ## 10. Decisions
 

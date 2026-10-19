@@ -2,7 +2,7 @@
 // worker is (the same permission flags, the same empty environment, the same IPC channel and broker), it tries what a compromised worker
 // would and reports what happened, as the `refusal` of its one result (a JSON of observations; never a customer value). Its ticket's
 // locale picks the behaviour: "hostile-probe" (files, network, environment, broker, child processes) or "hostile-allocate" (memory).
-import { execSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
 import dns from "node:dns";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
@@ -77,8 +77,31 @@ async function probe(ticket: { capability: { stagingPrefix: string }; render: { 
   observations["nodeChildWiderPermission"] = ran(() => spawnSync(process.execPath, ["--permission", "--allow-fs-read=*", "-e", read], { encoding: "utf8", env: {} }));
   observations["nodeChildOwnPermission"] = ran(() => spawnSync(process.execPath, ["--permission", `--allow-fs-read=${process.execPath}`, "-e", read], { encoding: "utf8", env: {} }));
   observations["nodeChildNodeOptions"] = ran(() => spawnSync(process.execPath, ["--permission", "-e", read], { encoding: "utf8", env: { NODE_OPTIONS: "--allow-fs-read=*" } }));
+  // review round 2: a permission negation, a script with the network the parent's preload refuses, a shell behind an allowed program
+  observations["nodeChildNoPermission"] = ran(() => spawnSync(process.execPath, ["--permission", "--no-permission", "-e", read], { encoding: "utf8", env: {} }));
+  const connect = `require("node:net").connect({host:"127.0.0.1",port:${probeData.port}}).on("connect",()=>{console.log("READ");process.exit(0)}).on("error",(e)=>{console.log(e.code);process.exit(0)})`;
+  observations["nodeChildNetwork"] = ran(() => spawnSync(process.execPath, ["--permission", `--allow-fs-read=${process.execPath}`, "-e", connect], { encoding: "utf8", env: {}, timeout: 10_000 }));
+  const shellLine = process.platform === "win32" ? `& type "${probeData.secretFile}"` : `; cat "${probeData.secretFile}"`;
+  observations["shellOptionSpawnSync"] = ran(() => spawnSync(process.execPath, ["--permission", shellLine], { encoding: "utf8", env: {}, shell: true }));
+  observations["shellOptionExecFileSync"] = ran(() => ({ stdout: execFileSync(process.execPath, ["--permission", shellLine], { encoding: "utf8", env: {}, shell: true }) }));
+  observations["detachedNodeChild"] = ran(() => spawnSync(process.execPath, ["--permission", "-e", read], { encoding: "utf8", env: {}, detached: true } as never));
+  observations["execve"] = ran(() => {
+    (process as unknown as { execve(file: string, args: string[]): void }).execve(process.platform === "win32" ? join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe") : "/bin/cat", [probeData.secretFile]);
+    return { stdout: "", status: 0 };
+  });
   observations["nativeChild"] = ran(() => (process.platform === "win32" ? spawnSync(join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe"), ["/d", "/c", "type", probeData.secretFile], { encoding: "utf8", windowsHide: true }) : spawnSync("/bin/cat", [probeData.secretFile], { encoding: "utf8" })));
   observations["shellExec"] = ran(() => ({ stdout: execSync(process.platform === "win32" ? `type "${probeData.secretFile}"` : `cat "${probeData.secretFile}"`, { encoding: "utf8" }) }));
+  observations["asyncShellSpawn"] = await new Promise<string>((resolve) => {
+    try {
+      const c = spawn(process.execPath, ["--permission", shellLine], { shell: true, env: {} });
+      let out = "";
+      c.stdout?.on("data", (d: Buffer) => (out += d.toString()));
+      c.on("close", () => resolve(out.includes("a secret of the host") ? "READ" : "NO_OUTPUT"));
+      c.on("error", (e: { code?: string }) => resolve(String(e.code)));
+    } catch (error) {
+      resolve(String((error as { code?: unknown }).code ?? (error as Error).name));
+    }
+  });
   observations["asyncSpawn"] = await new Promise<string>((resolve) => {
     try {
       const c = spawn(process.platform === "win32" ? join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe") : "/bin/cat", process.platform === "win32" ? ["/d", "/c", "type", probeData.secretFile] : [probeData.secretFile]);

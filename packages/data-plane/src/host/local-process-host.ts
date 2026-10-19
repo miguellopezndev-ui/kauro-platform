@@ -54,7 +54,7 @@ import type { AuthorizedReportInputs } from "../report/facts.js";
 import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
-import { killProcessTree, processExists } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, processCommandLine, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 import { readVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
@@ -174,6 +174,10 @@ interface Live {
 }
 
 const TERMINAL: ReadonlySet<RecordState> = new Set(["SUCCEEDED", "FAILED", "TERMINATED"]);
+/** The note of a cancelled identity's tombstone: terminated before any create, so never a job (observe answers NOT_FOUND). */
+const CANCELLED_BEFORE_CREATE = "CANCELLED_BEFORE_CREATE";
+/** Written in a job's directory by an instance that ends another instance's worker, before it kills it. */
+const TERMINATION_REQUEST = "terminate.request";
 /** How often an instance says it is alive, and how long another instance's silence means it is gone. */
 const INSTANCE_BEAT_MS = 5_000;
 const INSTANCE_LOST_MS = 30_000;
@@ -208,7 +212,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   readonly #beat: NodeJS.Timeout;
   #creations = 0;
   /** Launches between their first check and their create: a termination of the identity abandons one (it then creates nothing). */
-  readonly #launching = new Map<string, { abandoned: boolean }>();
+  readonly #launching = new Map<string, Set<{ abandoned: boolean }>>();
 
   /** Refuses an incomplete or unsafe configuration before any attempt can be launched (B14-A §5). */
   constructor(options: LocalProcessWorkerHostOptions) {
@@ -261,13 +265,15 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const problem = this.#specProblem(spec);
     if (problem !== null) return answer("REFUSED", problem);
     const jobDir = this.#jobDir(identity);
-    if (existsSync(jobDir)) return answer("ALREADY_EXISTS", null);
+    if (existsSync(jobDir)) return this.#cancelled(identity) ? answer("REFUSED", "IDENTITY_TERMINATED") : answer("ALREADY_EXISTS", null);
 
     // the control plane's records for this attempt, read before anything is created (a failed read creates nothing). The read is
     // bounded well inside the creation horizon, and a launch abandoned meanwhile (its identity terminated, or the bound passed)
     // creates nothing when the read lands: no create can land after the horizon
     const pending = { abandoned: false };
-    this.#launching.set(identity, pending);
+    const pendingOfIdentity = this.#launching.get(identity) ?? new Set<{ abandoned: boolean }>();
+    pendingOfIdentity.add(pending);
+    this.#launching.set(identity, pendingOfIdentity);
     const boundMs = Math.floor((this.creationHorizonSeconds * 1000) / 2);
     const startedMs = this.#o.clock.nowMs();
     let reads: AttemptTicketReads;
@@ -281,7 +287,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
         );
       });
     } finally {
-      if (this.#launching.get(identity) === pending) this.#launching.delete(identity);
+      pendingOfIdentity.delete(pending);
+      if (pendingOfIdentity.size === 0 && this.#launching.get(identity) === pendingOfIdentity) this.#launching.delete(identity);
     }
     if (pending.abandoned || this.#o.clock.nowMs() - startedMs >= boundMs) throw new Error(`${LOCAL_PROCESS_HOST}: the launch was abandoned before its create; nothing was created`);
     if (reads.planBinding === null) return answer("REFUSED", "PLAN_BINDING_MISSING");
@@ -303,7 +310,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const bytes = attemptTicketBytesOf(ticket);
 
     // the create: one directory per identity, for good — prepared aside with its ticket and its first record, then renamed into
-    // place, so the identity never exists without its record and a second create finds it taken (rename refuses a non-empty target)
+    // place, so the identity never exists without its record and a second create finds it taken (rename refuses a non-empty target).
+    // A termination of the absent identity takes the same name first (#cancel), from this instance or any other: then nothing is created
     const record = this.#firstRecord(spec, bytes);
     const prepared = join(this.#hostRoot, "jobs", `.creating-${identity}-${process.pid}-${++this.#creations}`);
     mkdirSync(prepared);
@@ -313,7 +321,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       renameSync(prepared, jobDir);
     } catch (error) {
       rmSync(prepared, { recursive: true, force: true });
-      if (existsSync(jobDir)) return answer("ALREADY_EXISTS", null);
+      if (existsSync(jobDir)) return this.#cancelled(identity) ? answer("REFUSED", "IDENTITY_TERMINATED") : answer("ALREADY_EXISTS", null);
       throw error;
     }
     this.#start(spec, bytes, record);
@@ -321,7 +329,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   observe(identity: string): Promise<WorkerObservation> {
-    const record = this.#recordOf(identity);
+    const record = this.#existing(identity);
     const observation: WorkerObservation = Object.freeze({
       evidenceClass: EVIDENCE,
       identity,
@@ -343,17 +351,26 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       this.#end(live, "TERMINATED");
       return answer("TERMINATED");
     }
-    const record = this.#recordOf(identity);
+    let record = this.#existing(identity);
     if (record === null) {
-      // a launch still reading its records is abandoned: it will create nothing, so the identity is proved absent
-      const pending = this.#launching.get(identity);
-      if (pending !== undefined) pending.abandoned = true;
-      return answer("NOT_FOUND");
+      // every launch of this instance still reading its records is abandoned, and the identity's name is taken for good, so no launch
+      // of any instance can create it afterwards: the identity is proved absent and stays absent
+      for (const pending of this.#launching.get(identity) ?? []) pending.abandoned = true;
+      if (this.#cancel(identity)) return answer("NOT_FOUND");
+      // a create took the name first: what it created is ended like any other job
+      record = this.#existing(identity);
+      if (record === null) return answer("NOT_FOUND");
+      const created = this.#live.get(identity);
+      if (created !== undefined) {
+        if (TERMINAL.has(created.record.state)) return answer("ALREADY_TERMINAL");
+        this.#end(created, "TERMINATED");
+        return answer("TERMINATED");
+      }
     }
     if (TERMINAL.has(record.state)) return answer("ALREADY_TERMINAL");
-    // a job of another instance: killed by its pid while that instance lives (its worker is its child, so the pid is that
-    // worker's); a lost instance's worker already ended itself when that host's channel closed
-    if (this.#instanceAlive(record.instance) && record.pid !== null) killProcessTree(record.pid);
+    // a job of another instance, live or lost: its tree is ended by the worker's pid once that pid is proved the worker's (its command
+    // line names the job's ticket digest), and the job is recorded ended only once its tree is known to have ended
+    if (!(await this.#endForeignTree(record))) return answer("UNCERTAIN");
     record.state = "TERMINATED";
     record.note = "TERMINATED_BY_HOST";
     record.endedAtMs = this.#o.clock.nowMs();
@@ -362,7 +379,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   resources(identity: string): Promise<WorkerResourceReport> {
-    const record = this.#recordOf(identity);
+    const record = this.#existing(identity);
     const report: WorkerResourceReport =
       record === null
         ? Object.freeze({ evidenceClass: EVIDENCE, identity, outcome: "NOT_FOUND" as const })
@@ -550,12 +567,23 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     });
     child.on("exit", () => {
       if (live.timer !== null) clearTimeout(live.timer);
-      this.#standDown(live);
       broker.close("WORKER_EXITED");
-      this.#closeRecord(live);
-      this.#removeBrowserTemp(spec.capability.attemptId);
-      exited();
-      void broker.revoke("WORKER_EXITED");
+      const close = (): void => {
+        this.#standDown(live);
+        this.#closeRecord(live);
+        this.#removeBrowserTemp(spec.capability.attemptId);
+        exited();
+        void broker.revoke("WORKER_EXITED");
+      };
+      // the worker's end is not yet the attempt's: what it started and left (Linux: re-parented, or in a session of its own) is ended
+      // and found gone before the end is recorded or the browser's directory removed; a process that outlives every sweep is left to
+      // the supervisor, which sweeps again
+      const pid = record.pid;
+      if (pid === null || sweepAttemptProcesses(pid, [attemptDir, browserTemp]).length === 0) return close();
+      void (async () => {
+        for (let round = 0; round < 25 && sweepAttemptProcesses(pid, [attemptDir, browserTemp]).length > 0; round++) await new Promise((r) => setTimeout(r, 200));
+        close();
+      })();
     });
     if (child.pid === undefined) {
       record.state = "FAILED";
@@ -700,7 +728,14 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.peakScratchBytes = result.peakScratchBytes;
       record.peakMemoryBytes = result.peakMemoryBytes;
     } else {
-      // no result: the supervisor's verdict when it ended the tree, else the host's own reading of the exit
+      // no result: a termination another instance asked for; the supervisor's verdict when it ended the tree; else the host's own
+      // reading of the exit
+      if (existsSync(join(this.#jobDir(record.identity), TERMINATION_REQUEST))) {
+        record.state = "TERMINATED";
+        record.note = "TERMINATED_BY_HOST";
+        this.#persist(record);
+        return;
+      }
       const verdict = readVerdict(this.#jobDir(record.identity))?.verdict ?? null;
       record.state = "FAILED";
       record.cause = verdict === "SCRATCH_EXHAUSTED" ? "SCRATCH_EXHAUSTED" : verdict === "DEADLINE" ? "DEADLINE_EXCEEDED" : "WORKER_CRASHED";
@@ -733,11 +768,86 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
 
   /**
    * Whether the tree of a job whose host is gone has ended: its supervisor recorded ending it (HOST_LOST, or any verdict), or its worker
-   * no longer exists. While neither holds, the job is answered as its record stands (RUNNING), never as ended.
+   * no longer exists, or its pid now names another process; and (Linux) no process the attempt's directories mark is left. While that
+   * does not hold, the job is answered as its record stands (RUNNING), never as ended.
    */
   #treeEnded(dir: string, record: LocalJobRecord): boolean {
-    if (readVerdict(dir) !== null) return true;
-    return record.pid === null || !processExists(record.pid);
+    if (process.platform === "linux" && linuxAttemptProcesses(this.#attemptDirsOf(record.identity)).length > 0) return false;
+    if (readVerdict(dir) !== null || record.pid === null) return true;
+    const line = processCommandLine(record.pid);
+    return line === null || (line !== undefined && !line.includes(record.ticketDigest));
+  }
+
+  /** The attempt's directory and its browser's temporary one (the marks of its processes). */
+  #attemptDirsOf(identity: string): string[] {
+    const attemptId = identity.slice("kauro-attempt-".length);
+    return [attemptScratchDirectoryOf(this.#scratchRoot, attemptId), browserTempDirectoryOf(this.#scratchRoot, attemptId)];
+  }
+
+  /**
+   * Ends the tree of a job this instance did not start, and answers whether it is known to have ended. The worker's pid is killed only
+   * once it is proved the worker's (its command line names the job's ticket digest; a pid can be reused); then the attempt's marked
+   * processes are swept (Linux) and the end awaited, bounded. Unknown (the command line cannot be read, or the tree outlives the bound):
+   * false, and the job stays as it is.
+   */
+  async #endForeignTree(record: LocalJobRecord): Promise<boolean> {
+    const dirs = this.#attemptDirsOf(record.identity);
+    if (record.pid === null) {
+      // never started: a live instance may be starting it this moment (UNCERTAIN); a lost one never will
+      return !this.#instanceAlive(record.instance);
+    }
+    const pid = record.pid;
+    const line = processCommandLine(pid);
+    if (line === undefined) return false;
+    const worker = line !== null && line.includes(record.ticketDigest);
+    if (worker) {
+      // the owning instance, reading the worker's exit without a result, records the termination asked for, not a crash
+      writeFileSync(join(this.#jobDir(record.identity), TERMINATION_REQUEST), this.instance);
+      killProcessTree(pid);
+    }
+    for (let round = 0; round < 50; round++) {
+      const left = sweepAttemptProcesses(worker ? pid : null, dirs);
+      const alive = worker && processRunning(pid);
+      if (left.length === 0 && !alive) {
+        this.#removeBrowserTemp(record.identity.slice("kauro-attempt-".length));
+        return true;
+      }
+      if (worker) killProcessTree(pid);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return false;
+  }
+
+  /** A record that is a job's (a cancelled identity's tombstone is no job: the identity was never created). */
+  #existing(identity: string): LocalJobRecord | null {
+    const record = this.#recordOf(identity);
+    return record === null || record.note === CANCELLED_BEFORE_CREATE ? null : record;
+  }
+
+  #cancelled(identity: string): boolean {
+    return this.#recordOf(identity)?.note === CANCELLED_BEFORE_CREATE;
+  }
+
+  /**
+   * Takes an absent identity's name for good, as a create would (the same rename of a prepared directory holding a record), so that no
+   * launch of any instance creates it afterwards. True when this call took it; false when a create, or another cancel, came first.
+   */
+  #cancel(identity: string): boolean {
+    const jobDir = this.#jobDir(identity);
+    if (existsSync(jobDir)) return this.#cancelled(identity);
+    const stamp = this.#o.clock.nowMs();
+    const record: LocalJobRecord = { host: LOCAL_PROCESS_HOST, identity, ticketDigest: "0".repeat(64), instance: this.instance, state: "TERMINATED", pid: null, createdAtMs: stamp, startedAtMs: null, endedAtMs: stamp, lastHeartbeatMs: null, cause: null, note: CANCELLED_BEFORE_CREATE, manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, flags: [], hardMemoryBytes: 0, hardScratchBytes: 0 };
+    const prepared = join(this.#hostRoot, "jobs", `.cancelling-${identity}-${process.pid}-${++this.#creations}`);
+    mkdirSync(prepared);
+    writeFileSync(join(prepared, "end.json"), JSON.stringify(record));
+    writeFileSync(join(prepared, "record.json"), JSON.stringify(record));
+    try {
+      renameSync(prepared, jobDir);
+      return true;
+    } catch {
+      rmSync(prepared, { recursive: true, force: true });
+      return this.#cancelled(identity);
+    }
   }
 
   #instanceFile(instance: string): string {

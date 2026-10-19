@@ -11,11 +11,16 @@
  *
  * It records its one verdict exclusively in the job's directory (`supervisor.json`), which the host reads to classify the worker's end
  * and a later host instance reads as proof that the tree was ended. It reads no clock: every bound is a duration it was handed.
- * Run as `node supervisor.js <config JSON>`; its stdin is the host's pipe ("EXITED\n": the worker ended, stand down).
+ * Run as `node supervisor.js <config JSON>`; its stdin is the host's pipe ("EXITED\n": the worker ended).
+ *
+ * The worker's end is not the attempt's: whenever the worker is gone (it exited, the host said so, or the supervisor ended it), the
+ * supervisor sweeps what the worker left — on Linux its process group, every process it saw in the worker's tree (by pid and start),
+ * and every process the attempt's directories mark (sweepAttemptProcesses) — and leaves only once none is left, or after a bounded
+ * number of sweeps.
  */
 import { lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { killProcessTree, linuxDescendantsOf, processExists } from "./process-tree.js";
+import { killProcessTree, linuxDescendantsOf, linuxStartOf, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
 export const SUPERVISOR_VERDICTS = ["HOST_LOST", "DEADLINE", "MEMORY_EXHAUSTED", "SCRATCH_EXHAUSTED"] as const;
 export type SupervisorVerdict = (typeof SUPERVISOR_VERDICTS)[number];
@@ -88,8 +93,17 @@ export function readVerdict(jobDir: string): { readonly verdict: SupervisorVerdi
   }
 }
 
+/** How many sweeps, a poll apart, the supervisor makes before it leaves with processes it could not end. */
+const SWEEPS = 20;
+
 export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream, exit: (code: number) => void): void {
   let done = false;
+  // every process seen in the worker's tree, with its start (Linux): one re-parented after its parent died is still the attempt's
+  const known = new Map<number, string>();
+  const sweep = (left: number): void => {
+    if (sweepAttemptProcesses(config.workerPid, config.scratchDirs, known).length === 0 || left <= 1) return exit(0);
+    setTimeout(() => sweep(left - 1), config.pollMs);
+  };
   const end = (verdict: SupervisorVerdict | null, detail: Record<string, number> = {}): void => {
     if (done) return;
     done = true;
@@ -97,7 +111,7 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
       recordVerdict(config.jobDir, verdict, detail);
       killProcessTree(config.workerPid);
     }
-    exit(0);
+    sweep(SWEEPS);
   };
   let hostGone = false;
   let buffered = "";
@@ -116,7 +130,13 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
   setTimeout(() => end("DEADLINE"), Math.max(0, Math.min(config.deadlineInMs, 2_147_483_647)));
   setInterval(() => {
     // the worker is gone: a host that died with it (on Windows its job object ends the tree with the host) is still recorded
-    if (!processExists(config.workerPid)) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
+    if (!processRunning(config.workerPid)) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
+    if (process.platform === "linux") {
+      for (const pid of linuxDescendantsOf(config.workerPid)) {
+        const start = linuxStartOf(pid);
+        if (pid !== config.workerPid && start !== null && !known.has(pid)) known.set(pid, start);
+      }
+    }
     const rss = treeResidentBytes(config.workerPid);
     if (rss !== null && rss > config.hardMemoryBytes) return end("MEMORY_EXHAUSTED", { residentBytes: rss });
     const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0);

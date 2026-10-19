@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { BROWSER_SOCKET_ROOT_MAX_BYTES, LocalProcessWorkerHost, attemptScratchDirectoryOf, removeAttemptScratch, type LocalProcessWorkerHostOptions } from "../src/index.js";
+import { toUtcInstant } from "@kauro/domain";
+import { BROWSER_SOCKET_ROOT_MAX_BYTES, LocalProcessWorkerHost, attemptScratchDirectoryOf, linuxAttemptProcesses, processRunning, removeAttemptScratch, sweepAttemptProcesses, type LocalProcessWorkerHostOptions } from "../src/index.js";
 import { collect, holderOf, sha } from "./support/attempt.js";
 import { BROWSER, BROWSER_REQUIRED, CORE_PACKAGE_HASH, HOSTILE_ENTRY, RENDER, REPO_ROOT, WALL, WORKER_ENTRY, eventually, hostLimits, localRig, plantedAttempt, processesReferencing, readsFor, type LocalRig } from "./support/local-host.js";
 
@@ -207,8 +208,10 @@ test("B14-A DENY (confinement, hostile worker): a worker started exactly as the 
     for (const key of ["brokerForeignSource", "brokerForeignPrefix", "brokerDelivery"]) assert.equal(seen[key], "OUTSIDE_CAPABILITY", key);
     // the process allowlist (worker-preload.ts): no native program, no shell, no Node child without a permission at most the worker's
     // own, no NODE_OPTIONS — each refused before a process exists; the one Node child it admits still cannot read the secret
-    for (const key of ["nodeChildPlain", "nodeChildWiderPermission", "nodeChildNodeOptions", "nativeChild", "shellExec", "asyncSpawn"]) assert.equal(seen[key], "KAURO_PROCESS_REFUSED", key);
-    assert.notEqual(seen["nodeChildOwnPermission"], "READ");
+    const refusedChildren = ["nodeChildPlain", "nodeChildWiderPermission", "nodeChildOwnPermission", "nodeChildNodeOptions", "nativeChild", "shellExec", "asyncSpawn"];
+    // review round 2 (R2-1..R2-3): only the core child's closed command line is a Node child; no negation, script, shell or detached child
+    refusedChildren.push("nodeChildNoPermission", "nodeChildNetwork", "shellOptionSpawnSync", "shellOptionExecFileSync", "detachedNodeChild", "execve", "asyncShellSpawn");
+    for (const key of refusedChildren) assert.equal(seen[key], "KAURO_PROCESS_REFUSED", key);
     assert.deepEqual(hostile.refusals(spec.identity).map((r) => r.code), ["OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY"]);
     await hostile.stop();
   } finally {
@@ -477,27 +480,34 @@ test("B14-A limits (review R2, native memory): a worker whose resident memory ou
 test("B14-A RACE (review R3): a launch whose records are still being read creates nothing when its identity is terminated meanwhile, or when the read outlasts its bound — the identity is proved absent and stays absent", async () => {
   const rig = localRig();
   try {
-    let release: (() => void) | null = null;
+    const releases: Array<() => void> = [];
+    const release = (): void => releases.splice(0).forEach((r) => r());
     const planted = plantedAttempt(rig.storage, 32);
     const late = plantedAttempt(rig.storage, 33);
     const reads = { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null };
     const host = new LocalProcessWorkerHost({
       workerEntry: WORKER_ENTRY, codeRoots: [REPO_ROOT], hostRoot: rig.hostRoot, scratchRoot: rig.scratchRoot, chromiumExecutable: BROWSER ?? process.execPath, storage: rig.storage, uploads: holderOf(rig.storage),
-      tickets: { read: (spec) => new Promise((resolve) => (release = () => resolve(spec.capability.attemptId === planted.fixture.attemptId ? reads : { ...reads, inputs: late.inputs }) as never)) },
+      tickets: { read: (spec) => new Promise((resolve) => void releases.push(() => resolve((spec.capability.attemptId === planted.fixture.attemptId ? reads : { ...reads, inputs: late.inputs }) as never))) },
       render: RENDER, corePackageHash: CORE_PACKAGE_HASH, clock: WALL, sessionOrigin: "https://app.kauro.test", creationHorizonSeconds: 2, workerHeapMegabytes: 256, coreHeapMegabytes: 256,
     });
     const spec = planted.fixture.spec(1);
-    const launching = host.launch(spec);
+    // two launches of the identity pending at once (review round 2, R2-4): the termination abandons both
+    const launching = [host.launch(spec), host.launch(spec)];
     assert.equal((await host.observe(spec.identity)).state, "NOT_FOUND");
-    assert.equal((await host.terminate(spec.identity)).outcome, "NOT_FOUND", "nothing exists, and the pending launch is abandoned");
-    release!();
-    await assert.rejects(launching, /abandoned before its create/);
-    assert.equal(existsSync(join(rig.hostRoot, "jobs", spec.identity)), false);
+    assert.equal((await host.terminate(spec.identity)).outcome, "NOT_FOUND", "nothing exists, and the pending launches are abandoned");
+    release();
+    await Promise.all(launching.map((l) => assert.rejects(l, /abandoned before its create/)));
     assert.equal((await host.observe(spec.identity)).state, "NOT_FOUND");
+    assert.equal((await host.resources(spec.identity)).outcome, "NOT_FOUND");
+    // the identity's name is taken for good: a later launch, of this instance or any other, creates nothing
+    assert.equal((await host.launch(spec)).outcome, "REFUSED");
+    assert.equal((await rig.restart().launch(spec)).outcome, "REFUSED");
+    assert.equal((await host.terminate(spec.identity)).outcome, "NOT_FOUND");
+    assert.equal(existsSync(join(rig.hostRoot, "jobs", spec.identity, "ticket.json")), false, "no ticket: nothing was created");
     // a read past its bound (half the 2 s horizon): the launch fails and nothing is ever created by it
     const lateSpec = late.fixture.spec(1);
     await assert.rejects(host.launch(lateSpec), /not read within 1000 ms/);
-    release!();
+    release();
     assert.equal(existsSync(join(rig.hostRoot, "jobs", lateSpec.identity)), false);
     await host.stop();
   } finally {
@@ -556,5 +566,77 @@ test("B14-A recovery (review R7): the host dies while its worker is stuck in syn
   } finally {
     child.kill("SIGKILL");
     rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
+
+test("B14-A RACE (review round 2, R2-4): a launch pending on one instance is cancelled by a termination through another instance over the same roots — the identity is proved absent there and stays absent everywhere", async () => {
+  const rig = localRig();
+  try {
+    let release: (() => void) | null = null;
+    const planted = plantedAttempt(rig.storage, 34);
+    const reads = { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null };
+    const host = new LocalProcessWorkerHost({
+      workerEntry: WORKER_ENTRY, codeRoots: [REPO_ROOT], hostRoot: rig.hostRoot, scratchRoot: rig.scratchRoot, chromiumExecutable: BROWSER ?? process.execPath, storage: rig.storage, uploads: holderOf(rig.storage),
+      tickets: { read: () => new Promise((resolve) => (release = () => resolve(reads as never))) },
+      render: RENDER, corePackageHash: CORE_PACKAGE_HASH, clock: WALL, sessionOrigin: "https://app.kauro.test", creationHorizonSeconds: 60, workerHeapMegabytes: 256, coreHeapMegabytes: 256,
+    });
+    const spec = planted.fixture.spec(1);
+    const launching = host.launch(spec);
+    const other = rig.restart();
+    assert.equal((await other.terminate(spec.identity)).outcome, "NOT_FOUND", "the other instance sees no job, and takes the name");
+    release!();
+    const result = await launching;
+    assert.deepEqual([result.outcome, result.reason], ["REFUSED", "IDENTITY_TERMINATED"], "the pending launch's create finds the name taken");
+    assert.equal((await host.observe(spec.identity)).state, "NOT_FOUND");
+    assert.equal((await other.observe(spec.identity)).state, "NOT_FOUND");
+    assert.equal(existsSync(attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId)), false, "no worker ever started");
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A RACE (review round 2, R2-5): an owner whose liveness is stale is not proof that its worker is dead — another instance answers the job RUNNING while the worker lives, and its termination kills the worker by a pid proved the job's (its command line names the ticket digest) before it records the end", { skip }, async () => {
+  const hold = gate();
+  const rig = localRig({ hooks: { atStage: (_id, stage) => (stage === "CORE_STARTED" ? (hold.open(), never()) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 35);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await hold.promise;
+    // a second instance whose clock runs a minute ahead: the owner's last sign of life is older than the 30 s that mean "lost"
+    const ahead = rig.restart({ now: () => toUtcInstant(Date.now() + 60_000), nowMs: () => Date.now() + 60_000 });
+    assert.equal((await ahead.observe(spec.identity)).state, "RUNNING", "the worker lives: its job is not declared ended");
+    assert.equal((await ahead.terminate(spec.identity)).outcome, "TERMINATED");
+    const ended = await rig.host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.note], ["TERMINATED", "TERMINATED_BY_HOST"]);
+    const attemptDir = attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId);
+    assert.ok(await eventually(() => processesReferencing(attemptDir).length === 0), "the worker and its core child are gone");
+  } finally {
+    hold.open();
+    await rig.dispose();
+  }
+});
+
+test("B14-A cleanup (review round 2, R2-6; Linux): what an attempt left after its worker died — a process re-parented, in a session of its own, working in the attempt's directory or naming its browser directory — is found and ended by the sweep", { skip: process.platform !== "linux" }, async () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-sweep-"));
+  try {
+    const attemptDir = join(root, "attempt");
+    const browserTemp = join(root, "kb");
+    mkdirSync(attemptDir);
+    mkdirSync(browserTemp);
+    // two orphans in sessions of their own: one working in the attempt's directory, one whose environment names the browser's
+    const inDir = spawn("/bin/sleep", ["60"], { cwd: attemptDir, detached: true, stdio: "ignore" });
+    const named = spawn("/bin/sleep", ["60"], { cwd: root, env: { TMPDIR: browserTemp }, detached: true, stdio: "ignore" });
+    const unrelated = spawn("/bin/sleep", ["60"], { cwd: root, detached: true, stdio: "ignore" });
+    await new Promise((r) => setTimeout(r, 300));
+    assert.deepEqual(linuxAttemptProcesses([attemptDir, browserTemp]).sort(), [inDir.pid!, named.pid!].sort());
+    assert.deepEqual(sweepAttemptProcesses(999_999, [attemptDir, browserTemp]), []);
+    assert.ok(await eventually(() => !processRunning(inDir.pid!) && !processRunning(named.pid!), 5_000));
+    assert.equal(processRunning(unrelated.pid!), true, "a process the attempt does not mark is left alone");
+    unrelated.kill("SIGKILL");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

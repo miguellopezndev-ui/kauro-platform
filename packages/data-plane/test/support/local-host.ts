@@ -107,8 +107,8 @@ export interface LocalRig {
   readonly scratchRoot: string;
   /** What the ticket source answers per attempt id (tests edit it). */
   readonly reads: Map<string, { planBinding: { configDocument: unknown; coreConfigHash: Sha256Hex } | null; inputs: readonly CoreInputRef[]; reportInputs: AuthorizedReportInputs | null }>;
-  /** A second host over the same roots (a restarted control plane). */
-  restart(): LocalProcessWorkerHost;
+  /** A second host over the same roots (a restarted control plane), on its own clock if one is given. */
+  restart(clock?: Clock): LocalProcessWorkerHost;
   dispose(): Promise<void>;
 }
 
@@ -119,7 +119,7 @@ export function localRig(options: { readonly root?: string; readonly render?: ty
   const scratchRoot = join(root, "scratch");
   const storage = new ContractFakeObjectStorage();
   const reads: LocalRig["reads"] = new Map();
-  const make = (): LocalProcessWorkerHost =>
+  const make = (clock: Clock = WALL): LocalProcessWorkerHost =>
     new LocalProcessWorkerHost({
       workerEntry: options.workerEntry ?? WORKER_ENTRY,
       codeRoots: [REPO_ROOT],
@@ -137,7 +137,7 @@ export function localRig(options: { readonly root?: string; readonly render?: ty
       },
       render: options.render ?? RENDER,
       corePackageHash: CORE_PACKAGE_HASH,
-      clock: WALL,
+      clock,
       sessionOrigin: "https://app.kauro.test",
       workerHeapMegabytes: options.workerHeapMegabytes ?? 512,
       coreHeapMegabytes: options.coreHeapMegabytes ?? 512,
@@ -153,8 +153,8 @@ export function localRig(options: { readonly root?: string; readonly render?: ty
     hostRoot,
     scratchRoot,
     reads,
-    restart() {
-      const next = make();
+    restart(clock?: Clock) {
+      const next = make(clock);
       hosts.push(next);
       return next;
     },
