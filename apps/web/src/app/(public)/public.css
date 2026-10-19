@@ -4927,7 +4927,7 @@ body:has(> .kauro-site-header) {
   --kauro-color-text-muted: #5f5955;
   --kauro-color-background: #f8f6f3;
   --kauro-color-surface: #f1ede8;
-  --kauro-color-raised: #ffffff;
+  --kauro-color-raised: #faf8f5;
   --kauro-color-border: #e3dcd4;
   --kauro-color-primary: #653a46;
   --kauro-color-on-primary: #f8f6f3;
@@ -5462,5 +5462,88 @@ body:has(> .kauro-site-header) {
   /* the sample report's quiet bands follow the stacked rows */
   .kauro-site-sheet .kauro-site-table--stack tbody tr:nth-child(even) {
     background: var(--kauro-color-surface);
+  }
+}
+
+/* Motion on every public page (Order 10, owner's review): each page's own objects move as Home's do (A10 §9). The first object of a page
+   settles on load, the way the hero window does; objects further down settle into place as the reader reaches them; a card straightens
+   and lifts a little under the pointer. Text never moves on its own, nothing is see-through on its way in, and nothing moves for a visitor
+   who asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  /* first impression: the object a page opens with */
+  .kauro-site-ladder .kauro-site-rung,
+  .kauro-site-service,
+  .kauro-status-panel,
+  .kauro-site-index,
+  .kauro-site-toc,
+  .kauro-site-contact-aside,
+  .kauro-site-card--focus {
+    animation: kauro-settle 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s backwards;
+    animation-timeline: auto;
+  }
+  .kauro-site-ladder .kauro-site-rung:nth-child(2),
+  .kauro-site-service:nth-child(2) {
+    animation-delay: 0.25s;
+  }
+  .kauro-site-ladder .kauro-site-rung:nth-child(3),
+  .kauro-site-service:nth-child(3) {
+    animation-delay: 0.35s;
+  }
+  .kauro-site-ladder .kauro-site-rung:nth-child(4) {
+    animation-delay: 0.45s;
+  }
+
+  /* response: every card on a page straightens a little and lifts under the pointer */
+  @media (hover: hover) {
+    .kauro-site-rung,
+    .kauro-site-service,
+    .kauro-status-panel,
+    .kauro-redact,
+    .kauro-answer,
+    .kauro-step-pane,
+    .kauro-site-sheet,
+    .kauro-site-cover-sheet,
+    .kauro-site-index,
+    .kauro-site-contact-aside,
+    .kauro-site-card--focus {
+      transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.45s ease;
+    }
+    .kauro-site-rung:hover,
+    .kauro-site-service:hover,
+    .kauro-status-panel:hover,
+    .kauro-redact:hover,
+    .kauro-answer:hover,
+    .kauro-step-pane:hover,
+    .kauro-site-sheet:hover,
+    .kauro-site-index:hover,
+    .kauro-site-contact-aside:hover,
+    .kauro-site-card--focus:hover {
+      transform: rotate(0deg) translateY(-0.25rem);
+    }
+    .kauro-site-cover-sheet:hover {
+      transform: rotate(0deg) translateY(-0.375rem);
+    }
+  }
+}
+/* arrival: the objects further down a page settle as the reader reaches them */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .kauro-site-sheet,
+    .kauro-site-sum-term,
+    .kauro-site-table-region,
+    .kauro-site-scope-column,
+    .kauro-site-units-col {
+      animation: kauro-settle linear backwards;
+      animation-timeline: view();
+      animation-range: entry 5% entry 70%;
+    }
+    .kauro-site-sum-term:nth-child(2),
+    .kauro-site-scope-column + .kauro-site-scope-column,
+    .kauro-site-units-col + .kauro-site-units-col {
+      animation-range: entry 15% entry 85%;
+    }
+    .kauro-site-sum-term:nth-child(3) {
+      animation-range: entry 25% entry 95%;
+    }
   }
 }

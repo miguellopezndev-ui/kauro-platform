@@ -35,7 +35,8 @@ export const COLOR = Object.freeze({
   textMuted: "#5F5955",
   background: BRAND.porcelain,
   surface: "#F1EDE8",
-  raised: "#FFFFFF",
+  /** A warm porcelain white for cards and documents (owner, 2026-10-19: pure white is not in the palette and made carbon read as black). */
+  raised: "#FAF8F5",
   border: "#E3DCD4",
   controlBorder: "#8C837D",
   primary: BRAND.wine,
