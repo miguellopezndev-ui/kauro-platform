@@ -11,8 +11,8 @@
  * could still land after a lost answer (here: never, once `launch` has returned or thrown).
  *
  * The worker's confinement (§4, §5):
- *   - a closed ticket (KAURO_ATTEMPT_TICKET_V1) built here from the control plane's records, sent over the child's private IPC
- *     channel, whose SHA-256 the worker is started with;
+ *   - a closed ticket (KAURO_ATTEMPT_TICKET_V1) built here from the control plane's records, sent over the worker's channel (a pipe
+ *     on its fd 3 in the protocol's own bounded frames, framing.ts — never Node's IPC), whose SHA-256 the worker is started with;
  *   - no credential: an empty environment (SystemRoot on Windows only); no database connection; every object through the attempt's
  *     storage broker, which admits exactly the capability (sealed generations read, own staging prefix written);
  *   - the Node permission model: read the code roots, the browser's directory and the attempt's own scratch directory; write that
@@ -22,6 +22,7 @@
  * Termination kills the worker's whole tree (process-tree.ts) and revokes the broker before anything else.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import type { Socket } from "node:net";
 import { createHash } from "node:crypto";
 import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -56,6 +57,7 @@ import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
 import { killProcessTree, linuxAttemptProcesses, linuxProcessOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 import { SUPERVISOR_READY, readVerdict, standDownOrVerdict, type SupervisorConfig } from "./supervisor.js";
+import { encodeFrame, FrameDecoder } from "./framing.js";
 import { WORKER_PROTOCOL_VERSION, normalizeWorkerMessage, type HostMessage, type InvalidWorkerMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
 
@@ -175,6 +177,8 @@ export interface LocalJobRecord {
 interface Live {
   readonly record: LocalJobRecord;
   readonly child: ChildProcess;
+  /** The worker's channel: its fd 3, read through the protocol's own bounded frames (framing.ts; review round 21). */
+  readonly channel: Socket | null;
   readonly broker: AttemptStorageBroker;
   result: WorkerResultReport | null;
   persistedBeatMs: number;
@@ -191,6 +195,8 @@ interface Live {
 const TERMINAL: ReadonlySet<RecordState> = new Set(["SUCCEEDED", "FAILED", "TERMINATED"]);
 /** Why the host itself ends a job: a termination, the deadline, or a supervisor that could not start or did not stay (review R4-1). */
 type EndReason = "TERMINATED" | "DEADLINE" | "SUPERVISOR_LOST" | "IDENTITY_UNREADABLE" | "CHANNEL_NOT_DRAINED" | "CHANNEL_PROTOCOL_VIOLATION";
+/** How long a worker's exit waits for the rest of its channel (what it wrote before it exited) before the channel is closed. */
+const CHANNEL_DRAIN_MS = 2_000;
 /** What the host may hold for one worker in messages not yet written to its channel. */
 const OUTBOUND_MESSAGES = 64;
 const OUTBOUND_BYTES = 128 * 1024 * 1024;
@@ -214,13 +220,9 @@ const INSTANCE_LOST_MS = 30_000;
 /** How often a running job's heartbeat reaches its durable record (another instance reads it there). */
 const RECORD_BEAT_MS = 10_000;
 
-/** Closes a handle a worker sent over its channel (any kind Node may hand over); never throws. */
-function closeHandle(handle: unknown): void {
-  try {
-    (handle as { close?: () => void } | null | undefined)?.close?.();
-  } catch {
-    // already closed
-  }
+/** Whether the worker's channel can still carry a message. */
+function channelOpen(live: Live): boolean {
+  return live.channel !== null && !live.channel.destroyed && live.channel.writable;
 }
 
 function isInside(root: string, path: string): boolean {
@@ -483,7 +485,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   /** The host's mirror of the lease's cancellation into the worker's channel (D8-CANCEL-1; D8-CEX-7 has no port for it). */
   signal(identity: string, state: "CANCELLED" | "FENCED"): boolean {
     const live = this.#live.get(identity);
-    if (live === undefined || !live.child.connected) return false;
+    if (live === undefined || !channelOpen(live)) return false;
     this.#send(live, { t: "signal", state });
     return true;
   }
@@ -638,15 +640,16 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       // removes its attempt's directory when the attempt ends
       cwd: this.#scratchRoot,
       env,
-      stdio: ["ignore", "ignore", "pipe", "ipc"],
-      serialization: "advanced",
+      // fd 3: the worker's channel, a plain pipe the host reads in its own frames (never Node's IPC, review round 21)
+      stdio: ["ignore", "ignore", "pipe", "pipe"],
       // POSIX: the worker leads its own process group, so its tree can be ended even after a re-parenting (process-tree.ts)
       detached: process.platform !== "win32",
       windowsHide: true,
     });
     const broker = new AttemptStorageBroker({ capability: spec.capability, storage: this.#o.storage, uploads: this.#o.uploads, origin: this.#o.sessionOrigin, maxObjectBytes: spec.limits.hardScratchBytes });
     let exited: () => void = () => undefined;
-    const live: Live = { record, child, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null, outbound: 0, outboundBytes: 0 };
+    const channel = (child.stdio[3] ?? null) as Socket | null;
+    const live: Live = { record, child, channel, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null, outbound: 0, outboundBytes: 0 };
     this.#live.set(identity, live);
     record.pid = child.pid ?? null;
     record.pidStart = child.pid !== undefined && process.platform === "linux" ? this.#startOfChild(child.pid) : null;
@@ -658,16 +661,41 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     child.stderr?.on("data", (chunk: Buffer) => {
       live.stderrTail = (live.stderrTail + chunk.toString("utf8")).slice(-4096);
     });
-    if (child.pid !== undefined) this.#guardChannel(live);
-    // normalized at once, in the listener itself: only the protocol's own fields are kept while a call waits (review round 18, R18-1)
-    child.on("message", (raw: unknown) => {
-      const message = normalizeWorkerMessage(raw);
-      if (message !== null) void this.#onMessage(live, message);
+    // the channel is read in the protocol's own frames (review round 21, R21-1, R21-2): a frame that declares more than the protocol's
+    // bounds is refused from its prefix, before its payload is held; anything outside the protocol ends the attempt, never this process.
+    // Each message is normalized at once: only the protocol's own fields are kept while a call waits (review round 18, R18-1)
+    const decoder = new FrameDecoder();
+    const violation = (): void => {
+      channel?.destroy();
+      this.#end(live, "CHANNEL_PROTOCOL_VIOLATION");
+    };
+    channel?.on("data", (bytes: Buffer) => {
+      let frames: Record<string, unknown>[];
+      try {
+        frames = decoder.push(bytes);
+      } catch {
+        return violation();
+      }
+      for (const raw of frames) {
+        const message = normalizeWorkerMessage(raw);
+        if (message !== null) void this.#onMessage(live, message);
+      }
     });
+    channel?.on("error", () => channel.destroy());
     child.on("error", () => {
       // a spawn that failed: the exit below records it (no result)
     });
+    // the worker's end, once what it wrote before it exited has been read (its channel closed, or after CHANNEL_DRAIN_MS: a process it
+    // left holding the pipe cannot hold the end back)
     child.on("exit", () => {
+      if (channel === null || channel.destroyed || channel.readableEnded) return exitedWorker();
+      const drained = setTimeout(() => channel.destroy(), CHANNEL_DRAIN_MS);
+      channel.once("close", () => {
+        clearTimeout(drained);
+        exitedWorker();
+      });
+    });
+    const exitedWorker = (): void => {
       if (live.timer !== null) clearTimeout(live.timer);
       broker.close("WORKER_EXITED");
       const close = (): void => {
@@ -689,7 +717,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
         for (let round = 0; round < 25 && sweep().length > 0; round++) await new Promise((r) => setTimeout(r, 200));
         close();
       })();
-    });
+    };
     if (child.pid === undefined) {
       record.state = "FAILED";
       record.cause = "WORKER_ERROR";
@@ -722,39 +750,6 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     }
   }
 
-  /**
-   * Node's own IPC commands (`NODE_*`) and handles are never part of this protocol (review round 20, R20-1). Node answers them itself, in
-   * an `internalMessage` listener of its own that trusts the other side (an unsolicited `NODE_HANDLE_ACK` fails an internal assertion
-   * and throws in this process). This host sends no handle, so Node's listener is removed and replaced: any internal command, and any
-   * handle arriving on the channel (closed at once), ends the attempt (`CHANNEL_PROTOCOL_VIOLATION`). A runtime whose channel cannot
-   * be guarded so starts nothing: the worker is ended before it has its ticket.
-   */
-  #guardChannel(live: Live): void {
-    const child = live.child;
-    const violation = (): void => this.#end(live, "CHANNEL_PROTOCOL_VIOLATION");
-    child.removeAllListeners("internalMessage");
-    child.on("internalMessage", (_message: unknown, handle: unknown) => {
-      closeHandle(handle);
-      violation();
-    });
-    const symbol = Object.getOwnPropertySymbols(child).find((s) => s.description === "kChannelHandle");
-    const channel = symbol === undefined ? undefined : (child as unknown as Record<symbol, { onread?: (...args: unknown[]) => unknown; pendingHandle?: unknown } | null>)[symbol];
-    if (channel === undefined || channel === null || typeof channel.onread !== "function") {
-      violation();
-      return;
-    }
-    const onread = channel.onread;
-    channel.onread = function guardedRead(this: unknown, ...args: unknown[]): unknown {
-      // a handle sent with any message: closed before Node keeps it, and the attempt ended
-      if (channel.pendingHandle != null) {
-        closeHandle(channel.pendingHandle);
-        channel.pendingHandle = null;
-        violation();
-      }
-      return onread.apply(this, args);
-    };
-  }
-
   /** Linux: the start of this host's own child, just spawned (so not yet reaped): read again a few times before it is given up. */
   #startOfChild(pid: number): string | null {
     for (let tries = 0; tries < 5; tries++) {
@@ -770,8 +765,16 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * (FAILED WORKER_ERROR, CHANNEL_NOT_DRAINED) and nothing more is queued for it.
    */
   #send(live: Live, message: HostMessage): void {
-    if (!live.child.connected || live.ended !== null) return;
-    const bytes = message.t === "ticket" ? message.bytes.byteLength : message.t === "reply" && message.ok && message.value instanceof Uint8Array ? message.value.byteLength : 0;
+    if (!channelOpen(live) || live.ended !== null) return;
+    let frame: Buffer;
+    try {
+      frame = encodeFrame(message);
+    } catch {
+      // a reply the protocol cannot carry (a provider's answer past a frame): the call fails, never this process
+      if (message.t !== "reply") return;
+      frame = encodeFrame({ t: "reply", id: message.id, ok: false, error: { code: "PROVIDER_ERROR", message: "the answer does not fit the channel", transient: false } });
+    }
+    const bytes = frame.byteLength;
     if (live.outbound + 1 > OUTBOUND_MESSAGES || live.outboundBytes + bytes > OUTBOUND_BYTES) {
       this.#end(live, "CHANNEL_NOT_DRAINED");
       return;
@@ -783,7 +786,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       live.outboundBytes -= bytes;
     };
     try {
-      live.child.send(message, undefined, {}, written);
+      live.channel?.write(frame, written);
     } catch {
       // the worker is gone; its exit records it
       written();

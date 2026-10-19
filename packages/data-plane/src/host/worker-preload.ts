@@ -13,6 +13,9 @@
  *     debugging port;
  *   - on Windows, taskkill ending the worker's own tree (`/PID <its pid> /T /F`).
  *
+ * No child gets the worker's channel (fd 3, worker-channel.ts): every spawn's fd 3 is given an entry of its own (`ignore` unless the
+ * caller named a pipe or `ignore` there), so the descriptor is replaced in the child before its program runs; a request to pass a
+ * descriptor or a stream there is refused (review round 21).
  * The permission model refuses `process.binding`, workers, addons and WASI, so the child_process module is the only way to a process:
  * the class behind every asynchronous spawn (`ChildProcess.prototype.spawn`, which sees a shell request already turned into the shell's
  * own command line) and the three synchronous exports are wrapped (a `shell` option refused outright), `process.execve` is removed, and
@@ -125,18 +128,34 @@ const context: ProcessContext = Object.freeze({
   systemRoot: process.env["SystemRoot"] ?? null,
   may: (scope: "fs.read" | "fs.write", path: string) => has?.(scope, path) ?? false,
 });
+const CHANNEL_FD = 3;
+/**
+ * The stdio a child gets, its fd 3 never the worker's channel: entries the caller named, and `ignore` at fd 3 unless it named `pipe`,
+ * `overlapped` or `ignore` there. Null when it asks to hand the child a descriptor or a stream at fd 3 (or inherit it).
+ */
+function stdioWithoutChannel(stdio: unknown): unknown[] | null {
+  const entries: unknown[] = typeof stdio === "string" ? [stdio, stdio, stdio] : Array.isArray(stdio) ? [...(stdio as unknown[])] : stdio == null ? [] : [null];
+  if (entries.length <= CHANNEL_FD || entries[CHANNEL_FD] == null) {
+    entries[CHANNEL_FD] = "ignore";
+    return entries;
+  }
+  const at = entries[CHANNEL_FD];
+  return at === "pipe" || at === "overlapped" || at === "ignore" ? entries : null;
+}
 const envPairsOf = (env: unknown): string[] => (env !== null && typeof env === "object" ? Object.entries(env as Record<string, unknown>).map(([k, v]) => `${k}=${String(v)}`) : []);
 
 type Loose = Record<string, unknown>;
 // the declarations below run when the module is loaded as the worker's preload; processAllowed is also imported by tests
 const proto = (childProcess as unknown as { ChildProcess: { prototype: Loose } }).ChildProcess.prototype;
 const originalSpawn = proto["spawn"] as (this: unknown, options: { file?: string; args?: string[] }) => unknown;
-const guardedSpawn = function guardedSpawn(this: unknown, options: { file?: string; args?: string[]; envPairs?: string[]; detached?: boolean }): unknown {
+const guardedSpawn = function guardedSpawn(this: unknown, options: { file?: string; args?: string[]; envPairs?: string[]; detached?: boolean; stdio?: unknown }): unknown {
   const file = String(options?.file ?? "");
   // options.args holds the program's own name first (argv0); envPairs the child's environment as KEY=value; a shell request has
   // already become the shell's own command line here, which no rule admits
   if (!processAllowed(file, (options?.args ?? []).slice(1), context, { env: options?.envPairs ?? [], shell: false, detached: options?.detached === true })) throw new ProcessRefused(file);
-  return originalSpawn.call(this, options);
+  const stdio = stdioWithoutChannel(options?.stdio);
+  if (stdio === null) throw new ProcessRefused(file);
+  return originalSpawn.call(this, { ...options, stdio });
 };
 Object.defineProperty(proto, "spawn", { value: guardedSpawn, writable: false, configurable: false });
 const module_ = childProcess as unknown as Loose;
@@ -147,7 +166,10 @@ for (const name of ["spawnSync", "execFileSync"] as const) {
     // no env option: the child gets this process's whole environment
     const request: SpawnRequest = { env: envPairsOf(opts?.env ?? process.env), shell: opts?.shell !== undefined && opts.shell !== false, detached: opts?.detached === true };
     if (!processAllowed(String(file), Array.isArray(args) ? (args as string[]) : [], context, request)) throw new ProcessRefused(String(file));
-    return original(file, args, options);
+    const stdio = stdioWithoutChannel((opts as { stdio?: unknown } | undefined)?.stdio);
+    if (stdio === null) throw new ProcessRefused(String(file));
+    const own = { ...(opts ?? {}), stdio };
+    return Array.isArray(args) ? original(file, args, own) : original(file, own);
   };
 }
 // a shell command line is never one of the allowed programs
