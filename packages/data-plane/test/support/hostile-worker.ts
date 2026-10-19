@@ -1,23 +1,25 @@
-// TEST ONLY — a hostile worker (B14-A; docs/design/B14-A-worker-executor.md §8): started by LocalProcessWorkerHost exactly as the real
-// worker is (the same permission flags, the same empty environment, the same IPC channel and broker), it tries what a compromised worker
-// would and reports what happened, as the `refusal` of its one result (a JSON of observations; never a customer value). Its ticket's
-// locale picks the behaviour: "hostile-probe" (files, network, environment, broker, child processes) or "hostile-allocate" (memory).
-import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
+// TEST ONLY — a hostile worker (B14-A; docs/design/B14-A-worker-executor.md §8, B14-A-recovery.md): started by LocalProcessWorkerHost
+// exactly as the real worker is (the same permission flags, the same empty environment, the same channel on fd 3 and broker), it tries
+// what a misbehaving or compromised worker would and reports what happened, as the `refusal` of its one result (a JSON of observations;
+// never a customer value). Its ticket's locale picks the behaviour: "hostile-probe" (files, network, environment, broker, and the local
+// limit: a native child), "hostile-allocate" (memory), "hostile-spin" (stuck), or one of the channel's misuses ("hostile-garbage",
+// "hostile-huge", "hostile-header", "hostile-message", "hostile-nodrain").
+import { spawnSync } from "node:child_process";
 import dns from "node:dns";
-import { appendFileSync, chmodSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { WorkerRpc, type HostMessage, type WorkerMessage, type WorkerResultReport } from "../../src/index.js";
+import { FrameDecoder, WorkerRpc, encodeFrame, type HostMessage, type WorkerMessage, type WorkerResultReport } from "../../src/index.js";
 
 const args = process.argv.slice(2);
 const scratchRoot = args[args.indexOf("--scratch-root") + 1] as string;
-const send = (m: WorkerMessage): void => void process.send?.(m);
-const rpc = new WorkerRpc(send);
+const socket = new net.Socket({ fd: 3, readable: true, writable: true });
+const send = (m: WorkerMessage, written?: () => void): void => void socket.write(encodeFrame(m), () => written?.());
+const rpc = new WorkerRpc((m) => send(m));
 
 function finish(observations: unknown): void {
   const result: WorkerResultReport = { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: JSON.stringify(observations), peakScratchBytes: 0, peakMemoryBytes: 0 };
-  process.send?.({ t: "result", result } satisfies WorkerMessage, undefined, {}, () => process.disconnect?.());
+  send({ t: "result", result }, () => process.exit(0));
 }
 
 const outcome = (f: () => unknown): string => {
@@ -38,21 +40,21 @@ const settle = async (f: () => Promise<unknown>): Promise<string> => {
   }
 };
 
-async function probe(ticket: { capability: { stagingPrefix: string }; render: { locale: string } }, probeData: { port: number; neighbourObject: string; neighbourGeneration: string; neighbourPrefix: string; otherScratchFile: string; secretFile: string; otherTicket: string }): Promise<void> {
+async function probe(ticket: { capability: { stagingPrefix: string } }, probeData: { port: number; neighbourObject: string; neighbourGeneration: string; neighbourPrefix: string; otherScratchFile: string; secretFile: string; hostRecords: string }): Promise<void> {
   const observations: Record<string, unknown> = {};
   observations["envKeys"] = Object.keys(process.env).sort();
   observations["readOtherAttemptScratch"] = outcome(() => readFileSync(probeData.otherScratchFile));
-  observations["readOtherJobTicket"] = outcome(() => readFileSync(probeData.otherTicket));
+  observations["readHostRecords"] = outcome(() => readFileSync(probeData.hostRecords));
   observations["readSecretFile"] = outcome(() => readFileSync(probeData.secretFile));
   observations["writeOutsideOwnScratch"] = outcome(() => writeFileSync(join(scratchRoot, "escape.txt"), "x"));
-  observations["writeHostRoot"] = outcome(() => writeFileSync(join(dirname(probeData.otherTicket), "planted.json"), "x"));
+  observations["writeHostRoot"] = outcome(() => writeFileSync(join(dirname(probeData.hostRecords), "planted.json"), "x"));
   observations["procEnvironOfHost"] = process.platform === "linux" ? outcome(() => readFileSync(`/proc/${process.ppid}/environ`)) : "NOT_LINUX";
   observations["netConnect"] = await settle(
     () =>
       new Promise<void>((resolve, reject) => {
         try {
-          const socket = net.connect({ host: "127.0.0.1", port: probeData.port }, () => resolve());
-          socket.on("error", reject);
+          const s = net.connect({ host: "127.0.0.1", port: probeData.port }, () => resolve());
+          s.on("error", reject);
         } catch (error) {
           reject(error);
         }
@@ -63,170 +65,90 @@ async function probe(ticket: { capability: { stagingPrefix: string }; render: { 
   observations["brokerForeignSource"] = await settle(() => rpc.call({ op: "storage.readOpen", zone: "ACCEPTED", objectName: probeData.neighbourObject, generation: probeData.neighbourGeneration }));
   observations["brokerForeignPrefix"] = await settle(() => rpc.call({ op: "storage.createSession", zone: "STAGING", objectName: `${probeData.neighbourPrefix}00000000-0000-8000-8000-000000000000`, declaredBytes: 1, contentType: "x", timeoutMs: 1000 }));
   observations["brokerDelivery"] = await settle(() => rpc.call({ op: "storage.readOpen", zone: "DELIVERY" as never, objectName: `${ticket.capability.stagingPrefix}x`, generation: "1" }));
-  // child processes: the worker's process allowlist (worker-preload.ts) admits only Node under a permission no wider than the worker's,
-  // the named browser and its own taskkill; every other way out is refused before a process exists
-  const read = `try{require("fs").readFileSync(${JSON.stringify(probeData.secretFile)});console.log("READ")}catch(e){console.log(e.code)}`;
-  const ran = (f: () => { stdout?: unknown; status?: number | null }): string => {
-    try {
-      const r = f();
-      return String(r.stdout ?? "").includes("a secret of the host") || String(r.stdout ?? "").trim() === "READ" ? "READ" : String(r.stdout ?? "").trim() || `EXIT_${r.status}`;
-    } catch (error) {
-      return String((error as { code?: unknown }).code ?? (error as Error).name);
-    }
-  };
-  observations["nodeChildPlain"] = ran(() => spawnSync(process.execPath, ["-e", read], { encoding: "utf8", env: {} }));
-  observations["nodeChildWiderPermission"] = ran(() => spawnSync(process.execPath, ["--permission", "--allow-fs-read=*", "-e", read], { encoding: "utf8", env: {} }));
-  observations["nodeChildOwnPermission"] = ran(() => spawnSync(process.execPath, ["--permission", `--allow-fs-read=${process.execPath}`, "-e", read], { encoding: "utf8", env: {} }));
-  observations["nodeChildNodeOptions"] = ran(() => spawnSync(process.execPath, ["--permission", "-e", read], { encoding: "utf8", env: { NODE_OPTIONS: "--allow-fs-read=*" } }));
-  // review round 2: a permission negation, a script with the network the parent's preload refuses, a shell behind an allowed program
-  observations["nodeChildNoPermission"] = ran(() => spawnSync(process.execPath, ["--permission", "--no-permission", "-e", read], { encoding: "utf8", env: {} }));
-  const connect = `require("node:net").connect({host:"127.0.0.1",port:${probeData.port}}).on("connect",()=>{console.log("READ");process.exit(0)}).on("error",(e)=>{console.log(e.code);process.exit(0)})`;
-  observations["nodeChildNetwork"] = ran(() => spawnSync(process.execPath, ["--permission", `--allow-fs-read=${process.execPath}`, "-e", connect], { encoding: "utf8", env: {}, timeout: 10_000 }));
-  const shellLine = process.platform === "win32" ? `& type "${probeData.secretFile}"` : `; cat "${probeData.secretFile}"`;
-  observations["shellOptionSpawnSync"] = ran(() => spawnSync(process.execPath, ["--permission", shellLine], { encoding: "utf8", env: {}, shell: true }));
-  observations["shellOptionExecFileSync"] = ran(() => ({ stdout: execFileSync(process.execPath, ["--permission", shellLine], { encoding: "utf8", env: {}, shell: true }) }));
-  observations["detachedNodeChild"] = ran(() => spawnSync(process.execPath, ["--permission", "-e", read], { encoding: "utf8", env: {}, detached: true } as never));
-  observations["execve"] = ran(() => {
-    (process as unknown as { execve(file: string, args: string[]): void }).execve(process.platform === "win32" ? join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe") : "/bin/cat", [probeData.secretFile]);
-    return { stdout: "", status: 0 };
-  });
-  observations["nativeChild"] = ran(() => (process.platform === "win32" ? spawnSync(join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe"), ["/d", "/c", "type", probeData.secretFile], { encoding: "utf8", windowsHide: true }) : spawnSync("/bin/cat", [probeData.secretFile], { encoding: "utf8" })));
-  observations["shellExec"] = ran(() => ({ stdout: execSync(process.platform === "win32" ? `type "${probeData.secretFile}"` : `cat "${probeData.secretFile}"`, { encoding: "utf8" }) }));
-  // review round 3 (R3-1): the guard's rules are out of reach — not exported, and a replaced permission check changes nothing
-  const imports = process.execArgv.flatMap((a, i) => (process.execArgv[i - 1] === "--import" ? [a] : []));
-  const processPreload = imports[imports.length - 1] as string;
-  observations["commandSpecExported"] = String(typeof ((await import(processPreload)) as Record<string, unknown>)["CORE_CHILD_COMMAND"]);
-  const codeRoot = dirname(dirname(fileURLToPath(processPreload)));
-  try {
-    (process as unknown as { permission: { has: () => boolean } }).permission.has = () => true;
-  } catch {
-    // not writable: nothing to tamper with
-  }
-  const widerCore = ["--permission", `--allow-fs-read=${dirname(probeData.secretFile)}`, `--allow-fs-write=${dirname(probeData.secretFile)}`, "--disallow-code-generation-from-strings", "--max-old-space-size=64", "--import", imports[0] as string, "--import", pathToFileURL(join(codeRoot, "cores", "child-preload-fs.js")).href, join(codeRoot, "cores", "core-child.js")];
-  observations["permissionTamperedCoreChild"] = ran(() => spawnSync(process.execPath, widerCore, { encoding: "utf8", env: {}, timeout: 10_000 }));
-  observations["asyncShellSpawn"] = await new Promise<string>((resolve) => {
-    try {
-      const c = spawn(process.execPath, ["--permission", shellLine], { shell: true, env: {} });
-      let out = "";
-      c.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-      c.on("close", () => resolve(out.includes("a secret of the host") ? "READ" : "NO_OUTPUT"));
-      c.on("error", (e: { code?: string }) => resolve(String(e.code)));
-    } catch (error) {
-      resolve(String((error as { code?: unknown }).code ?? (error as Error).name));
-    }
-  });
-  observations["asyncSpawn"] = await new Promise<string>((resolve) => {
-    try {
-      const c = spawn(process.platform === "win32" ? join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe") : "/bin/cat", process.platform === "win32" ? ["/d", "/c", "type", probeData.secretFile] : [probeData.secretFile]);
-      let out = "";
-      c.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-      c.on("close", () => resolve(out.includes("a secret of the host") ? "READ" : "NO_OUTPUT"));
-      c.on("error", (e: { code?: string }) => resolve(String(e.code)));
-    } catch (error) {
-      resolve(String((error as { code?: unknown }).code ?? (error as Error).name));
-    }
-  });
+  // THE LOCAL LIMIT (B14-A-recovery.md §6): the worker may start processes (the core's child, the browser), and a native program it
+  // starts is outside Node's permission model. A compromised worker could read the host user's files this way; the boundary against
+  // it is the cloud task, not the local host. Observed, not hidden.
+  const nativeRead = process.platform === "win32" ? spawnSync(join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe"), ["/d", "/c", "type", probeData.secretFile], { encoding: "utf8", windowsHide: true }) : spawnSync("/bin/cat", [probeData.secretFile], { encoding: "utf8" });
+  observations["nativeChildRead"] = String(nativeRead.stdout ?? "").includes("a secret of the host") ? "READ" : String(nativeRead.error ?? `EXIT_${nativeRead.status}`);
   finish(observations);
 }
 
-process.on("message", (message: HostMessage) => {
-  if (message?.t !== "ticket") {
-    rpc.receive(message);
-    return;
+/** The channel's misuses: each is outside the protocol, and the host must end the attempt without ending itself. */
+function misuse(locale: string, ticket: { capability: { stagingPrefix: string } }): boolean {
+  const prefix = (header: number, body: number): Buffer => {
+    const b = Buffer.alloc(8);
+    b.writeUInt32BE(header, 0);
+    b.writeUInt32BE(body, 4);
+    return b;
+  };
+  switch (locale) {
+    case "hostile-garbage":
+      // bytes that are no frame at all (a header length of zero)
+      socket.write(Buffer.alloc(64, 0));
+      return true;
+    case "hostile-huge": {
+      // review round 21 (R21-2): a frame declaring a 4 GiB body, its bytes trickled with one reusable buffer
+      socket.write(prefix(16, 0xffffffff));
+      const piece = Buffer.alloc(64 * 1024, 1);
+      const trickle = (): void => void socket.write(piece, () => setTimeout(trickle, 1));
+      trickle();
+      return true;
+    }
+    case "hostile-header": {
+      // review round 21 (R21-1): a frame whose header is not UTF-8 JSON
+      const header = Buffer.from([0xff, 0x00, 0xfe, 0x01]);
+      socket.write(Buffer.concat([prefix(header.byteLength, 0), header]));
+      return true;
+    }
+    case "hostile-message":
+      // review round 20 (R20-1): well-framed, but no message of the protocol (Node's own IPC commands, a call without an id)
+      socket.write(encodeFrame({ cmd: "NODE_HANDLE_ACK" }));
+      socket.write(encodeFrame({ t: "call", call: { op: "storage.stat" } }));
+      return true;
+    case "hostile-nodrain": {
+      // review round 19 (R19-1): it stops reading its channel and keeps asking — the host must stop reading too, never queue replies
+      socket.pause();
+      socket.removeAllListeners("data");
+      let id = 1_000_000;
+      const objectName = `${ticket.capability.stagingPrefix}00000000-0000-8000-8000-000000000000`;
+      const flood = (): void => {
+        let more = true;
+        for (let i = 0; i < 200 && more; i++) more = socket.write(encodeFrame({ t: "call", id: id++, call: { op: "storage.stat", zone: "STAGING", objectName } } satisfies WorkerMessage));
+        setTimeout(flood, more ? 1 : 50);
+      };
+      flood();
+      return true;
+    }
+    default:
+      return false;
   }
-  const doc = JSON.parse(Buffer.from(message.bytes).toString("utf8")) as { payload: { capability: { stagingPrefix: string }; render: { locale: string; rendererVersion: string } } };
-  const ticket = doc.payload;
-  if (ticket.render.locale === "hostile-allocate") {
-    // the heap, which --max-old-space-size bounds (a Buffer would be outside it)
-    const hoard: number[][] = [];
-    for (;;) hoard.push(new Array<number>(1_000_000).fill(hoard.length + 0.5));
+}
+
+const decoder = new FrameDecoder();
+socket.on("data", (bytes: Buffer) => {
+  decoder.push(bytes);
+  for (let message = decoder.next() as HostMessage | null; message !== null; message = decoder.next() as HostMessage | null) {
+    if (message.t !== "ticket") {
+      rpc.receive(message);
+      continue;
+    }
+    const doc = JSON.parse(Buffer.from(message.bytes).toString("utf8")) as { payload: { capability: { stagingPrefix: string }; render: { locale: string; rendererVersion: string } } };
+    const ticket = doc.payload;
+    const locale = ticket.render.locale;
+    if (locale === "hostile-allocate") {
+      // the heap, which --max-old-space-size bounds (a Buffer would be outside it)
+      const hoard: number[][] = [];
+      for (;;) hoard.push(new Array<number>(1_000_000).fill(hoard.length + 0.5));
+    }
+    if (locale === "hostile-spin") {
+      // stuck in synchronous work: no handler of its own can run any more
+      for (;;) Math.sqrt(Math.random());
+    }
+    if (misuse(locale, ticket)) {
+      setInterval(() => undefined, 1_000);
+      return;
+    }
+    void probe(ticket, JSON.parse(ticket.render.rendererVersion) as Parameters<typeof probe>[1]);
   }
-  if (ticket.render.locale === "hostile-buffers") {
-    // native memory outside the heap, touched so it is resident: only the supervisor's view of the tree bounds it
-    const hoard: Buffer[] = [];
-    const grow = (): void => {
-      hoard.push(Buffer.alloc(32 * 1024 * 1024, hoard.length % 251));
-      setTimeout(grow, 20);
-    };
-    grow();
-    return;
-  }
-  if (ticket.render.locale === "hostile-unlinked") {
-    // review round 3 (R3-3): a file whose name is removed at once, written through its descriptor past the attempt's hard scratch
-    const fd = openSync(join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden.bin"), "w");
-    unlinkSync(join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden.bin"));
-    const chunk = Buffer.alloc(1024 * 1024, 7);
-    const grow = (): void => {
-      writeSync(fd, chunk);
-      setTimeout(grow, 5);
-    };
-    grow();
-    return;
-  }
-  if (ticket.render.locale === "hostile-internal") {
-    // review round 20 (R20-1): Node's own IPC commands, unsolicited — the host must not trust them (nor crash on them)
-    for (const cmd of ["NODE_HANDLE_ACK", "NODE_HANDLE_NACK", "NODE_HANDLE"]) process.send?.({ cmd } as never);
-    setInterval(() => undefined, 1_000);
-    return;
-  }
-  if (ticket.render.locale === "hostile-nodrain") {
-    // review round 19 (R19-1): it stops reading its channel and keeps asking — the host's replies would queue without bound
-    const kChannelHandle = Object.getOwnPropertySymbols(process).find((sym) => sym.description === "kChannelHandle");
-    (process as unknown as Record<symbol, { readStop(): void }>)[kChannelHandle as symbol]?.readStop();
-    const prefix = ticket.capability.stagingPrefix;
-    let id = 1_000_000;
-    const flood = (): void => {
-      for (let i = 0; i < 200; i++) process.send?.({ t: "call", id: id++, call: { op: "storage.stat", zone: "STAGING", objectName: `${prefix}00000000-0000-8000-8000-000000000000` } } satisfies WorkerMessage);
-      setTimeout(flood, 1);
-    };
-    flood();
-    return;
-  }
-  if (ticket.render.locale === "hostile-dirs") {
-    // review round 14 (R14-1): empty directories only, each taking its own blocks
-    const base = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`);
-    let n = 0;
-    const grow = (): void => {
-      for (let i = 0; i < 64; i++) mkdirSync(join(base, `d${n++}`));
-      setTimeout(grow, 5);
-    };
-    grow();
-    return;
-  }
-  if (ticket.render.locale === "hostile-hidden") {
-    // review round 13 (R13-1): its own subdirectory made unreadable, a linked file in it written on through its descriptor
-    const hidden = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden");
-    mkdirSync(hidden);
-    const fd = openSync(join(hidden, "data.bin"), "w");
-    chmodSync(hidden, 0o000);
-    const chunk = Buffer.alloc(1024 * 1024, 7);
-    const grow = (): void => {
-      writeSync(fd, chunk);
-      setTimeout(grow, 5);
-    };
-    grow();
-    return;
-  }
-  if (ticket.render.locale === "hostile-title") {
-    // review round 3 (R3-2): a worker that rewrites its own command line (Linux /proc/<pid>/cmdline) and stays alive
-    process.title = "kauro-hidden";
-    setInterval(() => undefined, 1_000);
-    return;
-  }
-  if (ticket.render.locale === "hostile-disk") {
-    // writes inside its own directory past the attempt's hard scratch, outside every quota the attempt store keeps
-    const file = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "runaway.bin");
-    const chunk = Buffer.alloc(1024 * 1024, 7);
-    const grow = (): void => {
-      appendFileSync(file, chunk);
-      setTimeout(grow, 5);
-    };
-    grow();
-    return;
-  }
-  if (ticket.render.locale === "hostile-spin") {
-    // stuck in synchronous work: no handler of its own can run any more
-    for (;;) Math.sqrt(Math.random());
-  }
-  void probe(ticket, JSON.parse(ticket.render.rendererVersion) as Parameters<typeof probe>[1]);
 });
+socket.on("close", () => process.exit(0));

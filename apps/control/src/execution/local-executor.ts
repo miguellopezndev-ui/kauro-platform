@@ -1,6 +1,6 @@
 /**
  * The local executor's composition (B14-A; docs/design/B14-A-worker-executor.md §2): what a control plane binds to run real attempts on
- * this machine — LocalProcessWorkerHost (each attempt one confined @kauro/migration-worker process; EXECUTED_LOCAL) with the platform's
+ * this machine — LocalProcessWorkerHost (each attempt one @kauro/migration-worker process; EXECUTED_LOCAL, single-tenant qualification) with the platform's
  * attempt tickets, and Migration Core 3.0.0's own package verifier (the B05 adapter's `verify`, given the envelope's limits the B08
  * pipeline does not pass). The deployed control plane binds none of this (D8-PORT-1); a cloud host is B14's next part, a provider of
  * its own (docs/design/B14-A-aws-host-qualification.md).
@@ -33,9 +33,10 @@ export interface LocalExecutor {
   readonly coreVersion: string;
 }
 
-export function localExecutorOf(options: LocalExecutorOptions): LocalExecutor {
+/** Opens the host over its roots (one live host per root: HostRootInUse while another holds them) and binds the verifier. */
+export async function localExecutorOf(options: LocalExecutorOptions): Promise<LocalExecutor> {
   const tickets = new PlatformAttemptTickets({ units: options.units, ids: options.ids, ...(options.reportInputs === undefined ? {} : { reportInputs: options.reportInputs }) });
-  const host = new LocalProcessWorkerHost({ ...options.host, storage: options.storage, uploads: options.uploads, tickets, clock: options.clock });
+  const host = await LocalProcessWorkerHost.open({ ...options.host, storage: options.storage, uploads: options.uploads, tickets, clock: options.clock });
   const core = new MigrationCoreAdapter({
     attemptId: VERIFIER_CALL,
     scratchRoot: options.host.scratchRoot,

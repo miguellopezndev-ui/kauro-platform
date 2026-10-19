@@ -18,8 +18,8 @@ and no Terraform `apply` or push to ECR happened. The host these contracts are f
 
 ## The worker's protocol on S3 (what `EcsFargateWorkerHost` and the worker's S3 transport implement)
 
-The local protocol (IPC; `packages/data-plane/src/host/protocol.ts`) and this one carry the same facts. The local host's job directory
-plays the part of the claim object.
+The local protocol (frames on the worker's fd 3; `packages/data-plane/src/host/protocol.ts`, `framing.ts`) and this one carry the same
+facts. The local host's job record, written before its worker exists, plays the part of the claim object.
 
 | Key | Written by | How | Read by |
 |---|---|---|---|

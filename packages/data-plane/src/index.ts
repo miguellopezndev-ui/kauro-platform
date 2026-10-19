@@ -110,7 +110,7 @@ export { PACKAGE_MANIFEST_ROLE } from "./cores/migration-core-adapter.js";
 /**
  * The worker executor of B14-A (docs/design/B14-A-worker-executor.md): the closed attempt ticket, the local worker protocol, the
  * attempt's storage broker (the host side) and its client (the worker side), the composition of one attempt inside a worker process,
- * and LocalProcessWorkerHost — the real local WorkerHostPort (EXECUTED_LOCAL), each attempt one confined process.
+ * and LocalProcessWorkerHost — the local WorkerHostPort (EXECUTED_LOCAL, single-tenant qualification), each attempt one worker process.
  */
 export {
   ATTEMPT_TICKET_DOMAIN,
@@ -127,9 +127,15 @@ export { BrokerCallFailed, MAX_RESULT_REFUSAL_CHARS, WORKER_CALL_OPS, WORKER_PRO
 export { AttemptStorageBroker, BROKER_READ_CHUNK_BYTES, BrokerRefusal, callErrorOf, type AttemptStorageBrokerOptions, type BrokerRefusalRecord } from "./host/broker.js";
 export { BROKERED_STORAGE_PROVIDER, BrokeredObjectStorage, BrokeredUploads, WorkerRpc } from "./host/client.js";
 export { BROWSER_TEMP_DIRECTORY, WORKER_SESSION_ORIGIN, diagnosticOf, runAttemptWorker, type AttemptWorkerOptions } from "./host/worker-runtime.js";
-export { groupAlive, killOwnTree, killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxProcessOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./host/process-tree.js";
+export { encodeFrame, FRAME_MAX_BODY_BYTES, FRAME_MAX_HEADER_BYTES, FrameDecoder, FrameViolation } from "./host/framing.js";
+export { openWorkerChannel, WORKER_CHANNEL_FD, type WorkerChannel } from "./host/worker-channel.js";
+export { killOwnTree, killProcessTree, linuxDescendantsOf, processExists } from "./host/process-tree.js";
+export { HostRootInUse, acquireHostRootLock, rootLockNameOf, type HostRootLock } from "./host/root-lock.js";
+export { CANCELLED_BEFORE_CREATE, HostRecordUnreadable, JobJournal } from "./host/job-journal.js";
 export {
   BROWSER_SOCKET_ROOT_MAX_BYTES,
+  CALLS_HELD,
+  LOCAL_HOST_ISOLATION,
   LOCAL_PROCESS_HOST,
   LOCAL_PROCESS_MACHINE_TYPE,
   LocalProcessWorkerHost,

@@ -1,13 +1,14 @@
 // B14-A: the worker's closed input and its only way to storage (docs/design/B14-A-worker-executor.md §3, §4). The attempt ticket is
 // refused when it is not exactly the bytes the worker was started for, or not one attempt's complete, self-consistent input; the storage
 // broker admits exactly the attempt's capability — its sealed generations read, its own staging prefix written — and nothing after it
-// is revoked. Pure and in-process over B07's object-storage fake (CONTRACT FAKE — SIMULATED); no worker process here.
+// is revoked; the channel's frames are read within the protocol's bounds. Pure and in-process over B07's object-storage fake
+// (CONTRACT FAKE — SIMULATED); no worker process here.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { ContractFakeObjectStorage } from "@kauro/application/testing";
 import { stagedArtifactObjectNameOf } from "@kauro/application";
-import { AttemptStorageBroker, BrokerRefusal, normalizeWorkerMessage, workerResultProblem, attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, readAttemptTicket, type AttemptTicket, type WorkerCall } from "../src/index.js";
+import { AttemptStorageBroker, BrokerRefusal, FRAME_MAX_BODY_BYTES, FRAME_MAX_HEADER_BYTES, FrameDecoder, FrameViolation, encodeFrame, normalizeWorkerMessage, workerResultProblem, attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, readAttemptTicket, type AttemptTicket, type WorkerCall } from "../src/index.js";
 import { attemptFixture, collect, holderOf, sha } from "./support/attempt.js";
 import { hostLimits, plantedAttempt } from "./support/local-host.js";
 
@@ -207,7 +208,7 @@ test("B14-A broker (review round 4, R4-4): the session cap holds for concurrent 
   assert.match(String(((await first) as { handle: string }).handle), /^session-1$/);
 });
 
-test("B14-A broker (review round 16, R16-1): what an attempt makes the host hold is bounded — one chunk at a time per session, and at most a fixed number of calls and bytes waiting at once; past them a call is refused at once, holding nothing", async () => {
+test("B14-A broker (review round 16, R16-1): a session takes one chunk at a time — a second chunk while the first is being written is refused at once, holding nothing (how many calls an attempt has the host hold at once is the channel's bound, CALLS_HELD)", async () => {
   const storage = new ContractFakeObjectStorage();
   const ticket = ticketOf(storage, 5);
   const held: Array<() => void> = [];
@@ -220,25 +221,55 @@ test("B14-A broker (review round 16, R16-1): what an attempt makes the host hold
     },
   } as typeof real;
   const broker = new AttemptStorageBroker({ capability: ticket.capability, storage, uploads, origin: "https://app.kauro.test", maxObjectBytes: 1 << 20 });
-  const handles: string[] = [];
-  for (let i = 0; i < 17; i++) {
-    const objectName = `${ticket.capability.stagingPrefix}${String(i).padStart(8, "0")}-0000-8000-8000-000000000000`;
-    const session = (await broker.handle({ op: "storage.createSession", zone: "STAGING", objectName, declaredBytes: 4, contentType: "x", timeoutMs: 1000 })) as { handle: string };
-    handles.push(session.handle);
-  }
+  const objectName = `${ticket.capability.stagingPrefix}00000000-0000-8000-8000-000000000000`;
+  const { handle } = (await broker.handle({ op: "storage.createSession", zone: "STAGING", objectName, declaredBytes: 4, contentType: "x", timeoutMs: 1000 })) as { handle: string };
   const chunk = new Uint8Array([1, 2, 3, 4]);
-  const first = broker.handle({ op: "upload.writeChunk", handle: handles[0]!, chunk, final: true });
-  await assert.rejects(broker.handle({ op: "upload.writeChunk", handle: handles[0]!, chunk, final: true }), (e: unknown) => e instanceof BrokerRefusal && e.code === "SESSION_BUSY");
-  const waiting = [first, ...handles.slice(1, 16).map((handle) => broker.handle({ op: "upload.writeChunk", handle, chunk, final: true }))];
-  await assert.rejects(broker.handle({ op: "upload.writeChunk", handle: handles[16]!, chunk, final: true }), (e: unknown) => e instanceof BrokerRefusal && e.code === "TOO_MANY_PENDING");
+  const first = broker.handle({ op: "upload.writeChunk", handle, chunk, final: true });
+  await assert.rejects(broker.handle({ op: "upload.writeChunk", handle, chunk, final: true }), (e: unknown) => e instanceof BrokerRefusal && e.code === "SESSION_BUSY");
   await new Promise((r) => setImmediate(r));
   held.splice(0).forEach((release) => release());
-  await Promise.allSettled(waiting);
-  // released: the budget is free again
-  const again = broker.handle({ op: "upload.writeChunk", handle: handles[16]!, chunk, final: true });
-  await new Promise((r) => setImmediate(r));
-  held.splice(0).forEach((release) => release());
-  await again;
+  assert.equal(((await first) as { outcome: string }).outcome, "FINALIZED");
+  await assert.rejects(broker.handle({ op: "upload.writeChunk", handle, chunk: new Uint8Array(FRAME_MAX_BODY_BYTES + 1), final: true }), (e: unknown) => e instanceof BrokerRefusal);
+});
+
+test("B14-A channel frames (review round 21, R21-1, R21-2): the reader decodes one message at a time, when asked; a frame's declared lengths are refused from its prefix before any of its payload is held; a header that is not UTF-8 JSON, a body no header names or a body placed outside the protocol stops the reader for good — never an exception out of it", () => {
+  const ticket = new Uint8Array([1, 2, 3]);
+  const two = Buffer.concat([encodeFrame({ t: "ticket", protocol: "p", bytes: ticket }), encodeFrame({ t: "beat" })]);
+  const reader = new FrameDecoder();
+  // byte by byte: nothing is decoded until a frame is whole, and only when asked
+  for (const byte of two.subarray(0, two.byteLength - 1)) reader.push(Uint8Array.of(byte));
+  const first = reader.next();
+  assert.deepEqual(first, { t: "ticket", protocol: "p", bytes: ticket });
+  assert.equal(reader.next(), null, "the second frame is not whole yet");
+  reader.push(two.subarray(two.byteLength - 1));
+  assert.deepEqual(reader.next(), { t: "beat" });
+  assert.equal(reader.heldBytes, 0);
+
+  const prefix = (header: number, body: number): Buffer => {
+    const b = Buffer.alloc(8);
+    b.writeUInt32BE(header, 0);
+    b.writeUInt32BE(body, 4);
+    return b;
+  };
+  // R21-2: a 4 GiB body is refused from its eight-byte prefix; nothing after it is ever held
+  const huge = new FrameDecoder();
+  assert.throws(() => huge.push(prefix(2, 0xffffffff)), FrameViolation);
+  assert.equal(huge.heldBytes, 0);
+  assert.throws(() => huge.push(Buffer.alloc(64 * 1024)), FrameViolation, "a reader that refused stays refused");
+  assert.throws(() => new FrameDecoder().push(prefix(FRAME_MAX_HEADER_BYTES + 1, 0)), FrameViolation);
+  assert.throws(() => new FrameDecoder().push(prefix(0, 0)), FrameViolation);
+  // R21-1: bytes that are not the protocol's are refused by the reader, which throws only its own FrameViolation
+  const garbage = (header: Buffer, body: Buffer = Buffer.alloc(0)): void => {
+    const r = new FrameDecoder();
+    r.push(Buffer.concat([prefix(header.byteLength, body.byteLength), header, body]));
+    assert.throws(() => r.next(), FrameViolation);
+  };
+  garbage(Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+  garbage(Buffer.from("[1,2]"));
+  garbage(Buffer.from('{"t":"beat"}'), Buffer.from([1]));
+  garbage(Buffer.from('{"t":"beat","~body":"elsewhere"}'), Buffer.from([1]));
+  // a message too large for a frame is refused by its writer
+  assert.throws(() => encodeFrame({ t: "ticket", protocol: "p", bytes: new Uint8Array(FRAME_MAX_BODY_BYTES + 1) }));
 });
 
 test("B14-A broker and protocol (review round 17, R17-1): nothing a worker sends is kept unbounded — an unknown operation is recorded as UNKNOWN, never as its own string, and a result outside the closed, bounded shape is no result", async () => {
@@ -269,7 +300,7 @@ test("B14-A protocol (review round 18, R18-1): the host keeps only the protocol'
   assert.notEqual(kept.call.chunk.buffer, frame.buffer);
   assert.deepEqual(normalizeWorkerMessage({ t: "call", id: 8, call: { op: "storage.stat", zone: "STAGING", objectName: "x".repeat(4096) } }), { t: "invalid", id: 8, problem: "MALFORMED_CALL" });
   assert.deepEqual(normalizeWorkerMessage({ t: "call", id: 9, call: { op: "x".repeat(1 << 16) } }), { t: "invalid", id: 9, problem: "MALFORMED_CALL" });
-  assert.equal(normalizeWorkerMessage({ t: "call", id: "nine", call: {} }), null, "no answerable id: ignored");
+  assert.equal(normalizeWorkerMessage({ t: "call", id: "nine", call: {} }), null, "no answerable id: not one of the protocol's (the host ends the attempt)");
   const result = normalizeWorkerMessage({ t: "result", result: { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, padding: 1 } });
   assert.deepEqual(result, { t: "result", result: { state: "FAILED", cause: "WORKER_ERROR", manifest: null, refusal: "RESULT_FIELDS", peakScratchBytes: 0, peakMemoryBytes: 0 } });
 });

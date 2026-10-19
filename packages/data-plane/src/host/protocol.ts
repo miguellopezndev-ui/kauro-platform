@@ -1,12 +1,14 @@
 /**
  * The local worker protocol (B14-A; docs/design/B14-A-worker-executor.md §4): the messages between the local process host and the
- * worker process it started, over the child's private IPC channel (Node's advanced serialization, so bytes travel as bytes).
+ * worker process it started, over the worker's channel — a plain pipe on its fd 3, in the protocol's own frames (framing.ts), so bytes
+ * travel as bytes and nothing but these messages crosses it.
  *
- * The channel is the worker's only way out. It carries the ticket in, the worker's stage reports and heartbeats, its calls to the
- * attempt's storage broker (each answered by the host after the broker checked it against the attempt's capability), and its one
+ * The channel is the worker's only way to storage. It carries the ticket in, the worker's stage reports and heartbeats, its calls to
+ * the attempt's storage broker (each answered by the host after the broker checked it against the attempt's capability), and its one
  * result. A resumable session's bearer reference never crosses it: the worker holds an opaque handle the broker maps.
  */
 import type { ObjectObservation, WorkerFailureCause, WorkerManifestReference } from "@kauro/application";
+import { FRAME_MAX_BODY_BYTES } from "./framing.js";
 
 export const WORKER_PROTOCOL_VERSION = "kauro-worker-protocol/1";
 
@@ -73,8 +75,8 @@ export function workerResultProblem(result: unknown): string | null {
   return null;
 }
 
-/** The largest chunk a call may carry (as the broker's own bound). */
-const MAX_CALL_CHUNK_BYTES = 64 * 1024 * 1024;
+/** The largest chunk a call may carry: one frame's body (framing.ts). */
+const MAX_CALL_CHUNK_BYTES = FRAME_MAX_BODY_BYTES;
 
 /** A message the host can answer only with a refusal: its id (when it has one it can be answered by) and why. */
 export interface InvalidWorkerMessage {
@@ -89,7 +91,8 @@ const timeoutOf = (v: unknown): number => (typeof v === "number" && Number.isFin
 /**
  * What the host keeps of a message from a worker (review round 18, R18-1): a fresh object of the closed protocol's own fields, each of
  * its type and bounded, and a chunk copied into bytes of its own — so nothing else the worker sent, and not the frame it arrived in,
- * is held while the call waits. Null for a message the host ignores (no answerable id); an invalid call is answered with a refusal.
+ * is held while the call waits. Null for a message that is not one of the protocol's (the host ends the attempt); a call it cannot
+ * serve, with an id it can be answered by, is answered with a refusal.
  */
 export function normalizeWorkerMessage(raw: unknown): WorkerMessage | InvalidWorkerMessage | null {
   if (raw === null || typeof raw !== "object") return null;

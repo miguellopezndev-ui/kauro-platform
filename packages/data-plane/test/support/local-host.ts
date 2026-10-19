@@ -14,7 +14,7 @@ import type { RowCounts, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CoreInputRef, ExecutionLimits, WorkerLaunchSpec } from "@kauro/application";
 import { ContractFakeObjectStorage } from "@kauro/application/testing";
 import { toUtcInstant, type Clock } from "@kauro/domain";
-import { LocalProcessWorkerHost, MigrationCoreAdapter, coreTimersOf, findChromiumExecutable, type AuthorizedReportInputs, type LocalProcessHostHooks, type ReportScope } from "../../src/index.js";
+import { LOCAL_HOST_ISOLATION, LocalProcessWorkerHost, MigrationCoreAdapter, coreTimersOf, findChromiumExecutable, type AuthorizedReportInputs, type LocalProcessHostHooks, type LocalProcessWorkerHostOptions, type ReportScope } from "../../src/index.js";
 import { attemptFixture, holderOf, limitsOf, sha, v7, type AttemptFixture } from "./attempt.js";
 import { CONTACTS_CSV, configDocument, memorySource } from "./core-config.js";
 import { platformInputsOf } from "./platform-inputs.js";
@@ -101,65 +101,77 @@ export async function receiptOf(planted: Planted, scratchRoot: string): Promise<
 
 export interface LocalRig {
   readonly storage: ContractFakeObjectStorage;
+  /** The live host (one per root): the one `reopen` opened last. */
   readonly host: LocalProcessWorkerHost;
   readonly root: string;
   readonly hostRoot: string;
   readonly scratchRoot: string;
   /** What the ticket source answers per attempt id (tests edit it). */
   readonly reads: Map<string, { planBinding: { configDocument: unknown; coreConfigHash: Sha256Hex } | null; inputs: readonly CoreInputRef[]; reportInputs: AuthorizedReportInputs | null }>;
-  /** A second host over the same roots (a restarted control plane), on its own clock if one is given. */
-  restart(clock?: Clock): LocalProcessWorkerHost;
+  /** A restarted control plane: the live host stops (its running workers end TERMINATED), then a new one opens the same roots. */
+  reopen(overrides?: Partial<LocalProcessWorkerHostOptions>): Promise<LocalProcessWorkerHost>;
+  /** The host's options over this rig's roots (a test opens its own with changes). */
+  options(overrides?: Partial<LocalProcessWorkerHostOptions>): LocalProcessWorkerHostOptions;
   dispose(): Promise<void>;
 }
 
-export function localRig(options: { readonly root?: string; readonly render?: typeof RENDER | { pageSize: "LETTER"; locale: string; rendererVersion: string }; readonly workerEntry?: string; readonly hooks?: LocalProcessHostHooks; readonly maxWallClockMs?: number; readonly workerHeapMegabytes?: number; readonly coreHeapMegabytes?: number; readonly terminationGraceMs?: number } = {}): LocalRig {
+export type LocalRigOptions = { readonly root?: string; readonly render?: typeof RENDER | { pageSize: "LETTER"; locale: string; rendererVersion: string }; readonly workerEntry?: string; readonly hooks?: LocalProcessHostHooks; readonly maxWallClockMs?: number; readonly workerHeapMegabytes?: number; readonly coreHeapMegabytes?: number; readonly terminationGraceMs?: number; readonly creationHorizonSeconds?: number; readonly browserReserveBytes?: number };
+
+export async function localRig(options: LocalRigOptions = {}): Promise<LocalRig> {
   if (BROWSER === null) throw new Error("no Chromium-family browser (set KAURO_PDF_BROWSER)");
+  const browser = BROWSER;
   const root = options.root ?? mkdtempSync(join(tmpdir(), "kauro-b14a-"));
   const hostRoot = join(root, "host");
   const scratchRoot = join(root, "scratch");
   const storage = new ContractFakeObjectStorage();
   const reads: LocalRig["reads"] = new Map();
-  const make = (clock: Clock = WALL): LocalProcessWorkerHost =>
-    new LocalProcessWorkerHost({
-      workerEntry: options.workerEntry ?? WORKER_ENTRY,
-      codeRoots: [REPO_ROOT],
-      hostRoot,
-      scratchRoot,
-      chromiumExecutable: BROWSER,
-      storage,
-      uploads: holderOf(storage),
-      tickets: {
-        read: (spec: WorkerLaunchSpec) => {
-          const r = reads.get(spec.capability.attemptId);
-          if (r === undefined) return Promise.reject(new Error(`no reads for ${spec.capability.attemptId}`));
-          return Promise.resolve(r as never);
-        },
+  const optionsOf = (overrides: Partial<LocalProcessWorkerHostOptions> = {}, clock: Clock = WALL): LocalProcessWorkerHostOptions => ({
+    isolation: LOCAL_HOST_ISOLATION,
+    workerEntry: options.workerEntry ?? WORKER_ENTRY,
+    codeRoots: [REPO_ROOT],
+    hostRoot,
+    scratchRoot,
+    chromiumExecutable: browser,
+    storage,
+    uploads: holderOf(storage),
+    tickets: {
+      read: (spec: WorkerLaunchSpec) => {
+        const r = reads.get(spec.capability.attemptId);
+        if (r === undefined) return Promise.reject(new Error(`no reads for ${spec.capability.attemptId}`));
+        return Promise.resolve(r as never);
       },
-      render: options.render ?? RENDER,
-      corePackageHash: CORE_PACKAGE_HASH,
-      clock,
-      sessionOrigin: "https://app.kauro.test",
-      workerHeapMegabytes: options.workerHeapMegabytes ?? 512,
-      coreHeapMegabytes: options.coreHeapMegabytes ?? 512,
-      ...(options.maxWallClockMs === undefined ? {} : { maxWallClockMs: options.maxWallClockMs }),
-      ...(options.terminationGraceMs === undefined ? {} : { terminationGraceMs: options.terminationGraceMs }),
-      ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
-    });
-  const hosts: LocalProcessWorkerHost[] = [make()];
+    },
+    render: options.render ?? RENDER,
+    corePackageHash: CORE_PACKAGE_HASH,
+    clock,
+    sessionOrigin: "https://app.kauro.test",
+    workerHeapMegabytes: options.workerHeapMegabytes ?? 512,
+    coreHeapMegabytes: options.coreHeapMegabytes ?? 512,
+    ...(options.maxWallClockMs === undefined ? {} : { maxWallClockMs: options.maxWallClockMs }),
+    ...(options.terminationGraceMs === undefined ? {} : { terminationGraceMs: options.terminationGraceMs }),
+    ...(options.creationHorizonSeconds === undefined ? {} : { creationHorizonSeconds: options.creationHorizonSeconds }),
+    ...(options.browserReserveBytes === undefined ? {} : { browserReserveBytes: options.browserReserveBytes }),
+    ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
+    ...overrides,
+  });
+  let host = await LocalProcessWorkerHost.open(optionsOf());
   return {
     storage,
-    host: hosts[0]!,
+    get host() {
+      return host;
+    },
     root,
     hostRoot,
     scratchRoot,
     reads,
-    restart(clock?: Clock) {
-      const next = make(clock);
-      hosts.push(next);
-      return next;
+    async reopen(overrides?: Partial<LocalProcessWorkerHostOptions>) {
+      await host.stop();
+      host = await LocalProcessWorkerHost.open(optionsOf(overrides));
+      return host;
     },
+    options: (overrides) => optionsOf(overrides),
     async dispose() {
-      for (const h of hosts) await h.stop();
+      await host.stop();
       if (options.root === undefined) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };

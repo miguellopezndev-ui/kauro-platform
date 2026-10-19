@@ -86,9 +86,10 @@ never re-creates an identity outside the token's guaranteed hour:
    that is not the current attempt's (S056, S061).
 
 A late `RunTask` retry with the same token but a different request answers `ConflictException` with the existing task's ARN [B1].
-The adapter treats that as `ALREADY_EXISTS` (adopt). The local executor implements the equivalent guarantees with real processes: an
-exclusive, atomically prepared job directory is the create, a bounded read keeps a create from landing late, and a supervisor ends the
-tree (B14-A-worker-executor.md §5). Whether ECS behaves as documented under load is what §6 must prove before the adapter is written.
+The adapter treats that as `ALREADY_EXISTS` (adopt). The local executor implements the equivalent guarantees with real processes and
+one live host per root: a durable record written before the worker exists is the create, a bounded read keeps a create from landing
+late, and the kernel ends the worker's tree with its host (B14-A-worker-executor.md §5, B14-A-recovery.md). Whether ECS behaves as
+documented under load is what §6 must prove before the adapter is written.
 
 ## 4. Credentials, network and storage (I4, I7)
 

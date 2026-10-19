@@ -15,8 +15,8 @@ import { BROWSER, BROWSER_REQUIRED, localRig, plantedAttempt, readsFor } from ".
 
 const skip = BROWSER === null && !BROWSER_REQUIRED ? "no Chromium-family browser (set KAURO_PDF_BROWSER)" : false;
 
-test("B14-A OK (EXECUTED_LOCAL): one launch runs Migration Core 3.0.0 and the report in a confined worker process; the manifest names the package's files, the PDF and its record, each read back from the attempt's own prefix, and the PDF is the one its record names for this scope", { skip }, async () => {
-  const rig = localRig();
+test("B14-A OK (EXECUTED_LOCAL): one launch runs Migration Core 3.0.0 and the report in a worker process under the permission model; the manifest names the package's files, the PDF and its record, each read back from the attempt's own prefix, and the PDF is the one its record names for this scope", { skip }, async () => {
+  const rig = await localRig();
   try {
     const planted = plantedAttempt(rig.storage, 1);
     await readsFor(rig, planted);
@@ -60,9 +60,9 @@ ${rig.host.diagnostics(spec.identity)}`);
     assert.equal(existsSync(browserTempDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId)), false);
     assert.ok(record!.flags.includes("--permission"));
     assert.ok(record!.flags.some((f) => f.startsWith("--allow-fs-write=")));
-    assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")), [spec.identity]);
-    // the host's reading of the end came first: its supervisor is stood down for good, no verdict can follow (review round 7, R7-2)
-    assert.equal(JSON.parse(readFileSync(join(rig.hostRoot, "jobs", spec.identity, "supervisor.json"), "utf8")).verdict, "STOOD_DOWN");
+    // the host's durable evidence is one record per identity, its last version complete (no temporary file left)
+    assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")), [`${spec.identity}.json`]);
+    assert.equal(JSON.parse(readFileSync(join(rig.hostRoot, "jobs", `${spec.identity}.json`), "utf8")).state, "SUCCEEDED");
   } finally {
     await rig.dispose();
   }

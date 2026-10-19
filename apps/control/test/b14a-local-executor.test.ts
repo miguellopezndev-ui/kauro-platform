@@ -17,6 +17,7 @@ import { after, afterEach, before, test } from "node:test";
 import type { ExecutionLimits, ResumableUploadAnswer, ResumableUploadPort, WorkerHostPort } from "@kauro/application";
 import type { RowCounts, Sha256Hex } from "@kauro/contracts";
 import {
+  LOCAL_HOST_ISOLATION,
   MIGRATION_CORE_VERSION,
   MigrationCoreAdapter,
   REPORT_PDF_ROLE,
@@ -125,10 +126,10 @@ afterEach(async () => {
   for (const rig of live.splice(0)) await rig.exec.host.stop();
   await w.quiesce();
 });
-function rigOf(options: { readonly hooks?: LocalProcessHostHooks; readonly reportInputs?: ReportInputsPort; readonly host?: (h: WorkerHostPort) => WorkerHostPort } = {}): Rig {
+async function rigOf(options: { readonly hooks?: LocalProcessHostHooks; readonly reportInputs?: ReportInputsPort; readonly host?: (h: WorkerHostPort) => WorkerHostPort } = {}): Promise<Rig> {
   const n = ++rigs;
   const scratchRoot = join(root, `scratch-${n}`);
-  const exec = localExecutorOf({
+  const exec = await localExecutorOf({
     units: w.units,
     ids,
     storage: w.storage,
@@ -137,6 +138,7 @@ function rigOf(options: { readonly hooks?: LocalProcessHostHooks; readonly repor
     limits: LIMITS,
     ...(options.reportInputs === undefined ? {} : { reportInputs: options.reportInputs }),
     host: {
+      isolation: LOCAL_HOST_ISOLATION,
       workerEntry: WORKER_ENTRY,
       codeRoots: [REPO_ROOT],
       hostRoot: join(root, `host-${n}`),
@@ -180,7 +182,7 @@ async function observedAndDrained(rig: Rig, identity: string): Promise<void> {
 }
 
 test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a confined worker process — Migration Core 3.0.0 over the sealed acceptance file, the B13 report from the platform's records printed by Chromium — and B08's own steps verify it with Migration Core's verifier and publish it: package AVAILABLE, job READY, entitlement DELIVERED, the delivered package exactly the one the validation receipt bound", { skip, timeout: 600_000 }, async () => {
-  const rig = rigOf();
+  const rig = await rigOf();
   const p = await purchase("b14a-ok");
   const { jobId, identity } = await launchedOn(rig, p);
   assert.equal((await w.attempt(jobId)).launch_state, "LAUNCHED");
@@ -238,7 +240,7 @@ test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a conf
 
 test("B14-A RACE (S056 through B08): the launch's answer is lost after the local host created the job — the pipeline records UNCERTAIN, ATTEMPT_MONITOR observes the identity before any other create and adopts it, and the one worker run is the one published", { skip, timeout: 600_000 }, async () => {
   let lost = 0;
-  const rig = rigOf({
+  const rig = await rigOf({
     host: (h) => ({
       evidenceClass: h.evidenceClass,
       creationHorizonSeconds: h.creationHorizonSeconds,
@@ -268,7 +270,7 @@ test("B14-A RACE (S056 through B08): the launch's answer is lost after the local
 test("B14-A cancellation (CMD037 while the worker runs): EXECUTION_CONTROL terminates the identity — the worker, the core's child and every process of the attempt end — the job is CANCELLED, nothing is delivered and the entitlement is never DELIVERED", { skip, timeout: 600_000 }, async () => {
   let reached: () => void = () => undefined;
   const atCore = new Promise<void>((r) => (reached = r));
-  const rig = rigOf({ hooks: { atStage: (_id, stage) => (stage === "CORE_STARTED" ? (reached(), new Promise<void>(() => undefined)) : undefined) } });
+  const rig = await rigOf({ hooks: { atStage: (_id, stage) => (stage === "CORE_STARTED" ? (reached(), new Promise<void>(() => undefined)) : undefined) } });
   const p = await purchase("b14a-cancel");
   const { jobId, identity } = await launchedOn(rig, p);
   await atCore;
@@ -290,7 +292,7 @@ test("B14-A recovery (a worker killed mid-run, S075): the host observes the cras
   let first: string | null = null;
   let reached: () => void = () => undefined;
   const atCore = new Promise<void>((r) => (reached = r));
-  const rig = rigOf({
+  const rig = await rigOf({
     hooks: {
       atStage: (id, stage) => {
         if (stage !== "CORE_STARTED") return undefined;
@@ -339,7 +341,7 @@ test("B14-A B13 (no legal identity, the production state): when the platform's r
       return { ...read, terms: { ...read.terms, issuer: { ...read.terms.issuer, identity: null } } };
     },
   };
-  const rig = rigOf({ reportInputs: withoutIdentity });
+  const rig = await rigOf({ reportInputs: withoutIdentity });
   const p = await purchase("b14a-issuer");
   const { jobId, identity } = await launchedOn(rig, p);
   await observedAndDrained(rig, identity);

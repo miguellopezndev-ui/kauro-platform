@@ -17,18 +17,14 @@
  */
 import { isObjectName } from "@kauro/domain";
 import type { AttemptCapability, ObjectStoragePort, ResumableUploadPort, StorageLocation } from "@kauro/application";
+import { FRAME_MAX_BODY_BYTES } from "./framing.js";
 import { WORKER_CALL_OPS, type BrokeredZone, type SessionAnswer, type StatAnswer, type WorkerCall, type WorkerCallError } from "./protocol.js";
 
 const GENERATION = /^[1-9][0-9]{0,19}$/;
 /** The largest piece of a read the broker hands over at once (the worker pulls the next one when it has written this one). */
 export const BROKER_READ_CHUNK_BYTES = 1024 * 1024;
-const MAX_CHUNK_BYTES = 64 * 1024 * 1024;
-/**
- * What one attempt may hold in the host at once (review round 16, R16-1): calls not yet answered, and the chunk bytes they carry. The
- * host's memory is outside the supervised tree, so a worker may never make it hold more than this.
- */
-const MAX_PENDING_CALLS = 16;
-const MAX_PENDING_BYTES = 2 * MAX_CHUNK_BYTES;
+/** The largest chunk a write may carry: one frame's body. How many calls one attempt has the host hold at once is the channel's bound. */
+const MAX_CHUNK_BYTES = FRAME_MAX_BODY_BYTES;
 /** The refusals kept as evidence, at most (the first ones; a flood of refusals is counted, not kept). */
 const MAX_REFUSALS_KEPT = 1_024;
 const MAX_OPEN_STREAMS = 16;
@@ -68,8 +64,6 @@ export class AttemptStorageBroker {
   readonly #streams = new Map<number, Stream>();
   readonly #sessions = new Map<string, string>();
   readonly #refusals: BrokerRefusalRecord[] = [];
-  #pendingCalls = 0;
-  #pendingBytes = 0;
   /** The sessions with a chunk being written: one write at a time per session. */
   readonly #writing = new Set<string>();
   #nextStream = 0;
@@ -133,26 +127,14 @@ export class AttemptStorageBroker {
 
   /** Answers one call, or throws: a BrokerRefusal for what the capability does not admit, the provider's error for what failed there. */
   async handle(call: WorkerCall): Promise<unknown> {
-    const bytes = call?.op === "upload.writeChunk" && call.chunk instanceof Uint8Array ? call.chunk.byteLength : 0;
-    let reserved = false;
     try {
       if (this.#revoked !== null) throw new BrokerRefusal("REVOKED", `the attempt's capability was revoked (${this.#revoked})`);
-      // the attempt's budget in the host, reserved before anything is awaited and released when the call is answered
-      if (this.#pendingCalls >= MAX_PENDING_CALLS || this.#pendingBytes + bytes > MAX_PENDING_BYTES) throw new BrokerRefusal("TOO_MANY_PENDING", "the attempt has too many calls or bytes waiting in the host");
-      this.#pendingCalls += 1;
-      this.#pendingBytes += bytes;
-      reserved = true;
       return await this.#dispatch(call);
     } catch (error) {
       // the operation as one of the protocol's own tokens: a worker's own string is never kept (review round 17, R17-1)
       const op = (WORKER_CALL_OPS as readonly unknown[]).includes(call?.op) ? call.op : ("UNKNOWN" as WorkerCall["op"]);
       if (error instanceof BrokerRefusal && this.#refusals.length < MAX_REFUSALS_KEPT) this.#refusals.push({ op, code: error.code });
       throw error;
-    } finally {
-      if (reserved) {
-        this.#pendingCalls -= 1;
-        this.#pendingBytes -= bytes;
-      }
     }
   }
 
@@ -183,7 +165,7 @@ export class AttemptStorageBroker {
       }
       case "upload.writeChunk": {
         const ref = this.#session(call.handle);
-        if (!(call.chunk instanceof Uint8Array) || call.chunk.byteLength > MAX_CHUNK_BYTES || typeof call.final !== "boolean") throw new BrokerRefusal("MALFORMED_CALL", "a chunk is at most 64 MiB of bytes");
+        if (!(call.chunk instanceof Uint8Array) || call.chunk.byteLength > MAX_CHUNK_BYTES || typeof call.final !== "boolean") throw new BrokerRefusal("MALFORMED_CALL", "a chunk is at most one frame of bytes");
         if (this.#writing.has(call.handle)) throw new BrokerRefusal("SESSION_BUSY", "a session takes one chunk at a time");
         this.#writing.add(call.handle);
         try {
