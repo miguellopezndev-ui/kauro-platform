@@ -67,11 +67,14 @@ test('cleanup retries a Windows EPERM only on an established fact, printed, and 
   const root = mkdtempSync(join(tmpdir(), 'kauro-with-cleanup-'));
   const file = join(root, 'left.txt');
   writeFileSync(file, 'x');
-  // files remain and Restart Manager names no holder: the removal is repeated until it succeeds, and that is printed
+  // files remain and Restart Manager names no holder: only the entries found are removed, retried until that succeeds, and printed
   let calls = 0;
+  let unlinks = 0;
   const asked = [];
-  await withCleanup(root, async () => {}, () => { if (++calls < 4) throw eperm(); unlinkSync(file); rmdirSync(root); }, win32((files) => { asked.push(files); return []; }));
-  assert.equal(calls, 4);
+  await withCleanup(root, async () => {}, () => { calls++; throw eperm(); },
+    { ...win32((files) => { asked.push(files); return []; }), fs: { unlink: (path) => { if (++unlinks < 3) throw eperm(); unlinkSync(path); }, rmdir: rmdirSync } });
+  assert.equal(calls, 1, 'the recursive removal is never repeated');
+  assert.equal(unlinks, 3);
   assert.deepEqual(asked, [[file]], 'Restart Manager is asked once, about the files left');
   assert.equal(existsSync(root), false);
   assert.equal(lines.length, 2);

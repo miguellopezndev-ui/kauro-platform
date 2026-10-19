@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
-import { HOLD_BOUND_MS, removeTemp, restartManagerHolders } from "../temp-removal.mjs";
+import { HOLD_BOUND_MS, entries, removeTemp, restartManagerHolders } from "../temp-removal.mjs";
 
 const repo = join(import.meta.dirname, "..", "..");
 const windows = process.platform === "win32";
@@ -69,12 +69,17 @@ test("a hold that outlasts the bound fails with what is left and the retries mad
   writeFileSync(join(root, "held.txt"), "x");
   try {
     let clock = 0;
-    const { lines, options } = quiet({ holders: () => [], now: () => (clock += 1000) });
+    const asked = [];
+    let unlinks = 0;
+    const { lines, options } = quiet({ holders: (files, { timeoutMs }) => { asked.push(timeoutMs); return []; }, now: () => clock,
+      sleep: () => { clock += 1000; }, fs: { unlink: () => { unlinks++; throw eperm(); }, rmdir: rmdirSync } });
     let calls = 0;
     assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, options),
       (error) => error.message === `EPERM, Permission denied; still held ${HOLD_BOUND_MS} ms after the first failure (5 retries); left: held.txt`
         && error.code === "EPERM" && error.cause.code === "EPERM");
-    assert.equal(calls, 6, "the first removal and five retries, one clock second apart");
+    assert.equal(calls, 1, "the recursive removal is never repeated");
+    assert.equal(unlinks, 5, "five retries, one clock second apart");
+    assert.deepEqual(asked, [HOLD_BOUND_MS], "the query is given what is left of the bound");
     assert.equal(lines.length, 1, "the retry was announced; no success line");
     calls = 0;
     const unknown = quiet({ holders: () => { throw new Error("powershell.exe not found"); } });
@@ -85,16 +90,59 @@ test("a hold that outlasts the bound fails with what is left and the retries mad
   } finally { unlinkSync(join(root, "held.txt")); rmdirSync(root); }
 });
 
-test("an entry that appears after the failure stops the retry at once: something is still writing", () => {
+// R114-1 (Codex, PR #114 round 1): at 03d1a0c3 the new-entry check ran only after a retry failed, so a retry that succeeded
+// erased an entry written during the Restart Manager query.
+test("an entry that appears after the failure stops the retry before anything is removed, and is kept: something is still writing", () => {
   const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
   writeFileSync(join(root, "old.txt"), "x");
   try {
-    const { options } = quiet({ holders: () => [] });
+    const { options } = quiet({ holders: () => { writeFileSync(join(root, "new.txt"), "x"); return []; } });
     let calls = 0;
-    assert.throws(() => removeTemp(root, () => { if (++calls === 2) writeFileSync(join(root, "new.txt"), "x"); throw eperm(); }, options),
+    assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, options),
       { message: "EPERM, Permission denied; not retried further: new.txt appeared after the failure, so something is still writing there; left: new.txt, old.txt" });
-    assert.equal(calls, 2);
+    assert.equal(calls, 1);
+    assert.equal(existsSync(join(root, "new.txt")), true);
+    assert.equal(existsSync(join(root, "old.txt")), true);
   } finally { unlinkSync(join(root, "old.txt")); unlinkSync(join(root, "new.txt")); rmdirSync(root); }
+});
+
+test("an entry a retry removed that comes back stops the retry: it is not removed a second time", () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
+  writeFileSync(join(root, "old.txt"), "x");
+  try {
+    const ebusy = () => Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+    const { options } = quiet({ holders: () => [], fs: { unlink: unlinkSync, rmdir: () => { writeFileSync(join(root, "old.txt"), "again"); throw ebusy(); } } });
+    assert.throws(() => removeTemp(root, () => { throw eperm(); }, options),
+      { message: "EPERM, Permission denied; not retried further: old.txt appeared after the failure, so something is still writing there; left: old.txt" });
+    assert.equal(existsSync(join(root, "old.txt")), true);
+  } finally { unlinkSync(join(root, "old.txt")); rmdirSync(root); }
+});
+
+// R114-2 (Codex, PR #114 round 1): at 03d1a0c3 the bound was checked only after a failed retry, so a query that outlasted it was
+// followed by a removal, and the query itself had no timeout.
+test("no retry starts once the bound has passed, however long the query took", () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
+  writeFileSync(join(root, "old.txt"), "x");
+  try {
+    let clock = 0;
+    const { lines, options } = quiet({ now: () => clock, holders: () => { clock += HOLD_BOUND_MS; return []; }, fs: { unlink: () => assert.fail("no retry after the bound"), rmdir: () => assert.fail("no retry after the bound") } });
+    let calls = 0;
+    assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, options),
+      { message: `EPERM, Permission denied; still held ${HOLD_BOUND_MS} ms after the first failure (0 retries); left: old.txt` });
+    assert.equal(calls, 1);
+    assert.equal(lines.length, 1);
+    assert.equal(existsSync(join(root, "old.txt")), true);
+  } finally { unlinkSync(join(root, "old.txt")); rmdirSync(root); }
+});
+
+test("a Restart Manager query is given a timeout, and one that does not answer in time is an unknown answer, never no holder", () => {
+  let given;
+  const run = (file, args, options) => { given = options.timeout; return { error: Object.assign(new Error("spawnSync powershell.exe ETIMEDOUT"), { code: "ETIMEDOUT" }), pid: 77, status: null }; };
+  assert.throws(() => restartManagerHolders(["a.txt"], { run, timeoutMs: 1234 }),
+    { message: "Restart Manager query did not answer within 1234 ms; powershell.exe 77 was stopped" });
+  assert.equal(given, 1234);
+  restartManagerHolders(["a.txt"], { run: (file, args, options) => { given = options.timeout; return { status: 0, stdout: "[]" }; } });
+  assert.equal(given, HOLD_BOUND_MS, "never unbounded, even called on its own");
 });
 
 test("Windows: a live process whose current directory is in the tree keeps it, and the retry ends at the bound naming it", { skip: WINDOWS_ONLY }, async () => {
@@ -131,6 +179,54 @@ test("Windows: Restart Manager names a live process holding a remaining file, an
   assert.deepEqual(restartManagerHolders([file]), []);
   unlinkSync(file);
   rmdirSync(root);
+});
+
+// R114-1 with a real writer and the real query: the writer creates new.txt while Restart Manager is being asked.
+test("Windows: a live process that writes into the tree during the Restart Manager query is neither erased nor hidden", { skip: WINDOWS_ONLY }, async () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
+  writeFileSync(join(root, "old.txt"), "x");
+  const go = `${root}.go`, made = join(root, "new.txt");
+  const writer = await holderIn(tmpdir(), `const fs = require("node:fs"); const poll = setInterval(() => { if (fs.existsSync(${JSON.stringify(go)})) { clearInterval(poll); fs.writeFileSync(${JSON.stringify(made)}, "x"); } }, 5);`);
+  try {
+    const holders = (files, options) => {
+      const held = restartManagerHolders(files, options);
+      writeFileSync(go, "");
+      for (const until = performance.now() + 5_000; !existsSync(made) && performance.now() < until;) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      return held;
+    };
+    // the caller's removal deletes whatever is there, as a recursive rmSync would, once its first attempt has failed
+    let calls = 0;
+    const remove = () => { if (++calls === 1) throw eperm(); for (const path of entries(root).files) unlinkSync(path); rmdirSync(root); };
+    assert.throws(() => removeTemp(root, remove, { holders, log: () => {} }),
+      { message: "EPERM, Permission denied; not retried further: new.txt appeared after the failure, so something is still writing there; left: new.txt, old.txt" });
+    assert.equal(calls, 1, "the caller's removal is not repeated");
+    assert.equal(existsSync(made), true);
+    process.kill(writer.pid, 0);
+  } finally {
+    await writer.stop();
+    for (const file of [join(root, "old.txt"), made, go]) { try { unlinkSync(file); } catch (error) { if (error.code !== "ENOENT") throw error; } }
+    rmdirSync(root);
+  }
+});
+
+// R114-2 with the real query: it is stopped at its timeout, its process has exited when it returns, and the answer is unknown.
+test("Windows: a Restart Manager query that outlasts its timeout is stopped, and no process of it is left", { skip: WINDOWS_ONLY }, () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-temp-removal-"));
+  const file = join(root, "a.txt");
+  writeFileSync(file, "x");
+  try {
+    let pid;
+    assert.throws(() => restartManagerHolders([file], { timeoutMs: 1 }), (error) => {
+      pid = Number(/^Restart Manager query did not answer within 1 ms; powershell\.exe (\d+) was stopped$/.exec(error.message)?.[1]);
+      return pid > 0;
+    });
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+    let calls = 0;
+    assert.throws(() => removeTemp(root, () => { calls++; throw eperm(); }, { boundMs: 1, log: () => assert.fail("nothing is retried") }),
+      (error) => /^EPERM, Permission denied; not retried: who holds its 1 remaining files is unknown \(Restart Manager query did not answer within 1 ms; powershell\.exe \d+ was stopped\); left: a\.txt$/.test(error.message));
+    assert.equal(calls, 1);
+    assert.equal(existsSync(file), true);
+  } finally { unlinkSync(file); rmdirSync(root); }
 });
 
 // The sites. f839f4c7 lets each of these EPERMs escape: command() and runTest() throw, red-proof loses its report, the test
