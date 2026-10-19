@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+import { removeTemp } from "./temp-removal.mjs";
 import testEvents from "./test-events-reporter.mjs";
 
 const REPORTER = import.meta.url;
@@ -126,7 +127,7 @@ export function command(program, args, cwd, { env = {}, timeoutMs } = {}) {
   } finally {
     closeSync(stdout);
     closeSync(stderr);
-    rmSync(capture, { recursive: true, force: true });
+    removeTemp(capture, () => rmSync(capture, { recursive: true, force: true }));
   }
 }
 
@@ -311,7 +312,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
     cleaned = true;
     closeSync(stdout);
     closeSync(stderr);
-    rmSync(eventsDir, { recursive: true, force: true });
+    removeTemp(eventsDir, () => rmSync(eventsDir, { recursive: true, force: true }));
     captures.delete(cleanup);
   };
   captures.add(cleanup);

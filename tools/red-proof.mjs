@@ -3,6 +3,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
+import { removeTemp } from "./temp-removal.mjs";
 import { buildPackage, command, dependencyOrder, normalizePath, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
 
 function usage(message) {
@@ -42,14 +43,17 @@ const checkout = join(work, "head");
 let registered = false;
 function cleanup() {
   if (registered) {
+    registered = false;
     const result = command("git", ["worktree", "remove", "--force", checkout], repository);
     if (result.status !== 0) console.error(`worktree removal: ${result.output}`);
-    registered = false;
   }
-  rmSync(work, { recursive: true, force: true });
+  removeTemp(work, () => rmSync(work, { recursive: true, force: true }));
 }
-// test-runner's exit hook kills tracked groups before this hook removes their checkout.
-process.once('exit', cleanup);
+// test-runner's exit hook kills tracked groups before this hook removes their checkout. After a run, it is a second attempt at a
+// tree the run could not remove.
+process.once('exit', () => {
+  try { cleanup(); } catch (error) { console.error(`red-proof: temporary tree not removed at exit: ${error.message}`); }
+});
 let exitCode = 1;
 try {
   // A shared local clone reuses objects and keeps worktree metadata out of the caller's (possibly read-only) .git.
@@ -170,7 +174,12 @@ try {
   if (error instanceof Stop) report.verdict = "INCONCLUSIVE";
   else report.errors.push(error.message);
 } finally {
-  cleanup();
+  // Every process of the run has ended here: spawnSync returned, and runTest confirmed its tree or reported a killFailure. The
+  // report is always written. A tree still held after removeTemp's bound cannot certify a PASS; it never changes another verdict.
+  try { cleanup(); } catch (error) {
+    report.inconclusive.push(`temporary tree not removed: ${error.message}`);
+    if (report.verdict === "PASS") { report.verdict = "INCONCLUSIVE"; exitCode = 2; }
+  }
   writeFileSync(resolve(out), JSON.stringify(report, null, 2) + "\n");
 }
 console.log(`red-proof: ${report.verdict} (${resolve(out)})`);

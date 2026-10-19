@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { removeTemp } from '../temp-removal.mjs';
 
 export async function interruptedWorker(script, args, root, pidFile, signal, env = {}) {
   const childEnv = { ...process.env, ...env };
@@ -29,25 +30,25 @@ export async function interruptedWorker(script, args, root, pidFile, signal, env
   }
 }
 
-// Remove a fixture tree after a gate test. Windows can hold the cwd handle briefly after the process is gone, so removal
-// retries EPERM/EBUSY/ENOTEMPTY (bounded: ten retries, 50 ms longer each, about 2.75 s). Node 24's rmSync ignores maxRetries here,
-// so the retry is done explicitly. A cleanup failure must never replace the test's own assertion error.
-export async function withCleanup(root, body, remove = rmSync) {
+// Remove a fixture tree after a gate test. A cleanup failure must never replace the test's own assertion error. A Windows hold is
+// retried only as removeTemp allows (an established fact, bounded, printed); it replaced a blind retry of every EPERM/EBUSY/ENOTEMPTY.
+export async function withCleanup(root, body, remove = rmSync, options) {
   let failed = false;
   try { return await body(); } catch (error) { failed = true; throw error; } finally {
-    try { await removeWithRetry(root, remove); } catch (cleanup) { if (!failed) throw cleanup; }
+    try { removeTemp(root, () => remove(root, { recursive: true, force: true }), options); } catch (cleanup) { if (!failed) throw cleanup; }
   }
 }
 
-// Run a fixture test, then remove its tree once, without retrying. A removal failure never replaces the test's own error (a
-// try/finally rmSync did: on main 9dd3a3b3, windows, red-proof's "deciding body assertion" test failed after 1.7 s, well short of
-// a full gate run, and only the cleanup EPERM was reported). After a passing body, a tree that cannot be removed fails the test
-// with what was left, since something still holds it.
-export async function removeAfter(root, body, remove = rmSync) {
+// Run a fixture test, then remove its tree, retrying only as removeTemp allows. A removal failure never replaces the test's own
+// error (a try/finally rmSync did: on main 9dd3a3b3, windows, red-proof's "deciding body assertion" test failed after 1.7 s, well
+// short of a full gate run, and only the cleanup EPERM was reported). After a passing body, a tree that still cannot be removed
+// fails the test with what was left, since something still holds it.
+export async function removeAfter(root, body, remove = rmSync, options) {
   let failed = false;
   try { return await body(); } catch (error) { failed = true; throw error; } finally {
-    try { remove(root, { recursive: true, force: true }); } catch (cleanup) {
-      const report = `${cleanup.code ?? cleanup.name}: ${cleanup.message}; left: ${leftovers(root).join(', ') || '(none listed)'}`;
+    try { removeTemp(root, () => remove(root, { recursive: true, force: true }), options); } catch (cleanup) {
+      // removeTemp's own failure already lists what is left
+      const report = `${cleanup.code ?? cleanup.name}: ${cleanup.message}${cleanup.left ? '' : `; left: ${leftovers(root).join(', ') || '(none listed)'}`}`;
       if (!failed) throw new Error(`fixture removal failed after a passing test: ${report}`, { cause: cleanup });
       console.error(`fixture removal also failed (the test's own error is reported): ${report}`);
     }
@@ -89,15 +90,6 @@ export function killUnconfirmed(pids, confirmed, kill = process.kill) {
   for (const pid of pids) {
     if (confirmed.has(pid)) continue;
     try { kill(pid, 'SIGKILL'); } catch { /* already terminated */ }
-  }
-}
-
-async function removeWithRetry(root, remove) {
-  for (let retry = 0; ; retry++) {
-    try { return remove(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch (error) {
-      if (retry >= 10 || !['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) throw error;
-      await delay(50 * (retry + 1));
-    }
   }
 }
 

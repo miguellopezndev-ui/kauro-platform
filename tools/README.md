@@ -54,6 +54,11 @@ checkout. Unix runners own a detached process group; Windows runners stay attach
 and timeout cleanup uses `taskkill /T /F`.
 After a timeout kill, the runner has at most ten seconds to close. A kill error or unconfirmed stop is recorded with
 its reason; red-proof returns INCONCLUSIVE and stress-cells fails, without starting another phase or iteration.
+Temporary trees (red-proof's clone, `command()`'s capture, `runTest`'s events) are removed through `tools/temp-removal.mjs`.
+On Windows an `EPERM`/`EBUSY`/`ENOTEMPTY` removal is retried only when only directories are left, or when Restart Manager
+names no holder of the files left; the retry is printed, bounded at five seconds, and stops if a new entry appears. A named
+holder, an unanswered query or any other error fails as before, with what is left. red-proof writes its report in every case;
+a tree still held at the bound makes a PASS INCONCLUSIVE and leaves any other verdict as it is.
 
 Body failures with error code `ERR_MODULE_NOT_FOUND` or `ECONNREFUSED` are INCONCLUSIVE (exit 2). A `TypeError` reporting
 “is not a function” or “is not a constructor” is classified by where it was thrown (the first stack frame), never by the
