@@ -7,7 +7,7 @@
  *   - at the attempt's deadline plus a grace, whether or not the host still lives;
  *   - when the tree's resident memory passes the attempt's hard memory (Linux: the tree's VmRSS from /proc, Chromium and every native
  *     allocation included), or the attempt's directories pass its hard scratch (any write, the browser's profile and temporary files
- *     included).
+ *     included, and on Linux the files the tree still holds open after removing their names).
  *
  * It records its one verdict exclusively in the job's directory (`supervisor.json`), which the host reads to classify the worker's end
  * and a later host instance reads as proof that the tree was ended. It reads no clock: every bound is a duration it was handed.
@@ -18,7 +18,7 @@
  * and every process the attempt's directories mark (sweepAttemptProcesses) — and leaves only once none is left, or after a bounded
  * number of sweeps.
  */
-import { lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { killProcessTree, linuxDescendantsOf, linuxStartOf, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
@@ -70,6 +70,38 @@ export function directoryBytes(dir: string): number {
       else total += st.size;
     } catch {
       // removed meanwhile
+    }
+  }
+  return total;
+}
+
+/**
+ * Linux: the bytes of files the tree holds open after their names were removed (review round 3, R3-3). They still take the disk, and
+ * no directory walk finds them. Memory-backed ones (/dev/shm, memfd) are the memory's, which the tree's resident memory counts.
+ */
+export function openDeletedBytes(pids: readonly number[], platform: NodeJS.Platform = process.platform): number {
+  if (platform !== "linux") return 0;
+  const seen = new Set<string>();
+  let total = 0;
+  for (const pid of pids) {
+    let fds: string[];
+    try {
+      fds = readdirSync(`/proc/${pid}/fd`);
+    } catch {
+      continue;
+    }
+    for (const fd of fds) {
+      try {
+        const target = readlinkSync(`/proc/${pid}/fd/${fd}`);
+        if (!target.startsWith("/") || !target.endsWith(" (deleted)") || target.startsWith("/dev/shm/")) continue;
+        const st = statSync(`/proc/${pid}/fd/${fd}`);
+        const key = `${st.dev}:${st.ino}`;
+        if (!st.isFile() || seen.has(key)) continue;
+        seen.add(key);
+        total += Math.max(st.size, st.blocks * 512);
+      } catch {
+        // closed meanwhile
+      }
     }
   }
   return total;
@@ -139,7 +171,8 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
     }
     const rss = treeResidentBytes(config.workerPid);
     if (rss !== null && rss > config.hardMemoryBytes) return end("MEMORY_EXHAUSTED", { residentBytes: rss });
-    const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0);
+    const tree = process.platform === "linux" ? linuxDescendantsOf(config.workerPid) : [];
+    const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0) + openDeletedBytes(tree);
     if (scratch > config.hardScratchBytes) return end("SCRATCH_EXHAUSTED", { scratchBytes: scratch });
     return undefined;
   }, config.pollMs);

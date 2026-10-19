@@ -4,9 +4,10 @@
 // locale picks the behaviour: "hostile-probe" (files, network, environment, broker, child processes) or "hostile-allocate" (memory).
 import { execFileSync, execSync, spawn, spawnSync } from "node:child_process";
 import dns from "node:dns";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, openSync, readFileSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import net from "node:net";
 import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { WorkerRpc, type HostMessage, type WorkerMessage, type WorkerResultReport } from "../../src/index.js";
 
 const args = process.argv.slice(2);
@@ -91,6 +92,18 @@ async function probe(ticket: { capability: { stagingPrefix: string }; render: { 
   });
   observations["nativeChild"] = ran(() => (process.platform === "win32" ? spawnSync(join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe"), ["/d", "/c", "type", probeData.secretFile], { encoding: "utf8", windowsHide: true }) : spawnSync("/bin/cat", [probeData.secretFile], { encoding: "utf8" })));
   observations["shellExec"] = ran(() => ({ stdout: execSync(process.platform === "win32" ? `type "${probeData.secretFile}"` : `cat "${probeData.secretFile}"`, { encoding: "utf8" }) }));
+  // review round 3 (R3-1): the guard's rules are out of reach — not exported, and a replaced permission check changes nothing
+  const imports = process.execArgv.flatMap((a, i) => (process.execArgv[i - 1] === "--import" ? [a] : []));
+  const processPreload = imports[imports.length - 1] as string;
+  observations["commandSpecExported"] = String(typeof ((await import(processPreload)) as Record<string, unknown>)["CORE_CHILD_COMMAND"]);
+  const codeRoot = dirname(dirname(fileURLToPath(processPreload)));
+  try {
+    (process as unknown as { permission: { has: () => boolean } }).permission.has = () => true;
+  } catch {
+    // not writable: nothing to tamper with
+  }
+  const widerCore = ["--permission", `--allow-fs-read=${dirname(probeData.secretFile)}`, `--allow-fs-write=${dirname(probeData.secretFile)}`, "--disallow-code-generation-from-strings", "--max-old-space-size=64", "--import", imports[0] as string, "--import", pathToFileURL(join(codeRoot, "cores", "child-preload-fs.js")).href, join(codeRoot, "cores", "core-child.js")];
+  observations["permissionTamperedCoreChild"] = ran(() => spawnSync(process.execPath, widerCore, { encoding: "utf8", env: {}, timeout: 10_000 }));
   observations["asyncShellSpawn"] = await new Promise<string>((resolve) => {
     try {
       const c = spawn(process.execPath, ["--permission", shellLine], { shell: true, env: {} });
@@ -136,6 +149,24 @@ process.on("message", (message: HostMessage) => {
       setTimeout(grow, 20);
     };
     grow();
+    return;
+  }
+  if (ticket.render.locale === "hostile-unlinked") {
+    // review round 3 (R3-3): a file whose name is removed at once, written through its descriptor past the attempt's hard scratch
+    const fd = openSync(join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden.bin"), "w");
+    unlinkSync(join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`, "hidden.bin"));
+    const chunk = Buffer.alloc(1024 * 1024, 7);
+    const grow = (): void => {
+      writeSync(fd, chunk);
+      setTimeout(grow, 5);
+    };
+    grow();
+    return;
+  }
+  if (ticket.render.locale === "hostile-title") {
+    // review round 3 (R3-2): a worker that rewrites its own command line (Linux /proc/<pid>/cmdline) and stays alive
+    process.title = "kauro-hidden";
+    setInterval(() => undefined, 1_000);
     return;
   }
   if (ticket.render.locale === "hostile-disk") {

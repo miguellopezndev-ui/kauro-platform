@@ -178,13 +178,31 @@ most 1 MiB, so memory stays bounded.
   supervisor. On Windows the operating system does it first: libuv puts a process's children in a kill-on-close job object, so the
   worker's whole tree ends with the host; the supervisor is started detached, outside that job, and records `HOST_LOST`. B08 then abandons the attempt and takes it over at fence + 1.
 
-**Residual (local only).** Locally, all of the above runs as one operating-system user with no OS sandbox. The allowlist admits the
-named browser, and Chromium's browser process is not confined by Node's permission model. A worker that was already compromised
-(arbitrary code in the worker's own process) could drive that browser over its pipe to a `file:` URL. Such a worker still has no
-credential (boundary 1) and no storage except through the broker (boundary 2). The hostile-worker test proves that every other way
-out is refused. The local host is therefore for qualification and single-tenant development. Multi-tenant isolation belongs to the
-cloud task: one attempt per container, with its own filesystem and its own role. An OS sandbox for the local host (a container,
-bubblewrap or a Windows job object with an AppContainer) would close this residual and is not built.
+**Residual (local only) — not a boundary against a compromised worker.** Locally, all of the above runs as one operating-system
+user with no OS sandbox. What the operating system or Node's C++ permission model enforces holds against any code in the worker:
+the files it may read and write, no credential in its environment (boundary 1), no storage except through the broker (boundary 2),
+no worker threads, addons or WASI. What is enforced in the worker's own JavaScript realm does **not** hold against code that already
+runs there (a compromised worker):
+
+- the process allowlist (§2 item 3). Its rules, the functions it calls and the permission check are private and captured at load
+  (review R3-1), but such code can still tamper with the JavaScript intrinsics the guard relies on. Node's `--frozen-intrinsics`
+  would stop that, and the browser driver fails under it (it assigns `Error.stackTraceLimit`). Since the worker needs
+  `--allow-child-process`, such code can then start a program outside Node's permission model;
+- the network preload, likewise;
+- the named browser, which the allowlist admits and which Node's permission model does not confine: such code could drive it over
+  its pipe to a `file:` URL.
+
+The hostile-worker test proves that every direct way out a worker's code could take is refused (it does not prove the realm itself
+tamper-proof). A program so started would run as the same user, so it could read another attempt's leftover scratch before the
+janitor removes it, or the host's files. The local host is therefore qualification and single-tenant development infrastructure,
+for the platform's own code, never for another tenant's. Multi-tenant isolation belongs to the cloud task: one attempt per
+container, with its own filesystem, its own role and its own process namespace. An OS sandbox for the local host (a container,
+bubblewrap, or a Windows job object with an AppContainer) would close this residual and is not built: it is a blocker (§11).
+
+**Local limits that are not enforced** (beyond the residual above): on Windows, the tree's memory beyond the two heaps, and disk
+written outside the attempt's directories or held in files whose names were removed. On Linux the supervisor counts those files
+through `/proc/<pid>/fd` (review R3-3), but not disk the unconfined browser writes elsewhere. The cloud task's own memory and
+ephemeral-storage limits are the hard bound there.
 
 ## 6. B13 inside the worker
 
@@ -217,7 +235,7 @@ Windows with Google Chrome required (`KAURO_REQUIRE_PDF_ENGINE=1`).
 |---|---|---|
 | Ticket and broker, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 5: a session landing after revocation is cancelled; digest, canonical bytes, closed shape (18 refusals), broker OK, broker DENY (14 refusals and revocation) |
 | Local executor, happy path | `packages/data-plane/test/local-process-host.test.ts` | 1: real Migration Core and Chromium in a confined process; the manifest names the package, the PDF and its record; scratch removed |
-| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 23: a launch pending on one instance cancelled through another; a stale owner whose worker lives (killed by a pid proved the job's); the sweep of an attempt's orphans (Linux); two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
+| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 25: a worker that rewrites its command line, terminated by its recorded identity; a removed-but-open file past the hard scratch (Linux); a launch pending on one instance cancelled through another; a stale owner whose worker lives (killed by a pid proved the job's); the sweep of an attempt's orphans (Linux); two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
 | End to end, PostgreSQL 17 | `apps/control/test/b14a-local-executor.test.ts` | 5: OK (package AVAILABLE, job READY, entitlement DELIVERED, verification VALID EXECUTED_LOCAL 3.0.0, delivered manifest = the receipt's, janitor CLEANED with REPORTED resources); S056 lost answer adopted through B08; CMD037 during the run; worker killed, then takeover at fence 2 delivers; no legal identity → FAILED REFUSED |
 | Regressions | data-plane, control, persistence, application suites; `pnpm run verify` | B05 adapter (with F1), B08 control plane, B13 report suites unchanged and green |
 
@@ -251,6 +269,9 @@ EXECUTED_PROVIDER.**
 | R2-4 | A termination abandoned only the last pending launch of one instance. | Every pending launch is abandoned, and the identity's name is taken for good by the same rename a create uses, across instances. |
 | R2-5 | A stale owner made another instance record a termination without killing. | The pid is proved the job's and killed; the end is recorded only once the tree is gone, else `UNCERTAIN`. |
 | R2-6 | A child surviving the worker escaped supervision. | The host and the supervisor sweep the attempt's processes (group, seen, marked) before the end is recorded. |
+| R3-1 | (round 3) The allowed child's specification was exported and mutable. | Private and frozen; the guard's functions and the permission check are captured at load; probes show neither reachable. The realm-level residual is stated, and listed as a blocker (§5, §11). |
+| R3-2 | A worker could rewrite its own command line and pass for a reused pid. | The worker's Linux start is recorded at spawn and compared; an unreadable identity is `UNKNOWN`, never an end; a cell with a worker that rewrites its title. |
+| R3-3 | A file whose name was removed escaped the scratch measure. | The supervisor counts files the tree holds open after their names were removed (Linux, /proc); Windows stated as unenforced. |
 
 ## 10. Decisions
 
@@ -270,5 +291,7 @@ EXECUTED_PROVIDER.**
   generation mapping, and the live probes of the qualification's §6 (token, Chromium sandbox on Fargate, IAM life cycle, bucket
   policy, pull time, task retirement). Until then: no EXECUTED_PROVIDER, no G-CLOUD, no `B14_COMPLETO`.
 - **Legal identity:** every real report is refused until the owner records it (`docs/owner/LEGAL_IDENTITY_SNAPSHOT.md`).
-- **Local residual:** an OS-level sandbox for the local host (§5), if the local host is ever used beyond qualification.
+- **Local OS sandbox (blocker for any use of the local host beyond single-tenant qualification):** the process allowlist and the
+  network preload are not a boundary against code already running in a worker (§5, residual). An OS sandbox (container, bubblewrap,
+  AppContainer), or the cloud task, is that boundary. Not built in B14-A.
 - **Not in B14-A:** B14's database, API, queues and network beyond the worker; B04 and Bedrock.

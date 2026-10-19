@@ -54,7 +54,7 @@ import type { AuthorizedReportInputs } from "../report/facts.js";
 import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
-import { killProcessTree, linuxAttemptProcesses, processCommandLine, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, linuxStartOf, processCommandLine, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 import { readVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
@@ -144,6 +144,12 @@ export interface LocalJobRecord {
   readonly instance: string;
   state: RecordState;
   pid: number | null;
+  /**
+   * The worker process's own identity beside its pid (Linux: its start in clock ticks since boot, which the process cannot change; a pid
+   * can be reused, and a command line is the process's to rewrite). Null elsewhere: on Windows the identity is the command line, which a
+   * worker without native code cannot rewrite.
+   */
+  pidStart?: string | null;
   createdAtMs: number;
   startedAtMs: number | null;
   endedAtMs: number | null;
@@ -553,6 +559,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const live: Live = { record, child, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null };
     this.#live.set(identity, live);
     record.pid = child.pid ?? null;
+    record.pidStart = child.pid !== undefined && process.platform === "linux" ? linuxStartOf(child.pid) : null;
     record.state = "RUNNING";
     record.startedAtMs = this.#o.clock.nowMs();
     record.lastHeartbeatMs = record.startedAtMs;
@@ -771,11 +778,27 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * no longer exists, or its pid now names another process; and (Linux) no process the attempt's directories mark is left. While that
    * does not hold, the job is answered as its record stands (RUNNING), never as ended.
    */
-  #treeEnded(dir: string, record: LocalJobRecord): boolean {
+  #treeEnded(_dir: string, record: LocalJobRecord): boolean {
     if (process.platform === "linux" && linuxAttemptProcesses(this.#attemptDirsOf(record.identity)).length > 0) return false;
-    if (readVerdict(dir) !== null || record.pid === null) return true;
+    const who = this.#workerIdentity(record);
+    return who === "GONE" || who === "OTHER";
+  }
+
+  /**
+   * Whether the job's pid is still its worker (review round 3, R3-2): GONE (no such process), OTHER (the pid now names another
+   * process), WORKER, or UNKNOWN (its identity cannot be read — never taken for an end). Linux compares the start recorded at spawn,
+   * which the process cannot change; Windows the command line, which names the job's ticket digest.
+   */
+  #workerIdentity(record: LocalJobRecord): "GONE" | "OTHER" | "WORKER" | "UNKNOWN" {
+    if (record.pid === null) return "GONE";
+    if (!processRunning(record.pid)) return "GONE";
+    if (process.platform === "linux") {
+      if (record.pidStart == null) return "UNKNOWN";
+      const start = linuxStartOf(record.pid);
+      return start === null ? "GONE" : start === record.pidStart ? "WORKER" : "OTHER";
+    }
     const line = processCommandLine(record.pid);
-    return line === null || (line !== undefined && !line.includes(record.ticketDigest));
+    return line === null ? "GONE" : line === undefined ? "UNKNOWN" : line.includes(record.ticketDigest) ? "WORKER" : "OTHER";
   }
 
   /** The attempt's directory and its browser's temporary one (the marks of its processes). */
@@ -786,9 +809,8 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
 
   /**
    * Ends the tree of a job this instance did not start, and answers whether it is known to have ended. The worker's pid is killed only
-   * once it is proved the worker's (its command line names the job's ticket digest; a pid can be reused); then the attempt's marked
-   * processes are swept (Linux) and the end awaited, bounded. Unknown (the command line cannot be read, or the tree outlives the bound):
-   * false, and the job stays as it is.
+   * once it is proved the worker's (#workerIdentity; a pid can be reused); then the attempt's marked processes are swept (Linux) and the
+   * end awaited, bounded. Unknown (the identity cannot be read, or the tree outlives the bound): false, and the job stays as it is.
    */
   async #endForeignTree(record: LocalJobRecord): Promise<boolean> {
     const dirs = this.#attemptDirsOf(record.identity);
@@ -797,9 +819,9 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       return !this.#instanceAlive(record.instance);
     }
     const pid = record.pid;
-    const line = processCommandLine(pid);
-    if (line === undefined) return false;
-    const worker = line !== null && line.includes(record.ticketDigest);
+    const who = this.#workerIdentity(record);
+    if (who === "UNKNOWN") return false;
+    const worker = who === "WORKER";
     if (worker) {
       // the owning instance, reading the worker's exit without a result, records the termination asked for, not a crash
       writeFileSync(join(this.#jobDir(record.identity), TERMINATION_REQUEST), this.instance);
@@ -807,7 +829,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     }
     for (let round = 0; round < 50; round++) {
       const left = sweepAttemptProcesses(worker ? pid : null, dirs);
-      const alive = worker && processRunning(pid);
+      const alive = worker && this.#workerIdentity(record) === "WORKER";
       if (left.length === 0 && !alive) {
         this.#removeBrowserTemp(record.identity.slice("kauro-attempt-".length));
         return true;

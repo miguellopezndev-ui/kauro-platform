@@ -211,6 +211,9 @@ test("B14-A DENY (confinement, hostile worker): a worker started exactly as the 
     const refusedChildren = ["nodeChildPlain", "nodeChildWiderPermission", "nodeChildOwnPermission", "nodeChildNodeOptions", "nativeChild", "shellExec", "asyncSpawn"];
     // review round 2 (R2-1..R2-3): only the core child's closed command line is a Node child; no negation, script, shell or detached child
     refusedChildren.push("nodeChildNoPermission", "nodeChildNetwork", "shellOptionSpawnSync", "shellOptionExecFileSync", "detachedNodeChild", "execve", "asyncShellSpawn");
+    // review round 3 (R3-1): the rules are not reachable, and a replaced permission check does not widen a child
+    refusedChildren.push("permissionTamperedCoreChild");
+    assert.equal(seen["commandSpecExported"], "undefined");
     for (const key of refusedChildren) assert.equal(seen[key], "KAURO_PROCESS_REFUSED", key);
     assert.deepEqual(hostile.refusals(spec.identity).map((r) => r.code), ["OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY", "OUTSIDE_CAPABILITY"]);
     await hostile.stop();
@@ -638,5 +641,46 @@ test("B14-A cleanup (review round 2, R2-6; Linux): what an attempt left after it
     unrelated.kill("SIGKILL");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("B14-A limits (review round 3, R3-3; Linux): a file whose name the worker removed, written on through its descriptor past the hard scratch, still counts — the supervisor ends the tree SCRATCH_EXHAUSTED", { skip: process.platform !== "linux" }, async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 36);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-unlinked", rendererVersion: "x" }, 256, { supervisorPollMs: 100 });
+    const spec = planted.fixture.spec(1, { ...hostLimits(1 << 20), hardScratchBytes: 16 << 20 });
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED"]);
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
+
+test("B14-A RACE (review round 3, R3-2): a worker that rewrites its own command line is still known by the identity recorded at its spawn — another instance answers it RUNNING, terminates it by its pid and records the end only once it is gone", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 37);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-title", rendererVersion: "x" }, 256);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const pid = host.record(spec.identity)?.pid ?? null;
+    assert.notEqual(pid, null);
+    if (process.platform === "linux") assert.ok(host.record(spec.identity)?.pidStart, "the start of the worker is recorded at its spawn");
+    // the worker has had time to rewrite its title
+    await new Promise((r) => setTimeout(r, 2_000));
+    const ahead = rig.restart({ now: () => toUtcInstant(Date.now() + 60_000), nowMs: () => Date.now() + 60_000 });
+    assert.equal((await ahead.observe(spec.identity)).state, "RUNNING");
+    assert.equal((await ahead.terminate(spec.identity)).outcome, "TERMINATED");
+    assert.equal(processRunning(pid!), false, "the worker is gone before its end is recorded");
+    const ended = await host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.note], ["TERMINATED", "TERMINATED_BY_HOST"]);
+    await host.stop();
+  } finally {
+    await rig.dispose();
   }
 });

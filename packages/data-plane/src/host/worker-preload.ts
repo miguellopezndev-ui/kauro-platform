@@ -17,7 +17,13 @@
  * the class behind every asynchronous spawn (`ChildProcess.prototype.spawn`, which sees a shell request already turned into the shell's
  * own command line) and the three synchronous exports are wrapped (a `shell` option refused outright), `process.execve` is removed, and
  * a refusal throws `KAURO_PROCESS_REFUSED`. On Windows no process is started detached, so every child stays in the worker's
- * kill-on-close job. It narrows, and does not replace, the operating-system boundary of a cloud task.
+ * kill-on-close job.
+ *
+ * What it is not: a boundary against code already running in the worker. It lives in the worker's own JavaScript realm, so such code
+ * can tamper with the intrinsics it relies on (Node's --frozen-intrinsics would stop that, and the browser driver does not run under
+ * it). It keeps its own state out of reach (its rules, captured functions and the permission check are private and frozen) and refuses
+ * every direct way out a worker's code could take; the boundary against a compromised worker is the operating system's: the cloud
+ * task's container, or an OS sandbox the local host does not have (docs/design/B14-A-worker-executor.md §5, residual and blocker).
  */
 import childProcess from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
@@ -40,15 +46,20 @@ function argumentOf(flag: string): string | null {
   return at < 0 ? null : (process.argv[at + 1] ?? null);
 }
 
-const same = (a: string, b: string): boolean => (process.platform === "win32" ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b));
+// the functions the rules call, captured now: a builtin's export can be replaced later (syncBuiltinESMExports), a captured one cannot
+const resolvePath = resolve;
+const joinPath = join;
+const WINDOWS = process.platform === "win32";
+const same = (a: string, b: string): boolean => (WINDOWS ? resolvePath(a).toLowerCase() === resolvePath(b).toLowerCase() : resolvePath(a) === resolvePath(b));
 
 /** The data plane's compiled code (as sandbox/runner.ts's SANDBOX_CODE_ROOT) and, in it, the one Node child a worker may start. */
 const CODE_ROOT = realpathSync.native(join(dirname(fileURLToPath(import.meta.url)), ".."));
-export const CORE_CHILD_COMMAND = {
+// private and frozen: nothing outside this module can change what the guard admits (review round 3, R3-1)
+const CORE_CHILD_COMMAND = Object.freeze({
   networkPreload: pathToFileURL(join(CODE_ROOT, "sandbox", "preload.js")).href,
   fsPreload: pathToFileURL(join(CODE_ROOT, "cores", "child-preload-fs.js")).href,
   entry: join(CODE_ROOT, "cores", "core-child.js"),
-} as const;
+});
 
 export interface SpawnRequest {
   readonly env: readonly string[];
@@ -91,40 +102,43 @@ function nodeChildAllowed(args: readonly string[], context: ProcessContext): boo
 export function processAllowed(file: string, args: readonly string[], context: ProcessContext, request: SpawnRequest = { env: [], shell: false, detached: false }): boolean {
   // a shell runs whatever its command line says; a detached process leaves the worker's job (Windows) or its process group (POSIX)
   if (request.shell) return false;
-  if (request.detached && process.platform === "win32") return false;
+  if (request.detached && WINDOWS) return false;
   // a Node child: nothing of the environment but SystemRoot (NODE_OPTIONS or any NODE_* variable would change what its flags say)
   if (same(file, context.execPath)) return !request.detached && request.env.every((pair) => /^SystemRoot=/i.test(pair)) && nodeChildAllowed(args, context);
   if (context.chromium !== null && same(file, context.chromium)) {
     return args.includes("--remote-debugging-pipe") && !args.some((a) => SANDBOX_OFF.some((f) => a === f || a.startsWith(`${f}=`)) || /^(file|https?|ftp|data):/i.test(a));
   }
-  if (process.platform === "win32" && context.systemRoot !== null && same(file, join(context.systemRoot, "System32", "taskkill.exe"))) {
+  if (WINDOWS && context.systemRoot !== null && same(file, joinPath(context.systemRoot, "System32", "taskkill.exe"))) {
     return args.length === 4 && args[0] === "/PID" && args[1] === String(context.pid) && args[2] === "/T" && args[3] === "/F";
   }
   return false;
 }
 
 const permission = (process as unknown as { permission?: { has(scope: string, reference?: string): boolean } }).permission;
-const context: ProcessContext = {
+// the permission model's own check, bound now (a later replacement of process.permission.has changes nothing here)
+const has = permission === undefined ? null : permission.has.bind(permission);
+const context: ProcessContext = Object.freeze({
   chromium: argumentOf("--chromium"),
   coreHeapMegabytes: Number(argumentOf("--core-heap-mb") ?? 0),
   pid: process.pid,
   execPath: process.execPath,
   systemRoot: process.env["SystemRoot"] ?? null,
-  may: (scope, path) => permission?.has(scope, path) ?? false,
-};
+  may: (scope: "fs.read" | "fs.write", path: string) => has?.(scope, path) ?? false,
+});
 const envPairsOf = (env: unknown): string[] => (env !== null && typeof env === "object" ? Object.entries(env as Record<string, unknown>).map(([k, v]) => `${k}=${String(v)}`) : []);
 
 type Loose = Record<string, unknown>;
 // the declarations below run when the module is loaded as the worker's preload; processAllowed is also imported by tests
 const proto = (childProcess as unknown as { ChildProcess: { prototype: Loose } }).ChildProcess.prototype;
 const originalSpawn = proto["spawn"] as (this: unknown, options: { file?: string; args?: string[] }) => unknown;
-proto["spawn"] = function guardedSpawn(this: unknown, options: { file?: string; args?: string[]; envPairs?: string[]; detached?: boolean }): unknown {
+const guardedSpawn = function guardedSpawn(this: unknown, options: { file?: string; args?: string[]; envPairs?: string[]; detached?: boolean }): unknown {
   const file = String(options?.file ?? "");
   // options.args holds the program's own name first (argv0); envPairs the child's environment as KEY=value; a shell request has
   // already become the shell's own command line here, which no rule admits
   if (!processAllowed(file, (options?.args ?? []).slice(1), context, { env: options?.envPairs ?? [], shell: false, detached: options?.detached === true })) throw new ProcessRefused(file);
   return originalSpawn.call(this, options);
 };
+Object.defineProperty(proto, "spawn", { value: guardedSpawn, writable: false, configurable: false });
 const module_ = childProcess as unknown as Loose;
 for (const name of ["spawnSync", "execFileSync"] as const) {
   const original = module_[name] as (file: string, args?: unknown, options?: unknown) => unknown;
