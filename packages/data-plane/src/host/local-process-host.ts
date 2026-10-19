@@ -159,6 +159,8 @@ interface Live {
   timer: NodeJS.Timeout | null;
   /** Calls read from the channel whose replies have not yet left this process (at most CALLS_HELD). */
   held: number;
+  /** The cancellation state last mirrored to the worker (each state is written once). */
+  signalled: "CANCELLED" | "FENCED" | null;
 }
 
 interface PendingLaunch {
@@ -288,6 +290,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   // --- the port -----------------------------------------------------------------------------------------------------------------
 
   async launch(spec: WorkerLaunchSpec): Promise<WorkerLaunchResult> {
+    this.#serving();
     const identity = spec.identity;
     const answer = (outcome: WorkerLaunchResult["outcome"], reason: string | null): WorkerLaunchResult => Object.freeze({ evidenceClass: EVIDENCE, identity, outcome, reason });
     const problem = this.#specProblem(spec);
@@ -300,7 +303,6 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       const first = await under.answer;
       return first.outcome === "LAUNCHED" ? answer("ALREADY_EXISTS", null) : first;
     }
-    if (this.#stopped) throw new Error(`${LOCAL_PROCESS_HOST}: the host is stopped; nothing was created`);
     const pending: PendingLaunch = { abandoned: false, answer: this.#create(spec, this.#o.clock.nowMs(), () => pending.abandoned, answer) };
     this.#pending.set(identity, pending);
     try {
@@ -357,6 +359,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   async observe(identity: string): Promise<WorkerObservation> {
+    this.#serving();
     const record = this.#job(identity);
     return Object.freeze({
       evidenceClass: EVIDENCE,
@@ -371,7 +374,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   async terminate(identity: string): Promise<WorkerTerminationResult> {
+    this.#serving();
     const answer = (outcome: WorkerTerminationResult["outcome"]): WorkerTerminationResult => Object.freeze({ evidenceClass: EVIDENCE, identity, outcome });
+    // no launch accepts anything but an attempt's identity, so nothing exists, or can ever exist, under another name
+    if (!isAttemptIdentity(identity)) return answer("NOT_FOUND");
     const live = this.#live.get(identity);
     if (live !== undefined) {
       if (TERMINAL.has(live.record.state)) return answer("ALREADY_TERMINAL");
@@ -396,6 +402,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   async resources(identity: string): Promise<WorkerResourceReport> {
+    this.#serving();
     const record = this.#job(identity);
     return record === null
       ? Object.freeze({ evidenceClass: EVIDENCE, identity, outcome: "NOT_FOUND" as const })
@@ -408,7 +415,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   signal(identity: string, state: "CANCELLED" | "FENCED"): boolean {
     const live = this.#live.get(identity);
     if (live === undefined || live.ended !== null || TERMINAL.has(live.record.state) || !this.#writable(live)) return false;
-    this.#write(live, { t: "signal", state });
+    if (live.signalled !== state) {
+      live.signalled = state;
+      this.#write(live, { t: "signal", state });
+    }
     return true;
   }
 
@@ -485,6 +495,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
   }
 
   // --- internals ------------------------------------------------------------------------------------------------------------------
+
+  /** A stopped host answers nothing more about the root: another host may hold it now (a transient failure for its caller). */
+  #serving(): void {
+    if (this.#stopped) throw Object.assign(new Error(`${LOCAL_PROCESS_HOST}: the host is stopped; another host may hold its root`), { code: "HOST_STOPPED", transient: true });
+  }
 
   /** A job's record: null for an absent identity or a tombstone; throws HostRecordUnreadable for one the root could not read. */
   #job(identity: string): LocalJobRecord | null {
@@ -569,7 +584,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const channel = (child.stdio[3] ?? null) as Socket | null;
     const broker = new AttemptStorageBroker({ capability: spec.capability, storage: this.#o.storage, uploads: this.#o.uploads, origin: this.#o.sessionOrigin, maxObjectBytes: spec.limits.hardScratchBytes });
     let exited: () => void = () => undefined;
-    const live: Live = { record, child, channel, decoder: new FrameDecoder(), broker, result: null, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, held: 0 };
+    const live: Live = { record, child, channel, decoder: new FrameDecoder(), broker, result: null, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, held: 0, signalled: null };
     this.#live.set(spec.identity, live);
     record.pid = child.pid;
     record.state = "RUNNING";

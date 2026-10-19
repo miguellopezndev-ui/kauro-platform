@@ -108,6 +108,7 @@ export class JobJournal {
    * one that throws leaves the previous version on disk, which a later opening reads.
    */
   write(record: LocalJobRecord): void {
+    if (!isAttemptIdentity(record.identity)) throw new TypeError(`${LOCAL_PROCESS_HOST}: a record is an attempt's identity`);
     const path = join(this.#dir, `${record.identity}${SUFFIX}`);
     const temporary = `${path}${TEMPORARY}`;
     try {

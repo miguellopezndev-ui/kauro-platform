@@ -485,7 +485,7 @@ test("B14-A terminate (review R6): a worker whose storage call never answers is 
   }
 });
 
-test("B14-A records (review R9-1, R10-2, R11-3, the later audit): the next host reads the root once — a record it cannot read answers the host's transient failure for that identity alone (observe, resources, terminate and launch), never NOT_FOUND and never an end; a temporary file of a host that died mid-write is discarded; an unfinished record ends HOST_RESTARTED", async () => {
+test("B14-A records (review R9-1, R10-2, R11-3, the later audit): the next host reads the root once — a record it cannot read answers the host's transient failure for that identity alone (observe, resources, terminate and launch), never NOT_FOUND and never an end; a temporary file of a host that died mid-write is discarded; an unfinished record ends HOST_RESTARTED; a name that is no identity is never written; a stopped host answers nothing more", async () => {
   const rig = await localRig();
   try {
     const unreadable = plantedAttempt(rig.storage, 41);
@@ -508,6 +508,13 @@ test("B14-A records (review R9-1, R10-2, R11-3, the later audit): the next host 
     assert.deepEqual([ended.state, ended.cause, host.record(unfinished.fixture.identity)?.note], ["FAILED", "WORKER_CRASHED", "HOST_RESTARTED"]);
     assert.equal(existsSync(join(jobs, `${fine.fixture.identity}.json.tmp`)), false);
     assert.equal((await host.observe(fine.fixture.identity)).state, "NOT_FOUND");
+    // a name that is no attempt's identity is never one the root holds, and is never written as one
+    assert.equal((await host.terminate("../../escape")).outcome, "NOT_FOUND");
+    assert.deepEqual(readdirSync(dirname(rig.hostRoot)).filter((n) => n.startsWith("escape")), []);
+    // a stopped host answers nothing more: the next one holds the root
+    const next = await rig.reopen();
+    await assert.rejects(host.observe(fine.fixture.identity), /the host is stopped/);
+    assert.equal((await next.observe(unfinished.fixture.identity)).state, "FAILED");
   } finally {
     await rig.dispose();
   }

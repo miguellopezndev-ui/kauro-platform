@@ -44,6 +44,9 @@ export function linuxDescendantsOf(pid: number): number[] {
   return [...tree];
 }
 
+/** How long a tree kill may hold its caller (taskkill is synchronous); the job object still ends the worker's own children. */
+const TASKKILL_MS = 10_000;
+
 function systemTool(name: string): string {
   const root = process.env["SystemRoot"] ?? "C:\\Windows";
   return join(root, "System32", name);
@@ -53,7 +56,7 @@ function systemTool(name: string): string {
 export function killProcessTree(pid: number, platform: NodeJS.Platform = process.platform): void {
   if (!Number.isSafeInteger(pid) || pid <= 0) return;
   if (platform === "win32") {
-    spawnSync(systemTool("taskkill.exe"), ["/PID", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    spawnSync(systemTool("taskkill.exe"), ["/PID", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore", timeout: TASKKILL_MS });
     return;
   }
   if (platform === "linux") {
@@ -85,7 +88,7 @@ export function killProcessTree(pid: number, platform: NodeJS.Platform = process
  */
 export function killOwnTree(): void {
   if (process.platform === "win32") {
-    spawnSync(systemTool("taskkill.exe"), ["/PID", String(process.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    spawnSync(systemTool("taskkill.exe"), ["/PID", String(process.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore", timeout: TASKKILL_MS });
     return;
   }
   try {
