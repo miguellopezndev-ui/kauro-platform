@@ -129,8 +129,9 @@ granting the delivered PDF to its agency only and refusing every unpublished pac
 
 - **The issuer's legal identity**: order 6 added its store (migration 0095) and the platform's port; no document is recorded (the owner
   has not provided the facts: `docs/owner/LEGAL_IDENTITY_SNAPSHOT.md`), so every report is refused `ISSUER_UNAVAILABLE` until one is.
-- **A composition root** that binds `ReportingExecutionEnvelope` in a worker (B14) and a deployment-pinned browser; the cloud storage and
-  host remain B14/B15.
+- **A composition root** that binds `ReportingExecutionEnvelope` in a worker: since order 9 (B14-A) the worker process
+  `@kauro/migration-worker` does, run by the local process host ([B14-A-worker-executor.md](B14-A-worker-executor.md)); the
+  deployment-pinned browser is the image's (deploy/aws/worker); the cloud storage and host remain B14/B15.
 - **The database-backed `ReportInputsPort`** exists (order 6, `PlatformReportInputs`); binding it for a deployed worker is B14's.
 - **Replacement of a delivered package** (`AVAILABLE → RETIRED`, "LATER B13" in the B08 machine) is not performed; a corrected report is
   another job's package and the first delivery stays AVAILABLE. Deciding which one supersedes the other is a product decision.

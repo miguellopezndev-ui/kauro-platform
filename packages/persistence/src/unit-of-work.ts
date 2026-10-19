@@ -78,6 +78,7 @@ import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
 import { PgDownloadAuthorizationStore } from "./execution/downloads.js";
+import { PgAttemptInputs } from "./execution/attempt-inputs.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
 import { PgAuditDiscovery } from "./audit/discovery.js";
 import { PgImportStageStore } from "./repositories/import-stages.js";
@@ -224,6 +225,8 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly projectDashboard: PgProjectDashboard;
   /** The records a B13 report is made from, the agency's branding versions and the issuers' legal identity documents (order 6, migration 0095), read through reportSourcesOf(uow). */
   readonly reportSources: PgReportSources;
+  /** The records a worker's attempt ticket is built from (B14-A: the core plan binding, the sealed files as the core reads them), read through attemptInputsOf(uow). */
+  readonly attemptInputs: PgAttemptInputs;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
   #abandoned: Error | null = null;
@@ -242,6 +245,7 @@ export class PgUnitOfWork implements UnitOfWork {
     this.buyerTypes = new PgBuyerTypes(client);
     this.projectDashboard = new PgProjectDashboard(client);
     this.reportSources = new PgReportSources(client);
+    this.attemptInputs = new PgAttemptInputs(client);
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
     this.invitations = new PgInvitationRepository(client);
@@ -714,6 +718,12 @@ export function projectDashboardOf(uow: UnitOfWork): PgProjectDashboard {
 export function reportSourcesOf(uow: UnitOfWork): PgReportSources {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the report sources are read in a unit of work of @kauro/persistence");
   return uow.reportSources;
+}
+
+/** The records a worker's attempt ticket is built from, in a unit of work of this package (B14-A). */
+export function attemptInputsOf(uow: UnitOfWork): PgAttemptInputs {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the attempt inputs are read in a unit of work of @kauro/persistence");
+  return uow.attemptInputs;
 }
 
 /** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */

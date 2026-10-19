@@ -40,6 +40,7 @@ import type {
   ValidateRequest,
   ValidateResult,
 } from "@kauro/application";
+import { loadConfig } from "@kauro/migration-core";
 import { AttemptEnvelopeFailure } from "../attempt/failure.js";
 import { ATTEMPT_SCRATCH_DIRECTORY_PREFIX, attemptScratchDirectoryOf } from "../attempt/scratch-store.js";
 import { AttemptByteLedger } from "./attempt-byte-ledger.js";
@@ -157,6 +158,14 @@ function parseEffects(text: string): MigrationEffects {
   }
   if (head === null) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_SHAPE", "the effects file has no head");
   return { configHash: head.configHash, identity: head.identity, ...lists } as unknown as MigrationEffects;
+}
+
+/**
+ * The core-native hash of a MigrationConfig document, as Migration Core's own loader computes it (the `coreConfigHash` a plan binding
+ * records, D5-16); throws the core's MigrationError for a document the loader refuses.
+ */
+export function coreConfigHashOf(configDocument: unknown): Sha256Hex {
+  return loadConfig(JSON.stringify(configDocument), "kauro-core-config").configHash as Sha256Hex;
 }
 
 /** The platform target mode and the core's: one enum-only bridge (D5-7). */

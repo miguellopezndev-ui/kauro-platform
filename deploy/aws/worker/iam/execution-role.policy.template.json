@@ -1,0 +1,19 @@
+{
+  "$comment": "B14-A contract: the task execution role (ECS's own, never the worker's): pull the one image repository and write the one log group.",
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "EcrAuth", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Sid": "PullWorkerImage",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"],
+      "Resource": "${ECR_REPOSITORY_ARN}"
+    },
+    {
+      "Sid": "Logs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:us-east-1:${ACCOUNT_ID}:log-group:/kauro/${ENVIRONMENT}/migration-worker:*"
+    }
+  ]
+}

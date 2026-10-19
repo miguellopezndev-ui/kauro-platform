@@ -1,0 +1,36 @@
+{
+  "$comment": "B14-A contract (deploy/aws/worker/README.md): the ECS task definition of the migration worker on Fargate, Linux/x86_64, us-east-1. Placeholders in ${...} are bound by the next phase's IaC; nothing here has been registered. The task role is NOT set here: every RunTask names the attempt's own role through overrides.taskRoleArn.",
+  "family": "kauro-migration-worker",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "runtimePlatform": { "operatingSystemFamily": "LINUX", "cpuArchitecture": "X86_64" },
+  "cpu": "2048",
+  "memory": "8192",
+  "ephemeralStorage": { "sizeInGiB": 72 },
+  "executionRoleArn": "${EXECUTION_ROLE_ARN}",
+  "volumes": [{ "name": "scratch" }],
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "${ECR_REPOSITORY_URI}@${IMAGE_DIGEST}",
+      "essential": true,
+      "readonlyRootFilesystem": true,
+      "user": "10001:10001",
+      "stopTimeout": 30,
+      "mountPoints": [{ "sourceVolume": "scratch", "containerPath": "/scratch", "readOnly": false }],
+      "linuxParameters": { "initProcessEnabled": true },
+      "environment": [
+        { "name": "KAURO_WORKER_TRANSPORT", "value": "aws-s3" },
+        { "name": "KAURO_SCRATCH_ROOT", "value": "/scratch" },
+        { "name": "KAURO_CHROMIUM", "value": "/usr/bin/chromium" },
+        { "name": "KAURO_BROWSER_TEMP", "value": "/scratch/kb" },
+        { "name": "KAURO_CORE_HEAP_MB", "value": "2048" },
+        { "name": "KAURO_BUCKET", "value": "${OBJECT_BUCKET}" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": { "awslogs-group": "/kauro/${ENVIRONMENT}/migration-worker", "awslogs-region": "us-east-1", "awslogs-stream-prefix": "attempt" }
+      }
+    }
+  ]
+}

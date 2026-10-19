@@ -24,6 +24,13 @@ const OWNERS = Object.freeze({
   ObjectReadSigningPort: "packages/application/src/testing/contract-fake-read-signer.ts",
 });
 
+/**
+ * The real implementers of a provider port beside its fake (never a fake of their own): B14-A's worker reaches its storage only through
+ * the host's broker, and BrokeredObjectStorage is that broker's client (docs/design/B14-A-worker-executor.md §4). B15's provider
+ * adapters join this list when they exist.
+ */
+const REAL_IMPLEMENTERS = Object.freeze({ ObjectStoragePort: ["packages/data-plane/src/host/client.ts"] });
+
 /** Every TypeScript source of the workspace's packages and apps, production and test, outside build output and dependencies. */
 function sources() {
   const out = [];
@@ -44,7 +51,7 @@ test("B07 stage 1 is one implementation: each provider port has exactly one labe
   const files = sources();
   for (const [port, owner] of Object.entries(OWNERS)) {
     const implementers = files.filter((f) => new RegExp(`\\bimplements\\s+(?:[\\w.]+\\s*,\\s*)*${port}\\b`).test(readFileSync(join(root, f), "utf8")));
-    assert.deepEqual(implementers, [owner], `${port} is implemented by its owner's labelled fake only`);
+    assert.deepEqual(implementers, [owner, ...(REAL_IMPLEMENTERS[port] ?? [])].sort(), `${port} is implemented by its owner's labelled fake and its listed real implementers only`);
   }
 
   const entries = {

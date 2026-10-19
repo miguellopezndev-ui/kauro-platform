@@ -39,7 +39,7 @@
  * independently sealed sources of one project keep working. The database admits that shape — it guarantees one mutable
  * revision per project and one successor per predecessor; the linearity of lineage is CMD012's (design D-REV-1).
  */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   createIdGenerator,
   inspectionReceiptHashOf,
@@ -160,6 +160,14 @@ export interface SealSourceOptions {
   readonly billableSourceUnits?: number;
   /** The other populations the evaluation freezes (default 120 physical rows, 120 logical records or the billable units if more, no edges). */
   readonly populations?: Partial<Omit<SourceCounts, "billableSourceUnits">>;
+  /** The admitted file's real bytes (B14-A): its digest and length are theirs, and `plant` stores them at the accepted name, answering the generation. */
+  readonly content?: SourceFileContent;
+}
+
+/** Real bytes for the fixture's one admitted file, held by the test's object storage at the accepted name `plant` is given. */
+export interface SourceFileContent {
+  readonly bytes: Uint8Array;
+  plant(objectName: string): string;
 }
 
 /** The fixture's service identity on control-plane events and objects (a SERVICE actor, never a person). */
@@ -289,7 +297,7 @@ async function revisionToFill(sessions: SourceFixtureSessions, scope: SourceFixt
  * promotion, admission): the revision holds one admitted CSV file and is still UPLOADING — the intake closes only when the agency
  * binds its selection (bindSourceSelection, D-INTAKE-1).
  */
-export async function admitSourceFile(sessions: SourceFixtureSessions, scope: SourceFixtureScope, options: { readonly seed: string; readonly base?: Date }): Promise<AdmittedSourceFixture> {
+export async function admitSourceFile(sessions: SourceFixtureSessions, scope: SourceFixtureScope, options: { readonly seed: string; readonly base?: Date; readonly content?: SourceFileContent }): Promise<AdmittedSourceFixture> {
   const initiatedAt = options.base ?? new Date(Date.now() - FIFTEEN_DAYS_MS);
   const { revisionId, clientId } = await revisionToFill(sessions, scope);
   const uploadId = ids.next();
@@ -298,10 +306,12 @@ export async function admitSourceFile(sessions: SourceFixtureSessions, scope: So
   const fileId = ids.next();
   const tableId = ids.next();
   const reservedBytes = 4_096;
-  const bytes = 1_234;
+  const content = options.content;
+  const bytes = content === undefined ? 1_234 : content.bytes.byteLength;
   const quarantineGeneration = String(1_700_000_000_000_000 + Math.floor(Math.random() * 1_000_000));
-  const acceptedGeneration = String(Number(quarantineGeneration) + 1);
-  const sha256 = textDigest(`${options.seed}-bytes-${uploadId}`);
+  // with real content, the test's storage holds the bytes at the accepted name and answers their generation
+  const acceptedGeneration = content === undefined ? String(Number(quarantineGeneration) + 1) : content.plant(`accepted/${scope.agencyId}/${scope.projectId}/${fileId}`);
+  const sha256 = content === undefined ? textDigest(`${options.seed}-bytes-${uploadId}`) : createHash("sha256").update(content.bytes).digest("hex");
   const claimDigest = textDigest(`${options.seed}-completion-${uploadId}`);
 
   // CMD013 phase 1 (request handler): quarantine intent, RESERVED upload, its anchor, DRAFT -> UPLOADING — all at the initiation
@@ -653,7 +663,7 @@ export async function sealReadyRevision(sessions: SourceFixtureSessions, scope: 
  * expire it. Returns the manifest hash a plan names as its source (plans_source_fk).
  */
 export async function sealSourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, options: SealSourceOptions): Promise<SealedSourceFixture> {
-  const admitted = await admitSourceFile(sessions, scope, { seed: options.seed, ...(options.base !== undefined ? { base: options.base } : {}) });
+  const admitted = await admitSourceFile(sessions, scope, { seed: options.seed, ...(options.base !== undefined ? { base: options.base } : {}), ...(options.content !== undefined ? { content: options.content } : {}) });
   const ready = await readySourceRevision(sessions, scope, admitted, {
     ...(options.billableSourceUnits === undefined ? {} : { billableSourceUnits: options.billableSourceUnits }),
     ...(options.populations === undefined ? {} : { populations: options.populations }),

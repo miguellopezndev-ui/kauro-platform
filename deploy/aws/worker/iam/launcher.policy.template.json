@@ -1,0 +1,63 @@
+{
+  "$comment": "B14-A contract: what the control plane's role needs to host attempts (EcsFargateWorkerHost and STAGING_JANITOR): RunTask of the one task definition in the one cluster, with the tags of its own request (ecs:TagResource only as part of that RunTask); observation and termination in that cluster; per-attempt roles only under the kauro-attempts path and only with the boundary; tickets written once; the protocol keys read.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RunWorker",
+      "Effect": "Allow",
+      "Action": "ecs:RunTask",
+      "Resource": "${TASK_DEFINITION_ARN_WITHOUT_REVISION}:*",
+      "Condition": { "ArnEquals": { "ecs:cluster": "${CLUSTER_ARN}" } }
+    },
+    {
+      "Sid": "TagTasksAtTheirRunTask",
+      "Effect": "Allow",
+      "Action": "ecs:TagResource",
+      "Resource": "arn:aws:ecs:us-east-1:${ACCOUNT_ID}:task/${CLUSTER_NAME}/*",
+      "Condition": {
+        "StringEquals": { "ecs:CreateAction": "RunTask" },
+        "ForAllValues:StringEquals": { "aws:TagKeys": ["kauro:identity", "kauro:environment"] }
+      }
+    },
+    {
+      "Sid": "ObserveAndStop",
+      "Effect": "Allow",
+      "Action": ["ecs:DescribeTasks", "ecs:StopTask", "ecs:ListTasks"],
+      "Resource": "*",
+      "Condition": { "ArnEquals": { "ecs:cluster": "${CLUSTER_ARN}" } }
+    },
+    {
+      "Sid": "PassAttemptAndExecutionRoles",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": ["arn:aws:iam::${ACCOUNT_ID}:role/kauro-attempts/kauro-attempt-*", "${EXECUTION_ROLE_ARN}"],
+      "Condition": { "StringEquals": { "iam:PassedToService": "ecs-tasks.amazonaws.com" } }
+    },
+    {
+      "Sid": "CreateAttemptRolesWithinBoundary",
+      "Effect": "Allow",
+      "Action": ["iam:CreateRole", "iam:PutRolePolicy"],
+      "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/kauro-attempts/kauro-attempt-*",
+      "Condition": { "StringEquals": { "iam:PermissionsBoundary": "${ATTEMPT_BOUNDARY_POLICY_ARN}" } }
+    },
+    {
+      "Sid": "RemoveAttemptRoles",
+      "Effect": "Allow",
+      "Action": ["iam:DeleteRolePolicy", "iam:DeleteRole"],
+      "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/kauro-attempts/kauro-attempt-*"
+    },
+    {
+      "Sid": "WriteTicketsOnce",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/tickets/*",
+      "Condition": { "Null": { "s3:if-none-match": "false" } }
+    },
+    {
+      "Sid": "ReadProtocolKeys",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": ["arn:aws:s3:::${OBJECT_BUCKET}/claims/*", "arn:aws:s3:::${OBJECT_BUCKET}/results/*", "arn:aws:s3:::${OBJECT_BUCKET}/heartbeat/*"]
+    }
+  ]
+}

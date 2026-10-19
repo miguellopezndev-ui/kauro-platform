@@ -1,0 +1,31 @@
+{
+  "$comment": "B14-A contract: the one RunTask request per launch of an attempt (EcsFargateWorkerHost, next phase). clientToken = the attempt id (idempotent for min(24 h, task lifetime + 1 h)); startedBy = the identity (ListTasks filter); the attempt's own role; the ticket's key and SHA-256. Never a secret in overrides (DescribeTasks shows them).",
+  "cluster": "${CLUSTER_ARN}",
+  "taskDefinition": "${TASK_DEFINITION_ARN}",
+  "launchType": "FARGATE",
+  "platformVersion": "1.4.0",
+  "count": 1,
+  "clientToken": "${ATTEMPT_ID}",
+  "startedBy": "kauro-attempt-${ATTEMPT_ID}",
+  "propagateTags": "NONE",
+  "tags": [
+    { "key": "kauro:identity", "value": "kauro-attempt-${ATTEMPT_ID}" },
+    { "key": "kauro:environment", "value": "${ENVIRONMENT}" }
+  ],
+  "networkConfiguration": {
+    "awsvpcConfiguration": { "subnets": ["${PRIVATE_SUBNET_ID}"], "securityGroups": ["${WORKER_SECURITY_GROUP_ID}"], "assignPublicIp": "DISABLED" }
+  },
+  "overrides": {
+    "taskRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/kauro-attempts/kauro-attempt-${ATTEMPT_ID}",
+    "containerOverrides": [
+      {
+        "name": "worker",
+        "environment": [
+          { "name": "KAURO_IDENTITY", "value": "kauro-attempt-${ATTEMPT_ID}" },
+          { "name": "KAURO_TICKET_KEY", "value": "tickets/kauro-attempt-${ATTEMPT_ID}" },
+          { "name": "KAURO_TICKET_DIGEST", "value": "${TICKET_SHA256}" }
+        ]
+      }
+    ]
+  }
+}

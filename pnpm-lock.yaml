@@ -85,6 +85,19 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  apps/migration-worker:
+    dependencies:
+      '@kauro/data-plane':
+        specifier: workspace:*
+        version: link:../../packages/data-plane
+    devDependencies:
+      '@types/node':
+        specifier: 24.3.1
+        version: 24.3.1
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
   apps/web:
     dependencies:
       '@kauro/ui':

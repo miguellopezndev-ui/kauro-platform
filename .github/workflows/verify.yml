@@ -115,6 +115,12 @@ jobs:
         if: runner.os == 'Linux'
         run: bash tools/ci/prepare-chromium.sh
 
+      # The local worker host (B14-A) runs each attempt in a PID namespace on Linux; the script proves the runner user can make one,
+      # loading an AppArmor profile for util-linux unshare alone if the host restricts it (never the global sysctl).
+      - name: The local worker host's attempt boundary (Linux)
+        if: runner.os == 'Linux'
+        run: bash tools/ci/prepare-worker-scope.sh
+
       - name: Chromium for the PDF tests (Windows)
         if: runner.os == 'Windows'
         run: |
