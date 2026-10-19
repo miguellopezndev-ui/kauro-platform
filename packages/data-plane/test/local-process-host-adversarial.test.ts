@@ -862,3 +862,42 @@ test("B14-A limits (review round 8, R8-2): a supervisor file that cannot be read
     await rig.dispose();
   }
 });
+
+test("B14-A RACE (review round 9, R9-1): a job record another instance cannot read is no proof of an end — observe and terminate fail transiently, and nothing is recorded", { skip }, async () => {
+  const hold = gate();
+  const rig = localRig({ hooks: { atStage: (_id, stage) => (stage === "CORE_STARTED" ? (hold.open(), never()) : undefined) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 47);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await hold.promise;
+    writeFileSync(join(rig.hostRoot, "jobs", spec.identity, "record.json"), "{ unreadable");
+    const other = rig.restart();
+    const transient = (e: unknown): boolean => (e as { code?: unknown; transient?: unknown }).code === "HOST_RECORD_UNREADABLE" && (e as { transient?: unknown }).transient === true;
+    await assert.rejects(other.observe(spec.identity), transient);
+    await assert.rejects(other.terminate(spec.identity), transient);
+    assert.equal(existsSync(join(rig.hostRoot, "jobs", spec.identity, "end.json")), false, "no end was fabricated");
+    assert.equal(rig.host.running().includes(spec.identity), true, "the worker runs on, owned by its instance");
+  } finally {
+    hold.open();
+    await rig.dispose();
+  }
+});
+
+test("B14-A cleanup (review round 9, R9-2; Linux): a supervisor without the worker's recorded start never signals the pid — fail closed", { skip: process.platform !== "linux" }, async () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-sup-"));
+  const bystander = spawn("/bin/sleep", ["60"], { detached: true, stdio: "ignore" });
+  try {
+    const { supervise } = await import("../src/host/supervisor.js");
+    const { PassThrough } = await import("node:stream");
+    const input = new PassThrough();
+    const exited = new Promise<void>((resolve) => supervise({ workerPid: bystander.pid!, workerStart: null, jobDir: root, scratchDirs: [join(root, "none")], deadlineInMs: 60_000, hardMemoryBytes: 1, hardScratchBytes: 1, pollMs: 50 }, input, () => resolve()));
+    input.end();
+    await exited;
+    assert.equal(processRunning(bystander.pid!), true, "the process at that pid was left alone");
+  } finally {
+    bystander.kill("SIGKILL");
+    rmSync(root, { recursive: true, force: true });
+  }
+});

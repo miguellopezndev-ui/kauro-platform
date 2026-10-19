@@ -187,7 +187,7 @@ interface Live {
 
 const TERMINAL: ReadonlySet<RecordState> = new Set(["SUCCEEDED", "FAILED", "TERMINATED"]);
 /** Why the host itself ends a job: a termination, the deadline, or a supervisor that could not start or did not stay (review R4-1). */
-type EndReason = "TERMINATED" | "DEADLINE" | "SUPERVISOR_LOST";
+type EndReason = "TERMINATED" | "DEADLINE" | "SUPERVISOR_LOST" | "IDENTITY_UNREADABLE";
 /** How long a supervisor has to say it is watching before the worker gets its ticket. */
 const SUPERVISOR_READY_MS = 15_000;
 /** The note of a cancelled identity's tombstone: terminated before any create, so never a job (observe answers NOT_FOUND). */
@@ -217,6 +217,16 @@ function writeAtomically(path: string, bytes: string | Uint8Array): void {
   const temporary = `${path}.${process.pid}.tmp`;
   writeFileSync(temporary, bytes);
   renameSync(temporary, path);
+}
+
+/** A job's durable record could not be read: the host knows nothing about the job, so it answers nothing (a transient failure). */
+export class HostRecordUnreadable extends Error {
+  readonly code = "HOST_RECORD_UNREADABLE";
+  readonly transient = true;
+  constructor(identity: string, cause: unknown) {
+    super(`${LOCAL_PROCESS_HOST}: the record of ${identity} could not be read`, { cause });
+    this.name = "HostRecordUnreadable";
+  }
 }
 
 export class LocalProcessWorkerHost implements WorkerHostPort {
@@ -393,7 +403,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     return answer("LAUNCHED", null);
   }
 
-  observe(identity: string): Promise<WorkerObservation> {
+  async observe(identity: string): Promise<WorkerObservation> {
     const record = this.#existing(identity) ?? this.#absent(identity);
     const observation: WorkerObservation = Object.freeze({
       evidenceClass: EVIDENCE,
@@ -405,7 +415,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       resources: record === null || record.startedAtMs === null ? null : this.#resourcesOf(record),
       observedAt: this.#o.clock.now(),
     });
-    return Promise.resolve(observation);
+    return observation;
   }
 
   async terminate(identity: string): Promise<WorkerTerminationResult> {
@@ -443,13 +453,13 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     return answer("TERMINATED");
   }
 
-  resources(identity: string): Promise<WorkerResourceReport> {
+  async resources(identity: string): Promise<WorkerResourceReport> {
     const record = this.#existing(identity) ?? this.#absent(identity);
     const report: WorkerResourceReport =
       record === null
         ? Object.freeze({ evidenceClass: EVIDENCE, identity, outcome: "NOT_FOUND" as const })
         : Object.freeze({ evidenceClass: EVIDENCE, identity, outcome: "REPORTED" as const, state: record.state as WorkerObservedState, resources: this.#resourcesOf(record) });
-    return Promise.resolve(report);
+    return report;
   }
 
   // --- beyond the port ------------------------------------------------------------------------------------------------------------
@@ -623,7 +633,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const live: Live = { record, child, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null };
     this.#live.set(identity, live);
     record.pid = child.pid ?? null;
-    record.pidStart = child.pid !== undefined && process.platform === "linux" ? linuxStartOf(child.pid) : null;
+    record.pidStart = child.pid !== undefined && process.platform === "linux" ? this.#startOfChild(child.pid) : null;
     record.state = "RUNNING";
     record.startedAtMs = this.#o.clock.nowMs();
     record.lastHeartbeatMs = record.startedAtMs;
@@ -675,7 +685,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     live.timer.unref();
     // the ticket only once the supervisor watches (review R4-1): no worker runs its attempt unsupervised, and a supervisor that fails to
     // start, or ends while the worker runs, ends the attempt
-    if (child.pid !== undefined) {
+    if (child.pid !== undefined && process.platform === "linux" && record.pidStart === null) {
+      // the worker's identity could not be read: without it nothing may watch or signal it by pid (review round 9, R9-2); it is still
+      // this host's unreaped child, so it is ended now, before it has its ticket
+      this.#end(live, "IDENTITY_UNREADABLE");
+    } else if (child.pid !== undefined) {
       live.supervisor = this.#supervise(live, child.pid, [attemptDir, browserTemp], deadlineInMs + 1_000, spec, async () => {
         if (this.#o.hooks?.beforeTicket !== undefined) await this.#o.hooks.beforeTicket(identity);
         if (TERMINAL.has(live.record.state)) return;
@@ -685,6 +699,15 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
         this.#send(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes });
       });
     }
+  }
+
+  /** Linux: the start of this host's own child, just spawned (so not yet reaped): read again a few times before it is given up. */
+  #startOfChild(pid: number): string | null {
+    for (let tries = 0; tries < 5; tries++) {
+      const start = linuxStartOf(pid);
+      if (start !== null) return start;
+    }
+    return null;
   }
 
   #send(live: Live, message: HostMessage): void {
@@ -831,6 +854,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.state = "FAILED";
       record.cause = "WORKER_CRASHED";
       record.note = "SUPERVISOR_LOST";
+    } else if (how === "IDENTITY_UNREADABLE") {
+      record.state = "FAILED";
+      record.cause = "WORKER_ERROR";
+      record.note = "IDENTITY_UNREADABLE";
     } else {
       record.state = "TERMINATED";
       record.note = "TERMINATED_BY_HOST";
@@ -1092,12 +1119,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     try {
       const end = join(dir, "end.json");
       record = JSON.parse(readFileSync(existsSync(end) ? end : join(dir, "record.json"), "utf8")) as LocalJobRecord;
-    } catch {
-      // a directory without a readable record was not made by a host (a create renames a directory that holds one): nothing ran
-      const stamp = statSync(dir).mtimeMs;
-      record = { host: LOCAL_PROCESS_HOST, identity, ticketDigest: "0".repeat(64), instance: "unknown", state: "FAILED", pid: null, createdAtMs: stamp, startedAtMs: null, endedAtMs: stamp, lastHeartbeatMs: null, cause: "WORKER_CRASHED", note: "CREATE_INTERRUPTED", manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, flags: [], hardMemoryBytes: 0, hardScratchBytes: 0 };
-      this.#persist(record);
-      return record;
+    } catch (error) {
+      // a record that cannot be read is no proof of anything (review round 9, R9-1): the host's own failure, transient, answered as
+      // such and never as an end (a create renames a directory that holds its record, so a host never leaves one without it)
+      throw new HostRecordUnreadable(identity, error);
     }
     // a queued job (no pid yet) is ended here only if its creator will never start it (#queuedEnded)
     if (!TERMINAL.has(record.state) && !this.#instanceAlive(record.instance) && this.#treeEnded(dir, record) && (record.pid !== null || this.#queuedEnded(identity))) {

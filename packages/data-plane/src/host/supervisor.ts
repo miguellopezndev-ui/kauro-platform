@@ -175,7 +175,8 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
   let done = false;
   const pid = config.workerPid;
   // the pid is the worker's while it runs and (Linux) its start is the one recorded at the spawn; a reused pid is never signalled
-  const isWorker = (): boolean => processRunning(pid) && (process.platform !== "linux" || config.workerStart === null || linuxStartOf(pid) === config.workerStart);
+  // (Linux without a recorded start: never — the pid is then never signalled, walked or measured; review round 9, R9-2)
+  const isWorker = (): boolean => processRunning(pid) && (process.platform !== "linux" || (config.workerStart !== null && linuxStartOf(pid) === config.workerStart));
   // the worker's group is swept while the pid is the worker's or names no process at all (a pid in use as a group id is not reused)
   const groupOf = (): number | null => (isWorker() || !processExists(pid) ? pid : null);
   // every process seen in the worker's tree, with its start (Linux): one re-parented after its parent died is still the attempt's
@@ -234,6 +235,8 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
 // run as a process
 const argument = process.argv[2];
 if (argument !== undefined && process.argv[1] !== undefined && /supervisor\.js$/.test(process.argv[1])) {
+  // the host's end of these pipes may close at any moment (the host died): a write to it fails, and that is no reason to stop watching
+  process.stdout.on("error", () => undefined);
   supervise(
     JSON.parse(argument) as SupervisorConfig,
     process.stdin,
