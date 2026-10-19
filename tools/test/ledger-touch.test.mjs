@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { changedCaseRows, globToRegExp, main, packageGlobs, readPackageGlobs, touched, unattributed } from "../acceptance-touch.mjs";
 import { loadRegistry } from "../ledger.mjs";
+import { removeTemp } from "../temp-removal.mjs";
 
 const root = join(import.meta.dirname, "..", "..");
 
@@ -110,7 +111,7 @@ function fixture({ external = false, globsLater = false } = {}) {
     const code = main([...argv, "--json"], dir, (l) => lines.push(l));
     return { code, out: code === 2 ? lines.join("\n") : JSON.parse(lines.join("\n")) };
   };
-  return { dir, git, write, commit, X, Y, run, reg, program, globs, ownRows, reviewId, done: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir, git, write, commit, X, Y, run, reg, program, globs, ownRows, reviewId, done: () => removeTemp(dir, () => rmSync(dir, { recursive: true, force: true })) };
 }
 
 test("PR18-6 (T6): main end to end — the ACCEPTED package (not only REVIEW_ACCEPTED) is diffed; recording its review touches nothing; a later change to its files touches it; an unresolvable target is exit 2", () => {

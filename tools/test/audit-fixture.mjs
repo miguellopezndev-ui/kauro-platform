@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { removeTemp } from "../temp-removal.mjs";
 
 const IDENTITY = ["-c", "user.name=Audit Kit", "-c", "user.email=audit-kit@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", "-c", "init.defaultBranch=main", "-c", "protocol.file.allow=always"];
 
@@ -55,7 +56,7 @@ export function makeFixture(name = "kauro-platform") {
     },
     tree: (sha) => gitIn(work, ["rev-parse", `${sha}^{tree}`]),
     cleanup() {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+      removeTemp(dir, () => rmSync(dir, { recursive: true, force: true }));
     },
   };
   fx.commit("initial", { "README.md": "fixture\n" });
