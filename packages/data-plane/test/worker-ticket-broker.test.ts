@@ -183,3 +183,26 @@ test("B14-A broker (review R5): a session whose creation lands after the revocat
   assert.equal(cancelled.length, 1, "the late session was cancelled");
   assert.equal(broker.cancelledLate, 1);
 });
+
+test("B14-A broker (review round 4, R4-4): the session cap holds for concurrent requests — a session's number is taken before the provider answers, so a second request while the first is pending is refused TOO_MANY_SESSIONS", async () => {
+  const storage = new ContractFakeObjectStorage();
+  const ticket = ticketOf(storage, 4);
+  const lands: Array<() => void> = [];
+  const held = {
+    location: (zone: Parameters<ContractFakeObjectStorage["location"]>[0]) => storage.location(zone),
+    createResumableSession: async (...args: Parameters<ContractFakeObjectStorage["createResumableSession"]>) => {
+      await new Promise<void>((resolve) => lands.push(resolve));
+      return storage.createResumableSession(...args);
+    },
+    cancelResumableSession: (ref: string, timeoutMs: number) => storage.cancelResumableSession(ref, timeoutMs),
+  } as unknown as ContractFakeObjectStorage;
+  const broker = new AttemptStorageBroker({ capability: ticket.capability, storage: held, uploads: holderOf(storage), origin: "https://app.kauro.test", maxObjectBytes: 1 << 20, maxSessions: 1 });
+  const call = { op: "storage.createSession", zone: "STAGING", objectName: ticket.capability.manifestObjectName, declaredBytes: 5, contentType: "x", timeoutMs: 1000 } as const;
+  const first = broker.handle(call);
+  const second = broker.handle(call);
+  await assert.rejects(second, (e: unknown) => e instanceof BrokerRefusal && e.code === "TOO_MANY_SESSIONS");
+  await new Promise((r) => setImmediate(r));
+  lands.forEach((land) => land());
+  assert.equal(lands.length, 1, "the provider was asked once");
+  assert.match(String(((await first) as { handle: string }).handle), /^session-1$/);
+});

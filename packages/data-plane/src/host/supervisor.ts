@@ -20,14 +20,18 @@
  */
 import { lstatSync, readdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { killProcessTree, linuxDescendantsOf, linuxStartOf, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxDescendantsOf, linuxStartOf, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 
 export const SUPERVISOR_VERDICTS = ["HOST_LOST", "DEADLINE", "MEMORY_EXHAUSTED", "SCRATCH_EXHAUSTED"] as const;
 export type SupervisorVerdict = (typeof SUPERVISOR_VERDICTS)[number];
 export const SUPERVISOR_FILE = "supervisor.json";
+/** What the supervisor writes on its stdout once it watches: the host gives the worker its ticket only then. */
+export const SUPERVISOR_READY = "SUPERVISING\n";
 
 export interface SupervisorConfig {
   readonly workerPid: number;
+  /** The worker's start (Linux, recorded by the host at spawn): the pid is the worker's only while it matches (review R4-2). */
+  readonly workerStart: string | null;
   readonly jobDir: string;
   /** The attempt's directory and the browser's temporary one: their bytes together are the attempt's scratch. */
   readonly scratchDirs: readonly string[];
@@ -128,12 +132,17 @@ export function readVerdict(jobDir: string): { readonly verdict: SupervisorVerdi
 /** How many sweeps, a poll apart, the supervisor makes before it leaves with processes it could not end. */
 const SWEEPS = 20;
 
-export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream, exit: (code: number) => void): void {
+export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream, exit: (code: number) => void, ready: () => void = () => undefined): void {
   let done = false;
+  const pid = config.workerPid;
+  // the pid is the worker's while it runs and (Linux) its start is the one recorded at the spawn; a reused pid is never signalled
+  const isWorker = (): boolean => processRunning(pid) && (process.platform !== "linux" || config.workerStart === null || linuxStartOf(pid) === config.workerStart);
+  // the worker's group is swept while the pid is the worker's or names no process at all (a pid in use as a group id is not reused)
+  const groupOf = (): number | null => (isWorker() || !processExists(pid) ? pid : null);
   // every process seen in the worker's tree, with its start (Linux): one re-parented after its parent died is still the attempt's
   const known = new Map<number, string>();
   const sweep = (left: number): void => {
-    if (sweepAttemptProcesses(config.workerPid, config.scratchDirs, known).length === 0 || left <= 1) return exit(0);
+    if (sweepAttemptProcesses(groupOf(), config.scratchDirs, known).length === 0 || left <= 1) return exit(0);
     setTimeout(() => sweep(left - 1), config.pollMs);
   };
   const end = (verdict: SupervisorVerdict | null, detail: Record<string, number> = {}): void => {
@@ -141,7 +150,7 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
     done = true;
     if (verdict !== null) {
       recordVerdict(config.jobDir, verdict, detail);
-      killProcessTree(config.workerPid);
+      if (isWorker()) killProcessTree(pid);
     }
     sweep(SWEEPS);
   };
@@ -162,24 +171,31 @@ export function supervise(config: SupervisorConfig, input: NodeJS.ReadableStream
   setTimeout(() => end("DEADLINE"), Math.max(0, Math.min(config.deadlineInMs, 2_147_483_647)));
   setInterval(() => {
     // the worker is gone: a host that died with it (on Windows its job object ends the tree with the host) is still recorded
-    if (!processRunning(config.workerPid)) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
+    if (!isWorker()) return void setTimeout(() => end(hostGone ? "HOST_LOST" : null), 1_000);
     if (process.platform === "linux") {
-      for (const pid of linuxDescendantsOf(config.workerPid)) {
-        const start = linuxStartOf(pid);
-        if (pid !== config.workerPid && start !== null && !known.has(pid)) known.set(pid, start);
+      for (const p of linuxDescendantsOf(pid)) {
+        const start = linuxStartOf(p);
+        if (p !== pid && start !== null && !known.has(p)) known.set(p, start);
       }
     }
-    const rss = treeResidentBytes(config.workerPid);
+    const rss = treeResidentBytes(pid);
     if (rss !== null && rss > config.hardMemoryBytes) return end("MEMORY_EXHAUSTED", { residentBytes: rss });
-    const tree = process.platform === "linux" ? linuxDescendantsOf(config.workerPid) : [];
+    const tree = process.platform === "linux" ? linuxDescendantsOf(pid) : [];
     const scratch = config.scratchDirs.reduce((sum, dir) => sum + directoryBytes(dir), 0) + openDeletedBytes(tree);
     if (scratch > config.hardScratchBytes) return end("SCRATCH_EXHAUSTED", { scratchBytes: scratch });
     return undefined;
   }, config.pollMs);
+  // every watch is set: the host may now give the worker its ticket
+  ready();
 }
 
 // run as a process
 const argument = process.argv[2];
 if (argument !== undefined && process.argv[1] !== undefined && /supervisor\.js$/.test(process.argv[1])) {
-  supervise(JSON.parse(argument) as SupervisorConfig, process.stdin, (code) => process.exit(code));
+  supervise(
+    JSON.parse(argument) as SupervisorConfig,
+    process.stdin,
+    (code) => process.exit(code),
+    () => void process.stdout.write(SUPERVISOR_READY),
+  );
 }

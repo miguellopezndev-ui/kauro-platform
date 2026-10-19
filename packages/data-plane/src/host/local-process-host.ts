@@ -55,7 +55,7 @@ import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
 import { killProcessTree, linuxAttemptProcesses, linuxStartOf, processCommandLine, processRunning, sweepAttemptProcesses } from "./process-tree.js";
-import { readVerdict, type SupervisorConfig } from "./supervisor.js";
+import { SUPERVISOR_READY, readVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
 
@@ -172,7 +172,7 @@ interface Live {
   readonly broker: AttemptStorageBroker;
   result: WorkerResultReport | null;
   persistedBeatMs: number;
-  ended: "TERMINATED" | "DEADLINE" | null;
+  ended: EndReason | null;
   stderrTail: string;
   readonly settled: Promise<void>;
   timer: NodeJS.Timeout | null;
@@ -180,6 +180,10 @@ interface Live {
 }
 
 const TERMINAL: ReadonlySet<RecordState> = new Set(["SUCCEEDED", "FAILED", "TERMINATED"]);
+/** Why the host itself ends a job: a termination, the deadline, or a supervisor that could not start or did not stay (review R4-1). */
+type EndReason = "TERMINATED" | "DEADLINE" | "SUPERVISOR_LOST";
+/** How long a supervisor has to say it is watching before the worker gets its ticket. */
+const SUPERVISOR_READY_MS = 15_000;
 /** The note of a cancelled identity's tombstone: terminated before any create, so never a job (observe answers NOT_FOUND). */
 const CANCELLED_BEFORE_CREATE = "CANCELLED_BEFORE_CREATE";
 /** Written in a job's directory by an instance that ends another instance's worker, before it kills it. */
@@ -424,6 +428,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     return this.#live.get(identity)?.stderrTail ?? null;
   }
 
+  /** The pid of the supervisor watching a running job of this instance (evidence and tests), null when none watches. */
+  supervisorPid(identity: string): number | null {
+    return this.#live.get(identity)?.supervisor?.pid ?? null;
+  }
+
   /** Every job this instance started and that is still running. */
   running(): readonly string[] {
     return [...this.#live.values()].filter((l) => !TERMINAL.has(l.record.state)).map((l) => l.record.identity);
@@ -606,8 +615,11 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     const deadlineInMs = Math.max(0, Math.min(until, 2_147_483_647));
     live.timer = setTimeout(() => this.#end(live, "DEADLINE"), deadlineInMs);
     live.timer.unref();
-    if (child.pid !== undefined) live.supervisor = this.#supervise(live, child.pid, [attemptDir, browserTemp], deadlineInMs + 1_000, spec);
-    this.#send(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes });
+    // the ticket only once the supervisor watches (review R4-1): no worker runs its attempt unsupervised, and a supervisor that fails to
+    // start, or ends while the worker runs, ends the attempt
+    if (child.pid !== undefined) {
+      live.supervisor = this.#supervise(live, child.pid, [attemptDir, browserTemp], deadlineInMs + 1_000, spec, () => this.#send(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes }));
+    }
   }
 
   #send(live: Live, message: HostMessage): void {
@@ -660,17 +672,48 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * The supervisor of one worker (supervisor.ts): a process of its own, outside the worker's confinement, that ends the worker's tree if
    * this host dies, at the deadline whether or not this host lives, and past the attempt's hard memory or scratch.
    */
-  #supervise(live: Live, workerPid: number, scratchDirs: readonly string[], deadlineInMs: number, spec: WorkerLaunchSpec): ChildProcess {
-    const config: SupervisorConfig = { workerPid, jobDir: this.#jobDir(live.record.identity), scratchDirs, deadlineInMs, hardMemoryBytes: spec.limits.hardMemoryBytes, hardScratchBytes: spec.limits.hardScratchBytes, pollMs: this.#o.supervisorPollMs ?? 500 };
+  #supervise(live: Live, workerPid: number, scratchDirs: readonly string[], deadlineInMs: number, spec: WorkerLaunchSpec, ready: () => void): ChildProcess {
+    const config: SupervisorConfig = {
+      workerPid,
+      workerStart: live.record.pidStart ?? null,
+      jobDir: this.#jobDir(live.record.identity),
+      scratchDirs,
+      deadlineInMs,
+      hardMemoryBytes: spec.limits.hardMemoryBytes,
+      hardScratchBytes: spec.limits.hardScratchBytes,
+      pollMs: this.#o.supervisorPollMs ?? 500,
+    };
     const env: Record<string, string> = {};
     const systemRoot = process.env["SystemRoot"];
     if (systemRoot !== undefined) env["SystemRoot"] = systemRoot;
     // detached on every platform: on Windows a child that is not detached is in the host's job object and dies with the host, before it
     // could record why (the worker and its tree die with it there too: libuv's kill-on-close job); its working directory is the code's
-    const supervisor = spawn(process.execPath, [SUPERVISOR, JSON.stringify(config)], { cwd: SANDBOX_CODE_ROOT, env, stdio: ["pipe", "ignore", "ignore"], detached: true, windowsHide: true });
+    const supervisor = spawn(process.execPath, [SUPERVISOR, JSON.stringify(config)], { cwd: SANDBOX_CODE_ROOT, env, stdio: ["pipe", "pipe", "ignore"], detached: true, windowsHide: true });
+    let watching = false;
+    // lost: it could not start, did not say it watches in time, or ended while this worker still runs (a standing down clears it first)
+    const lost = (): void => {
+      // not lost: a supervisor that ended the tree itself (its verdict classifies the worker's exit), or one leaving after the worker
+      if (live.supervisor !== supervisor || TERMINAL.has(live.record.state) || readVerdict(this.#jobDir(live.record.identity)) !== null) return;
+      if (live.child.exitCode !== null || live.child.signalCode !== null) return;
+      this.#end(live, "SUPERVISOR_LOST");
+    };
+    const timer = setTimeout(() => (watching ? undefined : lost()), SUPERVISOR_READY_MS);
+    timer.unref();
+    let said = "";
+    supervisor.stdout?.on("data", (chunk: Buffer) => {
+      said += chunk.toString("utf8");
+      if (!watching && said.includes(SUPERVISOR_READY)) {
+        watching = true;
+        clearTimeout(timer);
+        if (live.supervisor === supervisor && !TERMINAL.has(live.record.state)) ready();
+      }
+    });
+    supervisor.stdout?.on("error", () => undefined);
     supervisor.stdin?.on("error", () => undefined);
-    supervisor.on("error", () => undefined);
+    supervisor.on("error", lost);
+    supervisor.on("exit", lost);
     supervisor.unref();
+    (supervisor.stdout as unknown as { unref?: () => void } | null)?.unref?.();
     return supervisor;
   }
 
@@ -702,17 +745,22 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * The host ends a job: the broker refuses everything at once, the worker's whole tree is killed at once, the end is recorded, and only
    * then is the provider's side cleaned (bounded, in the background): no cleanup can hold a termination or a deadline back.
    */
-  #end(live: Live, how: "TERMINATED" | "DEADLINE"): void {
+  #end(live: Live, how: EndReason): void {
     if (live.ended !== null || TERMINAL.has(live.record.state)) return;
     live.ended = how;
     live.broker.close(how === "DEADLINE" ? "DEADLINE_EXCEEDED" : "TERMINATED_BY_HOST");
-    if (live.record.pid !== null) killProcessTree(live.record.pid);
+    // the pid is still this host's child (not yet reaped), so it is the worker's
+    if (live.record.pid !== null && live.child.exitCode === null && live.child.signalCode === null) killProcessTree(live.record.pid);
     const record = live.record;
     record.endedAtMs = this.#o.clock.nowMs();
     if (how === "DEADLINE") {
       record.state = "FAILED";
       record.cause = "DEADLINE_EXCEEDED";
       record.note = "DEADLINE";
+    } else if (how === "SUPERVISOR_LOST") {
+      record.state = "FAILED";
+      record.cause = "WORKER_CRASHED";
+      record.note = "SUPERVISOR_LOST";
     } else {
       record.state = "TERMINATED";
       record.note = "TERMINATED_BY_HOST";

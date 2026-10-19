@@ -75,7 +75,11 @@ Boundaries, from the outside in:
    scratch quota and the wall clock.
 4. **A supervisor beside it** (`host/supervisor.ts`), outside the confinement and holding no customer data, ends the worker's whole
    tree without the worker's cooperation: when the host dies (its pipe closes), at the deadline whether or not the host lives, and
-   when the tree's resident memory (Linux) or the attempt directory passes the attempt's hard limits.
+   when the tree's resident memory (Linux) or the attempt directory passes the attempt's hard limits. The worker gets its ticket
+   only once its supervisor says it watches; a supervisor that cannot start, does not say so within 15 s, or ends while the worker
+   runs without having ended it ends the attempt (`FAILED WORKER_CRASHED`, `SUPERVISOR_LOST`; review R4-1). The supervisor knows the
+   worker by its pid and (Linux) the start the host recorded at the spawn, and never signals the pid, or discovers a tree under it,
+   once that no longer matches (review R4-2).
 5. **Inside the worker,** the core runs in its own child with narrower flags (B05). Chromium runs with its own sandbox, offline, with
    JavaScript off and every request aborted (B13).
 6. **On AWS** (qualification §4), the task, its container and its per-attempt IAM role are the operating-system boundary. The
@@ -233,9 +237,9 @@ Windows with Google Chrome required (`KAURO_REQUIRE_PDF_ENGINE=1`).
 
 | Suite | File | Cases |
 |---|---|---|
-| Ticket and broker, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 5: a session landing after revocation is cancelled; digest, canonical bytes, closed shape (18 refusals), broker OK, broker DENY (14 refusals and revocation) |
+| Ticket and broker, pure | `packages/data-plane/test/worker-ticket-broker.test.ts` | 6: the session cap under concurrent requests; a session landing after revocation is cancelled; digest, canonical bytes, closed shape (18 refusals), broker OK, broker DENY (14 refusals and revocation) |
 | Local executor, happy path | `packages/data-plane/test/local-process-host.test.ts` | 1: real Migration Core and Chromium in a confined process; the manifest names the package, the PDF and its record; scratch removed |
-| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 25: a worker that rewrites its command line, terminated by its recorded identity; a removed-but-open file past the hard scratch (Linux); a launch pending on one instance cancelled through another; a stale owner whose worker lives (killed by a pid proved the job's); the sweep of an attempt's orphans (Linux); two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
+| Local executor, adversarial | `packages/data-plane/test/local-process-host-adversarial.test.ts` | 26: a supervisor killed mid-attempt (SUPERVISOR_LOST); a worker that rewrites its command line, terminated by its recorded identity; a removed-but-open file past the hard scratch (Linux); a launch pending on one instance cancelled through another; a stale owner whose worker lives (killed by a pid proved the job's); the sweep of an attempt's orphans (Linux); two live instances over one root; scratch written outside the quotas (supervisor, SCRATCH_EXHAUSTED); native memory past the hard limit (supervisor, Linux); a launch abandoned while its read is pending and a read past its bound; termination while a storage call never answers; a dead host with a worker stuck in synchronous work (supervisor, HOST_LOST); and the earlier 14: concurrent and duplicate launches and a second host; lost answer and failed read; configuration refused; hostile worker (environment, files, writes, socket, fetch, DNS, broker, residual); memory (heap death recorded MEMORY_EXHAUSTED); disk (SCRATCH_EXHAUSTED); time (DEADLINE_EXCEEDED, and a deadline already past); termination during processing, during the PDF and before publication (no process survives, OS-checked); cancellation and fence; control-plane death (an orphan ends itself, recovery from the record); missing legal identity; altered and forged sealed generations |
 | End to end, PostgreSQL 17 | `apps/control/test/b14a-local-executor.test.ts` | 5: OK (package AVAILABLE, job READY, entitlement DELIVERED, verification VALID EXECUTED_LOCAL 3.0.0, delivered manifest = the receipt's, janitor CLEANED with REPORTED resources); S056 lost answer adopted through B08; CMD037 during the run; worker killed, then takeover at fence 2 delivers; no legal identity → FAILED REFUSED |
 | Regressions | data-plane, control, persistence, application suites; `pnpm run verify` | B05 adapter (with F1), B08 control plane, B13 report suites unchanged and green |
 
@@ -272,6 +276,10 @@ EXECUTED_PROVIDER.**
 | R3-1 | (round 3) The allowed child's specification was exported and mutable. | Private and frozen; the guard's functions and the permission check are captured at load; probes show neither reachable. The realm-level residual is stated, and listed as a blocker (§5, §11). |
 | R3-2 | A worker could rewrite its own command line and pass for a reused pid. | The worker's Linux start is recorded at spawn and compared; an unreadable identity is `UNKNOWN`, never an end; a cell with a worker that rewrites its title. |
 | R3-3 | A file whose name was removed escaped the scratch measure. | The supervisor counts files the tree holds open after their names were removed (Linux, /proc); Windows stated as unenforced. |
+| R4-1 | (round 4) A worker ran on when its supervisor failed to start or ended. | The ticket waits for the supervisor's word; its loss ends the attempt (`SUPERVISOR_LOST`); a cell kills a supervisor mid-attempt. |
+| R4-2 | The supervisor could signal a reused worker pid. | It receives the worker's recorded start and checks it before every signal and discovery; the group only while the pid is the worker's or names no process. |
+| R4-3 | The api loader census pinned the preload's `node:module` import at a stale line. | The exact line is updated; the census stays strict. |
+| R4-4 | Concurrent session requests passed the broker's cap together. | A session's number is taken before the provider is asked; a cell with two concurrent requests and a cap of one. |
 
 ## 10. Decisions
 

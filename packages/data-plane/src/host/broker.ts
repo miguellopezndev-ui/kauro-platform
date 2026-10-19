@@ -215,6 +215,9 @@ export class AttemptStorageBroker {
     if (!Number.isSafeInteger(call.declaredBytes) || call.declaredBytes < 1 || call.declaredBytes > this.#o.maxObjectBytes) throw new BrokerRefusal("OUTSIDE_CAPABILITY", "the declared length passes the attempt's hard scratch bound");
     if (typeof call.contentType !== "string" || call.contentType.length === 0 || call.contentType.length > 128) throw new BrokerRefusal("MALFORMED_CALL", "a content type is a short token");
     if (this.#nextSession >= (this.#o.maxSessions ?? 10_000)) throw new BrokerRefusal("TOO_MANY_SESSIONS", "the attempt opened more sessions than a package has files");
+    // the session's number is taken before the provider is asked (review round 4, R4-4): concurrent requests cannot all pass the cap,
+    // and a creation that fails still counts against it
+    const number = ++this.#nextSession;
     const session = await this.#o.storage.createResumableSession(
       { location: this.#location("STAGING"), objectName: call.objectName, declaredBytes: call.declaredBytes, contentType: call.contentType, origin: this.#o.origin },
       boundedTimeout(call.timeoutMs),
@@ -225,7 +228,7 @@ export class AttemptStorageBroker {
       await this.#cancel(session.sessionRef);
       this.#stillOpen();
     }
-    const handle = `session-${++this.#nextSession}`;
+    const handle = `session-${number}`;
     this.#sessions.set(handle, session.sessionRef);
     return { handle, chunkMultipleBytes: session.chunkMultipleBytes, providerExpiresAt: session.providerExpiresAt };
   }

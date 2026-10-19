@@ -684,3 +684,25 @@ test("B14-A RACE (review round 3, R3-2): a worker that rewrites its own command 
     await rig.dispose();
   }
 });
+
+test("B14-A limits (review round 4, R4-1): no worker runs its attempt unsupervised — the ticket is given only once the supervisor watches, and a supervisor that ends while the worker runs ends the attempt (FAILED WORKER_CRASHED, SUPERVISOR_LOST), the tree gone", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 38);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-title", rendererVersion: "x" }, 256);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const supervisor = host.supervisorPid(spec.identity);
+    assert.notEqual(supervisor, null);
+    await new Promise((r) => setTimeout(r, 1_500));
+    const pid = host.record(spec.identity)!.pid!;
+    process.kill(supervisor!, "SIGKILL");
+    const ended = await host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.cause, ended?.note], ["FAILED", "WORKER_CRASHED", "SUPERVISOR_LOST"]);
+    assert.ok(await eventually(() => !processRunning(pid), 10_000), "the worker was ended with its supervisor's loss");
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
