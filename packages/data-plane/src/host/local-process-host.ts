@@ -54,7 +54,7 @@ import type { AuthorizedReportInputs } from "../report/facts.js";
 import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
-import { killProcessTree, linuxAttemptProcesses, linuxStartOf, processCommandLine, processRunning, sweepAttemptProcesses } from "./process-tree.js";
+import { killProcessTree, linuxAttemptProcesses, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./process-tree.js";
 import { SUPERVISOR_READY, readVerdict, type SupervisorConfig } from "./supervisor.js";
 import { WORKER_PROTOCOL_VERSION, type HostMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { attemptTicketBytesOf, attemptTicketDigestOf, attemptTicketProblems, executionLimitsProblems, type AttemptTicket } from "./ticket.js";
@@ -101,6 +101,8 @@ export interface LocalProcessHostHooks {
   beforeCall?(identity: string, call: WorkerCall): Promise<void> | void;
   /** Awaited between a job's create and its start's claim (a test's pause of a creator; without it the two are one step). */
   afterCreate?(identity: string): Promise<void> | void;
+  /** Awaited between the supervisor's word and the ticket's delivery claim (a test's pause of a creator). */
+  beforeTicket?(identity: string): Promise<void> | void;
 }
 
 export interface LocalProcessWorkerHostOptions {
@@ -192,6 +194,8 @@ const CANCELLED_BEFORE_CREATE = "CANCELLED_BEFORE_CREATE";
 const TERMINATION_REQUEST = "terminate.request";
 /** Taken once per job, exclusively: by its creator before the worker is spawned, or by an instance that ends the queued job for good. */
 const START_CLAIM = "start.claim";
+/** Taken once per job, exclusively: by its creator before the worker gets its ticket, or by an instance that ends the job before that. */
+const TICKET_CLAIM = "ticket.claim";
 /** How often an instance says it is alive, and how long another instance's silence means it is gone. */
 const INSTANCE_BEAT_MS = 5_000;
 const INSTANCE_LOST_MS = 30_000;
@@ -341,7 +345,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     if (this.#o.hooks?.afterCreate !== undefined) await this.#o.hooks.afterCreate(identity);
     // the start's claim (review round 5, R5-1): another instance that judged this queued job ended took it first, and then the job,
     // created and ended, never starts
-    if (this.#claimStart(identity, `start:${this.instance}`)) {
+    if (this.#claimOnce(identity, START_CLAIM, `start:${this.instance}`)) {
       try {
         this.#start(spec, bytes, record);
       } catch {
@@ -613,9 +617,12 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       // and found gone before the end is recorded or the browser's directory removed; a process that outlives every sweep is left to
       // the supervisor, which sweeps again
       const pid = record.pid;
-      if (pid === null || sweepAttemptProcesses(pid, [attemptDir, browserTemp]).length === 0) return close();
+      // the worker is reaped: its group is named only while its pid names no process (a pid is not reused while a group holds it, and a
+      // process now holding it is not the worker's — review round 6, R6-2)
+      const sweep = (): number[] => sweepAttemptProcesses(pid !== null && !processExists(pid) ? pid : null, [attemptDir, browserTemp]);
+      if (sweep().length === 0) return close();
       void (async () => {
-        for (let round = 0; round < 25 && sweepAttemptProcesses(pid, [attemptDir, browserTemp]).length > 0; round++) await new Promise((r) => setTimeout(r, 200));
+        for (let round = 0; round < 25 && sweep().length > 0; round++) await new Promise((r) => setTimeout(r, 200));
         close();
       })();
     });
@@ -636,9 +643,12 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     // the ticket only once the supervisor watches (review R4-1): no worker runs its attempt unsupervised, and a supervisor that fails to
     // start, or ends while the worker runs, ends the attempt
     if (child.pid !== undefined) {
-      live.supervisor = this.#supervise(live, child.pid, [attemptDir, browserTemp], deadlineInMs + 1_000, spec, () => {
-        // an end another instance recorded meanwhile (it judged this instance lost) stands: the worker never gets the ticket (R5-1)
-        if (existsSync(join(this.#jobDir(identity), "end.json"))) return this.#end(live, "TERMINATED");
+      live.supervisor = this.#supervise(live, child.pid, [attemptDir, browserTemp], deadlineInMs + 1_000, spec, async () => {
+        if (this.#o.hooks?.beforeTicket !== undefined) await this.#o.hooks.beforeTicket(identity);
+        if (TERMINAL.has(live.record.state)) return;
+        // the ticket's delivery is claimed once (review round 6, R6-1): an instance that ended this job meanwhile, judging this one
+        // lost, claimed it first, and then the worker never gets its ticket and is ended; an end recorded meanwhile stands too
+        if (!this.#claimOnce(identity, TICKET_CLAIM, `deliver:${this.instance}`) || existsSync(join(this.#jobDir(identity), "end.json"))) return this.#end(live, "TERMINATED");
         this.#send(live, { t: "ticket", protocol: WORKER_PROTOCOL_VERSION, bytes });
       });
     }
@@ -694,7 +704,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * The supervisor of one worker (supervisor.ts): a process of its own, outside the worker's confinement, that ends the worker's tree if
    * this host dies, at the deadline whether or not this host lives, and past the attempt's hard memory or scratch.
    */
-  #supervise(live: Live, workerPid: number, scratchDirs: readonly string[], deadlineInMs: number, spec: WorkerLaunchSpec, ready: () => void): ChildProcess {
+  #supervise(live: Live, workerPid: number, scratchDirs: readonly string[], deadlineInMs: number, spec: WorkerLaunchSpec, ready: () => Promise<void>): ChildProcess {
     const config: SupervisorConfig = {
       workerPid,
       workerStart: live.record.pidStart ?? null,
@@ -714,9 +724,14 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     let watching = false;
     // lost: it could not start, did not say it watches in time, or ended while this worker still runs (a standing down clears it first)
     const lost = (): void => {
-      // not lost: a supervisor that ended the tree itself (its verdict classifies the worker's exit), or one leaving after the worker
-      if (live.supervisor !== supervisor || TERMINAL.has(live.record.state) || readVerdict(this.#jobDir(live.record.identity)) !== null) return;
-      if (live.child.exitCode !== null || live.child.signalCode !== null) return;
+      // a supervisor leaving after the worker, or after a standing down, is not lost
+      if (live.supervisor !== supervisor || TERMINAL.has(live.record.state) || live.child.exitCode !== null || live.child.signalCode !== null) return;
+      // one that recorded a verdict may have died before ending the tree (review round 6, R6-3): the host ends it now, and the verdict
+      // classifies the worker's exit; without a verdict the supervisor is lost
+      if (readVerdict(this.#jobDir(live.record.identity)) !== null) {
+        if (live.record.pid !== null) killProcessTree(live.record.pid);
+        return;
+      }
       this.#end(live, "SUPERVISOR_LOST");
     };
     const timer = setTimeout(() => (watching ? undefined : lost()), SUPERVISOR_READY_MS);
@@ -727,7 +742,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       if (!watching && said.includes(SUPERVISOR_READY)) {
         watching = true;
         clearTimeout(timer);
-        if (live.supervisor === supervisor && !TERMINAL.has(live.record.state)) ready();
+        if (live.supervisor === supervisor && !TERMINAL.has(live.record.state)) void ready();
       }
     });
     supervisor.stdout?.on("error", () => undefined);
@@ -913,9 +928,9 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * Takes a job's start, once: its creator before it spawns the worker (`start:`), or another instance that ends a queued job for good
    * (`never:`). Exclusive, so of a creator resuming late and an instance ending its job, exactly one goes on.
    */
-  #claimStart(identity: string, claim: string): boolean {
+  #claimOnce(identity: string, name: string, claim: string): boolean {
     try {
-      writeFileSync(join(this.#jobDir(identity), START_CLAIM), claim, { flag: "wx" });
+      writeFileSync(join(this.#jobDir(identity), name), claim, { flag: "wx" });
       return true;
     } catch {
       return false;
@@ -926,16 +941,20 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
    * Whether a queued job (no pid recorded) is ended for good. Its start's claim taken here first: its creator never starts it. Taken by
    * its creator, whose instance has since been lost for longer than the creation horizon: a creator that spawned would have recorded
    * the pid at once (the claim, the spawn and the record are one synchronous step), and one resuming later finds this end before it
-   * gives the worker its ticket, and ends it.
+   * gives the worker its ticket, and ends it. The ticket's delivery is itself claimed once (`ticket.claim`), so a decision to end and a
+   * resumed creator's delivery cannot both go on.
    */
   #queuedEnded(identity: string): boolean {
-    if (this.#claimStart(identity, `never:${this.instance}`)) return true;
+    if (this.#claimOnce(identity, START_CLAIM, `never:${this.instance}`)) return true;
     try {
       const path = join(this.#jobDir(identity), START_CLAIM);
       const claim = readFileSync(path, "utf8");
       if (claim.startsWith("never:")) return true;
       const owner = claim.slice("start:".length);
-      return !this.#instanceAlive(owner) && this.#o.clock.nowMs() - statSync(path).mtimeMs > this.creationHorizonSeconds * 1000;
+      if (this.#instanceAlive(owner) || this.#o.clock.nowMs() - statSync(path).mtimeMs <= this.creationHorizonSeconds * 1000) return false;
+      // its creator was lost after claiming the start: the job is ended only if this instance also takes the ticket's delivery, so a
+      // creator that resumes can never give a worker its ticket (a worker without its ticket runs nothing and ends) — R6-1
+      return this.#claimOnce(identity, TICKET_CLAIM, `never:${this.instance}`) || readFileSync(join(this.#jobDir(identity), TICKET_CLAIM), "utf8").startsWith("never:");
     } catch {
       return false;
     }

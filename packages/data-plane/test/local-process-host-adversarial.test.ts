@@ -731,3 +731,48 @@ test("B14-A RACE (review round 5, R5-1): a creator paused between its create and
     await rig.dispose();
   }
 });
+
+test("B14-A RACE (review round 6, R6-1): the ticket's delivery is claimed once — when another instance has taken it (its decision that the job ended), the creator never gives the worker its ticket and ends it; the worker runs nothing", async () => {
+  const atTicket = gate();
+  const resumed = gate();
+  const stages: string[] = [];
+  const rig = localRig({ hooks: { beforeTicket: async () => (atTicket.open(), await resumed.promise), atStage: (_id, stage) => void stages.push(stage) } });
+  try {
+    const planted = plantedAttempt(rig.storage, 40);
+    await readsFor(rig, planted);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await rig.host.launch(spec)).outcome, "LAUNCHED");
+    await atTicket.promise;
+    // another instance's committed decision that the job ended (as #queuedEnded takes it after the creator's long silence)
+    writeFileSync(join(rig.hostRoot, "jobs", spec.identity, "ticket.claim"), "never:another-instance", { flag: "wx" });
+    resumed.open();
+    const ended = await rig.host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.note], ["TERMINATED", "TERMINATED_BY_HOST"]);
+    assert.deepEqual(stages, [], "the worker never started its attempt");
+  } finally {
+    resumed.open();
+    await rig.dispose();
+  }
+});
+
+test("B14-A limits (review round 6, R6-3): a supervisor that recorded its verdict and died before ending the tree does not leave the worker running — the host ends it, and the verdict classifies the end", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 41);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-title", rendererVersion: "x" }, 256);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    await new Promise((r) => setTimeout(r, 1_500));
+    const pid = host.record(spec.identity)!.pid!;
+    // the verdict written, then the supervisor gone before its kill
+    writeFileSync(join(rig.hostRoot, "jobs", spec.identity, "supervisor.json"), JSON.stringify({ verdict: "SCRATCH_EXHAUSTED", scratchBytes: 1 }), { flag: "wx" });
+    process.kill(host.supervisorPid(spec.identity)!, "SIGKILL");
+    const ended = await host.settled(spec.identity);
+    assert.deepEqual([ended?.state, ended?.cause, ended?.note], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED"]);
+    assert.ok(await eventually(() => !processRunning(pid), 10_000));
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});
