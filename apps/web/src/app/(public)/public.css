@@ -5557,6 +5557,77 @@ body:has(> .kauro-site-header) {
     clip-path: inset(0 0 0 0);
   }
 }
+/* How it works, the window's scenes: a file drops into place, a bar measures, a thing is shown or hidden at a moment (never half), a
+   control is pressed, a step is taken, a line is drawn, the team receives */
+@keyframes kauro-drop {
+  from {
+    transform: translateY(-0.75rem);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kauro-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes kauro-shown-until {
+  0% {
+    visibility: visible;
+  }
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes kauro-hidden-until {
+  0% {
+    visibility: hidden;
+  }
+  100% {
+    visibility: visible;
+  }
+}
+@keyframes kauro-press {
+  0%,
+  70% {
+    visibility: visible;
+    transform: scale(1);
+  }
+  78% {
+    visibility: visible;
+    transform: scale(0.94);
+  }
+  88% {
+    visibility: visible;
+    transform: scale(1);
+  }
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes kauro-order-on {
+  from {
+    background-color: transparent;
+    color: var(--kauro-color-primary);
+  }
+}
+@keyframes kauro-lay {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kauro-team-on {
+  0% {
+    border-color: var(--kauro-color-border);
+    background-color: transparent;
+    color: var(--kauro-color-text-muted);
+  }
+}
 
 /* Pricing: the strike over "not counted" is a drawn line */
 .kauro-site-units-col--not .kauro-site-frag-figure {
@@ -5574,49 +5645,159 @@ body:has(> .kauro-site-header) {
   transform-origin: left center;
 }
 
-/* ---- How it works: the steps walked down beside one window of the product (wide screens, with the script) ------------------------ */
+/* ---- How it works: the process held in the middle of the screen while the reader scrolls through it (wide screens, with the script) - */
 
-.kauro-flow-window {
+/* The track is as tall as the screen plus one stretch of scrolling for each step after the first; the stage inside it holds still
+   (sticky) for as long as the track lasts, so the timeline and the window stay where they are while the process moves on. */
+.kauro-flow-track {
   display: none;
 }
 @media (min-width: 62rem) {
-  .kauro-flow.is-ready {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
-    column-gap: clamp(2.5rem, 5vw, 5rem);
-    align-items: start;
-  }
-  /* each step is given room to be read before the next one is reached */
-  .kauro-flow.is-ready .kauro-steps .kauro-step {
-    display: block;
-    min-block-size: 40vh;
-  }
-  .kauro-flow.is-ready .kauro-step-pane {
-    display: none;
-  }
-  /* the steps still to come wait in a quieter voice; the rule between two steps is wine once the reader has passed it */
-  .kauro-flow.is-ready .kauro-step.is-ahead::before {
-    border-color: var(--kauro-color-border);
-    background: var(--kauro-color-background);
-    color: var(--kauro-color-text-muted);
-  }
-  .kauro-site-main .kauro-flow.is-ready .kauro-step.is-ahead h3,
-  .kauro-flow.is-ready .kauro-step.is-ahead .kauro-site-actor {
-    color: var(--kauro-color-text-muted);
-  }
-  .kauro-flow.is-ready .kauro-step.is-done::after {
-    background: var(--kauro-color-primary);
-  }
-  .kauro-flow.is-ready .kauro-flow-window {
-    position: sticky;
-    inset-block-start: 7rem;
-    display: block;
-    border-radius: var(--kauro-radius-large);
-    background: var(--kauro-color-raised);
-    color: var(--kauro-color-text);
-    box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 55%, transparent), 0 0 0 1px var(--kauro-color-border);
+  .kauro-flow.is-ready > .kauro-steps {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
     overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
+  .kauro-flow.is-ready {
+    position: relative;
+  }
+  .kauro-flow.is-ready .kauro-flow-track {
+    --kauro-flow-stretch: 32vh;
+    position: relative;
+    display: block;
+    block-size: calc(100vh + (var(--kauro-flow-steps) - 1) * var(--kauro-flow-stretch));
+  }
+  .kauro-flow-stage {
+    position: sticky;
+    inset-block-start: 0;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+    align-items: center;
+    block-size: 100vh;
+    /* the middle of the stage is the middle of the screen under the header */
+    padding-block: 4.75rem 0;
+  }
+}
+
+/* the timeline, as on the page: a numbered circle per step (filled for the team, outlined for Kauro) and the rule between them. It is
+   brought up to date in place: the step being read opens with what it means, the steps passed keep a wine rule, the steps to come wait
+   in a quieter voice. */
+/* the timeline keeps one height whatever the open step says, so the steps above the open one never move */
+.kauro-flow-line {
+  display: grid;
+  align-content: start;
+  min-block-size: 37rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-flow-point {
+  position: relative;
+  display: grid;
+  align-content: start;
+  min-block-size: 2.75rem;
+  padding-inline-start: 4rem;
+  padding-block-end: 0.875rem;
+}
+.kauro-flow-point:last-child {
+  padding-block-end: 0;
+}
+.kauro-flow-point::after {
+  content: "";
+  position: absolute;
+  inset-block: 2.875rem 0.125rem;
+  inset-inline-start: 1.375rem;
+  inline-size: 1px;
+  background: var(--kauro-color-border);
+}
+.kauro-flow-point:last-child::after {
+  display: none;
+}
+.kauro-flow-point.is-done::after {
+  background: var(--kauro-color-primary);
+}
+.kauro-flow-point-number {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border: 1px solid var(--kauro-color-accent);
+  border-radius: 50%;
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-accent-text);
+  font-family: var(--kauro-display-family);
+  font-size: 1rem;
+  font-weight: 300;
+}
+.kauro-flow-point--team .kauro-flow-point-number {
+  border-color: var(--kauro-color-primary);
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-flow-point.is-ahead .kauro-flow-point-number {
+  border-color: var(--kauro-color-border);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-flow-point-actor {
+  display: none;
+  margin-block-end: 0.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kauro-flow-point--team .kauro-flow-point-actor {
+  color: var(--kauro-color-primary);
+}
+.kauro-flow-point-heading {
+  padding-block-start: 0.6875rem;
+  color: var(--kauro-color-text);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.kauro-flow-point.is-ahead .kauro-flow-point-heading {
+  color: var(--kauro-color-text-muted);
+  font-weight: 500;
+}
+.kauro-flow-point.is-current .kauro-flow-point-actor {
+  display: block;
+  padding-block-start: 0.25rem;
+}
+.kauro-flow-point.is-current .kauro-flow-point-heading {
+  padding-block-start: 0;
+  font-family: var(--kauro-display-family);
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+}
+.kauro-flow-point-body {
+  margin-block-start: 0.5rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+/* the window: one project, the same frame at every step; only what the project is doing changes inside it */
+.kauro-flow-window {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-block-size: min(27rem, calc(100vh - 8rem));
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 55%, transparent), 0 0 0 1px var(--kauro-color-border);
+  overflow: hidden;
 }
 .kauro-site-main p.kauro-flow-bar {
   display: flex;
@@ -5624,10 +5805,10 @@ body:has(> .kauro-site-header) {
   gap: 0.875rem;
   max-inline-size: none;
   margin: 0;
-  padding: 0.75rem 1.25rem;
+  padding: 0.875rem 1.5rem;
   border-block-end: 1px solid var(--kauro-color-border);
   background: var(--kauro-color-surface);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 .kauro-flow-brand {
   font-family: var(--kauro-display-family);
@@ -5639,66 +5820,356 @@ body:has(> .kauro-site-header) {
   border-inline-start: 1px solid var(--kauro-color-border);
   color: var(--kauro-color-text-muted);
 }
-.kauro-flow-count {
+.kauro-flow-state {
   margin-inline-start: auto;
-  color: var(--kauro-color-text-muted);
-  font-family: var(--kauro-mono-family);
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 62.5rem;
+  color: var(--kauro-color-primary);
   font-size: 0.75rem;
   font-weight: 650;
+  white-space: nowrap;
 }
-.kauro-flow-progress {
+.kauro-flow-state.is-final {
+  border-color: var(--kauro-color-success-text);
+  color: var(--kauro-color-success-text);
+}
+.kauro-flow-scene {
+  display: grid;
+  align-content: center;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+}
+.kauro-scene {
+  display: grid;
+  gap: 1.5rem;
+  font-size: 1.0625rem;
+}
+.kauro-site-main .kauro-scene p {
+  max-inline-size: none;
   margin: 0;
-  padding: 0.5rem 0;
+}
+.kauro-scene-caption {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* 01 the files dropped in, and the seal on the set */
+.kauro-scene-drop {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1.5px dashed var(--kauro-color-control-border);
+  border-radius: 0.75rem;
+}
+.kauro-scene-file {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.125rem 1.375rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  background: var(--kauro-color-surface);
+  font-size: 1.125rem;
+}
+.kauro-scene-file .kauro-site-file::before {
+  display: none;
+}
+/* a sheet with a folded corner, larger than the mark beside a file name */
+.kauro-scene-file-icon {
+  box-sizing: border-box;
+  inline-size: 2rem;
+  block-size: 2.625rem;
+  border: 1.5px solid var(--kauro-color-accent-text);
+  border-radius: 2px 0.625rem 2px 2px;
+}
+.kauro-scene-file-rows {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-scene-seal {
+  justify-self: end;
+  margin-block-start: -2.25rem;
+  margin-inline-end: 1.25rem;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.3125rem;
+  background: var(--kauro-color-raised);
+  box-shadow: inset 0 0 0 3px var(--kauro-color-raised), inset 0 0 0 4px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+}
+
+/* 02 the findings, as counts and as bars of their share of the file */
+.kauro-scene-bars {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
-/* a step of the process in the window: ticked once done, marked while it is the one being read, quiet while it is still to come */
-.kauro-flow-row {
+.kauro-scene-bar {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.25rem 0.875rem;
+}
+.kauro-scene-bar-figure {
+  min-inline-size: 4ch;
+  font-family: var(--kauro-display-family);
+  font-size: 2.5rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.kauro-scene-bar-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 1rem;
+}
+.kauro-scene-bar-share {
+  color: var(--kauro-color-primary);
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+.kauro-scene-bar-track {
+  grid-column: 1 / -1;
+  block-size: 0.625rem;
+  border-radius: 62.5rem;
+  background: var(--kauro-color-surface);
+  overflow: hidden;
+}
+.kauro-scene-bar-fill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--kauro-color-primary);
+  transform-origin: left center;
+}
+
+/* 03 two records that may be one, and the approval that unifies them */
+.kauro-scene-pair {
+  display: grid;
+  gap: 0.5rem;
+  padding-inline-start: 1rem;
+  border-inline-start: 3px solid var(--kauro-color-primary);
+}
+.kauro-scene-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.375rem;
+  background: var(--kauro-color-surface);
+  font-size: 1.0625rem;
+}
+.kauro-scene-record-email {
+  overflow: hidden;
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kauro-scene-record-company {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-scene-proposal {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 0.4375rem 1.25rem;
-  border-inline-start: 3px solid transparent;
+  gap: 0.75rem 1rem;
+}
+.kauro-scene-proposal-change {
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+.kauro-scene-proposal-state {
+  display: grid;
+  flex: 1;
+}
+.kauro-scene-proposal-state > * {
+  grid-area: 1 / 1;
+  font-size: 1rem;
+}
+.kauro-scene-proposal-waiting {
+  visibility: hidden;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-scene-proposal-done {
+  color: var(--kauro-color-success-text);
+  font-weight: 650;
+}
+.kauro-scene-proposal-done::before {
+  content: "\2713  " / "";
+}
+.kauro-scene-approve {
+  visibility: hidden;
+  padding: 0.625rem 1.375rem;
+  border-radius: 0.375rem;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+/* 04 the quote as a printed slip */
+.kauro-scene-receipt {
+  display: grid;
+  gap: 1rem;
+  inline-size: min(100%, 27rem);
+  margin-inline: auto;
+  padding: 1.75rem 2rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  background: var(--kauro-color-surface);
+}
+.kauro-scene-receipt-title {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.kauro-scene-receipt-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block-end: 0.75rem;
+  border-block-end: 1px dashed var(--kauro-color-control-border);
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-scene-receipt-price {
+  font-family: var(--kauro-display-family);
+  font-size: 3rem;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.kauro-scene-receipt-currency {
+  font-size: 0.4em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  vertical-align: 0.95em;
+}
+.kauro-scene-receipt-valid {
   color: var(--kauro-color-text-muted);
   font-size: 0.875rem;
 }
-.kauro-flow-number {
-  font-family: var(--kauro-mono-family);
-  font-size: 0.75rem;
+
+/* 05 the sum that reconciles, and the delivery written */
+.kauro-scene-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.625rem;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2.5rem, 1.6rem + 2vw, 3.5rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.kauro-scene-term--op {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-scene-term--total {
+  color: var(--kauro-color-primary);
+  font-weight: 500;
+}
+.kauro-scene-ok {
+  color: var(--kauro-color-success-text);
+  font-size: 1.125rem;
   font-weight: 650;
 }
-.kauro-flow-row::after {
-  content: "";
-  inline-size: 1rem;
-  text-align: center;
+.kauro-scene-ok::before {
+  content: "\2713  " / "";
 }
-.kauro-flow-row.is-done {
-  color: var(--kauro-color-text);
+.kauro-scene-outputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
-.kauro-flow-row.is-done::after {
-  content: "\2713" / "";
-  color: var(--kauro-color-primary);
-  font-weight: 700;
+.kauro-scene-output {
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.3125rem;
+  background: var(--kauro-color-surface);
+  font-size: 1rem;
 }
-.kauro-flow-row.is-current {
-  border-inline-start-color: var(--kauro-color-primary);
-  background: var(--kauro-color-accent-surface);
-  color: var(--kauro-color-text);
-  font-weight: 650;
+
+/* 06 the import order, and the team that runs it */
+.kauro-scene--import {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 1.25rem;
 }
-.kauro-flow-row.is-current .kauro-flow-number,
-.kauro-flow-row.is-done .kauro-flow-number {
-  color: var(--kauro-color-primary);
+.kauro-scene--import .kauro-scene-caption {
+  grid-column: 1 / -1;
 }
-.kauro-flow-detail {
-  min-block-size: 10rem;
-  padding: 1.25rem;
-  border-block-start: 1px solid var(--kauro-color-border);
-}
-.kauro-flow-detail .kauro-site-frag {
+.kauro-scene-order {
+  display: grid;
+  gap: 0.875rem;
   margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: scene-order;
 }
-.kauro-flow-detail .kauro-site-margin {
-  display: none;
+.kauro-scene-order-step {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  counter-increment: scene-order;
+  font-size: 1.125rem;
+}
+.kauro-scene-order-step::before {
+  content: counter(scene-order) / "";
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 2.125rem;
+  block-size: 2.125rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+/* the arrow is drawn inside its own box (its head included), so drawing it never cuts its head off */
+.kauro-scene-arrow {
+  position: relative;
+  inline-size: 3rem;
+  block-size: 0.75rem;
+  background: linear-gradient(var(--kauro-color-primary), var(--kauro-color-primary)) left center / calc(100% - 0.5rem) 2px no-repeat;
+}
+.kauro-scene-arrow::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: 50%;
+  border-block: 0.375rem solid transparent;
+  border-inline-start: 0.5625rem solid var(--kauro-color-primary);
+  transform: translateY(-50%);
+}
+.kauro-scene-team {
+  padding: 1.25rem 1.5rem;
+  font-size: 1.125rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.5rem;
+  background: var(--kauro-color-accent-surface);
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -5727,38 +6198,115 @@ body:has(> .kauro-site-header) {
     animation-delay: 1.1s;
   }
 
-  /* How it works: the window takes the new step (the row moves on, the fragment prints), and nothing else moves */
-  .kauro-flow-row {
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  /* How it works: the timeline is brought up to date in place, and the window plays what the project does at the new step, once */
+  .kauro-flow-point-number,
+  .kauro-flow-point-heading,
+  .kauro-flow-point::after {
+    transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease;
   }
-  .kauro-flow-detail {
+  .kauro-flow-point-body,
+  .kauro-flow-state {
     animation: kauro-print 0.35s cubic-bezier(0.5, 0, 0.2, 1) both;
+  }
+  /* 01 the files drop into the project one after the other, then the seal lands on the set */
+  .kauro-scene-file {
+    animation: kauro-drop 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s both;
+  }
+  .kauro-scene-file + .kauro-scene-file {
+    animation-delay: 0.3s;
+  }
+  .kauro-scene-seal {
+    animation: kauro-thunk 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 0.85s both;
+  }
+  /* 02 the bars measure the file while the counts run up to their figure */
+  .kauro-scene-bar-fill {
+    animation: kauro-grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s both;
+  }
+  /* 03 the proposal waits, the approval is pressed, the records are unified with approval */
+  .kauro-scene-proposal-waiting {
+    animation: kauro-shown-until 1.3s step-end both;
+  }
+  .kauro-scene-proposal-done {
+    animation: kauro-hidden-until 1.3s step-end both;
+  }
+  .kauro-scene-approve {
+    animation: kauro-press 1.3s ease both;
+  }
+  /* 04 the quote prints */
+  .kauro-scene-receipt {
+    animation: kauro-print 0.7s cubic-bezier(0.5, 0, 0.2, 1) 0.1s both;
+  }
+  /* 05 the sum is written term by term, it reconciles, and the delivery is written file by file */
+  .kauro-scene-term,
+  .kauro-scene-ok,
+  .kauro-scene-output {
+    animation: kauro-hidden-until 0.2s step-end both;
+  }
+  .kauro-scene-term:nth-child(2) {
+    animation-duration: 0.35s;
+  }
+  .kauro-scene-term:nth-child(3) {
+    animation-duration: 0.5s;
+  }
+  .kauro-scene-term:nth-child(4) {
+    animation-duration: 0.65s;
+  }
+  .kauro-scene-term:nth-child(5) {
+    animation-duration: 0.8s;
+  }
+  .kauro-scene-ok {
+    animation-duration: 1.1s;
+  }
+  .kauro-scene-output {
+    animation-duration: 1.35s;
+  }
+  .kauro-scene-output:nth-child(2) {
+    animation-duration: 1.5s;
+  }
+  .kauro-scene-output:nth-child(3) {
+    animation-duration: 1.65s;
+  }
+  .kauro-scene-output:nth-child(n + 4) {
+    animation-duration: 1.8s;
+  }
+  /* 06 each file is taken in its turn, then the package goes to the team */
+  .kauro-scene-order-step::before {
+    animation: kauro-order-on 0.3s step-end both;
+  }
+  .kauro-scene-order-step:nth-child(2)::before {
+    animation-duration: 0.6s;
+  }
+  .kauro-scene-order-step:nth-child(n + 3)::before {
+    animation-duration: 0.9s;
+  }
+  .kauro-scene-arrow {
+    animation: kauro-lay 0.35s ease-out 1s both;
+  }
+  .kauro-scene-team {
+    animation: kauro-team-on 1.45s step-end both;
   }
 
   @media (hover: hover) {
     /* a card of a choice lifts a little when it is pointed at */
     .kauro-site-service,
-    .kauro-site-rung,
-    .kauro-site-scope-column,
+    .kauro-site-rung:not(.kauro-site-rung--repeat),
+    .kauro-site-scope-column--in,
     .kauro-site-frag--units,
     :not(.kauro-site-sheet) > .kauro-site-table-region,
     .kauro-redact {
       transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.45s ease, border-color 0.3s ease;
     }
     .kauro-site-service:hover,
-    .kauro-site-rung:hover,
-    .kauro-site-scope-column:hover,
+    .kauro-site-rung:not(.kauro-site-rung--repeat):hover,
+    .kauro-site-scope-column--in:hover,
     .kauro-site-frag--units:hover,
     :not(.kauro-site-sheet) > .kauro-site-table-region:hover {
       transform: translateY(-0.25rem);
       box-shadow: 0 1.75rem 2.5rem -2rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent);
     }
-    /* what is included takes the accent; what is not keeps its dashed edge, drawn darker */
+    /* what is included takes the accent; what is not included stays as it is */
     .kauro-site-scope-column--in:hover {
       border-color: var(--kauro-color-accent);
-    }
-    .kauro-site-scope-column--out:hover {
-      border-color: var(--kauro-color-text-muted);
     }
     /* the redacted file straightens like the tilted cards of Home */
     .kauro-redact:hover {
