@@ -5465,20 +5465,20 @@ body:has(> .kauro-site-header) {
   }
 }
 
-/* Motion on every public page (Order 10, owner review, second pass). Each page moves only where the movement says something about the
-   product, and differently on each page; reference pages (help, contact, unsubscribe) stay still. Home keeps its own motion.
-     How it works  the rule between the steps fills as the reader walks down them: the process is gone through one decision at a time.
-     Pricing       the ladder steps up on load; the strike over the rows that are not counted is drawn as the reader reaches it.
-     Sample        the manifest sum adds up term by term as it is read: 12,480, minus 214, equals 12,266.
-     Data handling the file is redacted line by line as the reader reaches it, and only the limited context stays readable.
-     Status        the lamps come on one after another, as each service is read.
+/* Motion on every public page (Order 10, owner review, fourth pass, on the model of How it works). No card rises: on each page the product
+   does what the page says, at the moment the reader gets there. Home keeps its own motion; Help and Unsubscribe stay still.
+     Supported services  each service does its job in its pane: CLEAN lays down its delivery files one by one; HubSpot's paid options are
+                         switched off; Salesforce's import order is taken 1, 2, 3.
+     Pricing             the prices print on the ladder in order, the free check first, as on a quote; the strike over the rows that are
+                         not counted is drawn as the reader reaches it.
+     Sample delivery     the report prints top to bottom; the manifest sum is written term by term, 12,480, less 214, 12,266; the
+                         importer's order is taken step by step.
+     Data handling       the request across customers gets its arrow, then the stamp that refuses it; the file is redacted line by line
+                         and only the limited context stays readable.
+     Status              the lamps come on one after another.
+     Contact             what happens next is walked through once, one step after the other.
    Text never moves on its own, nothing is see-through on its way in, and nothing moves for a visitor who asked for less motion; where a
    browser cannot tie animation to scrolling, everything is simply in its final state. */
-@keyframes kauro-step-up {
-  from {
-    transform: translateY(var(--kauro-rise, 1.5rem));
-  }
-}
 @keyframes kauro-fill-down {
   from {
     background-size: 100% 0%;
@@ -5505,6 +5505,33 @@ body:has(> .kauro-site-header) {
     border-color: transparent;
   }
 }
+/* a switch seen on, its knob to the right, before it is turned off */
+@keyframes kauro-switch-off {
+  from {
+    border-color: var(--kauro-color-primary);
+    background-color: color-mix(in srgb, var(--kauro-color-primary) 14%, transparent);
+    background-position: 0.75rem 0;
+    color: var(--kauro-color-primary);
+  }
+}
+/* a stamp that is not there until it lands, and keeps its own tilt once landed */
+@keyframes kauro-land {
+  0% {
+    transform: scale(1.7) rotate(0deg);
+    clip-path: inset(50%);
+  }
+  1% {
+    clip-path: inset(0);
+  }
+}
+/* a step of a sequence taken for a moment, then left as it was */
+@keyframes kauro-number-pass {
+  30%,
+  60% {
+    background-color: var(--kauro-color-primary);
+    color: var(--kauro-color-on-primary);
+  }
+}
 
 /* Pricing: the strike over "not counted" is a drawn line (it stays drawn without motion) */
 .kauro-site-units-col--not .kauro-site-frag-figure {
@@ -5521,43 +5548,42 @@ body:has(> .kauro-site-header) {
   background: var(--kauro-color-primary);
   transform-origin: left center;
 }
+/* HubSpot: the knob of a switch takes the switch's colour, so the switch can be seen on before it is turned off */
+.kauro-site-frag-switch::before {
+  color: var(--kauro-color-control-border);
+  background: radial-gradient(circle at 0.5rem 50%, currentColor 0.3125rem, transparent 0.34rem) no-repeat;
+}
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Pricing: the ladder steps up, each rung from a little lower than the one before */
-  .kauro-site-ladder .kauro-site-rung {
-    animation: kauro-step-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-  }
-  .kauro-site-ladder .kauro-site-rung:nth-child(1) {
-    --kauro-rise: 1rem;
-    animation-delay: 0.1s;
-  }
-  .kauro-site-ladder .kauro-site-rung:nth-child(2) {
-    --kauro-rise: 1.75rem;
-    animation-delay: 0.2s;
-  }
-  .kauro-site-ladder .kauro-site-rung:nth-child(3) {
-    --kauro-rise: 2.5rem;
-    animation-delay: 0.3s;
-  }
-  .kauro-site-ladder .kauro-site-rung:nth-child(4) {
-    --kauro-rise: 3.25rem;
-    animation-delay: 0.4s;
-  }
-  .kauro-site-ladder .kauro-site-rung:nth-child(n + 5) {
-    --kauro-rise: 1rem;
-    animation-delay: 0.55s;
+  /* the arrival of main (A10 §9) is replaced on these pages: the objects stay where they are and their contents move */
+  .kauro-site-service,
+  .kauro-site-rung,
+  .kauro-status-panel,
+  .kauro-redact,
+  .kauro-answer {
+    animation: none;
   }
 
-  /* Supported services: the three services are laid on the table; a choice answers the pointer */
-  .kauro-site-service {
-    animation: kauro-settle 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s backwards;
+  /* Pricing, on a wide screen where the whole ladder is seen at once: the prices print in order, the free check first */
+  @media (min-width: 44rem) {
+    .kauro-site-ladder .kauro-site-price {
+      animation: kauro-print 0.45s cubic-bezier(0.5, 0, 0.2, 1) 0.25s backwards;
+    }
+    .kauro-site-ladder .kauro-site-rung:nth-child(2) .kauro-site-price {
+      animation-delay: 0.55s;
+    }
+    .kauro-site-ladder .kauro-site-rung:nth-child(3) .kauro-site-price {
+      animation-delay: 0.7s;
+    }
+    .kauro-site-ladder .kauro-site-rung:nth-child(4) .kauro-site-price {
+      animation-delay: 0.85s;
+    }
+    .kauro-site-ladder .kauro-site-rung:nth-child(n + 5) .kauro-site-price {
+      animation-delay: 1.15s;
+    }
   }
-  .kauro-site-service:nth-child(2) {
-    animation-delay: 0.27s;
-  }
-  .kauro-site-service:nth-child(3) {
-    animation-delay: 0.39s;
-  }
+
+  /* a choice answers the pointer */
   @media (hover: hover) {
     .kauro-site-service,
     .kauro-site-rung {
@@ -5583,6 +5609,17 @@ body:has(> .kauro-site-header) {
   .kauro-site-status-row:nth-child(n + 4) .kauro-site-status-state::before {
     animation-delay: 1.1s;
   }
+
+  /* Contact: what happens next is walked through once, each step taken for a moment in its turn */
+  .kauro-site-numbered--compact li::before {
+    animation: kauro-number-pass 0.9s ease-in-out 0.6s both;
+  }
+  .kauro-site-numbered--compact li:nth-child(2)::before {
+    animation-delay: 1.2s;
+  }
+  .kauro-site-numbered--compact li:nth-child(n + 3)::before {
+    animation-delay: 1.8s;
+  }
 }
 
 @supports (animation-timeline: view()) {
@@ -5600,6 +5637,72 @@ body:has(> .kauro-site-header) {
       animation-range: contain 0% exit 20%;
     }
 
+    /* Supported services: each pane does its service's job when the reader reaches it */
+    .kauro-site-service .kauro-site-frag {
+      view-timeline-name: --kauro-pane;
+    }
+    .kauro-site-service .kauro-site-frag * {
+      animation-timeline: --kauro-pane;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+    /* CLEAN: the delivery is laid down file by file */
+    .kauro-site-service .kauro-site-frag-file {
+      animation-name: kauro-lay;
+    }
+    .kauro-site-service .kauro-site-frag-file:nth-child(1) {
+      animation-range: cover 8% cover 16%;
+    }
+    .kauro-site-service .kauro-site-frag-file:nth-child(2) {
+      animation-range: cover 12% cover 20%;
+    }
+    .kauro-site-service .kauro-site-frag-file:nth-child(3) {
+      animation-range: cover 16% cover 24%;
+    }
+    .kauro-site-service .kauro-site-frag-file:nth-child(4) {
+      animation-range: cover 20% cover 28%;
+    }
+    .kauro-site-service .kauro-site-frag-file:nth-child(5) {
+      animation-range: cover 24% cover 32%;
+    }
+    .kauro-site-service .kauro-site-frag-file:nth-child(n + 6) {
+      animation-range: cover 28% cover 36%;
+    }
+    /* HubSpot: the options that would cost the customer are switched off, one after the other */
+    .kauro-site-service .kauro-site-frag-switch::before {
+      animation: kauro-switch-off linear both;
+      animation-timeline: --kauro-pane;
+      animation-range: cover 16% cover 24%;
+    }
+    .kauro-site-service .kauro-site-frag-setting:nth-child(n + 2) .kauro-site-frag-switch::before {
+      animation-range: cover 26% cover 34%;
+    }
+    /* Salesforce: the import order is taken 1, 2, 3 */
+    .kauro-site-service .kauro-site-frag-step::before {
+      background-color: var(--kauro-color-primary);
+      color: var(--kauro-color-on-primary);
+      animation: kauro-order-on linear both;
+      animation-timeline: --kauro-pane;
+    }
+    .kauro-site-service .kauro-site-frag-step:nth-child(1)::before {
+      animation-range: cover 14% cover 20%;
+    }
+    .kauro-site-service .kauro-site-frag-step:nth-child(2)::before {
+      animation-range: cover 20% cover 26%;
+    }
+    .kauro-site-service .kauro-site-frag-step:nth-child(n + 3)::before {
+      animation-range: cover 26% cover 32%;
+    }
+
+    /* Pricing, on a narrow screen where the rungs come one under the other: each price prints as its rung is reached */
+    @media (max-width: 43.99rem) {
+      .kauro-site-ladder .kauro-site-price {
+        animation: kauro-print linear both;
+        animation-timeline: view();
+        animation-range: cover 8% cover 22%;
+      }
+    }
+
     /* Pricing: the strike is drawn over the rows that are not counted once the reader is there */
     /* the box clips its corners (overflow: hidden), so it is the box, not the figure inside it, that is followed down the page */
     .kauro-site-frag--units {
@@ -5611,13 +5714,18 @@ body:has(> .kauro-site-header) {
       animation-range: entry 70% cover 50%;
     }
 
-    /* Sample delivery: the sum adds up term by term */
+    /* Sample delivery: the report prints top to bottom as it is reached */
+    .kauro-site-table-region--report {
+      animation: kauro-print linear both;
+      animation-timeline: view();
+      animation-range: cover 5% cover 35%;
+    }
+    /* the sum is written term by term: what came in, what was unified, what goes out */
     .kauro-site-sum {
       view-timeline-name: --kauro-sum;
     }
     .kauro-site-sum-term {
-      --kauro-rise: 0.75rem;
-      animation: kauro-step-up linear both;
+      animation: kauro-lay linear both;
       animation-timeline: --kauro-sum;
     }
     .kauro-site-sum-term:nth-child(1) {
@@ -5629,8 +5737,36 @@ body:has(> .kauro-site-header) {
     .kauro-site-sum-term:nth-child(3) {
       animation-range: entry 90% cover 45%;
     }
+    /* the importer's order: each step is taken as it is read, and stays taken */
+    .kauro-site-numbered:not(.kauro-site-numbered--compact) li {
+      view-timeline-name: --kauro-number;
+    }
+    .kauro-site-numbered:not(.kauro-site-numbered--compact) li::before {
+      background-color: var(--kauro-color-primary);
+      color: var(--kauro-color-on-primary);
+      animation: kauro-order-on linear both;
+      animation-timeline: --kauro-number;
+      animation-range: cover 30% cover 45%;
+    }
 
-    /* Data handling: the file is redacted line by line, top to bottom; the one line a model may see stays, and is marked last */
+    /* Data handling: a request across customers gets its arrow, then the stamp that refuses it */
+    .kauro-answer {
+      view-timeline-name: --kauro-answer;
+    }
+    .kauro-answer-ask::after {
+      content: "\2192";
+      display: inline-block;
+      margin-inline-start: 0.4em;
+      animation: kauro-lay linear both;
+      animation-timeline: --kauro-answer;
+      animation-range: cover 14% cover 24%;
+    }
+    .kauro-answer-stamp {
+      animation: kauro-land linear both;
+      animation-timeline: --kauro-answer;
+      animation-range: cover 26% cover 32%;
+    }
+    /* the file is redacted line by line, top to bottom; the one line a model may see stays, and is marked last */
     .kauro-redact {
       view-timeline-name: --kauro-redact;
     }
