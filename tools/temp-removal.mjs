@@ -7,27 +7,32 @@
 // diagnostic that took at least 0.7-2.3 s.
 // A retry here needs an established fact, is bounded and is printed:
 // - only directories remain: nothing is asked;
-// - files remain: Restart Manager is asked once who holds them, within what is left of the bound. A named holder, or a query
-//   that fails or does not answer in time, ends it at once.
+// - files remain: Restart Manager is asked once who holds them, within its own bound. A named holder, or a query that fails or
+//   does not answer in time, ends it at once.
 // A retry removes only what the walk at the failure found, one entry at a time (unlink, then a non-recursive rmdir deepest
 // first), so it can never delete an entry it has not seen. Before every retry the tree is walked again: an entry that was not
-// there, or one that comes back after a retry removed it, ends it at once (something is still writing), and so does the bound,
-// with what is left. A process that keeps the tree is never hidden. Any other error, or any other platform, throws as before.
+// there, or one that comes back after a retry removed it, ends it at once (something is still writing), and so does the hold
+// bound, counted from the moment the fact is established, with what is left. A process that keeps the tree is never hidden.
+// Any other error, or any other platform, throws as before.
 import { spawnSync } from "node:child_process";
 import { readdirSync, rmdirSync, unlinkSync } from "node:fs";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
 const TRANSIENT = new Set(["EPERM", "EBUSY", "ENOTEMPTY"]);
-// Twice the longest diagnostic delay after which Codex's held trees were removable, rounded up.
+// How long a hold may take to clear, from the moment its fact is established: twice the longest diagnostic delay after which
+// Codex's held trees were removable, rounded up.
 export const HOLD_BOUND_MS = 5_000;
+// How long Restart Manager may take to answer. It is not part of the hold: on windows-latest, under the tools suite's parallel
+// load, one query took more than 5 s (main run 39249788249, against about 0.4 s locally); this is six times that.
+export const QUERY_BOUND_MS = 30_000;
 const POLL_MS = 10;
 const LISTED = 20;
 const pause = (ms) => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
 
 /** Runs `remove` (the caller's own removal of `root`) and, on Windows only, retries a transient hold under the rules above. */
 export function removeTemp(root, remove, { platform = process.platform, holders = restartManagerHolders, boundMs = HOLD_BOUND_MS,
-  now = () => performance.now(), sleep = pause, log = (line) => console.error(line), fs = { unlink: unlinkSync, rmdir: rmdirSync } } = {}) {
+  queryBoundMs = QUERY_BOUND_MS, now = () => performance.now(), sleep = pause, log = (line) => console.error(line), fs = { unlink: unlinkSync, rmdir: rmdirSync } } = {}) {
   let first;
   try { remove(); return; } catch (error) { first = error; }
   if (platform !== "win32" || !TRANSIENT.has(first.code)) throw first;
@@ -38,18 +43,19 @@ export function removeTemp(root, remove, { platform = process.platform, holders 
   let fact = `only directories remain (${left.dirs.length} below the root), no file`;
   if (left.files.length) {
     let held;
-    const timeoutMs = Math.max(1, Math.ceil(boundMs - (now() - started)));
-    try { held = holders(left.files, { timeoutMs }); } catch (error) { throw fail(`not retried: who holds its ${left.files.length} remaining files is unknown (${error.message})`); }
+    const asked = now();
+    try { held = holders(left.files, { timeoutMs: queryBoundMs }); } catch (error) { throw fail(`not retried: who holds its ${left.files.length} remaining files is unknown (${error.message})`); }
     if (held.length) throw fail(`not retried: Restart Manager names ${held.join(", ")} as holding its remaining files`);
-    fact = `Restart Manager names no holder of its ${left.files.length} remaining files`;
+    fact = `Restart Manager names no holder of its ${left.files.length} remaining files (answered in ${Math.round(now() - asked)} ms)`;
   }
+  const retriesFrom = now();
   log(`temp removal: ${root}: ${first.code}; ${fact}; retrying for at most ${boundMs} ms`);
   for (let retry = 1; ; retry++) {
     const seen = new Set([...left.dirs, ...left.files]);
     left = entries(root);
     const added = [...left.dirs, ...left.files].find((path) => !seen.has(path));
     if (added) throw fail(`not retried further: ${relative(root, added)} appeared after the failure, so something is still writing there`);
-    if (now() - started >= boundMs) throw fail(`still held ${boundMs} ms after the first failure (${retry - 1} retries)`);
+    if (now() - retriesFrom >= boundMs) throw fail(`still held ${boundMs} ms after the retries began (${retry - 1} retries)`);
     const removed = new Set();
     let error;
     try { removeSeen(root, left, removed, fs); } catch (caught) { error = caught; }
@@ -136,7 +142,7 @@ try {
 } finally { [void]$rm::RmEndSession($session) }
 ConvertTo-Json -Compress -InputObject @($holders)`;
 
-export function restartManagerHolders(files, { run = spawnSync, timeoutMs = HOLD_BOUND_MS } = {}) {
+export function restartManagerHolders(files, { run = spawnSync, timeoutMs = QUERY_BOUND_MS } = {}) {
   // ASCII-only JSON on stdin: non-ASCII names survive whatever input code page PowerShell starts with.
   const input = JSON.stringify(files).replace(/[\u007f-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
   const result = run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
