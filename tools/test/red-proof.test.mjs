@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { command, requireCommand } from "../test-runner.mjs";
 import { interruptedWorker, removeAfter, withCleanup } from './gate-process.mjs';
 
@@ -66,18 +66,32 @@ test('head regression assertion', () => {
   return { parent, root, scratch, base, head, git, put };
 }
 
-for (const [name, expected, verdict, failedWithoutFix, passedAtHead] of [
+// The fault rows replay, through the eperm-fault preload, the removal failure Codex's PR #112 round-2 run recorded at
+// red-proof.mjs's own cleanup (EPERM, only the empty `repository` directory left): on f839f4c7 it was thrown from the finally
+// before the report was written. A transient Windows hold is retried and changes nothing; any other cleanup failure is reported
+// and turns a PASS into INCONCLUSIVE, and the exit hook's second attempt still removes the tree.
+const transientHold = process.platform === "win32";
+const FAULT = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "eperm-fault.mjs")).href;
+for (const [name, expected, verdict, failedWithoutFix, passedAtHead, fault] of [
   ["a regression test fails without the fix and passes at head", 2, "PASS", true, true],
   ["a test that passes without the fix cannot prove red", 1, "FAIL", false, false],
   ["a test failing at head fails the gate", 3, "FAIL", true, false],
+  [`a transient EPERM on the gate's own temporary tree keeps the report and is ${transientHold ? "retried, printed, and changes nothing" : "INCONCLUSIVE off Windows"}`,
+    2, transientHold ? "PASS" : "INCONCLUSIVE", true, true, { prefix: "kauro-red-proof-", left: ["repository"] }],
+  ["a cleanup failure that is no transient hold keeps the report and turns a PASS into INCONCLUSIVE", 2, "INCONCLUSIVE", true, true,
+    { prefix: "kauro-red-proof-", left: null, code: "EACCES" }],
 ]) {
   test(name, () => {
     const f = fixture(expected);
     return removeAfter(f.parent, () => {
-      const result = command(process.execPath, [script, f.base, f.head, "--tests", file], f.root, { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1" } });
-      assert.equal(result.status, verdict === "PASS" ? 0 : 1, result.output);
+      const result = command(process.execPath, [...(fault ? ["--import", FAULT] : []), script, f.base, f.head, "--tests", file], f.root,
+        { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1", ...(fault ? { KAURO_EPERM_FAULT: JSON.stringify(fault) } : {}) } });
+      assert.equal(result.status, { PASS: 0, FAIL: 1, INCONCLUSIVE: 2 }[verdict], result.output);
       const report = JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8"));
       assert.equal(report.verdict, verdict, result.output);
+      if (verdict === "INCONCLUSIVE") assert.match(report.inconclusive.join("\n"), new RegExp(`^temporary tree not removed: ${fault.code ?? "EPERM"}, Permission denied: `));
+      else assert.deepEqual(report.inconclusive, []);
+      if (fault && verdict === "PASS") assert.match(result.output, /temp removal: .*kauro-red-proof-\w+: EPERM; only directories remain \(1 below the root\), no file; retrying[^]*kauro-red-proof-\w+: removed at retry 1, /);
       assert.equal(report.base, f.base);
       assert.equal(report.head, f.head);
       assert.equal(report.tests[0].file, file);

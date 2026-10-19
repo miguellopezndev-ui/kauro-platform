@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cellsOf, fixedWaitCaps, selectChanged, touchedLines } from "../changed-cells.mjs";
+import { removeTemp } from "../temp-removal.mjs";
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../stress-cells.mjs");
 
@@ -90,7 +91,7 @@ test("stress-cells --changed: runs only the changed race cell N times, never the
     assert.deepEqual(rep.selection.map((s) => s.cells.map((c) => c.title)), [["A_RACE [race] step -> ok"]]);
     assert.equal(rep.results.length, 3);
     assert.ok(rep.results.every((x) => x.tests === 1), "one test per run: the untouched failing cell was filtered out");
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { removeTemp(dir, () => rmSync(dir, { recursive: true, force: true })); }
 });
 
 test("stress-cells --changed: a changed cell that fails one run in three FAILS; a fixed wait cap FAILS before any run; no timing change PASSES", () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -12,10 +12,10 @@ test('cleanup failure never replaces the primary assertion error', async () => {
   await assert.rejects(withCleanup('x', async () => { throw primary; }, remove), (error) => error === primary);
 });
 
-test('cleanup failure is reported when the body succeeded, and removal is retried', async () => {
+test('cleanup failure is reported when the body succeeded, and removal asks for no silent rmSync retries', async () => {
   const calls = [];
   await withCleanup('dir', async () => {}, (path, options) => { calls.push([path, options]); });
-  assert.deepEqual(calls, [['dir', { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }]]);
+  assert.deepEqual(calls, [['dir', { recursive: true, force: true }]]);
   await assert.rejects(withCleanup('x', async () => {}, () => { throw new Error('EPERM during cleanup'); }), /EPERM during cleanup/);
 });
 
@@ -60,17 +60,39 @@ test('assertDead confirms a dead pid and reports a live one as survived, even wh
   assert.deepEqual([...live], []);
 });
 
-test('cleanup retries a transient EPERM/EBUSY itself (rmSync does not on Node 24) and then succeeds', async () => {
+test('cleanup retries a Windows EPERM only on an established fact, printed, and never past a named holder (no blind retry)', async () => {
+  const lines = [];
+  const win32 = (holders) => ({ platform: 'win32', holders, sleep: () => {}, log: (line) => lines.push(line) });
+  const eperm = () => Object.assign(new Error('EPERM, Permission denied'), { code: 'EPERM' });
+  const root = mkdtempSync(join(tmpdir(), 'kauro-with-cleanup-'));
+  const file = join(root, 'left.txt');
+  writeFileSync(file, 'x');
+  // files remain and Restart Manager names no holder: only the entries found are removed, retried until that succeeds, and printed
   let calls = 0;
-  const remove = () => { if (++calls < 4) throw Object.assign(new Error('EPERM: handle rundown'), { code: 'EPERM' }); };
-  await withCleanup('x', async () => {}, remove);
-  assert.equal(calls, 4);
-  let persistent = 0;
-  await assert.rejects(withCleanup('x', async () => {}, () => { persistent++; throw Object.assign(new Error('EPERM forever'), { code: 'EPERM' }); }), /EPERM forever/);
-  assert.equal(persistent, 11, 'one attempt plus ten retries, then the error surfaces');
+  let unlinks = 0;
+  const asked = [];
+  await withCleanup(root, async () => {}, () => { calls++; throw eperm(); },
+    { ...win32((files) => { asked.push(files); return []; }), fs: { unlink: (path) => { if (++unlinks < 3) throw eperm(); unlinkSync(path); }, rmdir: rmdirSync } });
+  assert.equal(calls, 1, 'the recursive removal is never repeated');
+  assert.equal(unlinks, 3);
+  assert.deepEqual(asked, [[file]], 'Restart Manager is asked once, about the files left');
+  assert.equal(existsSync(root), false);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /: EPERM; Restart Manager names no holder of its 1 remaining files; retrying for at most 5000 ms$/);
+  assert.match(lines[1], /: removed at retry 3, \d+ ms after the first failure$/);
+  // a holder Restart Manager names is never retried, and the failure names it with what is left
+  const held = mkdtempSync(join(tmpdir(), 'kauro-with-cleanup-'));
+  writeFileSync(join(held, 'locked.txt'), 'x');
+  let attempts = 0;
+  try {
+    await assert.rejects(withCleanup(held, async () => {}, () => { attempts++; throw eperm(); }, win32(() => ['4242 node.exe'])),
+      (error) => error.message === 'EPERM, Permission denied; not retried: Restart Manager names 4242 node.exe as holding its remaining files; left: locked.txt');
+    assert.equal(attempts, 1);
+  } finally { unlinkSync(join(held, 'locked.txt')); rmdirSync(held); }
   let denied = 0;
-  await assert.rejects(withCleanup('x', async () => {}, () => { denied++; throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
+  await assert.rejects(withCleanup('x', async () => {}, () => { denied++; throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }, win32(() => [])), /EACCES/);
   assert.equal(denied, 1, 'a non-transient error is not retried');
+  assert.equal(lines.length, 2, 'nothing retried, nothing printed');
 });
 
 test('a pid that vanishes between the liveness probe and the /proc read counts as dead', () => {
@@ -82,7 +104,7 @@ test('a pid that vanishes between the liveness probe and the /proc read counts a
   assert.throws(() => hasTerminated(1, 'linux', () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
 });
 
-test('removeAfter removes once, keeps a failing test error primary, and fails a passing test whose tree is still held', async () => {
+test('removeAfter removes once, keeps a failing test error primary, and fails a passing test whose tree is held, naming the holder', async () => {
   const calls = [];
   await removeAfter('dir', () => 'body result', (path, options) => { calls.push([path, options]); });
   assert.deepEqual(calls, [['dir', { recursive: true, force: true }]], 'one removal, no retry options');
@@ -95,7 +117,7 @@ test('removeAfter removes once, keeps a failing test error primary, and fails a 
   mkdirSync(join(root, 'repo'));
   writeFileSync(join(root, 'repo', 'red-proof.json'), '{}');
   calls.length = 0;
-  await assert.rejects(removeAfter(root, () => {}, held), (error) => error.message === `fixture removal failed after a passing test: EPERM: EPERM, Permission denied; left: repo, ${join('repo', 'red-proof.json')}` && error.cause.code === 'EPERM');
+  await assert.rejects(removeAfter(root, () => {}, held, { platform: 'win32', holders: () => ['4242 node.exe'] }), (error) => error.message === `fixture removal failed after a passing test: EPERM: EPERM, Permission denied; not retried: Restart Manager names 4242 node.exe as holding its remaining files; left: repo, ${join('repo', 'red-proof.json')}` && error.cause.cause.code === 'EPERM');
   assert.deepEqual(calls, [root]);
   await removeAfter(root, () => {});
   assert.equal(existsSync(root), false);
