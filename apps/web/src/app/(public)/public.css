@@ -5505,12 +5505,6 @@ body:has(> .kauro-site-header) {
     border-color: transparent;
   }
 }
-@keyframes kauro-number-on {
-  from {
-    background-color: var(--kauro-color-background);
-    color: var(--kauro-color-accent-text);
-  }
-}
 
 /* Pricing: the strike over "not counted" is a drawn line (it stays drawn without motion) */
 .kauro-site-units-col--not .kauro-site-frag-figure {
@@ -5593,7 +5587,7 @@ body:has(> .kauro-site-header) {
 
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    /* How it works: the rule fills in wine as the reader passes each step, and a step of Kauro lights up when reached */
+    /* How it works: the rule fills in wine as the reader passes each step */
     .kauro-step {
       view-timeline-name: --kauro-step;
     }
@@ -5604,13 +5598,6 @@ body:has(> .kauro-site-header) {
       animation: kauro-fill-down linear both;
       animation-timeline: --kauro-step;
       animation-range: contain 0% exit 20%;
-    }
-    .kauro-site-timeline-step--kauro::before {
-      background-color: var(--kauro-color-accent);
-      color: var(--kauro-color-ink);
-      animation: kauro-number-on linear both;
-      animation-timeline: --kauro-step;
-      animation-range: entry 60% contain 15%;
     }
 
     /* Pricing: the strike is drawn over the rows that are not counted once the reader is there */
@@ -5674,6 +5661,173 @@ body:has(> .kauro-site-header) {
       animation: kauro-mark linear both;
       animation-timeline: --kauro-redact;
       animation-range: entry 95% cover 55%;
+    }
+  }
+}
+
+/* How it works, the six steps (Order 10, owner review, third pass). As on Home, the product does what the step says, at the moment the
+   reader reaches the step, instead of a card rising: the files are laid down and sealed; the check measures and writes its counts; the
+   approval asks for the decision; the quote prints; the counts reconcile; the files are imported in order. Tied to the scroll (the step's
+   own view timeline, --kauro-step), so each beat happens exactly when the step is read and runs back if the reader goes back. Without
+   that support, or with less motion asked for, every pane is simply in its final state. */
+@keyframes kauro-lay {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kauro-print {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+/* the seal is not there until it lands, then lands like the stamps of Home */
+@keyframes kauro-seal {
+  0% {
+    transform: scale(1.7) rotate(-4deg);
+    clip-path: inset(50%);
+  }
+  1% {
+    clip-path: inset(0);
+  }
+  100% {
+    transform: none;
+    clip-path: inset(0);
+  }
+}
+@keyframes kauro-scan {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes kauro-ask {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--kauro-color-primary) 55%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 0.625rem color-mix(in srgb, var(--kauro-color-primary) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+@keyframes kauro-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes kauro-order-on {
+  from {
+    background-color: transparent;
+    color: var(--kauro-color-primary);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* the pane itself stays put: its contents tell the step */
+    .kauro-steps .kauro-step-pane {
+      animation: none;
+    }
+    .kauro-steps .kauro-step-pane * {
+      animation-timeline: --kauro-step;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+    }
+
+    /* 01 upload: the files are laid down one after the other, then the set is sealed */
+    .kauro-steps .kauro-site-frag-file {
+      animation-name: kauro-lay;
+    }
+    .kauro-steps .kauro-site-frag-file:nth-child(1) {
+      animation-range: cover 10% cover 20%;
+    }
+    .kauro-steps .kauro-site-frag-file:nth-child(2) {
+      animation-range: cover 16% cover 26%;
+    }
+    .kauro-steps .kauro-site-frag-file:nth-child(n + 3) {
+      animation-range: cover 22% cover 32%;
+    }
+    .kauro-steps .kauro-site-frag-state {
+      animation-name: kauro-seal;
+      animation-range: cover 30% cover 38%;
+    }
+
+    /* 02 the health check: a measuring line sweeps the pane and writes each count as it passes */
+    .kauro-steps .kauro-site-frag-counts {
+      position: relative;
+    }
+    .kauro-steps .kauro-site-frag-counts::after {
+      content: "";
+      position: absolute;
+      inset-block: -0.25rem;
+      inset-inline: 0;
+      border-inline-start: 2px solid var(--kauro-color-accent);
+      animation: kauro-scan linear both;
+      animation-timeline: --kauro-step;
+      animation-range: cover 10% cover 34%;
+      pointer-events: none;
+    }
+    .kauro-steps .kauro-site-frag-count {
+      animation-name: kauro-lay;
+      animation-range: cover 10% cover 34%;
+    }
+
+    /* 03 you decide: the control that needs the reader asks for the decision, once */
+    .kauro-steps .kauro-site-frag-button {
+      animation-name: kauro-ask;
+      animation-range: cover 22% cover 40%;
+    }
+
+    /* 04 the quote prints, top to bottom */
+    .kauro-steps .kauro-site-frag--quote {
+      animation: kauro-print linear both;
+      animation-timeline: --kauro-step;
+      animation-range: cover 10% cover 30%;
+    }
+
+    /* 05 Kauro prepares: what came in, the arrow, what goes out, and the check that says they agree */
+    .kauro-steps .kauro-site-frag-reconcile .kauro-site-frag-arrow {
+      display: inline-block;
+      transform-origin: left center;
+      animation-name: kauro-draw;
+      animation-range: cover 12% cover 20%;
+    }
+    .kauro-steps .kauro-site-frag-figure--out {
+      animation-name: kauro-lay;
+      animation-range: cover 18% cover 26%;
+    }
+    .kauro-steps .kauro-site-frag-ok {
+      animation-name: kauro-lay;
+      animation-range: cover 26% cover 36%;
+    }
+
+    /* 06 the files are imported in their order: each number is taken in turn */
+    .kauro-steps .kauro-site-frag-step::before {
+      background-color: var(--kauro-color-primary);
+      color: var(--kauro-color-on-primary);
+      animation: kauro-order-on linear both;
+      animation-timeline: --kauro-step;
+    }
+    .kauro-steps .kauro-site-frag-step:nth-child(1)::before {
+      animation-range: cover 14% cover 20%;
+    }
+    .kauro-steps .kauro-site-frag-step:nth-child(2)::before {
+      animation-range: cover 20% cover 26%;
+    }
+    .kauro-steps .kauro-site-frag-step:nth-child(3)::before {
+      animation-range: cover 26% cover 32%;
+    }
+    .kauro-steps .kauro-site-frag-step:nth-child(n + 4)::before {
+      animation-range: cover 32% cover 38%;
     }
   }
 }
