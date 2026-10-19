@@ -1011,3 +1011,21 @@ test("B14-A limits (review round 19, R19-1): a worker that stops reading its cha
     await rig.dispose();
   }
 });
+
+test("B14-A DENY (review round 20, R20-1): Node's own IPC commands sent by a worker (an unsolicited NODE_HANDLE_ACK, NACK or HANDLE) never reach Node's trusting handler — the host lives on, and the attempt ends FAILED WORKER_ERROR, CHANNEL_PROTOCOL_VIOLATION", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 54);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-internal", rendererVersion: "x" }, 256);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "WORKER_ERROR", "CHANNEL_PROTOCOL_VIOLATION"]);
+    // this process is the host: it is still here to say so
+    assert.equal((await host.observe(spec.identity)).state, "FAILED");
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});

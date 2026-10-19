@@ -163,6 +163,12 @@ process.on("message", (message: HostMessage) => {
     grow();
     return;
   }
+  if (ticket.render.locale === "hostile-internal") {
+    // review round 20 (R20-1): Node's own IPC commands, unsolicited — the host must not trust them (nor crash on them)
+    for (const cmd of ["NODE_HANDLE_ACK", "NODE_HANDLE_NACK", "NODE_HANDLE"]) process.send?.({ cmd } as never);
+    setInterval(() => undefined, 1_000);
+    return;
+  }
   if (ticket.render.locale === "hostile-nodrain") {
     // review round 19 (R19-1): it stops reading its channel and keeps asking — the host's replies would queue without bound
     const kChannelHandle = Object.getOwnPropertySymbols(process).find((sym) => sym.description === "kChannelHandle");
