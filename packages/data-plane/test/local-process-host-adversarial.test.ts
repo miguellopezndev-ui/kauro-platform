@@ -961,7 +961,7 @@ test("B14-A limits (review round 13, R13-1; Linux): a scratch subdirectory the w
     rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
     hidden = join(attemptScratchDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId), "hidden");
     const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-hidden", rendererVersion: "x" }, 256, { supervisorPollMs: 100 });
-    const spec = planted.fixture.spec(1, { ...hostLimits(1 << 20), hardScratchBytes: 1 << 40 });
+    const spec = planted.fixture.spec(1, { ...hostLimits(1 << 20), hardScratchBytes: 1 << 30 });
     assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
     const record = await host.settled(spec.identity);
     assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "SCRATCH_EXHAUSTED", "SCRATCH_EXHAUSTED"]);
