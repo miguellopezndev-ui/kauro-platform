@@ -127,8 +127,17 @@ describe("report PDF — real engine", { skip: needsBrowser }, () => {
       for (const [key, figure] of Object.entries(report.model.counts)) assert.ok(said(copyText("en-US", `counts.${key}` as CopyKey), figure.value), `figure ${key}=${figure.value} missing from the PDF's text`);
       for (const [object, figure] of Object.entries(report.model.deliveredByObject)) assert.ok(said(object, figure.value), `records of ${object} missing from the PDF's text`);
       for (const key of ["delivered", "leftover", "unresolved", "deduplicated"] as const) assert.ok(said(copyText("en-US", `relationships.${key}`), report.model.relationships[key].value), `relationships ${key} missing from the PDF's text`);
-      // labels set in capitals with tracking still read as words
-      for (const label of [copyText("en-US", "doc.stamp"), copyText("en-US", "glance.heading"), copyText("en-US", "table.measure")]) assert.ok(words.toLowerCase().includes(` ${label.toLowerCase()} `), `label "${label}" does not read as words`);
+      // the per-file figures too: expected records in the guide, and the records of every exception and package file after its name
+      // (and its use, where the table prints one)
+      for (const step of report.model.importGuide) assert.ok(said(copyText("en-US", "guide.records"), step.records.value), `expected records of ${step.path} missing from the PDF's text`);
+      for (const a of [...report.model.exceptions, ...report.model.artifacts]) {
+        if (a.records === null) continue;
+        const name = a.path.slice(a.path.lastIndexOf("/") + 1);
+        const use = copyText("en-US", `artifacts.use.${a.use}`);
+        assert.ok(said(name, a.records.value) || said(`${name} ${use}`, a.records.value), `records of ${a.path} missing from the PDF's text`);
+      }
+      // labels set in capitals with tracking read as words, in capitals (so a mixed-case row of the same words cannot stand in for them)
+      for (const label of [copyText("en-US", "doc.stamp"), copyText("en-US", "glance.heading"), copyText("en-US", "table.measure")]) assert.ok(words.includes(` ${label.toUpperCase()} `), `label "${label}" does not read as words`);
       const raw = Buffer.from(pdf.bytes).toString("latin1");
       const faces = [...raw.matchAll(/\/FontName\s*\/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/g)].map((m) => m[1] as string);
       assert.ok(faces.some((f) => f.startsWith("Inter")), `no embedded Inter face: ${faces.join(", ")}`);
