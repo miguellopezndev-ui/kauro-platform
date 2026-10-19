@@ -183,11 +183,17 @@ interface Live {
   readonly settled: Promise<void>;
   timer: NodeJS.Timeout | null;
   supervisor: ChildProcess | null;
+  /** Messages sent to the worker and not yet written out, and the bytes they carry (review round 19, R19-1). */
+  outbound: number;
+  outboundBytes: number;
 }
 
 const TERMINAL: ReadonlySet<RecordState> = new Set(["SUCCEEDED", "FAILED", "TERMINATED"]);
 /** Why the host itself ends a job: a termination, the deadline, or a supervisor that could not start or did not stay (review R4-1). */
-type EndReason = "TERMINATED" | "DEADLINE" | "SUPERVISOR_LOST" | "IDENTITY_UNREADABLE";
+type EndReason = "TERMINATED" | "DEADLINE" | "SUPERVISOR_LOST" | "IDENTITY_UNREADABLE" | "CHANNEL_NOT_DRAINED";
+/** What the host may hold for one worker in messages not yet written to its channel. */
+const OUTBOUND_MESSAGES = 64;
+const OUTBOUND_BYTES = 128 * 1024 * 1024;
 /** How long a supervisor has to say it is watching before the worker gets its ticket. */
 const SUPERVISOR_READY_MS = 15_000;
 /** The note of a cancelled identity's tombstone: terminated before any create, so never a job (observe answers NOT_FOUND). */
@@ -631,7 +637,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     });
     const broker = new AttemptStorageBroker({ capability: spec.capability, storage: this.#o.storage, uploads: this.#o.uploads, origin: this.#o.sessionOrigin, maxObjectBytes: spec.limits.hardScratchBytes });
     let exited: () => void = () => undefined;
-    const live: Live = { record, child, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null };
+    const live: Live = { record, child, broker, result: null, persistedBeatMs: 0, ended: null, stderrTail: "", settled: new Promise<void>((resolve) => (exited = resolve)), timer: null, supervisor: null, outbound: 0, outboundBytes: 0 };
     this.#live.set(identity, live);
     record.pid = child.pid ?? null;
     record.pidStart = child.pid !== undefined && process.platform === "linux" ? this.#startOfChild(child.pid) : null;
@@ -715,12 +721,29 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
     return null;
   }
 
+  /**
+   * Sends one message to the worker, counted until it is written out: a worker that stops reading its channel cannot make the host
+   * queue replies without bound (review round 19, R19-1) — past OUTBOUND_MESSAGES or OUTBOUND_BYTES waiting, the attempt is ended
+   * (FAILED WORKER_ERROR, CHANNEL_NOT_DRAINED) and nothing more is queued for it.
+   */
   #send(live: Live, message: HostMessage): void {
-    if (!live.child.connected) return;
+    if (!live.child.connected || live.ended !== null) return;
+    const bytes = message.t === "ticket" ? message.bytes.byteLength : message.t === "reply" && message.ok && message.value instanceof Uint8Array ? message.value.byteLength : 0;
+    if (live.outbound + 1 > OUTBOUND_MESSAGES || live.outboundBytes + bytes > OUTBOUND_BYTES) {
+      this.#end(live, "CHANNEL_NOT_DRAINED");
+      return;
+    }
+    live.outbound += 1;
+    live.outboundBytes += bytes;
+    const written = (): void => {
+      live.outbound -= 1;
+      live.outboundBytes -= bytes;
+    };
     try {
-      live.child.send(message);
+      live.child.send(message, undefined, {}, written);
     } catch {
       // the worker is gone; its exit records it
+      written();
     }
   }
 
@@ -865,10 +888,10 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       record.state = "FAILED";
       record.cause = "WORKER_CRASHED";
       record.note = "SUPERVISOR_LOST";
-    } else if (how === "IDENTITY_UNREADABLE") {
+    } else if (how === "IDENTITY_UNREADABLE" || how === "CHANNEL_NOT_DRAINED") {
       record.state = "FAILED";
       record.cause = "WORKER_ERROR";
-      record.note = "IDENTITY_UNREADABLE";
+      record.note = how;
     } else {
       record.state = "TERMINATED";
       record.note = "TERMINATED_BY_HOST";

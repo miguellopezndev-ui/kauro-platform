@@ -995,3 +995,19 @@ test("B14-A limits (review round 14, R14-1; Linux): directories take disk too â€
     await rig.dispose();
   }
 });
+
+test("B14-A limits (review round 19, R19-1): a worker that stops reading its channel cannot make the host queue replies without bound â€” past the outbound budget the attempt ends (FAILED WORKER_ERROR, CHANNEL_NOT_DRAINED) and its tree is ended", async () => {
+  const rig = localRig();
+  try {
+    const planted = plantedAttempt(rig.storage, 53);
+    rig.reads.set(planted.fixture.attemptId, { planBinding: { configDocument: planted.configDocument, coreConfigHash: planted.coreConfigHash }, inputs: planted.inputs, reportInputs: null });
+    const host = hostileHost(rig, { pageSize: "LETTER", locale: "hostile-nodrain", rendererVersion: "x" }, 256);
+    const spec = planted.fixture.spec(1);
+    assert.equal((await host.launch(spec)).outcome, "LAUNCHED");
+    const record = await host.settled(spec.identity);
+    assert.deepEqual([record?.state, record?.cause, record?.note], ["FAILED", "WORKER_ERROR", "CHANNEL_NOT_DRAINED"]);
+    await host.stop();
+  } finally {
+    await rig.dispose();
+  }
+});

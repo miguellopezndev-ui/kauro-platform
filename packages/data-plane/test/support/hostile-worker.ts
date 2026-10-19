@@ -163,6 +163,19 @@ process.on("message", (message: HostMessage) => {
     grow();
     return;
   }
+  if (ticket.render.locale === "hostile-nodrain") {
+    // review round 19 (R19-1): it stops reading its channel and keeps asking — the host's replies would queue without bound
+    const kChannelHandle = Object.getOwnPropertySymbols(process).find((sym) => sym.description === "kChannelHandle");
+    (process as unknown as Record<symbol, { readStop(): void }>)[kChannelHandle as symbol]?.readStop();
+    const prefix = ticket.capability.stagingPrefix;
+    let id = 1_000_000;
+    const flood = (): void => {
+      for (let i = 0; i < 200; i++) process.send?.({ t: "call", id: id++, call: { op: "storage.stat", zone: "STAGING", objectName: `${prefix}00000000-0000-8000-8000-000000000000` } } satisfies WorkerMessage);
+      setTimeout(flood, 1);
+    };
+    flood();
+    return;
+  }
   if (ticket.render.locale === "hostile-dirs") {
     // review round 14 (R14-1): empty directories only, each taking its own blocks
     const base = join(scratchRoot, `kauro-attempt-scratch-${(ticket as unknown as { capability: { attemptId: string } }).capability.attemptId}`);
