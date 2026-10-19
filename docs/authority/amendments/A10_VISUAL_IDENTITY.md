@@ -164,3 +164,22 @@ right, toward its headline, and the redacted file leans right after the stamp th
 The rules decided in §1–§9 are consolidated as identity version 1.0 in `docs/design/KAURO_VISUAL_IDENTITY.md`, which is the visual
 authority for new work. The screens that follow it are listed in `docs/design/KAURO_SCREEN_COVERAGE.md`. Who directed and who built it is
 recorded in `docs/design/KAURO_VISUAL_PROVENANCE.md`. This amendment remains the record of how each decision was reached.
+
+## 11. The agreed faces implemented on the web (Order 10, 2026-10-19)
+
+The owner's typography decision of 2026-10-18 (recorded in KAURO_VISUAL_IDENTITY.md §3) replaced the system families of §1–§10 with
+Inter and JetBrains Mono. The printed report already used them; Order 10 implements them on the public web, without a new brand
+decision.
+
+- **Faces:** Inter 4.1 (variable, roman and italic) and JetBrains Mono 2.304 (400, 500, 600, 700). Official release files, licences and
+  provenance are in `apps/web/src/fonts`. Three files are byte-identical to the report's.
+- **Serving:** by `next/font/local` from Kauro's own origin. Only Inter's roman is preloaded, with a metric-adjusted fallback so text
+  does not reflow. No CDN, nothing fetched elsewhere, CSP `font-src 'self'`.
+- **Tokens:** `packages/ui/src/tokens.ts` names the faces (`--kauro-face-*`) before a system stack. Headings use the same Inter, whose
+  optical size axis gives large sizes their display cut.
+- **Notes:** the editor's notes are set in Inter Italic; the Georgia serif of §1 is retired. No third family remains.
+- **Wordmark:** "Kauro" is set in Inter. No reproducible artifact of a custom "a" exists in the repository, so none was invented; any
+  custom letterform awaits the owner's visual review.
+
+What the wider face changed on narrow screens, and how it was corrected, is recorded in the Order 10 evidence (gallery and word-break
+audit) and in KAURO_VISUAL_IDENTITY.md §3 and §5. The rules of §1–§10 otherwise stand unchanged.

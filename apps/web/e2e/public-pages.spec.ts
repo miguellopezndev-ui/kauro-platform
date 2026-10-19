@@ -117,6 +117,49 @@ test("every page reflows to one column at 320 CSS pixels with no horizontal scro
   expect(summary.scroll, "the error summary reflows").toBeLessThanOrEqual(summary.client);
 });
 
+test("the agreed faces really load from Kauro's own origin and are applied: Inter for text and headings, Inter Italic for notes, JetBrains Mono for technical text; no font is requested elsewhere (Order 10)", async ({ page, baseURL }) => {
+  const fonts: string[] = [];
+  page.on("request", (r) => {
+    if (r.resourceType() === "font") fonts.push(r.url());
+  });
+  await page.goto("/sample-delivery");
+  await page.evaluate(() => document.fonts.ready);
+  const facts = await page.evaluate(() => {
+    const family = (selector: string): string => getComputedStyle(document.querySelector(selector) as Element).fontFamily;
+    const used = (selector: string): string => {
+      const el = document.querySelector(selector) as HTMLElement;
+      const cs = getComputedStyle(el);
+      // the first face of the stack is the one that must have arrived (the fallback faces behind it are never downloaded)
+      return `${cs.fontStyle} ${cs.fontWeight} 16px ${cs.fontFamily.split(",")[0] as string}`;
+    };
+    return {
+      body: family("body"),
+      h1: family("h1"),
+      note: family(".kauro-site-margin"),
+      mono: family(".kauro-site-table-region--files tbody th"),
+      loaded: ((): string[] => {
+        const names: string[] = [];
+        document.fonts.forEach((f) => {
+          if (f.status === "loaded") names.push(f.family);
+        });
+        return names;
+      })(),
+      textLoaded: document.fonts.check(used("body")),
+      monoLoaded: document.fonts.check(used(".kauro-site-table-region--files tbody th")),
+      noteLoaded: document.fonts.check(used(".kauro-site-margin")),
+    };
+  });
+  expect(facts.body).toMatch(/^interFace\b/);
+  expect(facts.h1).toMatch(/^interFace\b/);
+  expect(facts.note).toMatch(/^interItalicFace\b/);
+  expect(facts.mono).toMatch(/^monoFace\b/);
+  expect(facts.loaded).toEqual(expect.arrayContaining(["interFace", "interItalicFace", "monoFace"]));
+  expect([facts.textLoaded, facts.monoLoaded, facts.noteLoaded]).toEqual([true, true, true]);
+  expect(fonts.length).toBeGreaterThan(0);
+  for (const url of fonts) expect(new URL(url).origin, url).toBe(new URL(baseURL as string).origin);
+  expect(fonts.every((url) => /\/_next\/static\/media\/(InterVariable|JetBrainsMono)[^/]*\.woff2$/.test(new URL(url).pathname)), fonts.join(", ")).toBe(true);
+});
+
 test("the pages give the same reading twice in a row: the publication is read on every request, never cached", async ({ page }) => {
   api.publish([["CLEAN", "AVAILABLE"]]);
   await page.goto("/status");

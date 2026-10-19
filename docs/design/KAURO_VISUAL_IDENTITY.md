@@ -88,18 +88,27 @@ Bands:
 
 The custom "a" of the wordmark is never applied to running text.
 
-**Discrepancy recorded:** the web still uses the system families in the table below, so the agreed faces are **not yet implemented on
-the web**. Changing the web's fonts is a separate visual integration, with its own tests. Printed documents already use the agreed
-faces, embedded (§13).
+**Implemented on the web (Order 10, 2026-10-19).** Until then the web used system families and a Georgia note; that discrepancy, recorded on
+2026-10-18, is closed. The decision record is A10 §11. Printed documents use the same files, embedded (§13).
 
-| Role | Family | Notes |
+| Role | Family (token) | Notes |
 | --- | --- | --- |
-| Body | `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` | 16 px, line height 1.5; dense metadata never below 14 px |
-| Display (headings, figures, wordmark) | `"Segoe UI Variable Display", system-ui, …` | tight tracking (−0.02 to −0.05 em), weights 300 to 700 |
-| Mono (file names, hashes, references, counters) | `ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, …` | 0.6875–0.875 rem; hashes break anywhere |
-| Editor's note | `Georgia, "Iowan Old Style", "Times New Roman", serif`, italic | margin notes and quiet asides only |
+| Body | Inter (`--kauro-font-family`) | 16 px, line height 1.5; dense metadata never below 14 px |
+| Display (headings, figures, wordmark) | Inter (`--kauro-display-family`), its optical size axis giving large sizes their display cut | tight tracking (−0.02 to −0.05 em), weights 300 to 700 |
+| Mono (file names, hashes, references, counters) | JetBrains Mono (`--kauro-mono-family`), 400 to 700 | 0.6875–0.875 rem; hashes break anywhere |
+| Editor's note | Inter Italic (`--kauro-note-family`) | margin notes and quiet asides only |
 
-There are no web fonts and no font request to another origin (`font-src 'self'`).
+**How the faces are served:**
+- the official files and their provenance are in `apps/web/src/fonts`, and `next/font/local` serves them from Kauro's own origin
+  (`font-src 'self'`), with no font CDN;
+- only Inter's roman is preloaded; the italic and the mono weights load when a page uses them;
+- the fallback is metric-adjusted to Inter so text does not reflow on arrival, and every stack ends in a system stack.
+
+**The wordmark:** it is "Kauro" set in Inter. The custom "a" mentioned above has no reproducible artifact in the repository, so it is not
+drawn; it awaits the owner's review.
+
+**Narrow screens:** a table of four columns or more is laid out row by row below 40 rem, each value beside its column's name (`DataTable`),
+so no word breaks inside a narrow column.
 - **Headline in two weights:** the last words of an h1 are set light in the primary colour (`PageHead accent`, `Headline`). The text is
   the registry's own sentence, unchanged.
 - **Figures:** prices and counts are display at weight 300, with tabular numbers. A currency code is set small and raised (`PriceFigure`).

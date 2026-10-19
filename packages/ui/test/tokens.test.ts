@@ -12,7 +12,7 @@ test("D-DS-1: tokens.css is exactly the rendering of TOKENS, so the stylesheet t
   assert.equal(onDisk, renderTokenCss());
 });
 
-test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcelain, wine primary with porcelain text, clay as the dark theme's primary on carbon, body 16px/1.5, dense text never below 14px, a two-pixel focus indicator with spacing, system-ui with no external font", () => {
+test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcelain, wine primary with porcelain text, clay as the dark theme's primary on carbon, body 16px/1.5, dense text never below 14px, a two-pixel focus indicator with spacing, and the agreed faces (Inter, JetBrains Mono, Inter Italic for notes; Order 10) named by the variables the web defines, with a system stack behind each and no font resource in the tokens", () => {
   assert.deepEqual({ ...BRAND }, { carbon: "#242426", porcelain: "#F8F6F3", wine: "#653A46", clay: "#C4A693" });
   assert.equal(COLOR.text, BRAND.carbon);
   assert.equal(COLOR.background, BRAND.porcelain);
@@ -29,7 +29,12 @@ test("D-DS-1 (amendment A10): the brand's fixed values — carbon text on porcel
   assert.ok(TYPOGRAPHY.denseSizePx >= 14);
   assert.equal(FOCUS.widthPx, 2);
   assert.ok(FOCUS.offsetPx >= 2, "the focus indicator has spacing");
-  assert.match(TYPOGRAPHY.fontFamily, /^system-ui,/);
+  assert.ok(TYPOGRAPHY.fontFamily.startsWith('var(--kauro-face-inter, "Inter"), system-ui,'), TYPOGRAPHY.fontFamily);
+  assert.equal(TYPOGRAPHY.displayFamily, TYPOGRAPHY.fontFamily, "one family: headings are Inter too");
+  assert.ok(TYPOGRAPHY.monoFamily.startsWith('var(--kauro-face-mono, "JetBrains Mono"), ui-monospace,'), TYPOGRAPHY.monoFamily);
+  assert.ok(TYPOGRAPHY.noteFamily.startsWith('var(--kauro-face-inter-italic, "Inter"), system-ui,'), TYPOGRAPHY.noteFamily);
+  // no third family: no serif face anywhere in the stacks
+  for (const stack of [TYPOGRAPHY.fontFamily, TYPOGRAPHY.displayFamily, TYPOGRAPHY.monoFamily, TYPOGRAPHY.noteFamily]) assert.doesNotMatch(stack.replace(/sans-serif/g, ""), /serif|Georgia|Times|Iowan/, stack);
   assert.doesNotMatch(renderTokenCss(), /url\(|@import|@font-face/, "no external font or resource request");
 });
 

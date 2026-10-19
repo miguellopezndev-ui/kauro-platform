@@ -140,11 +140,19 @@ export const THEMES = Object.freeze({ light: COLOR, dark: COLOR_DARK, inverse: C
 
 export type ThemeName = keyof typeof THEMES;
 
+/**
+ * The agreed faces (owner, 2026-10-18; Order 10 implements them on the web): Inter for the brand, headings and text, JetBrains Mono for
+ * technical information, Inter Italic for the editor's notes; no third family. The web serves the official files from its own origin
+ * (apps/web/src/app/fonts.ts) and exposes them as --kauro-face-*; each stack names the face by that variable, then by its family name,
+ * then a system stack, so text stays readable if a face has not arrived.
+ */
 export const TYPOGRAPHY = Object.freeze({
-  fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  /** Headlines: the optical display cut of the system face where the platform has one by name, else the same system face. */
-  displayFamily: '"Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  monoFamily: 'ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace',
+  fontFamily: 'var(--kauro-face-inter, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  /** Headlines and figures: the same Inter, whose optical size axis gives large sizes their display cut. */
+  displayFamily: 'var(--kauro-face-inter, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  monoFamily: 'var(--kauro-face-mono, "JetBrains Mono"), ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace',
+  /** The editor's notes: Inter Italic (it replaces the Georgia serif of v1.0). */
+  noteFamily: 'var(--kauro-face-inter-italic, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
   bodySizePx: 16,
   bodyLineHeight: 1.5,
   denseSizePx: 14,
@@ -257,6 +265,7 @@ export function renderTokenCss(): string {
   lines.push(`  --kauro-font-family: ${TYPOGRAPHY.fontFamily};`);
   lines.push(`  --kauro-display-family: ${TYPOGRAPHY.displayFamily};`);
   lines.push(`  --kauro-mono-family: ${TYPOGRAPHY.monoFamily};`);
+  lines.push(`  --kauro-note-family: ${TYPOGRAPHY.noteFamily};`);
   lines.push(`  --kauro-font-size-body: ${TYPOGRAPHY.bodySizePx}px;`);
   lines.push(`  --kauro-font-size-dense: ${TYPOGRAPHY.denseSizePx}px;`);
   lines.push(`  --kauro-line-height-body: ${TYPOGRAPHY.bodyLineHeight};`);

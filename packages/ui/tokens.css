@@ -31,9 +31,10 @@
   --kauro-color-success-surface: #E3EDE2;
   --kauro-color-info-text: #344E6B;
   --kauro-color-info-surface: #E4E9EF;
-  --kauro-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --kauro-display-family: "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --kauro-mono-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --kauro-font-family: var(--kauro-face-inter, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --kauro-display-family: var(--kauro-face-inter, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --kauro-mono-family: var(--kauro-face-mono, "JetBrains Mono"), ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --kauro-note-family: var(--kauro-face-inter-italic, "Inter"), system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --kauro-font-size-body: 16px;
   --kauro-font-size-dense: 14px;
   --kauro-line-height-body: 1.5;

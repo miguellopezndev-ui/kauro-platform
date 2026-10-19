@@ -200,9 +200,12 @@ export function DataTable({
   readonly rows: ReadonlyArray<{ readonly key: string; readonly head: string; readonly cells: readonly string[] }>;
   readonly variant?: string | undefined;
 }): ReactElement {
+  // A table of four columns or more is laid out row by row on a phone (Order 10): each value carries its column's name, so no word has to
+  // break inside a narrow column. The table stays a table for assistive technology.
+  const stacked = columns.length >= 4;
   return (
     <div className={classes("kauro-site-table-region", variant)}>
-      <table className="kauro-site-table">
+      <table className={classes("kauro-site-table", stacked ? "kauro-site-table--stack" : undefined)}>
         <caption>{caption}</caption>
         <thead>
           <tr>
@@ -218,7 +221,9 @@ export function DataTable({
             <tr key={row.key}>
               <th scope="row">{row.head}</th>
               {row.cells.map((cell, index) => (
-                <td key={`${row.key}-${columns[index + 1] ?? index}`}>{cell}</td>
+                <td key={`${row.key}-${columns[index + 1] ?? index}`} data-label={stacked ? columns[index + 1] : undefined}>
+                  {cell}
+                </td>
               ))}
             </tr>
           ))}
