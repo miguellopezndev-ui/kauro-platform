@@ -25,6 +25,7 @@ export const PROBLEM_CODES = [
   "PACKAGE_BINDING_MISMATCH",
   "REPORT_UNVERIFIED",
   "IMPORT_PARTS_INVALID",
+  "FONT_UNAVAILABLE",
 ] as const;
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
 

@@ -101,6 +101,33 @@ describe("report PDF — real engine", { skip: needsBrowser }, () => {
     for (const art of [...report.model.exceptions, ...report.model.artifacts]) assert.ok(flat.includes(squash(art.path)), `missing ${art.path}`);
   });
 
+  // template 2 embeds its faces and keeps its text extractable: every text of the HTML document is in the PDF's text (whitespace ignored, and
+  // case, because column heads are set in capitals), and the PDF carries the pinned faces rather than whatever the host has installed
+  for (const name of ["D-salesforce", "A-clean-multi-object"] as const) {
+    it(`${name}: every text of the document survives into the PDF, in the embedded Inter and JetBrains Mono`, async () => {
+      const report = reportOf(name);
+      const { html } = renderReportHtml(report, LETTER);
+      const pdf = await generateReportPdf(report, LETTER, engine());
+      if (evidenceDir !== null) {
+        mkdirSync(evidenceDir, { recursive: true });
+        writeFileSync(join(evidenceDir, `report-${name}-LETTER.pdf`), pdf.bytes);
+      }
+      const read = await readPdf(pdf.bytes);
+      const flat = squash(read.pages.map((p) => p.text).join(" ")).toLowerCase();
+      const unescape = (s: string): string => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+      const texts = [...html.slice(html.indexOf("<body>")).matchAll(/>([^<]+)</g)].map((m) => unescape(m[1] as string).trim()).filter((t) => t.length > 0);
+      assert.ok(texts.length > 100);
+      const lost = texts.filter((t) => !flat.includes(squash(t).toLowerCase()));
+      assert.deepEqual(lost, [], "text of the document missing from the PDF's extracted text");
+      assert.ok(read.pages.some((p) => p.text.includes(`Page 1 of ${read.pages.length}`)), "the running footer numbers the pages");
+      const raw = Buffer.from(pdf.bytes).toString("latin1");
+      const faces = [...raw.matchAll(/\/FontName\s*\/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/g)].map((m) => m[1] as string);
+      assert.ok(faces.some((f) => f.startsWith("Inter")), `no embedded Inter face: ${faces.join(", ")}`);
+      assert.ok(faces.some((f) => f.startsWith("JetBrainsMono")), `no embedded JetBrains Mono face: ${faces.join(", ")}`);
+      assert.ok(faces.every((f) => f.startsWith("Inter") || f.startsWith("JetBrainsMono")), `a face other than the pinned ones: ${faces.join(", ")}`);
+    });
+  }
+
   it("paginates a very long table and repeats its header on each page", async () => {
     const rows = Array.from({ length: 400 }, (_, i) => `<tr><td>row-${i}</td><td>${(i * 7919) % 10007}</td></tr>`).join("");
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:letter}thead{display:table-header-group}tr{break-inside:avoid}</style></head><body><table><thead><tr><th>HEADERCELL</th><th>VALUE</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
