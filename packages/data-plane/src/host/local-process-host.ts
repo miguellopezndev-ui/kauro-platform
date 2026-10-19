@@ -62,7 +62,7 @@ import type { ReportRenderConfig } from "../report/stage.js";
 import { SANDBOX_CODE_ROOT } from "../sandbox/runner.js";
 import { AttemptStorageBroker, callErrorOf } from "./broker.js";
 import { encodeFrame, FrameDecoder } from "./framing.js";
-import { CANCELLED_BEFORE_CREATE, JobJournal, LOCAL_PROCESS_HOST, TERMINAL, makeDurableDirectory, type LocalJobRecord } from "./job-journal.js";
+import { CANCELLED_BEFORE_CREATE, JobJournal, LOCAL_PROCESS_HOST, TERMINAL, type LocalJobRecord } from "./job-journal.js";
 import { qualifyAttemptScope, type AttemptScope } from "./attempt-scope.js";
 import { WORKER_PROTOCOL_VERSION, normalizeWorkerMessage, type HostMessage, type InvalidWorkerMessage, type WorkerCall, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./protocol.js";
 import { acquireHostRootLock, type HostRootLock } from "./root-lock.js";
@@ -214,8 +214,8 @@ function configured(options: LocalProcessWorkerHostOptions): Roots {
   const reserve = options.browserReserveBytes ?? 1024 * MIB;
   if (!heaps.every((n) => Number.isSafeInteger(n) && n >= 64) || !Number.isSafeInteger(reserve) || reserve < 0) problems.push("heap sizes are whole megabytes of at least 64");
   if (problems.length > 0) throw new TypeError(`${LOCAL_PROCESS_HOST}: ${problems.join("; ")}`);
-  // the journal's directory and its ancestors, each flushed in its parent as it is made (job-journal.ts)
-  makeDurableDirectory(join(options.hostRoot, "jobs"));
+  // the journal's directory made here; its durability, up to the root, is the journal's (job-journal.ts), at every opening
+  mkdirSync(join(options.hostRoot, "jobs"), { recursive: true });
   mkdirSync(options.scratchRoot, { recursive: true });
   const hostRoot = realpathSync.native(options.hostRoot);
   const scratchRoot = realpathSync.native(options.scratchRoot);
@@ -556,6 +556,7 @@ export class LocalProcessWorkerHost implements WorkerHostPort {
       peakScratchBytes: 0,
       peakMemoryBytes: 0,
       flags: this.flagsOf(spec, digest),
+      boundary: { kind: this.#scope.boundary, containment: this.#scope.containment },
       hardMemoryBytes: spec.limits.hardMemoryBytes,
       hardScratchBytes: spec.limits.hardScratchBytes,
     };

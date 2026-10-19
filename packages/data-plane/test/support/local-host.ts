@@ -203,8 +203,8 @@ export function processesReferencing(marker: string): number[] {
       if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
       try {
         if (readFileSync(`/proc/${name}/cmdline`, "utf8").includes(marker)) out.push(Number(name));
-      } catch {
-        // gone
+      } catch (error) {
+        if (!gone(error)) throw new Error(`/proc/${name} could not be read: no evidence either way`, { cause: error });
       }
     }
     return out;
@@ -225,21 +225,35 @@ export interface ProcessInstance {
   readonly command: string;
 }
 
-/** Every process of the machine (Linux /proc, Windows CIM). Throws when the list cannot be read: an empty list is never assumed. */
+/** A /proc read that failed because the process ended (its entry gone); any other failure is no evidence of an end, and throws. */
+function gone(error: unknown): boolean {
+  const code = (error as { code?: unknown }).code;
+  return code === "ENOENT" || code === "ESRCH";
+}
+
+/**
+ * Every live process of the machine (Linux /proc, Windows CIM). A process that ended while it was read is left out; one that cannot
+ * be read for another reason makes the whole snapshot throw (review R3-3): an unreadable process is never taken for an ended one, and
+ * an empty list is never assumed. A zombie (Linux state Z) has ended.
+ */
 export function processSnapshot(): ProcessInstance[] {
   if (process.platform === "linux") {
     const out: ProcessInstance[] = [];
     for (const name of readdirSync("/proc")) {
       if (!/^\d+$/.test(name)) continue;
+      let stat: string;
+      let command: string;
       try {
         // /proc/<pid>/stat: "pid (comm) state ppid ..." — the fields after the last ")": state is 1st, ppid 2nd, starttime 20th
-        const stat = readFileSync(`/proc/${name}/stat`, "utf8");
-        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-        const command = readFileSync(`/proc/${name}/cmdline`, "utf8").split("\0").join(" ");
-        out.push({ pid: Number(name), ppid: Number(fields[1]), start: String(fields[19]), command });
-      } catch {
-        // ended while it was read
+        stat = readFileSync(`/proc/${name}/stat`, "utf8");
+        command = readFileSync(`/proc/${name}/cmdline`, "utf8").split("\0").join(" ");
+      } catch (error) {
+        if (gone(error)) continue;
+        throw new Error(`/proc/${name} could not be read: no evidence either way`, { cause: error });
       }
+      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+      if (fields[0] === "Z") continue;
+      out.push({ pid: Number(name), ppid: Number(fields[1]), start: String(fields[19]), command });
     }
     if (out.length === 0) throw new Error("/proc listed no process");
     return out;

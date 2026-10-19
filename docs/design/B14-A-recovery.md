@@ -88,6 +88,12 @@ can provide them, and stay `PENDING_AWS_QUALIFICATION` until the live probes of 
 - **Hard** memory and ephemeral-disk limits against code that bypasses the in-process quotas: the task's cgroup memory limit and
   ephemeral storage limit.
 - Multi-tenant isolation between agencies on one machine.
+- **The whole-tree lifetime guarantee on Windows.** Linux holds every process of an attempt atomically (a PID namespace: membership
+  at creation). Windows holds them per spawn: libuv creates each child running, then assigns it to its parent's kill-on-close job, and
+  lets grandchildren break away silently, so a child created in the instant its parent is killed can escape (review R3-1 of the
+  recovery). The worker itself cannot (it starts nothing before its ticket); the processes it starts can. An atomic Windows boundary
+  needs a job the host creates without breakaway, which Node cannot make. The guarantee is qualified on Linux and in the cloud task;
+  each job's record names the boundary that held it (`boundary`: `PID_NAMESPACE`/`ATOMIC` or `JOB_OBJECTS`/`PER_SPAWN`).
 - Everything already listed as blocked in the qualification document (token horizon, Chromium sandbox on Fargate, IAM life cycle,
   bucket policy, pull time, task retirement).
 
@@ -173,3 +179,15 @@ architectural rebuild".
 | R2-2 | The tree tests counted processes naming the attempt, which a browser alone could satisfy. | The tests now capture the whole descendant tree of the host's child from the operating system (marked or not), require the stuck child and the browser each by its own mark, and check every captured instance (pid and start) ends; a process list that cannot be read fails the test, never reads as empty. |
 
 On Ubuntu CI the candidate ce274213 showed the boundary works (the runner restricts user namespaces; the profile for unshare alone was loaded and the probe then passed; host death, the stuck worker and the real browser inside the namespace all passed). Its two tree tests hung there: the hostile browser was started with a temporary directory too long for a POSIX socket and never came up. The hostile worker now starts it as worker-runtime.ts does, an attempt whose tree never comes up ends the test instead of hanging it, and a host process that never reaches its hold is killed after 90 s.
+
+## 11. The recovery's own review, round 3 (Codex, candidate 5a12e391)
+
+Verdict REJECT with two MAJOR and one MINOR findings; the architecture again judged sound, preservation (F1–F3, B13, ticket, broker,
+evidence classes) found intact, and "these findings require correcting boundary and durability implementation, not rebuilding the
+control-plane architecture".
+
+| # | Finding | Answer |
+|---|---|---|
+| R3-1 | On Windows, libuv assigns each child to its job just after creating it, and lets grandchildren break away: a child created as its parent is killed can escape. | Stated, not hidden (§6): the Windows boundary is classified PER_SPAWN, the Linux one ATOMIC, and each job's record names which held it; the whole-tree guarantee is qualified on Linux and in the cloud task only. Node cannot create a job without breakaway; building a native job keeper would bring back a separate supervising process. |
+| R3-2 | An opening interrupted between a directory's creation and its parent's flush left the entry undurable, and a later opening skipped it. | `ensureDurableDirectory` flushes every directory from the journal's up to the filesystem's root at every opening, made now or before; a test with recorded directory operations and a host root an interrupted opening left behind. |
+| R3-3 | The tests' process snapshot took an unreadable /proc entry for an ended process. | Only ENOENT/ESRCH (and a zombie) count as ended; any other failure makes the snapshot throw, in the tree capture and in the marked-process check. |

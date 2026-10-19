@@ -13,7 +13,7 @@
  * directory or to rename with write-through, so a power loss there is not covered by the local host (the cloud host's records are
  * the store's conditional objects, B14-A-aws-host-qualification.md).
  */
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
+import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Sha256Hex } from "@kauro/contracts";
 import { isAttemptIdentity, type WorkerFailureCause, type WorkerManifestReference } from "@kauro/application";
@@ -48,6 +48,8 @@ export interface LocalJobRecord {
   peakMemoryBytes: number;
   /** The worker's exact command line (evidence of its confinement). */
   readonly flags: readonly string[];
+  /** The boundary that held the attempt's tree and how it held it (attempt-scope.ts); null for a tombstone. */
+  readonly boundary?: { readonly kind: "PID_NAMESPACE" | "JOB_OBJECTS"; readonly containment: "ATOMIC" | "PER_SPAWN" } | null;
   readonly hardMemoryBytes: number;
   readonly hardScratchBytes: number;
 }
@@ -62,16 +64,27 @@ export class HostRecordUnreadable extends Error {
   }
 }
 
+/** How the journal makes and flushes directories (the operating system's, unless a test records or interrupts them). */
+export interface DirectoryOps {
+  make(dir: string): void;
+  /** Flushes a directory's entries to the device (Linux; a no-op where Node cannot open a directory). */
+  sync(dir: string): void;
+}
+
+export const OS_DIRECTORIES: DirectoryOps = { make: (dir) => void mkdirSync(dir, { recursive: true }), sync: (dir) => syncDirectory(dir) };
+
 /**
- * Makes `dir` and every missing ancestor, each one's entry flushed in its parent before the next is made (Linux; elsewhere the
- * directories alone): a directory a record is written in is never lost with the machine's power once a record has been acknowledged.
+ * Makes `dir` (and every missing ancestor), then flushes every directory from `dir` up to the filesystem's root — each flush makes
+ * durable the entries of the one below it — whether this call made them or an earlier opening did and was interrupted before its own
+ * flush (review R3-2 of the recovery). Existence is never taken for durability: a directory a record is written in is not lost with the
+ * machine's power once a record has been acknowledged.
  */
-export function makeDurableDirectory(dir: string): void {
-  if (existsSync(dir)) return;
-  const parent = dirname(dir);
-  if (parent !== dir) makeDurableDirectory(parent);
-  mkdirSync(dir);
-  syncDirectory(parent);
+export function ensureDurableDirectory(dir: string, ops: DirectoryOps = OS_DIRECTORIES): void {
+  ops.make(dir);
+  for (let at = dir; ; at = dirname(at)) {
+    ops.sync(at);
+    if (dirname(at) === at) break;
+  }
 }
 
 function syncDirectory(dir: string): void {
@@ -105,6 +118,12 @@ function recordOf(identity: string, text: string): LocalJobRecord {
 /** How the journal writes bytes to a descriptor (the operating system's, unless a test injects a fault). */
 export type JournalWrite = (fd: number, bytes: Uint8Array, offset: number, length: number) => number;
 
+/** What a test may put in place of the operating system's calls (faults, records). */
+export interface JournalFaults {
+  readonly writeBytes?: JournalWrite;
+  readonly directories?: DirectoryOps;
+}
+
 export class JobJournal {
   readonly #dir: string;
   readonly #writeBytes: JournalWrite;
@@ -112,12 +131,10 @@ export class JobJournal {
   readonly #unreadable = new Map<string, unknown>();
 
   /** Reads every record of the root; temporary files of a host that died mid-write are discarded. */
-  constructor(dir: string, writeBytes: JournalWrite = (fd, bytes, offset, length) => writeSync(fd, bytes, offset, length)) {
-    this.#writeBytes = writeBytes;
-    // the journal's directory, and its place in the host root, durable before any record is written in it (Linux), whoever made them
-    makeDurableDirectory(dir);
-    syncDirectory(dirname(dir));
-    syncDirectory(dir);
+  constructor(dir: string, faults: JournalFaults = {}) {
+    this.#writeBytes = faults.writeBytes ?? ((fd, bytes, offset, length) => writeSync(fd, bytes, offset, length));
+    // the journal's directory and every directory above it durable before any record is written in it (Linux), whoever made them
+    ensureDurableDirectory(dir, faults.directories);
     this.#dir = dir;
     for (const name of readdirSync(dir)) {
       if (name.endsWith(TEMPORARY)) {

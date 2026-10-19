@@ -595,16 +595,37 @@ test("B14-A records (review R5): a record is written whole or not at all — a w
     const identity = "kauro-attempt-0192b000-0000-7000-8000-000000000001";
     const record: LocalJobRecord = { host: "kauro-local-process-host", identity, ticketDigest: "0".repeat(64) as never, state: "QUEUED", pid: null, createdAtMs: 1, startedAtMs: null, endedAtMs: null, lastHeartbeatMs: null, cause: null, note: null, manifest: null, refusal: null, peakScratchBytes: 0, peakMemoryBytes: 0, flags: ["--permission"], hardMemoryBytes: 1, hardScratchBytes: 1 };
     // three bytes at a time: every write a short one
-    const short = new JobJournal(dir, (fd, bytes, offset, length) => writeSyncOf(fd, bytes, offset, Math.min(3, length)));
+    const short = new JobJournal(dir, { writeBytes: (fd, bytes, offset, length) => writeSyncOf(fd, bytes, offset, Math.min(3, length)) });
     short.write(record);
     assert.deepEqual(JSON.parse(readFileSync(join(dir, `${identity}.json`), "utf8")), record);
     // no progress: the write fails, and the version on disk is the previous one, whole
-    const stuck = new JobJournal(dir, () => 0);
+    const stuck = new JobJournal(dir, { writeBytes: () => 0 });
     assert.throws(() => stuck.write({ ...record, state: "RUNNING" }), /made no progress/);
     assert.equal(JSON.parse(readFileSync(join(dir, `${identity}.json`), "utf8")).state, "QUEUED");
     assert.deepEqual(readdirSync(dir), [`${identity}.json`], "no temporary file left");
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("B14-A records (review R2-1, R3-2): every opening makes the journal's directories durable up to the filesystem's root — those it makes and those an earlier, interrupted opening made but never flushed — before any record is written", () => {
+  const root = mkdtempSync(join(tmpdir(), "kauro-b14a-durable-"));
+  try {
+    // an earlier opening made the host root and died before flushing its parent: the directory exists, its entry is not durable
+    const hostRoot = join(root, "made-before");
+    mkdirSync(hostRoot);
+    const jobs = join(hostRoot, "jobs");
+    const synced: string[] = [];
+    new JobJournal(jobs, { directories: { make: (dir) => void mkdirSync(dir, { recursive: true }), sync: (dir) => void synced.push(dir) } });
+    const chain: string[] = [];
+    for (let at = jobs; ; at = dirname(at)) {
+      chain.push(at);
+      if (dirname(at) === at) break;
+    }
+    assert.deepEqual(synced, chain, "every directory from the journal's to the root is flushed, existing or not");
+    assert.ok(synced.includes(root), "the parent of the host root an interrupted opening left unflushed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

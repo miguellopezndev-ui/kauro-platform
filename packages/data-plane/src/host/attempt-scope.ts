@@ -10,7 +10,11 @@
  * - Windows: job objects. A child Node starts without `detached` is assigned to its parent's kill-on-close job (libuv's), so the worker
  *   ends with the host, and the worker's own children (the core's child, the browser) end with the worker; the browser's own processes
  *   are in the browser's kill-on-close jobs. libuv does not report a failed assignment, so the host proves the nesting on this machine
- *   when it opens (qualifyAttemptScope) and refuses to open where it does not hold.
+ *   when it opens (qualifyAttemptScope) and refuses to open where it does not hold. This boundary is PER_SPAWN, not ATOMIC (review R3-1
+ *   of the recovery): libuv creates each child running and assigns it to the job just after, and its job lets grandchildren break away
+ *   silently, so a child created in the instant its parent is killed can escape. The worker itself cannot (it starts nothing before its
+ *   ticket, which follows its `hello`); a child it starts can. An atomic boundary on Windows needs a job the host creates without
+ *   breakaway, which Node cannot make: the whole-tree guarantee is qualified on Linux (and in the cloud task), not on Windows.
  *
  * Both need something of the environment (Linux: unprivileged user and PID namespaces; Windows: nested jobs, Windows 8 and later):
  * where it is missing the host does not open — it never runs an attempt outside its boundary.
@@ -29,7 +33,16 @@ export class AttemptScopeUnavailable extends Error {
 const SETPRIV = ["/usr/bin/setpriv", "/bin/setpriv"];
 const UNSHARE = ["/usr/bin/unshare", "/bin/unshare"];
 
+/**
+ * How the boundary holds a process the tree starts: ATOMIC — the kernel puts it in the boundary as it is created (Linux PID
+ * namespace); PER_SPAWN — the parent assigns it just after creating it (Windows, libuv's job objects; see above).
+ */
+export type AttemptContainment = "ATOMIC" | "PER_SPAWN";
+
 export interface AttemptScope {
+  /** Which boundary holds the tree (evidence in each job's record). */
+  readonly boundary: "PID_NAMESPACE" | "JOB_OBJECTS";
+  readonly containment: AttemptContainment;
   /** The program and arguments that start `node <flags>` inside a new boundary. */
   command(nodeFlags: readonly string[]): readonly [string, readonly string[]];
 }
@@ -39,11 +52,13 @@ function linuxScope(): AttemptScope {
   const unshare = UNSHARE.find((p) => existsSync(p));
   if (setpriv === undefined || unshare === undefined) throw new AttemptScopeUnavailable("util-linux setpriv and unshare are required");
   return {
+    boundary: "PID_NAMESPACE",
+    containment: "ATOMIC",
     command: (flags) => [setpriv, ["--pdeathsig", "KILL", "--", unshare, "--user", "--map-current-user", "--pid", "--fork", "--kill-child=SIGKILL", "--", process.execPath, ...flags]],
   };
 }
 
-const windowsScope: AttemptScope = { command: (flags) => [process.execPath, flags] };
+const windowsScope: AttemptScope = { boundary: "JOB_OBJECTS", containment: "PER_SPAWN", command: (flags) => [process.execPath, flags] };
 
 /**
  * The attempt scope of this platform, proved on this machine: Linux starts a probe as the first process of a new PID namespace (it

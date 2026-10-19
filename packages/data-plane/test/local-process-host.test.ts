@@ -59,6 +59,8 @@ ${rig.host.diagnostics(spec.identity)}`);
     // and so is the browser's own temporary directory, which the host made beside it (short: the browser binds a socket there)
     assert.equal(existsSync(browserTempDirectoryOf(realpathSync.native(rig.scratchRoot), planted.fixture.attemptId)), false);
     assert.ok(record!.flags.includes("--permission"));
+    // the boundary that held the tree, as evidence: atomic on Linux (a PID namespace), per spawn on Windows (B14-A-recovery.md §6)
+    assert.deepEqual(record!.boundary, process.platform === "linux" ? { kind: "PID_NAMESPACE", containment: "ATOMIC" } : { kind: "JOB_OBJECTS", containment: "PER_SPAWN" });
     assert.ok(record!.flags.some((f) => f.startsWith("--allow-fs-write=")));
     // the host's durable evidence is one record per identity, its last version complete (no temporary file left)
     assert.deepEqual(readdirSync(join(rig.hostRoot, "jobs")), [`${spec.identity}.json`]);

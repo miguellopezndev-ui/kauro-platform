@@ -77,7 +77,9 @@ listed in [B14-A-recovery.md §6](B14-A-recovery.md) and belongs to the cloud ta
    --kill-child=SIGKILL`); on Windows kill-on-close job objects (the host's holds the worker, the worker's holds its children). The
    kernel ends the whole tree — the core's child, the browser and the browser's own processes included — when the host ends the
    boundary's first process (its own unreaped child) or when the host itself ends. No process is known or signalled by its number. The
-   host proves the boundary on the machine before it opens, and does not open without it.
+   host proves the boundary on the machine before it opens, and does not open without it. On Linux the boundary holds every process
+   atomically, at its creation; on Windows per spawn (libuv assigns each child just after creating it), so the whole-tree guarantee is
+   qualified on Linux only (B14-A-recovery.md §6); each job's record names its boundary.
 6. **On AWS** (qualification §4), the task, its container and its per-attempt IAM role are the operating-system boundary, with the
    task's memory and ephemeral-storage limits. The worker's code is the same.
 
