@@ -163,7 +163,8 @@ most 1 MiB, so memory stays bounded.
     Windows only the heaps are bounded locally; the cloud task's memory limit is the container's.
   - Disk: the attempt's scratch budget is enforced inside (AttemptScratchStore, the core's byte ledger). The supervisor measures the
     whole attempt directory, so it also counts writes outside those quotas and the browser's profile, and ends the tree past
-    `hardScratchBytes` (`SCRATCH_EXHAUSTED`). It also counts the browser's own temporary directory (below).
+    `hardScratchBytes` (`SCRATCH_EXHAUSTED`). It also counts the browser's own temporary directory (below). Against a hostile worker
+    this hard bound holds on Linux only (the qualification platform, as the cloud task is); on Windows it is not enforced (below).
   - The browser's temporary directory: `<scratchRoot>/kb-<12 hex of the attempt id's SHA-256>`, made by the host (mode 0700), named
     to the browser alone as `TMPDIR`/`TMP`/`TEMP`, never granted to the worker, and removed by the host when the worker's tree ends
     (or by a later instance once it has declared the job ended). The browser binds its singleton socket there, and a socket's path is
@@ -216,10 +217,15 @@ for the platform's own code, never for another tenant's. Multi-tenant isolation 
 container, with its own filesystem, its own role and its own process namespace. An OS sandbox for the local host (a container,
 bubblewrap, or a Windows job object with an AppContainer) would close this residual and is not built: it is a blocker (§11).
 
-**Local limits that are not enforced** (beyond the residual above): on Windows, the tree's memory beyond the two heaps, and disk
-written outside the attempt's directories or held in files whose names were removed. On Linux the supervisor counts those files
-through `/proc/<pid>/fd` (review R3-3), but not disk the unconfined browser writes elsewhere. The cloud task's own memory and
-ephemeral-storage limits are the hard bound there.
+**Local limits that are not enforced** (beyond the residual above). The local host on Windows is development infrastructure: there the
+supervisor bounds neither the tree's memory beyond the two heaps nor, against a hostile worker, the attempt's disk — its measure reads
+each file's default data stream only, so NTFS alternate data streams (`file:stream`, which a worker may write inside its own
+directory), files whose names were removed and writes outside the attempt's directories are not counted (review R15-1). Only the
+in-process quotas (AttemptScratchStore, the core's byte ledger) bound a well-behaved attempt there. On Linux the supervisor counts
+every file and directory's allocation in the attempt's directories, files held open after their names were removed (`/proc/<pid>/fd`,
+review R3-3) and fails closed on what it cannot inspect, but not disk the unconfined browser writes elsewhere. The cloud task's own
+memory and ephemeral-storage limits are the hard bound in production. Blocker (§11): an enforced local disk bound on Windows needs an
+OS quota (a per-attempt volume or NTFS quota), which is not built.
 
 ## 6. B13 inside the worker
 
@@ -316,6 +322,7 @@ EXECUTED_PROVIDER.**
 | R13-1 | (round 13) A scratch subdirectory the worker made unreadable was counted as empty. | What exists and cannot be inspected counts as past every bound (`SCRATCH_EXHAUSTED`); allocated blocks count, not only lengths; a cell (Linux). |
 | R13-2 | On Windows the supervisor took any process at the worker's pid for the worker. | Before any signal it checks that the pid's command line names the worker's ticket digest (CIM); unreadable is UNKNOWN, another is OTHER, and neither is signalled. |
 | R14-1 | (round 14) Directories' own allocation was not counted. | Every directory's own allocation counts, the measured roots included; a cell (Linux) with empty directories only. |
+| R15-1 | (round 15) NTFS alternate data streams escaped the Windows scratch measure. | Stated, not fixed: the Windows local host bounds no hostile worker's disk (§5 local limits); the hard bound is enforced on Linux and in the cloud task; listed as a blocker (§11). |
 | R7-3 | The launcher could not authorize its own tagged RunTask. | `ecs:TagResource` for the cluster's tasks, only as part of a RunTask and only with the request's two tag keys. |
 
 ## 10. Decisions
@@ -336,6 +343,8 @@ EXECUTED_PROVIDER.**
   generation mapping, and the live probes of the qualification's §6 (token, Chromium sandbox on Fargate, IAM life cycle, bucket
   policy, pull time, task retirement). Until then: no EXECUTED_PROVIDER, no G-CLOUD, no `B14_COMPLETO`.
 - **Legal identity:** every real report is refused until the owner records it (`docs/owner/LEGAL_IDENTITY_SNAPSHOT.md`).
+- **Windows local disk bound:** against a hostile worker the Windows local host enforces no hard scratch (NTFS alternate streams,
+  removed-but-open files); an OS quota per attempt would. Linux and the cloud task enforce it.
 - **Local OS sandbox (blocker for any use of the local host beyond single-tenant qualification):** the process allowlist and the
   network preload are not a boundary against code already running in a worker (§5, residual). An OS sandbox (container, bubblewrap,
   AppContainer), or the cloud task, is that boundary. Not built in B14-A.

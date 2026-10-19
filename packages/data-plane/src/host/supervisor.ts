@@ -8,7 +8,9 @@
  *   - when the attempt's resident memory passes its hard memory (Linux: the VmRSS from /proc of the worker's tree, of every process
  *     seen in it before and of every process the attempt's directories mark; Chromium and every native
  *     allocation included), or the attempt's directories pass its hard scratch (any write, the browser's profile and temporary files
- *     included, and on Linux the files the tree still holds open after removing their names).
+ *     included, and on Linux the files the tree still holds open after removing their names). On Windows the measure reads each
+ *     file's default data stream only (NTFS alternate streams are not counted): there it bounds no hostile worker's disk (the design's
+ *     §5 local limits, a stated blocker).
  *
  * It records its one verdict exclusively in the job's directory (`supervisor.json`), which the host reads to classify the worker's end
  * and a later host instance reads as proof that the tree was ended. It reads no clock: every bound is a duration it was handed.
