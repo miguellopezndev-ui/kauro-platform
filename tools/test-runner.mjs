@@ -338,6 +338,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       let settled = false;
       let postKillTimer;
       let runnerClosed = false;
+      let killError; // the killer's own failure, kept apart from a spawn error
       let pending = []; // the runner's descendants the kill reported, until each is observed terminated
       const finish = (status, signal, killFailure = null) => {
         if (settled) return;
@@ -351,7 +352,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       };
       const timer = timeoutMs ? setTimeout(() => {
         timedOut = true;
-        try { pending = (killer(child.pid) ?? []).filter((pid) => pid !== child.pid); } catch (cause) { error = cause; }
+        try { pending = (killer(child.pid) ?? []).filter((pid) => pid !== child.pid); } catch (cause) { error = cause; killError = cause; }
         // One bound for the whole tree: a runner that does not close, or a worker still alive after it closed, is a kill failure.
         postKillTimer = setTimeout(() => finish(null, null, `${error ? `${error.code ?? error.name}: ${error.message}; ` : ''}${runnerClosed
           ? `worker ${pending.join(', ')} still alive ${postKillWaitMs} ms after kill` : `runner did not close within ${postKillWaitMs} ms after kill`}`), postKillWaitMs);
@@ -364,7 +365,9 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
         const confirm = () => {
           if (settled) return;
           pending = pending.filter(alive); // a pid seen dead is never probed again: the OS reuses pids
-          if (pending.length) setTimeout(confirm, LIVENESS_POLL_MS); else finish(status, signal);
+          if (pending.length) setTimeout(confirm, LIVENESS_POLL_MS);
+          // A kill that failed or could not be read confirmed nothing: the runner closing does not vouch for its workers (Codex R-112-1).
+          else finish(status, signal, killError ? `${killError.code ?? killError.name}: ${killError.message}; the runner closed but its tree's termination is unconfirmed` : null);
         };
         confirm();
       });

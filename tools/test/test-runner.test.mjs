@@ -256,3 +256,19 @@ test('a worker the kill reported that never terminates fails the run within the 
   assert.equal(result.killFailure, `worker ${worker.pid} still alive ${POST_KILL_BOUND_MS} ms after kill`);
   assert.doesNotThrow(() => process.kill(worker.pid, 0), 'the survivor is reported, not killed behind the caller\'s back');
 }));
+// Codex R-112-1: a kill that failed or could not be read confirms nothing, even when the runner itself then closes.
+for (const [mode, fake, reason] of [
+  ['a taskkill listing without the runner', (worker) => ({ status: 0, stdout: `SUCCESS: The process with PID ${worker} (child process of PID 1) has been terminated.\r\n` }), /did not list runner \d+/],
+  ['a taskkill that failed for part of the tree', (worker) => ({ status: 1, stdout: `SUCCESS: The process with PID ${worker} (child process of PID 1) has been terminated.\r\n`, stderr: 'ERROR: one process could not be terminated.' }), /taskkill exited 1: ERROR: one process could not be terminated\./],
+]) {
+  test(`${mode} is a kill failure even though the runner closes`, () => withLateWorker(async (target, worker) => {
+    const result = await runTest(target, undefined, { timeoutMs: RUN_TIMEOUT_MS, postKillWaitMs: POST_KILL_BOUND_MS, killer(pid) {
+      killRunner(pid); // the runner really dies and closes
+      return killRunner(pid, { platform: 'win32', run: () => fake(worker.pid) }); // but what the kill reports cannot be confirmed
+    } });
+    assert.equal(result.timedOut, true);
+    assert.match(result.killFailure ?? '', reason);
+    assert.match(result.killFailure, /the runner closed but its tree's termination is unconfirmed$/);
+    assert.doesNotThrow(() => process.kill(worker.pid, 0), 'the unconfirmed worker is reported, not assumed dead');
+  }));
+}
