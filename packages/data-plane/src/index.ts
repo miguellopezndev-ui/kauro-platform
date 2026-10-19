@@ -42,6 +42,7 @@ export {
   CORE_RUN_DIRECTORY,
   MIGRATION_CORE_VERSION,
   MigrationCoreAdapter,
+  coreConfigHashOf,
   coreInputPathOf,
   coreTargetModeOf,
   platformTargetModeOf,
@@ -105,3 +106,37 @@ export {
   type ReportingExecutionEnvelopeOptions,
 } from "./report/stage.js";
 export { PACKAGE_MANIFEST_ROLE } from "./cores/migration-core-adapter.js";
+
+/**
+ * The worker executor of B14-A (docs/design/B14-A-worker-executor.md): the closed attempt ticket, the local worker protocol, the
+ * attempt's storage broker (the host side) and its client (the worker side), the composition of one attempt inside a worker process,
+ * and LocalProcessWorkerHost — the real local WorkerHostPort (EXECUTED_LOCAL), each attempt one confined process.
+ */
+export {
+  ATTEMPT_TICKET_DOMAIN,
+  ATTEMPT_TICKET_MAX_BYTES,
+  attemptTicketBytesOf,
+  attemptTicketDigestOf,
+  attemptTicketProblems,
+  executionLimitsProblems,
+  readAttemptTicket,
+  type AttemptTicket,
+  type AttemptTicketReading,
+} from "./host/ticket.js";
+export { BrokerCallFailed, MAX_RESULT_REFUSAL_CHARS, WORKER_CALL_OPS, WORKER_PROTOCOL_VERSION, WORKER_STAGES, normalizeWorkerMessage, workerResultProblem, type BrokeredZone, type InvalidWorkerMessage, type HostMessage, type WorkerCall, type WorkerCallError, type WorkerMessage, type WorkerResultReport, type WorkerStage } from "./host/protocol.js";
+export { AttemptStorageBroker, BROKER_READ_CHUNK_BYTES, BrokerRefusal, callErrorOf, type AttemptStorageBrokerOptions, type BrokerRefusalRecord } from "./host/broker.js";
+export { BROKERED_STORAGE_PROVIDER, BrokeredObjectStorage, BrokeredUploads, WorkerRpc } from "./host/client.js";
+export { BROWSER_TEMP_DIRECTORY, WORKER_SESSION_ORIGIN, diagnosticOf, runAttemptWorker, type AttemptWorkerOptions } from "./host/worker-runtime.js";
+export { groupAlive, killOwnTree, killProcessTree, linuxAttemptProcesses, linuxDescendantsOf, linuxProcessOf, linuxStartOf, processCommandLine, processExists, processRunning, sweepAttemptProcesses } from "./host/process-tree.js";
+export {
+  BROWSER_SOCKET_ROOT_MAX_BYTES,
+  LOCAL_PROCESS_HOST,
+  LOCAL_PROCESS_MACHINE_TYPE,
+  LocalProcessWorkerHost,
+  browserTempDirectoryOf,
+  type AttemptTicketReads,
+  type AttemptTicketSource,
+  type LocalJobRecord,
+  type LocalProcessHostHooks,
+  type LocalProcessWorkerHostOptions,
+} from "./host/local-process-host.js";

@@ -74,6 +74,7 @@ export type {
   WorkerObservation,
   WorkerTerminationResult,
   WorkerResourceReport,
+  WorkerHostEvidenceClass,
   WorkerHostPort,
 } from "./worker-host.js";
 export {

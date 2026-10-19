@@ -2,7 +2,7 @@
  * The task the core child runs (B05 D5-2, D5-2c, D5-15 order; M01, M10, M20, M24): vendored kauro-migration-core 3.0.0 over the
  * materialized inputs, entirely inside the call directory, every device write metered by the fs preload.
  *
- *   execute / validate:  loadConfig (hash must equal the binding's) -> [buildSourceProfile] -> runMigration -> writePackage ->
+ *   execute / validate:  loadConfig (hash must equal the binding's) -> buildSourceProfile -> runMigration -> writePackage ->
  *                        dispose the run scratch S -> verifyPackage(stagingDir) with a fresh scratch V -> dispose V ->
  *                        promotePackage -> record
  *   profile:             buildSourceProfile over the inputs -> record
@@ -246,7 +246,9 @@ export async function run(payload: CoreTaskPayload, context: CoreChildContext): 
   let result: ReturnType<typeof runMigration>;
   let staged: ReturnType<typeof writePackage>;
   try {
-    if (payload.mode === "validate") profile = buildSourceProfile({ inputRoot: payload.inputRoot, config: runLoaded.config, scratch: runScratch });
+    // execute runs with the source profile exactly as validate does, so the package an attempt stages is byte for byte the one the
+    // validation receipt bound (artifactEvidenceHash): without it every real report was refused PACKAGE_BINDING_MISMATCH (B14-A)
+    profile = buildSourceProfile({ inputRoot: payload.inputRoot, config: runLoaded.config, scratch: runScratch });
     await context.progress("before-run");
     result = runMigration({ inputRoot: payload.inputRoot, config: runLoaded.config, configHash: loaded.configHash, scratch: runScratch, ...(profile === null ? {} : { sourceProfile: profile }) });
     await context.progress("after-run");

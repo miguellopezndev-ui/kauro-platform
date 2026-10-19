@@ -1,0 +1,33 @@
+{
+  "name": "@kauro/migration-worker",
+  "version": "0.1.0",
+  "description": "Kauro migration worker (B14-A): the entrypoint of one processing attempt in an isolated process. It verifies its closed attempt ticket (KAURO_ATTEMPT_TICKET_V1), runs Migration Core 3.0.0 through the B05 adapter inside the B08 attempt envelope, stages the B13 PDF report beside the package and reports its one result; every object through its host's storage broker, no database connection and no credential of its own.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@kauro/data-plane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

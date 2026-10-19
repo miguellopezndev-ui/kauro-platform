@@ -64,6 +64,11 @@ export { EXECUTION_SERVICES } from "./execution/work.js";
 // the platform's inputs of a B13 report (order 6; docs/design/B13-report-inputs.md): the control plane's side of ReportInputsPort
 export { PlatformReportInputs, reportInputsOf } from "./execution/report-inputs.js";
 export type { PlatformReportInputsDependencies } from "./execution/report-inputs.js";
+// the worker executor of B14-A (docs/design/B14-A-worker-executor.md): the platform's attempt tickets and the local executor's composition
+export { PlatformAttemptTickets } from "./execution/attempt-tickets.js";
+export type { PlatformAttemptTicketsDependencies } from "./execution/attempt-tickets.js";
+export { localExecutorOf } from "./execution/local-executor.js";
+export type { LocalExecutor, LocalExecutorOptions } from "./execution/local-executor.js";
 export type { ExecutionStep } from "./execution/work.js";
 // audit authority (package B08, mandate B08-CONTROL-AUDIT; docs/design/B08-audit-approval-jobs.md §3, §6, §8.1, §11)
 export type { AuditUnits } from "@kauro/application";

@@ -19,12 +19,14 @@ export interface ChromiumPdfEngineOptions {
   readonly executablePath: string;
   /** Upper bound for one print, milliseconds. Default 60 000. */
   readonly timeoutMs?: number;
+  /** The browser's whole environment (default: this process's). A worker names the browser's own temporary directory here. */
+  readonly environment?: Readonly<Record<string, string>>;
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 /** The one way the engine starts a browser: headless, with the browser's own sandbox (no `--no-sandbox`, never retried without it). */
-const launchOptionsOf = (executablePath: string, timeout: number) => ({ executablePath, headless: true, chromiumSandbox: true, timeout }) as const;
+const launchOptionsOf = (executablePath: string, timeout: number, env?: Readonly<Record<string, string>>) => ({ executablePath, headless: true, chromiumSandbox: true, timeout, ...(env === undefined ? {} : { env: { ...env } }) }) as const;
 
 /** What a sandbox self-check observed in the running browser's process tree (Linux only; see `ChromiumPdfEngine.probe`). */
 export interface ChromiumProbe {
@@ -87,17 +89,19 @@ export class ChromiumPdfEngine implements PdfEngine {
   readonly engineId: string;
   readonly #executablePath: string;
   readonly #timeoutMs: number;
+  readonly #environment: Readonly<Record<string, string>> | undefined;
 
   constructor(options: ChromiumPdfEngineOptions, engineId = "chromium") {
     this.#executablePath = options.executablePath;
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.#environment = options.environment;
     this.engineId = engineId;
   }
 
   async print(request: PdfPrintRequest): Promise<Uint8Array> {
     if (Buffer.byteLength(request.html, "utf8") > PDF_HTML_MAX_BYTES) throw new ReportPdfError("ENGINE_FAILED", "the document is larger than the print limit");
     if (!existsSync(this.#executablePath)) throw new ReportPdfError("ENGINE_FAILED", "the PDF browser executable was not found");
-    const browser = await chromium.launch(launchOptionsOf(this.#executablePath, this.#timeoutMs));
+    const browser = await chromium.launch(launchOptionsOf(this.#executablePath, this.#timeoutMs, this.#environment));
     try {
       const context = await browser.newContext({ javaScriptEnabled: false, offline: true, serviceWorkers: "block", acceptDownloads: false, bypassCSP: false });
       context.setDefaultTimeout(this.#timeoutMs);

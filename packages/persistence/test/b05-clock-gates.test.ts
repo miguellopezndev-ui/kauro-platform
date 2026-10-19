@@ -1,6 +1,6 @@
 // B05 lane L3t, CK1-CK3 (docs/design/B05-cores.md D5-20 "one clock by source", D5-11 deferred census): the clock census of the live
 // schema and the migration files equals persistence/clock-gates.json, each site classified; no deferred function but the two gates
-// locks or writes and the deferred foreign keys are D5-11's; the product reads no process clock outside its four injection points.
+// locks or writes and the deferred foreign keys are D5-11's; the product reads no process clock outside its five injection points.
 // Write mode (the coordinator's, at every rebase; never hand-merged, as openapi.json): KAURO_CLOCK_GATES=write regenerates the file,
 // keeping no hand edit: the classes come from the rules and tables below, and a site no rule classifies fails as UNCLASSIFIED.
 import assert from "node:assert/strict";
@@ -207,9 +207,9 @@ const CK3_PATHS = [
   "packages/persistence/src/repositories/commercial-outreach.ts",
   "packages/application/src/commercial/outreach",
 ];
-/** The product's server code (the process clocks are exactly the four injection points). apps/web is the browser client. */
-const PRODUCT_ROOTS = ["packages/application/src", "packages/authorization/src", "packages/contracts/src", "packages/data-plane/src", "packages/domain/src", "packages/persistence/src", "packages/reports/src", "apps/api/src", "apps/control/src"];
-const INJECTION_POINTS = ["apps/control/src/composition.ts:controlClock", "apps/api/src/composition.ts:systemClock", "apps/api/src/identity-verifier.ts:systemClock", "packages/application/src/sources/provider-holds.ts:performance.now"];
+/** The product's server code (the process clocks are exactly the five injection points; B14-A added the worker's). apps/web is the browser client. */
+const PRODUCT_ROOTS = ["packages/application/src", "packages/authorization/src", "packages/contracts/src", "packages/data-plane/src", "packages/domain/src", "packages/persistence/src", "packages/reports/src", "apps/api/src", "apps/control/src", "apps/migration-worker/src"];
+const INJECTION_POINTS = ["apps/control/src/composition.ts:controlClock", "apps/api/src/composition.ts:systemClock", "apps/api/src/identity-verifier.ts:systemClock", "packages/application/src/sources/provider-holds.ts:performance.now", "apps/migration-worker/src/main.ts:workerClock"];
 /**
  * The product's LeaseStore claim/heartbeat/checkpoint callers, exactly: the outbox dispatchers (B08 commissions, PV1 payments, the
  * control outbox), none in the B05 paths. Their p_now is a stamp and the expiry is judged after the row lock at
@@ -439,13 +439,13 @@ test("CK2 (CK) DENY commit-time locks (census): in the live schema no deferred c
   assert.ok(fkProblems.some((p) => p.includes("not D5-11's 14")), "the count changed");
 });
 
-test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/request-journal.ts, src/lease-store.ts, apps/control/src/audit/**, domain src/model/audit/** and ports, application src/audit/**, data-plane src/cores/** and application src/adapters/cores/intelligence/** there is no Date.now(, zero-argument new Date(, performance.now( or process.hrtime( and no comparison of a database instant with a process clock; the database clock reads from the app (serverNow, serverInstantOf) and the app-side judges (reached) equal the checked-in list with their class, LeaseStore claim/heartbeat/checkpoint have no caller in those paths and their product callers are exactly the checked-in outbox dispatchers, whose expiry claim_lease/heartbeat_lease/checkpoint_lease judge after the row lock at GREATEST(p_now, effect_now()) (0054) in their latest definition, claim_lease's deadline judged at that same instant after the lock and never at p_now (0067), and the process clocks of the product are exactly the four injection points (apps/control composition.ts:70, apps/api composition.ts:48, apps/api identity-verifier.ts:60, application sources/provider-holds.ts:28); a planted Date.now() in apps/control/src/audit fails", () => {
+test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/request-journal.ts, src/lease-store.ts, apps/control/src/audit/**, domain src/model/audit/** and ports, application src/audit/**, data-plane src/cores/** and application src/adapters/cores/intelligence/** there is no Date.now(, zero-argument new Date(, performance.now( or process.hrtime( and no comparison of a database instant with a process clock; the database clock reads from the app (serverNow, serverInstantOf) and the app-side judges (reached) equal the checked-in list with their class, LeaseStore claim/heartbeat/checkpoint have no caller in those paths and their product callers are exactly the checked-in outbox dispatchers, whose expiry claim_lease/heartbeat_lease/checkpoint_lease judge after the row lock at GREATEST(p_now, effect_now()) (0054) in their latest definition, claim_lease's deadline judged at that same instant after the lock and never at p_now (0067), and the process clocks of the product are exactly the five injection points (apps/control composition.ts:70, apps/api composition.ts:48, apps/api identity-verifier.ts:60, application sources/provider-holds.ts:28, apps/migration-worker main.ts workerClock); a planted Date.now() in apps/control/src/audit fails", () => {
   const app = appSide();
   assert.deepEqual(app.problems, [], "no process clock in the B05/B08 paths");
   for (const p of CK3_PATHS) assert.ok(tsFiles(p).length > 0, `${p} is scanned`);
   assert.deepEqual(diff(app.rows, listed().app), { unlisted: [], gone: [] });
   const product = productClocks();
-  assert.deepEqual(product.points, [...INJECTION_POINTS].sort(), "the product's process clocks are its four injection points");
+  assert.deepEqual(product.points, [...INJECTION_POINTS].sort(), "the product's process clocks are its five injection points");
   assert.deepEqual(product.leaseCallers, [...LEASE_CALLERS].sort(), "the LeaseStore claim/heartbeat/checkpoint callers are the checked-in outbox dispatchers");
   for (const caller of product.leaseCallers) assert.ok(!CK3_PATHS.some((p) => caller.startsWith(p)), `${caller} is not in a B05 path`);
   // their expiry is judged after the row lock at the database clock (0054) in the definition that is in force, the latest migration

@@ -49,7 +49,7 @@ import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
 import { createAuditUnitOfWorkFactory, createCommerceUnitOfWorkFactory, createExecutionUnitOfWorkFactory, createUnitOfWorkFactory, type PgAuditUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgExecutionUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
 import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute, revokeCorporateRole, type QualifiedRoute } from "./commerce-fixtures.js";
-import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
+import { clockAt, expireSealedRevision, sealSourceRevision, type SourceFileContent } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 import { serverNow } from "./server-now.js";
 import { mintTestDatabaseEnvironment } from "../environment.js";
@@ -161,7 +161,7 @@ export interface Harness {
    * the retention its seal left, B09 quotes_source_binding; the B07+B09 merge). The manifest hash is the revision's source hash
    * (plans_source_fk).
    */
-  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date; readonly billableSourceUnits?: number; readonly populations?: { readonly physicalSourceRows?: number; readonly logicalSourceRecords?: number; readonly associationEdges?: number } }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
+  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date; readonly billableSourceUnits?: number; readonly populations?: { readonly physicalSourceRows?: number; readonly logicalSourceRecords?: number; readonly associationEdges?: number }; readonly content?: SourceFileContent }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
   /**
    * The retention sweeper's retention_expires of a SEALED revision (source-lifecycle.ts expireSealedRevision: its governing records
    * past their effective deadline expire, then SEALED -> EXPIRED), in one control-plane transaction bound to the agency whose labelled
@@ -385,7 +385,7 @@ export async function start(options: { readonly migrationsDir?: string } = {}): 
           control: (fn) => asControlFor(agency.agencyId, fn),
         },
         { agencyId: agency.agencyId, projectId, ownerUserId: agency.ownerUserId, ownerMembershipId: agency.ownerMembershipId },
-        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}), ...(options.billableSourceUnits !== undefined ? { billableSourceUnits: options.billableSourceUnits } : {}), ...(options.populations !== undefined ? { populations: options.populations } : {}) },
+        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}), ...(options.billableSourceUnits !== undefined ? { billableSourceUnits: options.billableSourceUnits } : {}), ...(options.populations !== undefined ? { populations: options.populations } : {}), ...(options.content !== undefined ? { content: options.content } : {}) },
       );
       return { revisionId: sealed.revisionId as RevisionId, revisionHash: sealed.manifestHash as Sha256Hex, version: sealed.version };
     },
