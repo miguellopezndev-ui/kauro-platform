@@ -80,6 +80,17 @@ async function assertDocument(page: Page, response: Response | null, status: num
 }
 
 async function assertAccessible(page: Page): Promise<void> {
+  // axe measures the page as a reader sees it once it rests. Home's walk plays its first step on arrival (the owner's film timeline), and
+  // a row caught while it fades in from opacity 0 fails contrast on a colour nobody reads. So the check waits for every finite animation
+  // to end: a condition, never a fixed time (Order 10, proof in order10/tools/flake-proof.mjs: mid-fade 5/5 fail, settled 5/5 clean).
+  // Only what runs on the document's clock can end by itself: a scroll-driven animation rests where the scroll leaves it, and a paused
+  // one rests where it stopped, so neither is waited for. The condition is read on every frame (an animation's finished promise does
+  // not always settle inside the test's evaluation).
+  await page.waitForFunction(
+    () => document.getAnimations().every((animation) => animation.timeline !== document.timeline || animation.playState !== "running" || !Number.isFinite(animation.effect?.getComputedTiming().endTime ?? Infinity)),
+    undefined,
+    { polling: "raf" },
+  );
   const result = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   expect(result.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(" | ")}`)).toEqual([]);
 }

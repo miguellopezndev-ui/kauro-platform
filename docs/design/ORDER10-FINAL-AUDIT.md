@@ -90,6 +90,14 @@ none of them is visual. PR #117 is merged only after the owner's look at the How
   - dead CSS from the removed animation is gone (seven keyframes, the fragments, a stale comment).
 
   The card of who acts keeps its pointer response, as every card on the table does.
+- **End-to-end accessibility check, an intermittent contrast failure on Home** (1 run in 4).
+  - **Cause:** axe sometimes ran while step 01 of Home's walk was still fading its rows in from opacity 0, so it measured a half-transparent
+    row.
+  - **Proof:** `order10/tools/flake-proof.mjs` fails 5 times out of 5 when axe runs mid-fade, and is clean 5 times out of 5 once the page
+    has settled.
+  - **Fix:** the check now waits, on every frame, until no finite animation on the document's clock is running. It waits for a condition,
+    never for a fixed time, and nothing in the check was loosened. Scroll-driven and paused animations are not waited for.
+  - **Result:** 8 consecutive runs of the suite, all 54 tests passing each time. Home itself is unchanged.
 - **Removed:** `how-flow.tsx`, its CSS and three fragments only it used.
 - **Kept from earlier rounds:** the pricing estimator above the launch envelope, the sample's "group" and consecutive trace, the Contact
   resend rule, the Status description, and "Minimised".
