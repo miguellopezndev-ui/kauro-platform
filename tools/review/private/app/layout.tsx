@@ -2,6 +2,7 @@
 // web stores (the same cookie, the same values), so the screens are drawn in the light or dark theme exactly as the product draws them.
 import "@kauro/ui/tokens.css";
 import "@web/shell/shell.css";
+import "@web/screens/screens.css";
 import "./review.css";
 import "../prototypes/foundation.css";
 import "../prototypes/pages.css";

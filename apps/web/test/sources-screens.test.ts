@@ -125,9 +125,9 @@ test("UI14: each file shows declared size, upload progress, provider observation
   assert.equal(facts.scanner.kind === "INSPECTED" && facts.scanner.fullyChecked, false, "a skip is not a clean scan");
   assert.equal(facts.parser.kind === "PARSED" && facts.parser.structure, "STRUCTURE_VALID", "the parser's state does not depend on the scanner's");
   const html = renderToStaticMarkup(createElement(UploadFacts, { upload: skipped, progress: { sent: 1024, total: 2048 } }));
-  for (const label of ["Declared size", "Upload progress from this browser", "Provider observation", "Scanner coverage", "Parser state"]) assert.ok(html.includes(label), label);
+  for (const label of ["Size", "Sent from this browser", "Received by the storage provider", "Security scan", "Structure"]) assert.ok(html.includes(label), label);
   assert.ok(html.includes("Not fully checked: the scanner skipped this file"));
-  assert.ok(html.includes("1,024 of 2,048 bytes sent") && html.includes("2,048 bytes seen at") && html.includes("The structure is valid"));
+  assert.ok(html.includes("1,024 of 2,048 bytes sent") && html.includes("2,048 bytes, at") && html.includes("The structure is valid"));
   // a clean scan that covered only part of the file is still not fully checked
   const partial = upload({ inspection: { ...(scannerSkipped().inspection as NonNullable<ReturnType<typeof scannerSkipped>["inspection"]>), scanState: "COVERED_CLEAN", scanCoverage: { expectedParts: 4, scannedParts: 3, expectedBytes: 2048, scannedBytes: 1536 } } });
   assert.ok(renderToStaticMarkup(createElement(UploadFacts, { upload: partial, progress: null })).includes("Not fully checked: 3 of 4 parts were scanned"));
@@ -342,7 +342,7 @@ test("UI16/R2-065: the seal review shows physical rows, billable source units an
   assert.ok(html.includes("contacts.xlsx") && html.includes("Contacts") && html.includes("Old or archived data"));
   assert.ok(html.includes(SELECTION_HASH) && html.includes(INVENTORY_HASH));
   assert.ok(html.includes("Files available until"));
-  assert.ok(html.includes("It does not start a funded run."));
+  assert.ok(html.includes("It does not start anything you pay for."));
   // before the selection is evaluated there is no figure, only the sentence saying so
   const unevaluated = sealHtml(unevaluatedRevision(), unevaluatedInspection());
   assert.ok(unevaluated.includes("The counts are not available until the selection is evaluated.") && !unevaluated.includes("Physical rows"));
@@ -351,7 +351,7 @@ test("UI16/R2-065: the seal review shows physical rows, billable source units an
 test("UI16/CMD017: seal is offered only for READY_TO_SEAL with no unresolved input, sends the inventory hash it showed, and a changed hash is STALE", async () => {
   const offered = sealOffer(readyToSeal(), evaluated());
   assert.deepEqual(offered, { kind: "OFFERED", selectionHash: SELECTION_HASH, inventoryHash: INVENTORY_HASH });
-  assert.ok(sealHtml().includes("Seal this revision"));
+  assert.ok(sealHtml().includes("Seal this set"));
   // not offered: not ready, a blocker, no selection, a failed evaluation, sealed, not permitted
   const cases: ReadonlyArray<readonly [string, ReturnType<typeof readyToSeal>, ReturnType<typeof evaluated>, string]> = [
     ["not ready", readyToSeal({ state: "INSPECTING" }), evaluated(), "BLOCKED"],
@@ -364,7 +364,7 @@ test("UI16/CMD017: seal is offered only for READY_TO_SEAL with no unresolved inp
   ];
   for (const [name, rev, insp, kind] of cases) {
     assert.equal(sealOffer(rev, insp).kind, kind, name);
-    assert.ok(!sealHtml(rev, insp).includes("Seal this revision"), `${name}: no seal control`);
+    assert.ok(!sealHtml(rev, insp).includes("Seal this set"), `${name}: no seal control`);
   }
   assert.ok(sealHtml(readyToSeal({ blockers: ["INPUT_REJECTED_NOT_EXCLUDED"] })).includes("A rejected file is not excluded yet."));
   assert.ok(sealHtml(readyToSeal(), evaluated({ inventoryHash: "b".repeat(64) })).includes("The selection and the files no longer match"));

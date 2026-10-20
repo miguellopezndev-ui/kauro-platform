@@ -1,5 +1,6 @@
 import "@kauro/ui/tokens.css";
 import "../shell/shell.css";
+import "../screens/screens.css";
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";

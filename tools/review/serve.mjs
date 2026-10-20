@@ -54,7 +54,8 @@ if (process.argv.includes("--rebuild-private") || !existsSync(join(privateDir, "
   const built = spawnSync(process.execPath, [nextBin, "build", privateDir], { stdio: "inherit", env: quiet });
   if (built.status !== 0) throw new Error("the private-screen review did not build");
 }
-const privateReview = spawn(process.execPath, [nextBin, "start", privateDir, "-p", String(PRIVATE_PORT), "-H", HOST], { stdio: "inherit", env: { ...quiet, NODE_ENV: "production" } });
+// a fictitious upload origin, so the source intake draws its upload form (nothing is ever sent: the review answers every call itself)
+const privateReview = spawn(process.execPath, [nextBin, "start", privateDir, "-p", String(PRIVATE_PORT), "-H", HOST], { stdio: "inherit", env: { ...quiet, NODE_ENV: "production", KAURO_UPLOAD_ORIGIN: "https://uploads.example.test" } });
 
 const next = spawn(process.execPath, [server], {
   stdio: "inherit",

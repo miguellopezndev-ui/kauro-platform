@@ -9,6 +9,7 @@ import type { BrowserPage } from "@web/client/browser-session.ts";
 import type { SessionPhase } from "@web/client/session.ts";
 import type { AgencyContext } from "@web/shell/agency-context.ts";
 import { type AnchorComponent, type AnchorProps, ShellFrame } from "@web/shell/frame.tsx";
+import { ImplementedScreens } from "@web/screens/shared/project-stages.tsx";
 import { ShellContext } from "@web/shell/shell-context.ts";
 import { createShell, type Shell } from "@web/shell/shell-runtime.ts";
 import { viewOf } from "@web/shell/view.ts";
@@ -102,7 +103,9 @@ export function ReviewShell({ appPath, context, script, children }: ReviewShellP
   };
   return (
     <ShellFrame view={view} Anchor={Anchor} actions={actions}>
-      <ShellContext value={shell}>{children}</ShellContext>
+      <ShellContext value={shell}>
+        <ImplementedScreens value={ALL_PRIVATE}>{children}</ImplementedScreens>
+      </ShellContext>
     </ShellFrame>
   );
 }

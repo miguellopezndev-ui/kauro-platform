@@ -9,7 +9,7 @@
 //   - No inline style and no script: the look is shell.css (D-SEC-1).
 //   - Waiting is announced by one polite live region that exists before its text does; a refusal takes focus once, on its heading.
 //   - Navigation links are not prefetched (D-PRIV-1): a link that fetches on sight would load a screen's private data before it is asked for.
-import { type ComponentType, type ReactElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ComponentType, createContext, type ReactElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { message } from "../copy/en.ts";
 import { Main, SkipLink } from "./landmarks.tsx";
 import { ThemeControl } from "./theme-control.tsx";
@@ -30,6 +30,9 @@ export const PlainAnchor: AnchorComponent = ({ href, "aria-current": current, ch
     {children}
   </a>
 );
+
+/** The anchor of the running frame, for the links a screen draws inside it (the project stages): the router's in the app, a plain one elsewhere. */
+export const AnchorContext = createContext<AnchorComponent>(PlainAnchor);
 
 export interface ShellActions {
   readonly signOut: () => void;
@@ -115,7 +118,7 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
       <div role="status" className="kauro-live">
         {gate.kind === "WAIT" ? <p>{message(gate.message)}</p> : null}
       </div>
-      {gate.kind === "OPEN" ? children : null}
+      {gate.kind === "OPEN" ? <AnchorContext value={Link}>{children}</AnchorContext> : null}
       {gate.kind === "REFUSED" ? <Refused key={gate.title} title={message(gate.title)} body={message(gate.body)} action={gate.action} Anchor={Link} actions={actions} /> : null}
     </Main>
   );

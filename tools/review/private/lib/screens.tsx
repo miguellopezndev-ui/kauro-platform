@@ -10,6 +10,7 @@ import { PROTOTYPES } from "./prototypes.tsx";
 import { proposalOf } from "./proposals.ts";
 import { NOT_MEMBER, PENDING, READ, type StateDef, UNAVAILABLE, withShared } from "./scenario.ts";
 import { agencyFor } from "./world.ts";
+import { UI14_STATES, UI15_STATES, UI16_STATES } from "./fixtures/sources-states.ts";
 
 export interface PrototypeProps {
   readonly ctx: ReviewContext;
@@ -57,6 +58,9 @@ export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.
 }
 
 const REAL: Readonly<Record<string, readonly StateDef[]>> = {
+  UI14: UI14_STATES,
+  UI15: UI15_STATES,
+  UI16: UI16_STATES,
   UI32: [
     { key: "normal", label: "Normal", note: "The settings as this person sees them: the closure is offered to an owner only." },
     {
@@ -84,7 +88,7 @@ export function screenDef(id: string): ScreenDef {
   if (real !== undefined) return { states: withShared(real), contexts };
   const prototype = PROTOTYPES[id];
   // the sign-in and the invitation are drawn without a session: the shell's session states do not apply to them
-  const anonymous = id === "UI50" || id === "UI51";
+  const anonymous = id === "UI50" || id === "UI51" || id === "P-05" || id === "P-06";
   const states = prototype?.states ?? PROTOTYPE_STATES;
   return { states: anonymous ? states : withShared(states), contexts: prototype?.contexts ?? contexts, ...(prototype === undefined ? {} : { Prototype: prototype.Component }) };
 }

@@ -48,6 +48,12 @@ export const APPLICATION_COPY = {
   "nav.billing.label": "Billing",
   "nav.settings.label": "Settings",
   "nav.support.label": "Support",
+  // the six stages of a project, named by How it works (its stage headings)
+  "project.stages.label": "Project stages",
+  "project.stages.count": "Stage {number} of {total}",
+  "project.stages.done.label": "done",
+  "project.stages.current.label": "current stage",
+  "project.stages.later.label": "later",
   "nav.ops.home.label": "Today",
   "nav.ops.owner-actions.label": "Owner actions",
   "nav.ops.finance.label": "Finance",
