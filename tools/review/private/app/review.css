@@ -1,0 +1,287 @@
+/* The review tool's own look (Order 11): its index, its viewer and the notice above every screen. It reads the web's tokens, so it follows
+   the theme the product draws, and it styles only `rx-`, `rv-` and `kauro-review-` classes: nothing here reaches a product class. */
+
+.kauro-review-notice {
+  margin: 0;
+  padding: 0.375rem 1rem;
+  border-block-end: 1px dashed var(--kauro-color-accent, #c4a693);
+  background: var(--kauro-color-accent-surface, #ece2d9);
+  color: var(--kauro-color-text, #242426);
+  font: 600 0.75rem/1.4 system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+.kauro-review-notice span {
+  font-weight: 400;
+  color: var(--kauro-color-text-muted, #5f5955);
+}
+
+/* ---- index ---- */
+.rx {
+  max-inline-size: 76rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+  font: 15px/1.5 system-ui, sans-serif;
+  color: var(--kauro-color-text);
+}
+.rx h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+.rx-lead,
+.rx-legend {
+  max-inline-size: 62rem;
+  color: var(--kauro-color-text-muted);
+}
+.rx-counts {
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 6px;
+  background: var(--kauro-color-raised, var(--kauro-color-surface));
+}
+.rx-group {
+  margin-block-start: 2rem;
+}
+.rx-group h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+.rx table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+.rx th,
+.rx td {
+  padding: 0.5rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  text-align: start;
+  vertical-align: top;
+}
+.rx thead th {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.rx tbody th a {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+}
+.rx-says {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+  font-size: 0.875rem;
+}
+.rx code,
+.rv code {
+  font-size: 0.8125rem;
+  color: var(--kauro-color-text-muted);
+  overflow-wrap: anywhere;
+}
+.rx-proposals {
+  margin-block-start: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--kauro-color-accent, #c4a693);
+  border-radius: 6px;
+}
+.rx-proposals h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+}
+.rx-proposals a {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+}
+.rv-id {
+  font-family: var(--kauro-mono-family, ui-monospace, monospace);
+  font-size: 0.8125em;
+  font-weight: 700;
+}
+.rv-tech,
+.rv-review {
+  display: inline-block;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.rv-tech--IMPLEMENTED {
+  color: var(--kauro-color-success-text, #2e5b38);
+}
+.rv-tech--PROTOTYPE {
+  color: var(--kauro-color-primary);
+}
+.rv-tech--BLOCKED_EXTERNAL {
+  color: var(--kauro-color-warning-text, #7a4d0c);
+}
+.rv-review {
+  color: var(--kauro-color-text-muted);
+}
+.rv-review--OWNER_APPROVED {
+  color: var(--kauro-color-success-text, #2e5b38);
+}
+.rv-review--CHANGES_REQUESTED {
+  color: var(--kauro-color-danger-text, #8a1c2b);
+}
+
+/* ---- viewer ---- */
+.rv {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  min-block-size: 100vh;
+  font: 14px/1.45 system-ui, sans-serif;
+  color: var(--kauro-color-text);
+}
+.rv-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+.rv-bar a {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+}
+.rv-step {
+  display: flex;
+  gap: 0.75rem;
+}
+.rv-title {
+  margin: 0;
+  font-size: 1rem;
+}
+.rv-group {
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+  font-size: 0.8125rem;
+}
+.rv-badges {
+  display: flex;
+  gap: 0.375rem;
+  margin: 0 0 0 auto;
+}
+.rv-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.rv-controls label {
+  display: grid;
+  gap: 0.125rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.rv-controls select,
+.rv-controls button {
+  min-block-size: 2.25rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--kauro-color-control-border, #8c837d);
+  border-radius: 4px;
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+.rv-controls a {
+  align-self: center;
+  color: var(--kauro-color-primary);
+}
+.rv-state-note {
+  margin: 0;
+  padding: 0.375rem 1rem;
+  color: var(--kauro-color-text-muted);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.rv-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  min-block-size: 0;
+}
+.rv-stage {
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  padding: 0.75rem;
+  background: var(--kauro-color-surface);
+}
+.rv-frame {
+  display: block;
+  inline-size: 100%;
+  block-size: calc(100vh - 9.5rem);
+  border: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-background);
+}
+.rv-stage--1440 .rv-frame {
+  inline-size: 1440px;
+  flex: none;
+}
+.rv-stage--1280 .rv-frame {
+  inline-size: 1280px;
+  flex: none;
+}
+.rv-stage--768 .rv-frame {
+  inline-size: 768px;
+  flex: none;
+}
+.rv-stage--375 .rv-frame {
+  inline-size: 375px;
+  flex: none;
+}
+.rv-stage--320 .rv-frame {
+  inline-size: 320px;
+  flex: none;
+}
+.rv-side {
+  overflow: auto;
+  padding: 0.75rem 1rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  max-block-size: calc(100vh - 8rem);
+}
+.rv-side h2 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--kauro-color-text-muted);
+}
+.rv-side dl {
+  margin: 0;
+}
+.rv-side dt {
+  margin-block-start: 0.5rem;
+  font-weight: 650;
+}
+.rv-side dd {
+  margin: 0;
+}
+.rv-calls {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  font-family: var(--kauro-mono-family, ui-monospace, monospace);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.rv-muted {
+  color: var(--kauro-color-text-muted);
+}
+@media (max-width: 64rem) {
+  .rv-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rv-side {
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--kauro-color-border);
+    max-block-size: none;
+  }
+}
