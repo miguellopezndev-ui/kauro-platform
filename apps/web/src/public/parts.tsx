@@ -194,15 +194,18 @@ export function DataTable({
   columns,
   rows,
   variant,
+  stack,
 }: {
   readonly caption: string;
   readonly columns: readonly string[];
   readonly rows: ReadonlyArray<{ readonly key: string; readonly head: string; readonly cells: readonly string[] }>;
   readonly variant?: string | undefined;
+  /** Lay the table out row by row on a phone even with fewer than four columns (a column of sentences beside the figures). */
+  readonly stack?: boolean | undefined;
 }): ReactElement {
   // A table of four columns or more is laid out row by row on a phone (Order 10): each value carries its column's name, so no word has to
   // break inside a narrow column. The table stays a table for assistive technology.
-  const stacked = columns.length >= 4;
+  const stacked = stack ?? columns.length >= 4;
   return (
     <div className={classes("kauro-site-table-region", variant)}>
       <table className={classes("kauro-site-table", stacked ? "kauro-site-table--stack" : undefined)}>

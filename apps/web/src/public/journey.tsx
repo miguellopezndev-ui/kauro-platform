@@ -18,7 +18,7 @@ import { PUBLIC_COPY, copy, type PublicCopyId } from "../copy/public.ts";
 import { FileName } from "./parts.tsx";
 import { bandIndexOf, bandLabel, bandRange, formatCount, formatUsd, priceOf } from "./pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "./policy-snapshot.ts";
-import { JOURNEY_ROWS, MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_COLUMN, SAMPLE_SOURCES, sharePercent, type JourneyRow, type RowFlag } from "./sample-data.ts";
+import { JOURNEY_ROWS, MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_COLUMN, SAMPLE_MODE, SAMPLE_SOURCES, sharePercent, type JourneyRow, type RowFlag } from "./sample-data.ts";
 
 type ProposalId = "unify" | "normalise" | "map";
 type Actor = "team" | "kauro";
@@ -63,7 +63,7 @@ const outputRows = contacts?.rows ?? sourceRows;
 // every object of the sealed files is a billable source unit, counted before anything is unified: the contacts and the companies
 const billableUnits = sourceRows + (companies?.source ?? 0);
 // the project is an import into a CRM (associations, import order, the team's account): it is priced as the HubSpot service
-const QUOTED_MODE = "HUBSPOT" as const;
+const QUOTED_MODE = SAMPLE_MODE;
 const countOf = (label: PublicCopyId): number => REPORT_ROWS.find((row) => row.label === label)?.count ?? 0;
 const reducedMotion = (): boolean => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

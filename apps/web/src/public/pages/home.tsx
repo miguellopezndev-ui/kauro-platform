@@ -19,7 +19,6 @@ import { ROUTE } from "../site.ts";
 
 export interface HomePageProps {
   readonly publication: Publication;
-  readonly signInHref: string;
 }
 
 const RESULT: Readonly<Record<RecordResult, PublicCopyId>> = {
@@ -188,7 +187,7 @@ function ModesSection({ publication }: { readonly publication: Publication }): R
   );
 }
 
-export function HomePage({ publication, signInHref }: HomePageProps): ReactElement {
+export function HomePage({ publication }: HomePageProps): ReactElement {
   return (
     <>
       <PageHead
@@ -200,7 +199,7 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
         aside={<ProductWindow />}
       >
         <div className="kauro-site-actions">
-          <LinkButton href={signInHref} primary>
+          <LinkButton href={ROUTE.contact} primary>
             {PUBLIC_COPY["public.cta.request-health-check.cta"]}
           </LinkButton>
           <LinkButton href={ROUTE.sample}>{PUBLIC_COPY["home.hero.sample.cta"]}</LinkButton>
@@ -261,7 +260,7 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
         lead={PUBLIC_COPY["home.closing.body"]}
         headExtra={
           <div className="kauro-site-actions">
-            <LinkButton href={signInHref} primary>
+            <LinkButton href={ROUTE.contact} primary>
               {PUBLIC_COPY["public.cta.request-health-check.cta"]}
             </LinkButton>
           </div>
