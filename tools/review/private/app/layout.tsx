@@ -5,6 +5,7 @@ import "@web/shell/shell.css";
 import "./review.css";
 import "../prototypes/foundation.css";
 import "../prototypes/pages.css";
+import "../prototypes/auth.css";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";

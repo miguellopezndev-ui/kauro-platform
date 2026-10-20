@@ -3,9 +3,10 @@
 // were open. CLEAN names as qualified only the destinations the publication lists, and no card claims compatibility with another CRM.
 //
 // Order 10, owner review: the head carries the availability as the product shows it, one row a service with its state, each row taking
-// the reader to that service; each service is then a spread, what it delivers beside the piece of the product that shows it; the limits of
-// a project are a sheet of figures.
-import type { ReactElement } from "react";
+// the reader to that service. Order 11, owner review: the three services are three upright cards side by side, read in the same order
+// (name and state, the piece of the product that shows it, who it is for, what you receive, its limit and version) so that each row lines up across the
+// three; the limits of a project are a sheet of figures.
+import type { ReactElement, ReactNode } from "react";
 import { PUBLIC_COPY, copy } from "../../copy/public.ts";
 import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Availability, type Publication } from "../capabilities.ts";
 import { FileChips, ImportOrder, Pane, Settings } from "../artifacts.tsx";
@@ -22,24 +23,38 @@ const CARD_NAME: Readonly<Record<ServiceMode, string>> = {
   SALESFORCE: PUBLIC_COPY["services.salesforce.name"],
 };
 
+/** One part of a card, under its label, on the row the three cards share. */
+function Part({ part, children }: { readonly part: "for" | "receive"; readonly children: ReactNode }): ReactElement {
+  return (
+    <div className={`kauro-site-service-part kauro-site-service-part--${part}`}>
+      <p className="kauro-site-service-label">{PUBLIC_COPY[part === "for" ? "services.card.for" : "services.card.receive"]}</p>
+      {children}
+    </div>
+  );
+}
+
+/** What a service is, in the order every card reads: the piece of the product that shows it, who it is for, what you receive, its limit. */
 function Details({ mode, publication }: { readonly mode: ServiceMode; readonly publication: Publication }): ReactElement {
   switch (mode) {
     case "CLEAN":
       return (
         <>
-          <p className="kauro-site-card-lead">{PUBLIC_COPY["services.clean.summary"]}</p>
-          <p>{PUBLIC_COPY["services.clean.delivery"]}</p>
-          <p>{PUBLIC_COPY[cleanQualifiesId(publication)]}</p>
           <Pane>
             <FileChips files={[...MANIFEST_FILES.map((file) => file.name), PUBLIC_COPY["home.delivery.report.name"], PUBLIC_COPY["home.delivery.manifest.name"]]} />
           </Pane>
+          <Part part="for">
+            <p>{PUBLIC_COPY["services.clean.summary"]}</p>
+          </Part>
+          <Part part="receive">
+            <p>{PUBLIC_COPY["services.clean.delivery"]}</p>
+            <p>{PUBLIC_COPY[cleanQualifiesId(publication)]}</p>
+          </Part>
           <p className="kauro-site-card-limit">{PUBLIC_COPY["services.clean.limit"]}</p>
         </>
       );
     case "HUBSPOT":
       return (
         <>
-          <p className="kauro-site-card-lead">{PUBLIC_COPY["services.hubspot.summary"]}</p>
           <Pane>
             <Settings
               rows={[
@@ -48,16 +63,27 @@ function Details({ mode, publication }: { readonly mode: ServiceMode; readonly p
               ]}
             />
           </Pane>
+          <Part part="for">
+            <p>{PUBLIC_COPY["services.hubspot.for"]}</p>
+          </Part>
+          <Part part="receive">
+            <p>{PUBLIC_COPY["services.hubspot.summary"]}</p>
+          </Part>
           <p className="kauro-site-card-limit">{PUBLIC_COPY["services.hubspot.cost"]}</p>
         </>
       );
     case "SALESFORCE":
       return (
         <>
-          <p className="kauro-site-card-lead">{PUBLIC_COPY["services.salesforce.summary"]}</p>
           <Pane title={PUBLIC_COPY["home.frag.order"]}>
             <ImportOrder plain files={[PUBLIC_COPY["services.frag.accounts"], PUBLIC_COPY["services.frag.contacts"], PUBLIC_COPY["services.frag.opportunities"]]} />
           </Pane>
+          <Part part="for">
+            <p>{PUBLIC_COPY["services.salesforce.for"]}</p>
+          </Part>
+          <Part part="receive">
+            <p>{PUBLIC_COPY["services.salesforce.summary"]}</p>
+          </Part>
           <p className="kauro-site-card-limit">{PUBLIC_COPY["services.salesforce.limit"]}</p>
         </>
       );
@@ -121,7 +147,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
         ) : (
           <p className="kauro-site-callout">{PUBLIC_COPY["services.availability.unknown"]}</p>
         )}
-        <div className="kauro-site-spreads">
+        <div className="kauro-site-trio">
           {MODE_ORDER.map((mode) => (
             <ServiceCard key={mode} mode={mode} publication={publication} />
           ))}

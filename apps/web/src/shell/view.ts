@@ -8,7 +8,7 @@
 //   - The navigation lists a screen only when its page exists in this build; an agency with no implemented entry has no navigation.
 import type { SessionPhase } from "../client/session.ts";
 import type { MessageId } from "../copy/en.ts";
-import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, originOfPath, pathOf, signInHref } from "../screens.ts";
+import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, opsNavigationFor, originOfPath, pathOf, signInHref } from "../screens.ts";
 import type { AgencyContext, AgencyState } from "./agency-context.ts";
 
 export type RefusedAction = { readonly kind: "SIGN_IN"; readonly href: string } | { readonly kind: "CHECK_AGAIN" } | { readonly kind: "SIGN_OUT" } | { readonly kind: "NONE" };
@@ -23,6 +23,8 @@ export interface NavigationItem {
   readonly label: MessageId;
   readonly href: string;
   readonly current: boolean;
+  /** The heading it sits under (none: the first group; "nav.group.help.label": the foot of the menu). */
+  readonly group?: MessageId;
 }
 
 export interface ShellView {
@@ -33,6 +35,12 @@ export interface ShellView {
   /** The agency switcher, when its screen exists. */
   readonly switchHref: string | null;
   readonly signOut: boolean;
+  /** True on the operations origin: the menu is Kauro's own, with no workspace in it. */
+  readonly ops: boolean;
+  /** The person's own settings, when that screen exists (none in this build). */
+  readonly accountHref: string | null;
+  /** True on a screen without a person (sign-in, invitation): a plain header, never the private menu. */
+  readonly anonymous?: boolean;
 }
 
 export interface ShellInput {
@@ -42,11 +50,13 @@ export interface ShellInput {
   /** The agency of the page's URL when it was loaded: the agency this page's runtime belongs to for its whole life. */
   readonly activeAgency: string | null;
   readonly implemented?: ReadonlySet<string>;
+  /** The operations screens this person may open, as their capabilities say; absent, every implemented entry is listed. */
+  readonly allowedOps?: ReadonlySet<string>;
 }
 
 const stateLabel = (state: AgencyState): MessageId => `shell.agency.state.${state}.label`;
 
-const CLOSED_SHELL: Pick<ShellView, "agency" | "navigation" | "switchHref" | "signOut"> = { agency: null, navigation: [], switchHref: null, signOut: false };
+const CLOSED_SHELL: Pick<ShellView, "agency" | "navigation" | "switchHref" | "signOut" | "ops" | "accountHref"> = { agency: null, navigation: [], switchHref: null, signOut: false, ops: false, accountHref: null };
 
 function refused(title: MessageId, body: MessageId, action: RefusedAction): Gate {
   return { kind: "REFUSED", title, body, action };
@@ -54,7 +64,7 @@ function refused(title: MessageId, body: MessageId, action: RefusedAction): Gate
 
 export function viewOf(input: ShellInput): ShellView {
   const implemented = input.implemented ?? IMPLEMENTED_SCREENS;
-  if (matchRoute(input.pathname)?.screen.anonymous === true) return { gate: { kind: "OPEN" }, ...CLOSED_SHELL };
+  if (matchRoute(input.pathname)?.screen.anonymous === true) return { gate: { kind: "OPEN" }, ...CLOSED_SHELL, anonymous: true };
   const { phase } = input;
   switch (phase.kind) {
     case "CHECKING":
@@ -81,8 +91,15 @@ export function viewOf(input: ShellInput): ShellView {
 function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellView {
   // the agency switcher is a screen of the application origin: an operations page (the owner, a seller) has no agency to switch (Order 11 D-03)
   const ops = originOfPath(input.pathname) === "OPS" || input.pathname === "/ops" || input.pathname.startsWith("/ops/");
-  const switchHref = implemented.has("UI10") && !ops ? pathOf("UI10") : null;
-  const withPerson = { agency: null, navigation: [], switchHref, signOut: true } as const;
+  // Order 11 (D-06): no way to the switcher from the switcher itself or from the setup, where there is nothing to switch from
+  const switchHref = implemented.has("UI10") && !ops && input.pathname !== pathOf("UI10") && input.pathname !== pathOf("UI09") ? pathOf("UI10") : null;
+  const current = (entry: { readonly href: string }): boolean => input.pathname === entry.href || input.pathname.startsWith(`${entry.href}/`);
+  if (ops) {
+    // the home's entry ("/ops") is current only on itself, never on every operations page under it
+    const navigation = opsNavigationFor(implemented, input.allowedOps).map((entry) => ({ ...entry, current: entry.href === "/ops" ? input.pathname === "/ops" : current(entry) }));
+    return { gate: { kind: "OPEN" }, agency: null, navigation, switchHref: null, signOut: true, ops: true, accountHref: null };
+  }
+  const withPerson = { agency: null, navigation: [], switchHref, signOut: true, ops: false, accountHref: null } as const;
   // a client-side navigation that crossed into another agency (or out of one) is never drawn: the page waits for the hard navigation
   if (agencyOfPathname(input.pathname) !== input.activeAgency) return { gate: { kind: "WAIT", message: "shell.session.switching.body" }, ...withPerson };
   if (input.activeAgency === null) {
@@ -97,8 +114,8 @@ function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellVie
     case "UNAVAILABLE":
       return { gate: refused("state.DENIED.title", "shell.agency.unavailable.body", { kind: "CHECK_AGAIN" }), ...withPerson };
     case "READY": {
-      const navigation = navigationFor(input.activeAgency, implemented).map((entry) => ({ ...entry, current: input.pathname === entry.href || input.pathname.startsWith(`${entry.href}/`) }));
-      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state) }, navigation, switchHref, signOut: true };
+      const navigation = navigationFor(input.activeAgency, implemented).map((entry) => ({ ...entry, current: current(entry) }));
+      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state) }, navigation, switchHref, signOut: true, ops: false, accountHref: null };
     }
   }
 }

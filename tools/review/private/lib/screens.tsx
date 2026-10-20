@@ -31,7 +31,12 @@ export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.
   const agencyId = agencyOf(ctx);
   // a proposal has no route of its own: it is drawn where it would live (the settings of the agency, or a path no screen owns yet)
   const proposal = proposalOf(id);
-  if (proposal !== undefined) return proposal.key === "P-02" ? pathOf("UI32", { agencyId }) : proposal.origin === "OPS" ? "/ops/settings" : "/account";
+  if (proposal !== undefined) {
+    if (proposal.key === "P-02") return pathOf("UI32", { agencyId });
+    if (proposal.key === "P-05") return "/signup";
+    if (proposal.key === "P-06") return "/login/reset";
+    return proposal.origin === "OPS" ? "/ops/settings" : "/account";
+  }
   switch (id) {
     case "UI09":
     case "UI10":

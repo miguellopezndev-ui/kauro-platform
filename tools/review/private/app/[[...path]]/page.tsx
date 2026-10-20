@@ -17,6 +17,8 @@ const isPerson = (value: string | undefined): value is ContextKey => value !== u
 /** The screen a path is: a registry screen, or the place where a proposal is drawn. */
 function screenAt(pathname: string, person: ContextKey, proposal: string | undefined): { readonly id: string; readonly params: Readonly<Record<string, string>> } | null {
   if (pathname === "/account") return { id: "P-01", params: {} };
+  if (pathname === "/signup") return { id: "P-05", params: {} };
+  if (pathname === "/login/reset") return { id: "P-06", params: {} };
   if (pathname === "/ops/settings") return { id: person === "seller" ? "P-03" : "P-04", params: {} };
   const match = matchRoute(pathname);
   if (match === null || match.screen.origin === "PUBLIC") return null;

@@ -156,7 +156,7 @@ test("D-A11Y-1, D-PRIV-1: the frame is a skip link first, one banner, one naviga
   assert.ok(html.includes(`<main id="${MAIN_ID}" class="kauro-main" tabindex="-1">`), "the skip link's target exists and takes focus");
   assert.equal((html.match(/<header\b/g) ?? []).length, 1);
   assert.equal((html.match(/<nav\b/g) ?? []).length, 1);
-  assert.ok(html.includes('<nav class="kauro-shell-nav" aria-label="Agency navigation">'));
+  assert.ok(html.includes('<nav class="kauro-shell-nav" aria-label="Workspace navigation">'));
   assert.ok(html.indexOf("<header") < html.indexOf("<nav") && html.indexOf("<nav") < html.indexOf("<main"), "banner, navigation, main");
   assert.ok(html.includes('<a href="' + PROJECTS + '" data-recorded="yes" aria-current="page">Projects</a>'), "the current entry is marked and is a plain link");
   assert.ok(prefetchOf.length >= 7, "the navigation entries, the switcher and nothing else went through the anchor");
@@ -170,7 +170,7 @@ test("D-DS-3, D-SEC-1: an agency's name is a text node in <bdi>, never markup, a
   const html = render(viewOf(input({ agency: { kind: "READY", agencyId: AGENCY, displayName: hostile, state: "RESTRICTED" } })));
   assert.ok(html.includes('<bdi class="kauro-agency-name">&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &quot;quotes&quot; &lt;/bdi&gt;&lt;script&gt;1&lt;/script&gt;</bdi>'), "escaped, inside the bdi");
   assert.ok(html.includes('<span class="kauro-agency-state">Restricted</span>'));
-  assert.ok(html.includes('<span class="kauro-agency-label">Agency</span>'));
+  assert.ok(html.includes('<span class="kauro-agency-label">Workspace</span>'));
   // the tags of the markup are the frame's own: no script, no image, no inline style and no event attribute on any of them
   const tags = html.match(/<[^>]+>/g) ?? [];
   assert.ok(tags.length > 10);
@@ -213,7 +213,7 @@ test("D-STATE-1, D-A11Y-1: while the session is unknown the page says so in the 
   assert.ok(stuck.includes('<button type="button" class="kauro-button">Sign out</button>'), "the one next step is to try again");
 
   const noAgency = render(viewOf(input({ agency: { kind: "UNAVAILABLE" } })));
-  assert.ok(noAgency.includes("This agency is not available"));
+  assert.ok(noAgency.includes("This workspace is not available"));
   assert.ok(noAgency.includes('<button type="button" class="kauro-button">Check again</button>'));
   assert.ok(noAgency.includes('<button type="button" class="kauro-button">Sign out</button>'), "and the person can still leave");
 });

@@ -97,6 +97,8 @@ export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(Object.v
 export interface NavigationEntry {
   readonly screen: string;
   readonly label: MessageId;
+  /** A heading the entry sits under; an entry without one is in the menu's first group. "nav.group.help.label" is drawn at the foot. */
+  readonly group?: MessageId;
 }
 
 /** The agency-level entries of the shell, in order (reference "Agency context stays visible through Projects, Clients, Team, Billing, Settings"). */
@@ -106,7 +108,27 @@ export const AGENCY_NAVIGATION: readonly NavigationEntry[] = [
   { screen: "UI31", label: "nav.team.label" },
   { screen: "UI30", label: "nav.billing.label" },
   { screen: "UI32", label: "nav.settings.label" },
-  { screen: "UI52", label: "nav.support.label" },
+  { screen: "UI52", label: "nav.support.label", group: "nav.group.help.label" },
+];
+
+/**
+ * The operations entries (Order 11): the owner's day first, then money, the work, the product and sales. A person sees the entries their
+ * capabilities allow (the server refuses everything else in any case); a seller's are Today, Prospects, Commissions, Resources and Outreach.
+ */
+export const OPS_NAVIGATION: readonly NavigationEntry[] = [
+  { screen: "UI33", label: "nav.ops.home.label" },
+  { screen: "UI38", label: "nav.ops.owner-actions.label" },
+  { screen: "UI39", label: "nav.ops.finance.label", group: "nav.group.money.label" },
+  { screen: "UI40", label: "nav.ops.jobs.label", group: "nav.group.work.label" },
+  { screen: "UI41", label: "nav.ops.deletion.label", group: "nav.group.work.label" },
+  { screen: "UI42", label: "nav.ops.incidents.label", group: "nav.group.work.label" },
+  { screen: "UI55", label: "nav.ops.support.label", group: "nav.group.work.label" },
+  { screen: "UI43", label: "nav.ops.releases.label", group: "nav.group.product.label" },
+  { screen: "UI44", label: "nav.ops.reviews.label", group: "nav.group.product.label" },
+  { screen: "UI34", label: "nav.ops.prospects.label", group: "nav.group.sales.label" },
+  { screen: "UI36", label: "nav.ops.commissions.label", group: "nav.group.sales.label" },
+  { screen: "UI53", label: "nav.ops.resources.label", group: "nav.group.sales.label" },
+  { screen: "UI54", label: "nav.ops.outreach.label", group: "nav.group.sales.label" },
 ];
 
 const SEGMENT = /^[A-Za-z0-9_-]{1,128}$/;
@@ -186,8 +208,13 @@ export function originOfPath(pathname: string): Origin | null {
 }
 
 /** The navigation entries of an agency, for the screens that exist. Each link is a plain path (the shell renders it without prefetch). */
-export function navigationFor(agencyId: string, implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS): readonly { readonly screen: string; readonly label: MessageId; readonly href: string }[] {
+export function navigationFor(agencyId: string, implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS): readonly { readonly screen: string; readonly label: MessageId; readonly href: string; readonly group?: MessageId }[] {
   return AGENCY_NAVIGATION.filter((entry) => implemented.has(entry.screen)).map((entry) => ({ ...entry, href: pathOf(entry.screen, { agencyId }) }));
+}
+
+/** The operations entries whose pages exist in this build and that this person may open (all of them when the caller does not narrow it). */
+export function opsNavigationFor(implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS, allowed?: ReadonlySet<string>): readonly { readonly screen: string; readonly label: MessageId; readonly href: string; readonly group?: MessageId }[] {
+  return OPS_NAVIGATION.filter((entry) => implemented.has(entry.screen) && (allowed === undefined || allowed.has(entry.screen))).map((entry) => ({ ...entry, href: pathOf(entry.screen) }));
 }
 
 const MAX_RETURN_PATH = 512;

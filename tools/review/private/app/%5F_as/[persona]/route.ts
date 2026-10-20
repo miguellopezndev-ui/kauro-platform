@@ -6,6 +6,7 @@ import { AGENCY_ID, COMPANY_ID, CONTEXTS } from "@review/lib/contexts.ts";
 import { AS_COOKIE } from "@review/lib/links.ts";
 
 const LANDING: Readonly<Record<string, string>> = {
+  newcomer: "/agencies",
   agency: "/agencies",
   company: `/agencies/${COMPANY_ID}/projects`,
   admin: `/agencies/${AGENCY_ID}/projects`,

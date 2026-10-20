@@ -1,53 +1,55 @@
 "use client";
 // UI50 Sign in (registry: "Continue securely."). BLOCKED EXTERNAL: the identity provider is not connected (W-IDP-LIVE), so the real page
-// can only say sign-in is not available. The design follows the identity port's steps (apps/web/src/client/identity/port.ts): email and
-// password go to the provider, never to Kauro; then a code, or setting up two-step verification; an unverified email is sent a link. A
-// failure never says whether an account exists. After sign-in the person returns only to an application path (safeReturnPath).
+// can only say sign-in is not available. This is the design for the owner's decisions of 2026-10-20:
+//   - two ways in, Google and email with a password, Google first and never less prominent;
+//   - after either, Kauro's own six-digit code from an authenticator app, never replaced by an email;
+//   - an unverified email or an account without two-step verification finishes those steps before any private data;
+//   - a failure never says whether an account exists, and repeated attempts pause sign-in;
+//   - "Create an account" only on the customer application. The operations sign-in (owner, sellers, staff) is by invitation.
+// After sign-in the person returns only to an application path (safeReturnPath).
 //
-// The page is the doorway from the public site: one card with the form, and under it the same strip of three assurances the public Home
-// shows under its hero, here about how the account is protected. Nothing else competes with the form.
+// The page is the doorway seen from the public site: the product's own window, holding the form, and nothing competing with it.
 import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactElement, useState } from "react";
 import { asHref } from "../lib/links.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Eyebrow } from "./kit.tsx";
+import { AuthFrame, CodeField, EnrolSteps, GoogleButton, HELP, Or, PasswordField, RecoveryList, RESET, SIGN_UP, Who } from "./auth.tsx";
 
 export const UI50_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Sign in", note: "Email and password. They go to the identity provider; Kauro never receives the password." },
-  { key: "invalid", label: "Wrong details", note: "One generic message for every failure: it never says whether an account exists." },
-  { key: "code", label: "Two-step code", note: "The provider asks for the six-digit code of the person's authenticator app." },
-  { key: "enrol", label: "Set up two-step verification", note: "First sign-in without two-step verification: Kauro requires it before any client data." },
-  { key: "unverified", label: "Email not verified", note: "The address is not verified yet: send the link again, then continue." },
-  { key: "sent", label: "Verification sent", note: "The link was sent; the person confirms once they have opened it." },
-  { key: "locked", label: "Too many attempts", note: "The provider paused attempts. The message names no account." },
+  { key: "normal", label: "Sign in", note: "Google first, then email and password. The password goes to the identity provider; Kauro never receives it." },
+  { key: "invalid", label: "Wrong details", note: "One message for every failure: it never says whether an account exists." },
+  { key: "code", label: "Kauro code", note: "After the password, the six-digit code of the person's authenticator app." },
+  { key: "google", label: "Back from Google", note: "Google has said who the person is; Kauro still asks for its own code." },
+  { key: "google-new", label: "Google account without Kauro", note: "The Google account has no Kauro account: the person may create one, with the same Google account." },
+  { key: "recovery", label: "Recovery code", note: "The authenticator app is not at hand: one recovery code opens the account once." },
+  { key: "unverified", label: "Email not verified", note: "An account that never verified its email: a code is sent, then two-step verification." },
+  { key: "enrol", label: "Set up two-step verification", note: "An account without two-step verification sets it up before any private data." },
+  { key: "codes", label: "Recovery codes", note: "Shown once, right after two-step verification is set up." },
+  { key: "locked", label: "Too many attempts", note: "Repeated failures pause sign-in for a while. The message names no account." },
+  { key: "expired", label: "Session ended", note: "A session that ended sends the person here, and back to the same page after signing in." },
   { key: "unavailable", label: "Provider not connected (today)", note: "What the real page shows until the identity provider is connected (W-IDP-LIVE)." },
-  { key: "expired", label: "Session ended", note: "A session that ended sends the person here, and back to the same screen after signing in." },
-  { key: "ops", label: "Operations sign-in", note: "The same page on the operations address, for the Kauro owner and sellers." },
+  { key: "ops", label: "Operations sign-in", note: "The same page on the operations address, for the Kauro owner, sellers and staff: no sign-up, access by invitation." },
 ];
 
-const ASSURANCES = [
-  { title: "Two-step verification", body: "Required on every account before any client data is shown." },
-  { title: "Your password stays private", body: "It goes to the identity provider only. Kauro never receives or stores it." },
-  { title: "Kauro never writes to your CRM", body: "Your team imports the files Kauro prepares, in its own account." },
-] as const;
-
-function CodeField({ id, hint, error }: { readonly id: string; readonly hint: string; readonly error?: string | undefined }): ReactElement {
-  return (
-    <Field id={id} label="Six-digit code" hint={hint} error={error}>
-      {(control) => <input {...control} name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} className="kauro-code-input" />}
-    </Field>
-  );
-}
+const EMAIL = "lena.ortiz@northwind.example";
+const OPS_EMAIL = "miguel@kauro.example";
+type Errors = readonly { readonly fieldId: string; readonly message: string }[];
 
 export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
   const router = useRouter();
-  const [step, setStep] = useState(state);
-  const [errors, setErrors] = useState<readonly { fieldId: string; message: string }[]>([]);
   const ops = state === "ops" || ctx.key === "owner" || ctx.key === "seller";
+  const email = ops ? OPS_EMAIL : EMAIL;
+  const [step, setStep] = useState(state === "ops" ? "normal" : state);
+  const [via, setVia] = useState<"password" | "google">(state === "google" ? "google" : "password");
+  const [errors, setErrors] = useState<Errors>([]);
   const errorOf = (id: string): string | undefined => errors.find((entry) => entry.fieldId === id)?.message;
-  // in review, a correct code opens the person's own start page (the real page returns to the path the person came from)
+  const go = (next: string): void => {
+    setErrors([]);
+    setStep(next);
+  };
+  // in the review a correct code opens the person's own start page; the real page returns to the path the person came from
   const enter = (): void => router.push(asHref(ctx.key));
 
   const submitCredentials = (event: FormEvent<HTMLFormElement>): void => {
@@ -57,78 +59,174 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
     if (String(data.get("email") ?? "").trim() === "") found.push({ fieldId: "signin-email", message: "Enter your email address." });
     if (String(data.get("password") ?? "") === "") found.push({ fieldId: "signin-password", message: "Enter your password." });
     setErrors(found);
-    if (found.length === 0) setStep("code");
+    if (found.length === 0) {
+      setVia("password");
+      setStep("code");
+    }
   };
-  const submitCode = (event: FormEvent<HTMLFormElement>): void => {
+  const checkCode = (event: FormEvent<HTMLFormElement>, id: string, then: () => void): void => {
     event.preventDefault();
-    const code = String(new FormData(event.currentTarget).get("code") ?? "");
+    const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
     const ok = /^[0-9]{6}$/.test(code);
-    setErrors(ok ? [] : [{ fieldId: "signin-code", message: "Enter the six digits your authenticator app shows." }]);
-    if (ok) enter();
+    setErrors(ok ? [] : [{ fieldId: id, message: "Enter the six digits the app shows now. The code changes every 30 seconds." }]);
+    if (ok) then();
   };
 
+  let title = "Sign in to Kauro";
+  let lead: string | undefined = "Continue securely.";
   let body: ReactElement;
   switch (step) {
     case "code":
+    case "google":
+      title = "Enter your Kauro code";
+      lead = "Open your authenticator app and enter the code it shows for Kauro.";
       body = (
-        <form className="kauro-form" noValidate onSubmit={submitCode}>
-          <p className="kauro-signin-who">lena.ortiz@northwind.example</p>
+        <form className="kauro-form" noValidate onSubmit={(event) => checkCode(event, "signin-code", enter)}>
+          <Who email={email} onChange={() => go("normal")} change="Change" />
+          {via === "google" || step === "google" ? <p className="kauro-auth-small">Google confirmed this address. Kauro still asks for its own code.</p> : null}
           <ErrorSummary title="Check the code" errors={errors} />
-          <CodeField id="signin-code" hint="Open your authenticator app and enter the code it shows for Kauro." error={errorOf("signin-code")} />
+          <CodeField id="signin-code" error={errorOf("signin-code")} />
           <Button type="submit" variant="primary">
             <span className="kauro-go">Continue</span>
           </Button>
-          <button type="button" className="kauro-text-button" onClick={() => setStep("normal")}>
-            Use another account
+          <button type="button" className="kauro-text-button" onClick={() => go("recovery")}>
+            I do not have my authenticator app
+          </button>
+        </form>
+      );
+      break;
+    case "recovery":
+      title = "Use a recovery code";
+      lead = "Each of the recovery codes you saved when you set up two-step verification opens your account once.";
+      body = (
+        <form
+          className="kauro-form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            const code = String(new FormData(event.currentTarget).get("recovery") ?? "").trim();
+            const ok = /^[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}$/.test(code);
+            setErrors(ok ? [] : [{ fieldId: "signin-recovery", message: "Enter one recovery code, such as REVW-0001." }]);
+            if (ok) go("recovered");
+          }}
+        >
+          <Who email={email} onChange={() => go("normal")} change="Change" />
+          <ErrorSummary title="Check the recovery code" errors={errors} />
+          <Field id="signin-recovery" label="Recovery code" hint="Eight letters and digits, with or without the hyphen." error={errorOf("signin-recovery")}>
+            {(control) => <input {...control} name="recovery" autoComplete="one-time-code" spellCheck={false} className="kauro-code-input kauro-code-input--wide" />}
+          </Field>
+          <Button type="submit" variant="primary">
+            <span className="kauro-go">Continue</span>
+          </Button>
+          <p className="kauro-auth-small">
+            No app and no codes? <a href={HELP}>Get help from Kauro</a>. We confirm who you are before two-step verification is reset, and that takes time on purpose.
+          </p>
+        </form>
+      );
+      break;
+    case "recovered":
+      title = "You are signed in";
+      lead = undefined;
+      body = (
+        <div className="kauro-form">
+          <Banner tone="warning" title="That recovery code is now used" announce="status">
+            <p>You have 9 recovery codes left. Set up your authenticator app again, or create new codes, in your settings.</p>
+          </Banner>
+          <Button variant="primary" onClick={enter}>
+            <span className="kauro-go">Continue</span>
+          </Button>
+        </div>
+      );
+      break;
+    case "google-new":
+      title = "No Kauro account yet";
+      lead = undefined;
+      body = (
+        <div className="kauro-form">
+          <Who email="lena.ortiz@gmail.example" />
+          <p>No Kauro account uses this Google account. You can create one with it now: you will then set up two-step verification and your workspace.</p>
+          <a className="kauro-button kauro-button-primary" href={SIGN_UP}>
+            <span className="kauro-go">Create an account with Google</span>
+          </a>
+          <button type="button" className="kauro-text-button" onClick={() => go("normal")}>
+            Sign in another way
+          </button>
+        </div>
+      );
+      break;
+    case "unverified":
+      title = "Verify your email";
+      lead = "Your account was created but its email address is not verified yet. We have sent a six-digit code to it.";
+      body = (
+        <form className="kauro-form" noValidate onSubmit={(event) => checkCode(event, "signin-email-code", () => go("enrol"))}>
+          <Who email={email} onChange={() => go("normal")} change="Change" />
+          <ErrorSummary title="Check the code" errors={errors} />
+          <CodeField id="signin-email-code" label="Code from the email" hint="It works for a short time. Look in spam if it has not arrived." error={errorOf("signin-email-code")} />
+          <Button type="submit" variant="primary">
+            <span className="kauro-go">Verify email</span>
+          </Button>
+          <button type="button" className="kauro-text-button" onClick={() => go("unverified")}>
+            Send a new code
           </button>
         </form>
       );
       break;
     case "enrol":
+      title = "Set up two‑step verification";
+      lead = "Kauro asks for a code from an authenticator app every time you sign in, before anyone can see client data. This takes a minute, once.";
       body = (
-        <form className="kauro-form" noValidate onSubmit={submitCode}>
-          <p>Kauro asks for a second step before anyone can see client data. Add Kauro to your authenticator app, once:</p>
-          <ol className="kauro-signin-steps">
-            <li>In the app, choose to add an account.</li>
-            <li>
-              Scan the code your identity provider shows, or type this setup key: <code className="kauro-secret">REVW SYNT HETI CXXX</code>
-            </li>
-            <li>Enter the six-digit code the app now shows.</li>
-          </ol>
-          <p className="kauro-muted">A synthetic key, for review. A real key is shown once by the identity provider and never kept by Kauro.</p>
+        <form className="kauro-form" noValidate onSubmit={(event) => checkCode(event, "signin-enrol", () => go("codes"))}>
+          <EnrolSteps />
           <ErrorSummary title="Check the code" errors={errors} />
-          <CodeField id="signin-code" hint="This confirms the app is set up." error={errorOf("signin-code")} />
+          <CodeField id="signin-enrol" hint="This confirms the app is set up." error={errorOf("signin-enrol")} />
           <Button type="submit" variant="primary">
-            <span className="kauro-go">Confirm and continue</span>
+            <span className="kauro-go">Turn on two-step verification</span>
           </Button>
         </form>
       );
       break;
-    case "unverified":
-    case "sent":
+    case "codes":
+      title = "Save your recovery codes";
+      lead = "If you lose your authenticator app, each code opens your account once. Keep them somewhere safe: a password manager is a good place.";
       body = (
-        <div className="kauro-form">
-          {step === "sent" ? (
-            <Banner tone="success" title="Link sent" announce="status">
-              <p>A new link is on its way to the address you signed in with. Open it, then come back here.</p>
-            </Banner>
-          ) : (
-            <p>Before you continue, open the verification link we sent to the address you signed in with.</p>
-          )}
+        <form
+          className="kauro-form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            const kept = new FormData(event.currentTarget).get("kept") !== null;
+            setErrors(kept ? [] : [{ fieldId: "signin-kept", message: "Confirm that you have saved the codes." }]);
+            if (kept) enter();
+          }}
+        >
+          <RecoveryList />
           <div className="kauro-actions">
-            <Button variant="primary" onClick={() => setStep("code")}>
-              <span className="kauro-go">I have opened the link</span>
-            </Button>
-            <Button onClick={() => setStep("sent")}>Send the link again</Button>
+            <Button>Download as a text file</Button>
+            <Button>Copy</Button>
           </div>
-        </div>
+          <ErrorSummary title="Before you continue" errors={errors} />
+          <label className="kauro-confirm" id="signin-kept">
+            <input type="checkbox" name="kept" />
+            <span>I have saved these codes somewhere safe.</span>
+          </label>
+          <Button type="submit" variant="primary">
+            <span className="kauro-go">Continue</span>
+          </Button>
+        </form>
       );
       break;
     case "locked":
+      title = "Sign-in is paused";
+      lead = undefined;
       body = (
-        <Banner tone="warning" title="Too many attempts" announce="alert">
-          <p>Sign-in is paused for a while to protect the account. Try again later, or get help below.</p>
-        </Banner>
+        <div className="kauro-form">
+          <Banner tone="warning" title="Too many attempts" announce="alert">
+            <p>To protect the account, sign-in is paused for a few minutes. Try again later.</p>
+          </Banner>
+          <p>
+            If you have forgotten your password, <a href={RESET}>reset it</a>. A reset does not change your two-step verification.
+          </p>
+        </div>
       );
       break;
     case "unavailable":
@@ -140,10 +238,10 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
       break;
     default:
       body = (
-        <form className="kauro-form" noValidate onSubmit={submitCredentials}>
+        <>
           {step === "invalid" ? (
             <Banner tone="danger" title="We could not sign you in" announce="alert">
-              <p>Check your email address and password and try again.</p>
+              <p>Check your email address and password and try again. If you created your account with Google, use Continue with Google.</p>
             </Banner>
           ) : null}
           {step === "expired" ? (
@@ -151,47 +249,43 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
               <p>Sign in again to carry on. You will return to Team, in Northwind Data.</p>
             </Banner>
           ) : null}
-          <ErrorSummary title="Check these details" errors={errors} />
-          <Field id="signin-email" label="Email address" error={errorOf("signin-email")}>
-            {(control) => <input {...control} name="email" type="email" autoComplete="username" spellCheck={false} defaultValue={step === "invalid" ? "lena.ortiz@northwind.example" : ""} />}
-          </Field>
-          <Field id="signin-password" label="Password" error={errorOf("signin-password")}>
-            {(control) => <input {...control} name="password" type="password" autoComplete="current-password" />}
-          </Field>
-          <Button type="submit" variant="primary">
-            <span className="kauro-go">Sign in</span>
-          </Button>
-        </form>
+          <GoogleButton
+            onClick={() => {
+              setVia("google");
+              go("google");
+            }}
+          />
+          <Or />
+          <form className="kauro-form" noValidate onSubmit={submitCredentials}>
+            <ErrorSummary title="Check these details" errors={errors} />
+            <Field id="signin-email" label="Email address" error={errorOf("signin-email")}>
+              {(control) => <input {...control} name="email" type="email" autoComplete="username" spellCheck={false} defaultValue={step === "invalid" ? email : ""} />}
+            </Field>
+            <PasswordField id="signin-password" label="Password" autoComplete="current-password" error={errorOf("signin-password")} aside={<a href={RESET}>Forgot password?</a>} />
+            <Button type="submit" variant="primary">
+              <span className="kauro-go">Sign in</span>
+            </Button>
+          </form>
+        </>
       );
   }
 
+  const after = ops ? (
+    <p>
+      Kauro operations is for Kauro&apos;s owner, sellers and staff. Access is by invitation only.
+      <br />
+      <a href={HELP}>Help signing in</a>
+    </p>
+  ) : (
+    <p>
+      New to Kauro? <a href={SIGN_UP}>Create an account</a>
+      <br />
+      <a href={HELP}>Help signing in</a>
+    </p>
+  );
   return (
-    <div className="kauro-signin">
-      <section className="kauro-signin-card" aria-labelledby="signin-title">
-        <Eyebrow>{ops ? "Kauro operations" : "Your Kauro workspace"}</Eyebrow>
-        <h1 id="signin-title">Sign in</h1>
-        <p className="kauro-lead">Continue securely.</p>
-        <div className="kauro-signin-body" aria-live="polite">
-          {body}
-        </div>
-        <p className="kauro-signin-help">
-          Cannot sign in? <a href="/help">Get help signing in</a>
-          {ops ? null : (
-            <>
-              <br />
-              New to Kauro? <a href="/contact">Request a free data health check</a>
-            </>
-          )}
-        </p>
-      </section>
-      <ul className="kauro-assurances" aria-label="How your account is protected">
-        {ASSURANCES.map((item) => (
-          <li key={item.title}>
-            <strong>{item.title}</strong>
-            <span>{item.body}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <AuthFrame title={title} lead={lead} bar={ops ? "Operations" : "Sign in"} after={step === "normal" || step === "invalid" || step === "expired" || step === "locked" || step === "unavailable" ? after : undefined}>
+      {body}
+    </AuthFrame>
   );
 }

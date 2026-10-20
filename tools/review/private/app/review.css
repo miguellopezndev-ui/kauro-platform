@@ -389,3 +389,10 @@
     max-block-size: none;
   }
 }
+
+/* the review strip sits above the application: the side menu keeps its foot in view under it */
+@media (min-width: 62rem) {
+  .kauro-review-strip ~ .kauro-shell .kauro-shell-side {
+    block-size: calc(100vh - 2.375rem);
+  }
+}

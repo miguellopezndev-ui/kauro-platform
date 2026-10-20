@@ -10,14 +10,17 @@ import { Button } from "@kauro/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactElement, useState } from "react";
+import type { ReviewContext } from "../lib/contexts.ts";
+import { IDS } from "../lib/ids.ts";
 import { appPathOf, type PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { MEMBERSHIPS, workspaceOf } from "../lib/world.ts";
-import { Badge, Monogram, PageHead, ROLE_NAME, type Role, ScreenButton, ScreenLink } from "./kit.tsx";
+import { EXAMPLE_ID, MEMBERSHIPS, workspaceOf } from "../lib/world.ts";
+import { EXAMPLE, EXAMPLE_STAGES, UNPAID_RETENTION } from "./example.ts";
+import { Badge, Monogram, Note, PageHead, ROLE_NAME, type Role, Rings, ScreenButton, ScreenLink, Window } from "./kit.tsx";
 
 export const UI10_STATES: readonly StateDef[] = [
   { key: "normal", label: "Several agencies", note: "Every membership with its role and state; where the person works now is said first." },
-  { key: "empty", label: "No agency yet", note: "Signed in without any membership: set up an organisation or use an invitation." },
+  { key: "empty", label: "Welcome: no workspace yet", note: "A new account (any Google account or email): explore the synthetic example, or set up an agency or company to check its own files. An invitation link joins an existing one." },
   { key: "switching", label: "Switching", note: "After choosing: the old agency's content is cleared and the page says it is switching." },
   { key: "loading", label: "Loading", note: "The list has not arrived: the place is held and announced." },
   { key: "error", label: "Could not load", note: "The list could not be read: try again; nothing else is shown." },
@@ -64,7 +67,7 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
   if (target !== null)
     return (
       <div className="kauro-switching" role="status">
-        <h1 className="kauro-visually-hidden">Your agencies</h1>
+        <h1 className="kauro-visually-hidden">Your workspaces</h1>
         <Monogram name={target.name} />
         <p>
           Opening <bdi>{target.name}</bdi>…
@@ -73,35 +76,24 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
       </div>
     );
 
+  if (rows.length === 0 && state !== "loading" && state !== "error") return <Welcome ctx={ctx} />;
+
   return (
     <>
-      <PageHead eyebrow="Signed in" title="Your agencies" accent={1} lead="Choose the agency you are working with." />
+      <PageHead eyebrow="Signed in" title="Your workspaces" accent={1} lead="Choose the workspace you are working in." />
       {state === "loading" ? (
         <div className="kauro-state" role="status">
-          <p>Loading your agencies…</p>
+          <p>Loading your workspaces…</p>
         </div>
       ) : state === "error" ? (
         <div className="kauro-state" role="alert">
-          <h2>Your agencies could not be loaded</h2>
+          <h2>Your workspaces could not be loaded</h2>
           <p>Nothing is shown until the list is read. Try again in a moment.</p>
           <Button>Try again</Button>
         </div>
-      ) : rows.length === 0 ? (
-        <section className="kauro-panel kauro-switch-empty" aria-labelledby="switch-empty">
-          <h2 id="switch-empty">You are not part of an agency yet</h2>
-          <p>Set up your own organisation, or open the invitation link an agency sent you. An email address never adds you to an agency on its own.</p>
-          <div className="kauro-actions">
-            <ScreenButton to="UI09" ctx={ctx} variant="primary">
-              <span className="kauro-go">Set up an organisation</span>
-            </ScreenButton>
-            <ScreenButton to="UI51" ctx={ctx}>
-              I have an invitation
-            </ScreenButton>
-          </div>
-        </section>
       ) : (
         <>
-          <ul className="kauro-workspaces" aria-label="Agencies you belong to">
+          <ul className="kauro-workspaces" aria-label="Workspaces you belong to">
             {rows.map((row) => {
               const here = row === current;
               const inner = (
@@ -147,16 +139,77 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
           <p className="kauro-switch-new">
             {hasDraft ? (
               <>
-                One organisation is already in setup. <ScreenLink to="UI09" ctx={ctx}>Finish it</ScreenLink> before starting another.
+                One workspace is already in setup. <ScreenLink to="UI09" ctx={ctx}>Finish it</ScreenLink> before starting another.
               </>
             ) : (
               <>
-                Need another workspace? <ScreenLink to="UI09" ctx={ctx}>Set up an organisation</ScreenLink>. You become its owner.
+                Need another workspace? <ScreenLink to="UI09" ctx={ctx}>Set up an agency or company</ScreenLink>. You become its owner.
               </>
             )}
           </p>
         </>
       )}
+    </>
+  );
+}
+
+/**
+ * The welcome of a new account (the owner's decisions of 2026-10-20): any Google account or email may sign up, explore the example with
+ * synthetic data, and set up an agency or company only when it wants its own files checked. The first step is the useful one, checking
+ * the person's own files, with concrete promises beside it instead of an incentive (research: onboarding-vs-discounts.md, 1 and 8); the
+ * example is the second way in, beside it, the public site's own worked example inside the product's window (Hightouch's sample sources).
+ * No discount is shown here: the repeat ladder appears once there is a first project (research 6).
+ */
+function Welcome({ ctx }: { readonly ctx: ReviewContext }): ReactElement {
+  const example: ReviewContext = { ...ctx, agency: { agencyId: EXAMPLE_ID, version: 1, displayName: "Example workspace", state: "ACTIVE", createdAt: "2026-10-01T00:00:00Z", permittedActions: ["VIEW"] } };
+  return (
+    <>
+      <PageHead eyebrow="Your account is ready" title="Welcome to Kauro." lead="See exactly what you would receive, then check your own files for free when you are ready." />
+      <div className="kauro-welcome">
+        <section className="kauro-welcome-start" aria-labelledby="welcome-start-h">
+          <h2 id="welcome-start-h">Check your own files</h2>
+          <ol className="kauro-welcome-steps">
+            <li>
+              <strong>Set up your agency or company</strong>
+              <span>Its name, who buys, and the agreements. About a minute.</span>
+            </li>
+            <li>
+              <strong>Upload your exports</strong>
+              <span>CSV or spreadsheet files of contacts, companies and deals.</span>
+            </li>
+            <li>
+              <strong>Read your free data health check</strong>
+              <span>What Kauro found in your files, and the exact price to prepare them.</span>
+            </li>
+          </ol>
+          <ScreenButton to="UI09" ctx={ctx} variant="primary">
+            <span className="kauro-go">Set up your agency or company</span>
+          </ScreenButton>
+          <ul className="kauro-checklist kauro-welcome-promises" aria-label="What Kauro promises">
+            <li>An exact quote before you pay anything</li>
+            <li>You approve every change before it is prepared</li>
+            <li>Kauro never connects to your CRM</li>
+            <li>
+              Unless you buy, your files are deleted {UNPAID_RETENTION.days} days after the check, {UNPAID_RETENTION.hardDays} at the latest
+            </li>
+          </ul>
+        </section>
+        <section className="kauro-welcome-example" aria-labelledby="welcome-example-h">
+          <h2 id="welcome-example-h" className="kauro-visually-hidden">
+            The example project
+          </h2>
+          <Window title={EXAMPLE.name} state="Synthetic data">
+            <Rings label={`${EXAMPLE.client} · for ${EXAMPLE.destination}`} items={EXAMPLE_STAGES.map((stage) => ({ key: stage.key, name: stage.name, fact: stage.fact, state: "done" as const }))} />
+            <div className="kauro-welcome-example-go">
+              <ScreenButton to="UI13" ctx={example} project={IDS.project}>
+                Explore the example
+              </ScreenButton>
+            </div>
+          </Window>
+          <Note>The same project How it works describes, walked from the upload to the delivery. Nothing in it is anyone&apos;s data.</Note>
+        </section>
+      </div>
+      <p className="kauro-switch-new">Invited by a team? Open the link in your invitation email. An email address never adds anyone to an agency on its own.</p>
     </>
   );
 }

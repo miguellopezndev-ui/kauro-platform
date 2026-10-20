@@ -14,6 +14,9 @@ export const ROLE_ACTIONS: Readonly<Record<Role, AgencyView["permittedActions"]>
   VIEWER: ["VIEW"],
 };
 
+/** The example workspace: synthetic, read-only, open to anyone signed in, with the public site's worked example as its one project. */
+export const EXAMPLE_ID = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fe0";
+
 export interface Workspace {
   readonly agencyId: string;
   readonly name: string;
@@ -29,6 +32,7 @@ export const WORKSPACES: readonly Workspace[] = [
   { agencyId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc2", name: "Ridge & Fennel Consulting", kind: "agency", state: "RESTRICTED", createdAt: "2026-07-30T15:45:00Z" },
   { agencyId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc3", name: "Juniper Digital", kind: "agency", state: "ACTIVE", createdAt: "2026-06-18T12:10:00Z" },
   { agencyId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc4", name: "Northwind Labs", kind: "agency", state: "DRAFT", createdAt: "2026-10-18T16:40:00Z" },
+  { agencyId: EXAMPLE_ID, name: "Example workspace", kind: "agency", state: "ACTIVE", createdAt: "2026-10-01T00:00:00Z" },
 ];
 
 export interface Membership {
@@ -50,6 +54,7 @@ export const MEMBERSHIPS: Readonly<Record<string, readonly Membership[]>> = {
   admin: [{ agencyId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1", role: "ADMIN", state: "ACTIVE" }],
   operator: [{ agencyId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1", role: "OPERATOR", state: "ACTIVE" }],
   outsider: [],
+  newcomer: [],
   owner: [],
   seller: [],
 };
@@ -61,7 +66,8 @@ export function workspaceOf(agencyId: string): Workspace | undefined {
 /** The api's answer for an agency, as one person sees it: their own permitted actions, or null when they are not an active member. */
 export function agencyFor(person: string, agencyId: string): AgencyView | null {
   const workspace = workspaceOf(agencyId);
-  const membership = (MEMBERSHIPS[person] ?? []).find((candidate) => candidate.agencyId === agencyId);
+  // the example is read-only for everyone: it can be looked at, never changed
+  const membership = agencyId === EXAMPLE_ID ? { agencyId, role: "VIEWER" as const, state: "ACTIVE" as const } : (MEMBERSHIPS[person] ?? []).find((candidate) => candidate.agencyId === agencyId);
   if (workspace === undefined || membership === undefined || membership.state !== "ACTIVE") return null;
   return {
     agencyId,

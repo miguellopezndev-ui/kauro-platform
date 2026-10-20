@@ -1,17 +1,21 @@
 "use client";
 // P-01 Personal settings (proposed; Order 11 §4 A). One page per person, the same in every agency. Built only from what exists where it
 // can be: the theme is the application's own control (POST /preferences/theme), two-step verification and the session's limits come from
-// the session (getCurrentSession: mfaAt, idleExpiresAt, absoluteExpiresAt), signing out is the real sign-out. The profile read, signing
-// out other devices and notices have no contract: each is marked as proposed. No password, code or secret appears here, ever.
-import { Button } from "@kauro/ui";
+// the session (getCurrentSession: mfaAt, idleExpiresAt, absoluteExpiresAt), signing out is the real sign-out. The profile read, the
+// sign-in methods, recovery codes, other sessions and notices have no contract: each is marked as proposed. Two-step verification cannot
+// be turned off (the owner's decision of 2026-10-20). No password, code or secret appears here, ever: a new set of recovery codes is shown
+// once, at the moment it is made, and never again.
+import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useEffect, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
+import { RecoveryList } from "./auth.tsx";
 import { Badge, Facts, PageHead, ScreenLink } from "./kit.tsx";
 
 export const P01_STATES: readonly StateDef[] = [
   { key: "normal", label: "Personal settings", note: "Every section with the person's synthetic data." },
-  { key: "no-mfa", label: "Two-step verification off", note: "A person whose two-step verification is not set up: the page says what it blocks and how to fix it." },
+  { key: "signed-out", label: "Other sessions ended", note: "After signing out of every other session: only this one is left." },
+  { key: "new-codes", label: "New recovery codes", note: "After confirming identity again: the new set is shown once, and the old codes stop working." },
   { key: "saved", label: "Notices saved", note: "After saving notice choices (proposed)." },
 ];
 
@@ -38,7 +42,7 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
             <a href="#me-profile">Profile</a>
           </li>
           <li>
-            <a href="#me-security">Security</a>
+            <a href="#me-security">Sign-in and security</a>
           </li>
           <li>
             <a href="#me-sessions">Sessions</a>
@@ -65,42 +69,80 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
             ["Email address", person.email],
           ]}
         />
-        <p className="kauro-muted">Your name and address are held by Kauro&apos;s identity provider. Change them there; Kauro shows what it holds.</p>
+        <p className="kauro-muted">Your name and email address are the ones you signed up with. To change either, open a support case: a new address is verified before it is used.</p>
       </section>
 
       <section id="me-security" aria-labelledby="me-security-h">
-        <h2 id="me-security-h">Security</h2>
+        <h2 id="me-security-h">Sign-in and security</h2>
+        <p className="kauro-proposed">Proposed — sign-in methods and recovery codes need a read and commands (D-P01-4)</p>
         <Facts
           rows={[
-            [
-              "Two-step verification",
-              state === "no-mfa" ? <Badge key="m" tone="warning">Not set up</Badge> : <Badge key="m" tone="success">On since 2 Sep 2026</Badge>,
-            ],
+            ["Google", ctx.key === "operator" ? "Not connected" : <span key="g">Connected as <bdi>{person.email}</bdi></span>],
+            ["Password", "Set on 2 Sep 2026"],
+            ["Two-step verification", <Badge key="m" tone="success">Authenticator app, since 2 Sep 2026</Badge>],
+            ["Recovery codes", "8 of 10 unused"],
             ["Identity confirmed for sensitive actions", "Not in the last 15 minutes. Kauro asks again before a sensitive action."],
-            ["Password", "Kept by the identity provider. Kauro never receives it."],
           ]}
         />
-        {state === "no-mfa" ? (
-          <p>
-            Until two-step verification is on you cannot open any agency&apos;s data. <ScreenLink to="UI50" ctx={ctx}>Set it up now</ScreenLink>.
-          </p>
+        <div className="kauro-actions">
+          <Button>Change password</Button>
+          <Button>Replace authenticator app</Button>
+          <Button>Create new recovery codes</Button>
+        </div>
+        <p className="kauro-muted">Two-step verification is required on every Kauro account and cannot be turned off. Each of these asks you to confirm your identity first.</p>
+        {state === "new-codes" ? (
+          <Banner tone="warning" title="Your new recovery codes" announce="status">
+            <p>Save them now: they are shown only this once. Your previous codes no longer work.</p>
+            <RecoveryList />
+          </Banner>
         ) : null}
       </section>
 
       <section id="me-sessions" aria-labelledby="me-sessions-h">
         <h2 id="me-sessions-h">Sessions</h2>
+        {state === "signed-out" ? (
+          <Banner tone="success" title="Other sessions ended" announce="status">
+            <p>You are now signed in only here. Anyone on another device must sign in again, with your password and Kauro code.</p>
+          </Banner>
+        ) : null}
+        <p className="kauro-proposed">Proposed — listing and ending other sessions needs a contract (D-P01-2)</p>
+        <ul className="kauro-sessions">
+          <li>
+            <span className="kauro-sessions-what">
+              <strong>This device</strong>
+              <span>Chrome on Windows · signed in today at 14:02 UTC</span>
+            </span>
+            <Badge tone="success">Active now</Badge>
+          </li>
+          {state === "signed-out" ? null : (
+            <>
+              <li>
+                <span className="kauro-sessions-what">
+                  <strong>Safari on iPhone</strong>
+                  <span>Signed in 18 Oct 2026 · last active yesterday</span>
+                </span>
+                <Button>Sign out</Button>
+              </li>
+              <li>
+                <span className="kauro-sessions-what">
+                  <strong>Firefox on macOS</strong>
+                  <span>Signed in 12 Oct 2026 · last active 14 Oct 2026</span>
+                </span>
+                <Button>Sign out</Button>
+              </li>
+            </>
+          )}
+        </ul>
+        <div className="kauro-actions">
+          {state === "signed-out" ? null : <Button>Sign out of all other sessions</Button>}
+          <Button>Sign out here</Button>
+        </div>
         <Facts
           rows={[
-            ["This session", "Started today at 14:02 UTC on this device"],
             ["Ends after inactivity", "30 minutes without activity"],
-            ["Ends at the latest", "Tomorrow at 02:02 UTC, 12 hours after sign-in"],
+            ["Ends at the latest", "12 hours after signing in"],
           ]}
         />
-        <div className="kauro-actions">
-          <Button>Sign out</Button>
-        </div>
-        <p className="kauro-proposed">Proposed — signing out other devices needs a contract (D-P01-2)</p>
-        <p className="kauro-muted">Other devices where you are signed in are not listed yet. Signing out here ends this session only.</p>
       </section>
 
       <section id="me-notices" aria-labelledby="me-notices-h">

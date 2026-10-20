@@ -60,6 +60,9 @@ function reviewPage(appPath: string, script: () => Script): BrowserPage {
   };
 }
 
+/** What a seller may open in operations (GetSellerHome and the sales screens); the owner sees every entry. */
+const SELLER_SCREENS: ReadonlySet<string> = new Set(["UI33", "UI34", "UI36", "UI53", "UI54"]);
+
 export interface ReviewShellProps {
   /** The path the screen has in the application, e.g. /agencies/{id}/settings. */
   readonly appPath: string;
@@ -81,7 +84,9 @@ export function ReviewShell({ appPath, context, script, children }: ReviewShellP
   }, [appPath, script]);
   const phase = useStore(shell, sessionOf, CHECKING);
   const agency = useStore(shell, agencyOf, LOADING);
-  const view = viewOf({ phase, agency, pathname: appPath, activeAgency: shell === null ? null : shell.session.activeAgency(), implemented: ALL_PRIVATE });
+  const base = viewOf({ phase, agency, pathname: appPath, activeAgency: shell === null ? null : shell.session.activeAgency(), implemented: ALL_PRIVATE, ...(context === "seller" ? { allowedOps: SELLER_SCREENS } : {}) });
+  // the person's own settings are proposals (P-01, P-03, P-04): the review links them from the menu, where they would live
+  const view = base.signOut ? { ...base, accountHref: base.ops ? "/ops/settings" : "/account" } : base;
   // the application's own links: the review serves every private path, so they are followed exactly as in the product
   const Anchor: AnchorComponent = useCallback(
     ({ href, "aria-current": current, children: label }: AnchorProps) => (

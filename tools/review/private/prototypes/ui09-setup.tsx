@@ -1,253 +1,205 @@
 "use client";
-// UI09 Agency setup (registry: "Complete the steps needed to handle client data."). Identity, the organisation, who buys, the billing
-// profile and the agreements are separate steps, each with its state (registry "Separate identity, membership, legal/billing profile,
-// agreements and MFA readiness"). The organisation is created as a draft (CMD001, one draft per person), its buyer type is set once by the
-// owner (setBuyerType, A3 3.7: an agency or a company buying for its own data), the billing profile is prepared by Kauro (no intake
-// command yet), and activation accepts the published agreements (CMD002). Today the agreements are not published, so activation is shown
-// as not available. An email domain never adds anyone to an agency: joining an existing one is by invitation only.
+// UI09 Agency setup (registry: "Complete the steps needed to handle client data."). The owner's decisions of 2026-10-20: the account
+// already exists (any Google account or email, verified, with Kauro's two-step verification); the agency or company is set up when the
+// person wants their own files checked, as a minimal workspace, and every detail is asked only when it is needed:
+//   - its name;
+//   - who buys: an agency, or a company buying for its own data (setBuyerType, A3 3.7), for a business activity, never as consumers (D-30);
+//   - who accepts: the signed-in person, who confirms they are authorised to accept on the organisation's behalf;
+//   - the agreements: the service terms and the data processing terms (DPA), whose accepted versions are kept with the organisation.
+// The billing profile is not asked here: it is asked at the first quote, the first moment money is involved. PROPOSED (D-UI09-2): today
+// activation (CMD002) needs agreements_and_profile_accepted, so the profile would move from activation to the quote. No business email
+// domain is required, and a domain never adds anyone to an agency: joining an existing one is by invitation only.
 //
-// The setup is the first stretch of the path, so it is drawn as the product's window: the organisation and its state in the bar, the five
-// steps as rings with their facts, and the current step's work beside them. One object, one next step.
+// The organisation is created as a draft (CMD001, one draft per person) and activated by accepting (CMD002). Today the agreements are not
+// published, so activation is shown as not available.
+//
+// The setup is drawn as the product's window, with the path beside the form: the account done, the workspace now, the first project next.
+// Starting with a step already done is honest here (the account is done) and moves people on (endowed progress, research 6).
 import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
 import { type FormEvent, type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, day, Facts, Note, PageHead, type RingState, Rings, ScreenButton, ScreenLink, Stamp, Window } from "./kit.tsx";
+import { day, Note, PageHead, type RingState, Rings, ScreenButton, ScreenLink, Stamp, Window } from "./kit.tsx";
 
 export const UI09_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Name your organisation", note: "Identity is ready; the person names the organisation, which is created as a draft." },
-  { key: "identity", label: "Two-step verification missing", note: "The email is verified but two-step verification is off: nothing else can start until it is on." },
-  { key: "invalid", label: "Name not accepted", note: "Validation: an empty or over-long name is explained next to the field and in a summary." },
-  { key: "buyer", label: "Who buys", note: "The draft exists; the owner says once whether it is an agency or a company buying for its own data." },
-  { key: "billing", label: "Billing profile pending", note: "Kauro prepares the billing profile from the details sent through support; the person waits." },
-  { key: "agreements-today", label: "Agreements not published (today)", note: "The real state today: the legal documents are not published, so activation is not available." },
-  { key: "agreements", label: "Accept and activate", note: "Designed future: the published agreements are accepted and the organisation becomes active." },
-  { key: "activated", label: "Active", note: "Activation done: the organisation is ready for its first client or project." },
+  { key: "normal", label: "Set up the workspace", note: "One short form: the name, who buys, who accepts, and the agreements. Billing details come at the first quote." },
+  { key: "invalid", label: "Something missing", note: "No name and the agreements not accepted: each is explained beside it and in a summary." },
+  { key: "agreements-today", label: "Agreements not published (today)", note: "The real state today: the legal documents are not published, so the workspace stays a draft and nothing can be uploaded yet." },
+  { key: "activated", label: "Ready", note: "The workspace is active: the next step is the first project and its free data health check." },
   { key: "draft-exists", label: "A draft already exists", note: "One draft per person: the existing draft is resumed instead of creating another." },
   { key: "limited", label: "Too many new organisations", note: "Creation is rate-limited: the person is told to wait, nothing is created." },
 ];
 
-type StepKey = "identity" | "organisation" | "buyer" | "billing" | "agreements";
-const ORDER: readonly StepKey[] = ["identity", "organisation", "buyer", "billing", "agreements"];
+type Errors = readonly { readonly fieldId: string; readonly message: string }[];
 
-function firstStep(state: string): StepKey {
-  if (state === "identity") return "identity";
-  if (state === "buyer" || state === "draft-exists") return state === "buyer" ? "buyer" : "organisation";
-  if (state === "billing") return "billing";
-  if (state === "agreements" || state === "agreements-today" || state === "activated") return "agreements";
-  return "organisation";
-}
+const PERSON: Readonly<Record<string, { readonly name: string; readonly email: string }>> = {
+  newcomer: { name: "Ana Silva", email: "ana.silva@gmail.example" },
+  company: { name: "Tomas Reyes", email: "tomas.reyes@halden.example" },
+};
 
 export function AgencySetup({ ctx, state }: PrototypeProps): ReactElement {
   const company = ctx.key === "company";
-  const orgName = company ? "Halden Outdoor" : "Northwind Data";
-  const kind = company ? "company" : "agency";
-  const [current, setCurrent] = useState<StepKey>(firstStep(state));
+  const person = PERSON[ctx.key] ?? { name: "Lena Ortiz", email: "lena.ortiz@northwind.example" };
+  const suggested = ctx.key === "newcomer" ? "" : company ? "Halden Outdoor" : "Northwind Data";
   const [activated, setActivated] = useState(state === "activated");
-  const [errors, setErrors] = useState<readonly { fieldId: string; message: string }[]>(
-    state === "invalid" ? [{ fieldId: "setup-name", message: "Enter the name of your organisation." }] : [],
+  const [name, setName] = useState(state === "activated" ? suggested || "Silva Data Studio" : suggested);
+  const [kind, setKind] = useState<"agency" | "in-house">(company ? "in-house" : "agency");
+  const [errors, setErrors] = useState<Errors>(
+    state === "invalid"
+      ? [
+          { fieldId: "setup-name", message: "Enter the name of your agency or company." },
+          { fieldId: "setup-accept", message: "Accept the agreements to continue." },
+        ]
+      : [],
   );
-  const position = ORDER.indexOf(current);
-  const named = position > 1;
-  const ring = (step: StepKey): RingState => {
-    if (activated) return "done";
-    const at = ORDER.indexOf(step);
-    if (step === "agreements" && current === "agreements" && state === "agreements-today") return "blocked";
-    return at < position ? "done" : at === position ? "current" : "waiting";
-  };
-  const facts: Readonly<Record<StepKey, string>> = {
-    identity: current === "identity" ? "Two-step verification needed" : "Verified · two-step on",
-    organisation: activated ? orgName : named ? `${orgName} · draft` : current === "organisation" ? "Now" : "",
-    buyer: position > 2 || activated ? (company ? "A company, for its own data" : "An agency, for its clients") : current === "buyer" ? "Now" : "",
-    billing: position > 3 || activated ? "Prepared by Kauro" : current === "billing" ? "Kauro is preparing it" : "",
-    agreements: activated ? "Accepted · 2026-10" : state === "agreements-today" && current === "agreements" ? "Not published yet" : current === "agreements" ? "Now" : "",
-  };
-  const createDraft = (event: FormEvent<HTMLFormElement>): void => {
+  const errorOf = (id: string): string | undefined => errors.find((entry) => entry.fieldId === id)?.message;
+  const label = name.trim() === "" ? "your organisation" : name.trim();
+
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
-    const found = name === "" ? [{ fieldId: "setup-name", message: "Enter the name of your organisation." }] : name.length > 120 ? [{ fieldId: "setup-name", message: "Use 120 characters or fewer." }] : [];
+    const data = new FormData(event.currentTarget);
+    const text = String(data.get("name") ?? "").trim();
+    const found: { fieldId: string; message: string }[] = [];
+    if (text === "") found.push({ fieldId: "setup-name", message: "Enter the name of your agency or company." });
+    else if (text.length > 120) found.push({ fieldId: "setup-name", message: "Use 120 characters or fewer." });
+    if (data.get("economic") === null) found.push({ fieldId: "setup-economic", message: "Confirm that you buy for a business activity." });
+    if (data.get("accept") === null) found.push({ fieldId: "setup-accept", message: "Accept the agreements to continue." });
     setErrors(found);
-    if (found.length === 0) setCurrent("buyer");
+    if (found.length === 0) setActivated(true);
   };
 
-  let step: ReactElement;
-  if (activated) {
-    step = (
-      <>
-        <h2>{orgName} is active</h2>
-        <p>The agreements are accepted and the billing profile is in place. {company ? "Start your first project: upload the exports you want prepared." : "Add your first client: each client is its own workspace, with its own projects and files."}</p>
-        <div className="kauro-actions">
-          <ScreenButton to={company ? "UI11" : "UI12"} ctx={ctx} variant="primary">
-            <span className="kauro-go">{company ? "Start a project" : "Add a client"}</span>
-          </ScreenButton>
-        </div>
-      </>
-    );
-  } else
-    switch (current) {
-      case "identity":
-        step = (
-          <>
-            <h2>Your identity</h2>
-            <p>Kauro asks every person for two-step verification before any client data can be seen. It is set up once, and asked for again before sensitive actions.</p>
-            <ul className="kauro-checklist">
-              <li>Email address verified</li>
-            </ul>
-            <div className="kauro-actions">
-              <ScreenButton to="UI50" ctx={ctx} variant="primary">
-                <span className="kauro-go">Set up two-step verification</span>
-              </ScreenButton>
-            </div>
-          </>
-        );
-        break;
-      case "buyer":
-        step = (
-          <form className="kauro-form" noValidate onSubmit={(event) => (event.preventDefault(), setCurrent("billing"))}>
-            <h2>Who buys</h2>
-            <fieldset className="kauro-choice">
-              <legend>
-                <bdi>{orgName}</bdi> is
-              </legend>
-              <label>
-                <input type="radio" name="buyerType" value="agency" defaultChecked={!company} />
-                <span>
-                  <strong>An agency</strong>
-                  <small>Prepares CRM data for its clients. Each client is its own workspace, with its own projects.</small>
-                </span>
-              </label>
-              <label>
-                <input type="radio" name="buyerType" value="in-house" defaultChecked={company} />
-                <span>
-                  <strong>A company</strong>
-                  <small>Prepares its own CRM data. The company is the one workspace.</small>
-                </span>
-              </label>
-            </fieldset>
-            <label className="kauro-confirm">
-              <input type="checkbox" name="economic" defaultChecked />
-              <span>We buy for a business activity, not as private consumers.</span>
-            </label>
-            <Note>Same price, same discounts, either way. Only the owner sets it, once.</Note>
-            <Button type="submit" variant="primary">
-              <span className="kauro-go">Save and continue</span>
-            </Button>
-          </form>
-        );
-        break;
-      case "billing":
-        step = (
-          <>
-            <h2>Billing profile</h2>
-            <p>Kauro prepares your billing profile from the legal name, address and tax details you send through support. It appears here, ready to confirm, once it is prepared.</p>
-            <Facts
-              rows={[
-                ["State", <Badge key="s" tone="info">Being prepared by Kauro</Badge>],
-                ["Requested", day("2026-10-20T09:00:00Z")],
-              ]}
-            />
-            <div className="kauro-actions">
-              <ScreenButton to="UI52" ctx={ctx}>
-                Send the billing details
-              </ScreenButton>
-              <Button variant="primary" onClick={() => setCurrent("agreements")}>
-                <span className="kauro-go">Continue to agreements</span>
-              </Button>
-            </div>
-          </>
-        );
-        break;
-      case "agreements":
-        step =
-          state === "agreements-today" ? (
-            <>
-              <h2>Agreements</h2>
-              <Banner tone="warning" title="The agreements are not published yet" announce="status">
-                <p>Activation needs the published service terms and data processing terms. They are not available in this environment, so {orgName} stays a draft for now.</p>
-              </Banner>
-            </>
-          ) : (
-            <form className="kauro-form" noValidate onSubmit={(event) => (event.preventDefault(), setActivated(true))}>
-              <h2>Agreements</h2>
-              <p>Read both documents. The versions you accept are kept with {orgName}, and every order refers to them.</p>
-              <ul className="kauro-documents">
-                <li>
-                  <a href="/legal/terms">Service terms</a>
-                  <span>Version 2026-10</span>
-                </li>
-                <li>
-                  <a href="/legal/data-processing">Data processing terms</a>
-                  <span>Version 2026-10</span>
-                </li>
-              </ul>
-              <label className="kauro-confirm">
-                <input type="checkbox" name="accept" required />
-                <span>I accept both documents on behalf of {orgName}, and I am authorised to do so.</span>
-              </label>
-              <Button type="submit" variant="primary">
-                <span className="kauro-go">Accept and activate</span>
-              </Button>
-            </form>
-          );
-        break;
-      default:
-        step =
-          state === "draft-exists" ? (
-            <>
-              <h2>Your organisation</h2>
-              <p>
-                You already have one organisation in setup: <bdi>{orgName}</bdi>, started on {day("2026-10-18T16:40:00Z")}. Each person can have one in setup at a time.
-              </p>
-              <div className="kauro-actions">
-                <Button variant="primary" onClick={() => setCurrent("buyer")}>
-                  <span className="kauro-go">Continue with {orgName}</span>
-                </Button>
-              </div>
-            </>
-          ) : (
-            <form className="kauro-form" noValidate onSubmit={createDraft}>
-              <h2>Your organisation</h2>
-              {state === "limited" ? (
-                <Banner tone="warning" title="Please wait before starting another" announce="alert">
-                  <p>Too many organisations were started from this account recently. Nothing was created. Try again later.</p>
-                </Banner>
-              ) : null}
-              <ErrorSummary title="Check the name" errors={errors} />
-              <Field id="setup-name" label="Name" hint="Shown to your team and on the reports Kauro delivers. You can change it later." error={errors.find((entry) => entry.fieldId === "setup-name")?.message}>
-                {(control) => <input {...control} name="name" autoComplete="organization" defaultValue={state === "invalid" ? "" : orgName} maxLength={200} />}
-              </Field>
-              <Button type="submit" variant="primary">
-                <span className="kauro-go">Create {company ? "the company workspace" : "the agency"}</span>
-              </Button>
-            </form>
-          );
-    }
+  const rings = (current: "workspace" | "project"): ReadonlyArray<{ key: string; name: string; fact: string; state: RingState }> => [
+    { key: "account", name: "Your account", fact: "Verified · two-step on", state: "done" },
+    { key: "workspace", name: kind === "in-house" ? "Your company" : "Your agency", fact: current === "project" ? "Ready" : "Now", state: current === "project" ? "done" : state === "agreements-today" ? "blocked" : "current" },
+    { key: "project", name: "Your first project", fact: "The free data health check", state: current === "project" ? "current" : "waiting" },
+  ];
 
-  const windowState = activated ? "Active" : named ? "Draft" : "Not created yet";
+  let body: ReactElement;
+  if (activated) {
+    body = (
+      <div className="kauro-setup-step">
+        <h2>
+          <bdi>{label}</bdi> is ready
+        </h2>
+        <p>
+          The agreements are accepted and kept with {label}. Start your first project: upload the exports you want prepared, and the free data
+          health check shows what Kauro finds and the exact price.
+        </p>
+        <ScreenButton to="UI11" ctx={ctx} variant="primary">
+          <span className="kauro-go">Start your first project</span>
+        </ScreenButton>
+        {kind === "agency" ? (
+          <p className="kauro-muted">
+            Working for several clients? Each client keeps its own projects and files. <ScreenLink to="UI12" ctx={ctx}>Add your clients</ScreenLink> when you need them.
+          </p>
+        ) : null}
+      </div>
+    );
+  } else if (state === "draft-exists") {
+    body = (
+      <div className="kauro-setup-step">
+        <h2>You already have one in setup</h2>
+        <p>
+          <bdi>Northwind Labs</bdi> was started on {day("2026-10-18T16:40:00Z")}. Each person can have one organisation in setup at a time.
+        </p>
+        <Button variant="primary">
+          <span className="kauro-go">Continue with Northwind Labs</span>
+        </Button>
+      </div>
+    );
+  } else {
+    body = (
+      <form className="kauro-form kauro-setup-step" noValidate onSubmit={submit}>
+        {state === "limited" ? (
+          <Banner tone="warning" title="Please wait before starting another" announce="alert">
+            <p>Too many organisations were started from this account recently. Nothing was created. Try again later.</p>
+          </Banner>
+        ) : null}
+        {state === "agreements-today" ? (
+          <Banner tone="warning" title="The agreements are not published yet" announce="status">
+            <p>Your workspace can be named and saved as a draft, but it can be activated, and files uploaded, only once the service terms and data processing terms are published.</p>
+          </Banner>
+        ) : null}
+        <ErrorSummary title="Check these details" errors={errors} />
+        <Field id="setup-name" label="Name of your agency or company" hint="Shown to your team and on the reports Kauro delivers. You can change it later." error={errorOf("setup-name")}>
+          {(control) => <input {...control} name="name" autoComplete="organization" value={name} onChange={(event) => setName(event.target.value)} maxLength={200} />}
+        </Field>
+
+        <fieldset className="kauro-choice">
+          <legend>Who buys</legend>
+          <label>
+            <input type="radio" name="buyerType" value="agency" checked={kind === "agency"} onChange={() => setKind("agency")} />
+            <span>
+              <strong>An agency</strong>
+              <small>You prepare CRM data for your clients. Each client keeps its own projects and files.</small>
+            </span>
+          </label>
+          <label>
+            <input type="radio" name="buyerType" value="in-house" checked={kind === "in-house"} onChange={() => setKind("in-house")} />
+            <span>
+              <strong>A company</strong>
+              <small>You prepare your own company&apos;s CRM data.</small>
+            </span>
+          </label>
+        </fieldset>
+        <Note>Same prices and the same discounts either way.</Note>
+
+        <div className="kauro-setup-accept">
+          <h3>Who accepts</h3>
+          <p className="kauro-setup-who">
+            <strong>{person.name}</strong> <bdi>{person.email}</bdi>
+          </p>
+          <ul className="kauro-documents">
+            <li>
+              <a href="/legal/terms">Service terms</a>
+              <span>Version 2026-10</span>
+            </li>
+            <li>
+              <a href="/legal/data-processing">Data processing terms</a>
+              <span>Version 2026-10</span>
+            </li>
+          </ul>
+          <label className="kauro-confirm" id="setup-economic">
+            <input type="checkbox" name="economic" defaultChecked={state !== "invalid"} />
+            <span>We buy for a business activity, not as private consumers.</span>
+          </label>
+          <label className="kauro-confirm" id="setup-accept">
+            <input type="checkbox" name="accept" />
+            <span>
+              I accept both documents on behalf of <bdi>{label}</bdi>, and I am authorised to do so.
+            </span>
+          </label>
+        </div>
+
+        <Button type="submit" variant="primary" disabled={state === "agreements-today"} aria-describedby={state === "agreements-today" ? undefined : "setup-billing-later"}>
+          <span className="kauro-go">{state === "agreements-today" ? "Not available yet" : "Create the workspace"}</span>
+        </Button>
+        {state === "agreements-today" ? (
+          <Button type="button">Save as a draft</Button>
+        ) : (
+          <p id="setup-billing-later" className="kauro-muted">
+            Billing details are asked when you accept your first quote, not before. <span className="kauro-proposed">Proposed — D-UI09-2</span>
+          </p>
+        )}
+      </form>
+    );
+  }
+
   return (
     <>
-      <PageHead eyebrow="Getting started" title={`Set up your ${kind}`} accent={2} lead="Complete the steps needed to handle client data." />
+      <PageHead eyebrow="Your workspace" title="Set up your agency or company" accent={4} lead="Complete the steps needed to handle client data." />
       <div className="kauro-setup-object">
-        <Window title={named || activated ? `${orgName} · setup` : "New organisation · setup"} state={windowState} stateTone={activated ? "done" : "neutral"} className="kauro-setup">
+        <Window title={activated ? `${label} · setup` : "New workspace · setup"} state={activated ? "Ready" : state === "agreements-today" ? "Draft" : "Not created yet"} stateTone={activated ? "done" : "neutral"} className="kauro-setup">
           <div className="kauro-setup-grid">
             <div className="kauro-setup-path">
-              <Rings
-                label="Five steps"
-                items={[
-                  { key: "identity", name: "Your identity", fact: facts.identity, state: ring("identity") },
-                  { key: "organisation", name: "Your organisation", fact: facts.organisation, state: ring("organisation") },
-                  { key: "buyer", name: "Who buys", fact: facts.buyer, state: ring("buyer") },
-                  { key: "billing", name: "Billing profile", fact: facts.billing, state: ring("billing") },
-                  { key: "agreements", name: "Agreements", fact: facts.agreements, state: ring("agreements") },
-                ]}
-              />
+              <Rings label="From your account to your first project" items={rings(activated ? "project" : "workspace")} />
             </div>
-            <section className="kauro-setup-step" aria-live="polite" aria-label="Current step">
-              {step}
+            <section aria-live="polite" aria-label="Current step">
+              {body}
             </section>
           </div>
         </Window>
-        {activated ? <Stamp>Active</Stamp> : null}
+        {activated ? <Stamp>Ready</Stamp> : null}
       </div>
       <p className="kauro-setup-join">
         Joining an agency that already uses Kauro? Open the invitation link you were sent. An email address never adds anyone to an agency on its own. <ScreenLink to="UI51" ctx={ctx}>About invitations</ScreenLink>

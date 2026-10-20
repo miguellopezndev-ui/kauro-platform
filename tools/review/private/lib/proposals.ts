@@ -17,20 +17,50 @@ export interface Proposal {
   readonly information: string;
   readonly actions: string;
   readonly exceptions: string;
+  /** Drawn without the private chrome, as the sign-in is (no session is needed to see it). */
+  readonly anonymous?: boolean;
 }
 
 export const PROPOSALS: readonly Proposal[] = [
+  {
+    key: "P-05",
+    group: "A",
+    anchor: "UI50",
+    origin: "APP",
+    title: "Create account",
+    why: "Sign-up is public and self-serve for agencies and companies (owner, 2026-10-20). The registry has no sign-up screen: it needs a route, the identity provider's sign-up and email verification.",
+    route: "/signup (proposed)",
+    primaryCopy: "Create your Kauro account.",
+    information: "Google, or work email, full name and password; then an email code; then Kauro's two-step verification and the recovery codes; then the workspace setup (UI09). The path to the first project beside the form.",
+    actions: "Continue with Google; create the account; verify the email; turn on two-step verification; keep the recovery codes.",
+    exceptions: "Never says whether an address has an account; never grants seller, staff or owner access; an email domain never joins anyone to an agency.",
+    anonymous: true,
+  },
+  {
+    key: "P-06",
+    group: "A",
+    anchor: "UI50",
+    origin: "APP",
+    title: "Reset password",
+    why: "Email and password need a safe recovery that ends every other session (owner, 2026-10-20). The registry has none.",
+    route: "/login/reset (proposed)",
+    primaryCopy: "Reset your password.",
+    information: "The address; a code sent to it; the new password; the result.",
+    actions: "Send a code; enter it; set a new password; sign in again.",
+    exceptions: "Never says whether an address has an account; never changes two-step verification; pauses after repeated requests.",
+    anonymous: true,
+  },
   {
     key: "P-01",
     group: "A",
     anchor: "UI32",
     origin: "APP",
     title: "Personal settings",
-    why: "Appearance, profile, security, sessions and notices for every person. Only the theme and the current session exist in the contract today.",
+    why: "Appearance, profile, sign-in methods, two-step verification, recovery codes, sessions and notices for every person. Only the theme and the current session exist in the contract today.",
     route: "/account (proposed)",
     primaryCopy: "Your own settings, the same in every agency.",
     information: "Appearance (exists); name and address as the identity provider holds them (needs a read); two-step verification state (exists in the session); this session's limits (exists); notices (needs a contract).",
-    actions: "Change the theme (exists); sign out (exists); sign out of other devices (needs a contract); choose notices (needs a contract).",
+    actions: "Change the theme (exists); sign out (exists); change password, replace the authenticator app, create new recovery codes, sign out of other sessions (need contracts, with step-up); choose notices (needs a contract).",
     exceptions: "No password, code or secret is ever shown or stored here; the identity provider keeps them.",
   },
   {

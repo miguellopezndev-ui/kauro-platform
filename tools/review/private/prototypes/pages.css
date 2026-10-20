@@ -1,158 +1,5 @@
 /* Pages of the private application (Order 11), each in its own block, in the order the owner reviews them. */
 
-/* ===== UI50 Sign in: one card, then the three assurances, as on the public Home ===== */
-.kauro-signin {
-  display: grid;
-  justify-items: center;
-  gap: var(--kauro-space-7);
-  padding-block: clamp(0.5rem, 3vw, 2.5rem) var(--kauro-space-4);
-}
-.kauro-main .kauro-signin-card {
-  box-sizing: border-box;
-  inline-size: min(100%, 30rem);
-  padding: clamp(1.5rem, 4vw, 2.5rem);
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.875rem;
-  background: var(--kauro-color-raised);
-  box-shadow: 0 2rem 4rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
-}
-.kauro-main .kauro-signin-card h1 {
-  margin: 0;
-}
-.kauro-signin-body {
-  margin-block-start: var(--kauro-space-6);
-}
-.kauro-signin-body .kauro-field {
-  margin-block-end: var(--kauro-space-5);
-}
-.kauro-signin-body .kauro-form > .kauro-button {
-  justify-self: stretch;
-}
-.kauro-main .kauro-signin-who {
-  margin-block-end: var(--kauro-space-4);
-  padding: var(--kauro-space-2) var(--kauro-space-3);
-  border-radius: var(--kauro-radius);
-  background: var(--kauro-color-surface);
-  font-family: var(--kauro-mono-family);
-  font-size: var(--kauro-font-size-dense);
-  overflow-wrap: anywhere;
-}
-.kauro-signin-steps {
-  display: grid;
-  gap: var(--kauro-space-2);
-  margin: 0 0 var(--kauro-space-3);
-  padding-inline-start: 1.25rem;
-}
-.kauro-secret {
-  display: inline-block;
-  padding: 0.125rem 0.375rem;
-  border: 1px dashed var(--kauro-color-border);
-  border-radius: var(--kauro-radius);
-  background: var(--kauro-color-background);
-  letter-spacing: 0.08em;
-  word-break: normal;
-}
-.kauro-main .kauro-code-input {
-  max-inline-size: 11rem;
-  font-family: var(--kauro-mono-family);
-  font-size: 1.25rem;
-  letter-spacing: 0.3em;
-}
-.kauro-main .kauro-signin-help {
-  margin: var(--kauro-space-6) 0 0;
-  padding-block-start: var(--kauro-space-4);
-  border-block-start: 1px solid var(--kauro-color-border);
-  color: var(--kauro-color-text-muted);
-  font-size: var(--kauro-font-size-dense);
-  line-height: 1.9;
-}
-/* the strip of assurances: a ring with a check, a title, one line; three columns on a wide screen, as under the public hero */
-.kauro-assurances {
-  display: grid;
-  gap: var(--kauro-space-4);
-  inline-size: min(100%, 60rem);
-  margin: 0;
-  padding: var(--kauro-space-5) 0 0;
-  border-block-start: 1px solid var(--kauro-color-border);
-  list-style: none;
-}
-.kauro-main .kauro-assurances li {
-  position: relative;
-  display: grid;
-  gap: 0.25rem;
-  max-inline-size: none;
-  padding-inline-start: 3rem;
-}
-.kauro-assurances li::before {
-  content: "";
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  box-sizing: border-box;
-  inline-size: 2.25rem;
-  block-size: 2.25rem;
-  border: 1px solid var(--kauro-color-accent);
-  border-radius: 50%;
-  background: var(--kauro-color-accent-surface);
-}
-.kauro-assurances li::after {
-  content: "";
-  position: absolute;
-  inset-block-start: 0.6875rem;
-  inset-inline-start: 0.875rem;
-  inline-size: 0.3125rem;
-  block-size: 0.625rem;
-  border: solid var(--kauro-color-primary);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-}
-.kauro-assurances span {
-  color: var(--kauro-color-text-muted);
-  font-size: var(--kauro-font-size-dense);
-}
-@media (min-width: 48rem) {
-  .kauro-assurances {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--kauro-space-6);
-  }
-}
-
-/* ===== UI51 Accept invitation: the invitation as a window, its verdict stamped ===== */
-.kauro-invite {
-  display: grid;
-  justify-items: center;
-  gap: var(--kauro-space-6);
-  padding-block: clamp(0.5rem, 3vw, 2rem);
-}
-.kauro-invite-head {
-  inline-size: min(100%, 36rem);
-}
-.kauro-main .kauro-invite-head h1 {
-  margin: 0;
-}
-.kauro-invite-object {
-  position: relative;
-  inline-size: min(100%, 36rem);
-}
-.kauro-main .kauro-invite-title {
-  margin: 0 0 var(--kauro-space-3);
-  font-size: 1.375rem;
-}
-.kauro-main .kauro-invite-object .kauro-proposed {
-  margin-block-end: var(--kauro-space-3);
-}
-/* the verdict sits on the window's lower edge, as the public hero's stamp does, never over the words */
-.kauro-invite-object:has(> .kauro-stamp) {
-  margin-block-end: var(--kauro-space-5);
-}
-.kauro-main .kauro-invite-object > .kauro-stamp {
-  position: absolute;
-  inset-block-end: -1.125rem;
-  inset-inline-end: 1.5rem;
-  font-size: 0.8125rem;
-  transform: rotate(-6deg);
-}
-
 /* ===== UI09 Agency setup: one window; the steps as rings beside the step's work ===== */
 .kauro-setup-object {
   position: relative;
@@ -715,9 +562,9 @@ fieldset.kauro-notice-form {
   max-inline-size: 40rem;
 }
 .kauro-logo-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: start;
   gap: var(--kauro-space-4);
 }
 .kauro-logo-preview {
@@ -759,11 +606,153 @@ fieldset.kauro-notice-form {
   color: var(--kauro-color-text-muted);
   font-size: var(--kauro-font-size-dense);
 }
-@media (min-width: 60rem) {
+/* the provider, its state and its way in on one line; what the state means under them, across the row */
+@media (min-width: 40rem) {
   .kauro-provider-list > li {
-    grid-template-columns: minmax(12rem, 1fr) auto minmax(0, 1.6fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .kauro-provider-list > li > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .kauro-provider-list > li > .kauro-status-badge {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .kauro-provider-list > li > .kauro-button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .kauro-main .kauro-provider-list > li > p {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }
 
 /* A form laid out as a grid takes the width it is given, never the width of its widest control (a long select or a file input would
    otherwise push the page wider than a phone). */
+
+/* ===== UI10 with no workspace: the welcome of a new account ===== */
+.kauro-welcome {
+  display: grid;
+  gap: var(--kauro-space-7);
+  align-items: start;
+}
+@media (min-width: 62rem) {
+  .kauro-welcome {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
+  }
+}
+.kauro-main .kauro-welcome-start h2 {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-welcome-steps {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  list-style: none;
+  counter-reset: welcome;
+}
+.kauro-main .kauro-welcome-steps li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: none;
+  padding-inline-start: 2.75rem;
+  counter-increment: welcome;
+}
+.kauro-welcome-steps li::before {
+  content: counter(welcome);
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.875rem;
+  block-size: 1.875rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-welcome-steps span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-welcome-promises {
+  margin-block: var(--kauro-space-6) 0;
+  padding-block-start: var(--kauro-space-5);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-welcome-example-go {
+  margin-block-start: var(--kauro-space-5);
+}
+
+/* UI09: who accepts, and the agreements, as one block under the choices */
+.kauro-setup-accept {
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-setup-accept h3 {
+  margin: 0;
+}
+.kauro-main .kauro-setup-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-3);
+  margin: 0;
+}
+.kauro-setup-who bdi {
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: var(--kauro-font-size-dense);
+  overflow-wrap: anywhere;
+}
+.kauro-setup-accept .kauro-confirm,
+.kauro-setup-accept .kauro-documents {
+  margin: 0;
+}
+.kauro-main .kauro-setup-step {
+  display: grid;
+  gap: var(--kauro-space-4);
+  align-content: start;
+}
+.kauro-main .kauro-setup-step > :is(h2, p, .kauro-field, .kauro-choice, .kauro-note) {
+  margin: 0;
+}
+.kauro-main .kauro-setup-step > .kauro-button {
+  justify-self: start;
+}
+
+/* the two sides of the welcome are not two sections of a page: no rule between them */
+.kauro-main .kauro-welcome > section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* the example's stages: each fact under its name, so the stage names never break */
+.kauro-welcome-example .kauro-ring {
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: start;
+  padding-block: 0.3125rem;
+}
+.kauro-welcome-example .kauro-ring::before,
+.kauro-welcome-example .kauro-ring::after {
+  margin-block-start: 0.125rem;
+}
+.kauro-welcome-example .kauro-ring--done::after {
+  margin-block-start: 0.3125rem;
+}
+.kauro-welcome-example .kauro-ring-fact {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: start;
+}

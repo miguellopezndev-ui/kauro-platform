@@ -4,12 +4,13 @@
 // rendered by the server); a prototype is drawn here from the state the review asks for.
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
+import { proposalOf } from "./proposals.ts";
 import { asHref, REVIEW } from "./links.ts";
 import { ReviewShell } from "./review-shell.tsx";
 import { scriptOf } from "./scenario.ts";
 import { screenDef } from "./screens.tsx";
 
-const PEOPLE: readonly ContextKey[] = ["agency", "company", "admin", "operator", "owner", "seller", "outsider"];
+const PEOPLE: readonly ContextKey[] = ["newcomer", "agency", "company", "admin", "operator", "owner", "seller", "outsider"];
 
 export function FrameHost({ id, context, state, pathname, children }: { readonly id: string; readonly context: ContextKey; readonly state: string; readonly pathname: string; readonly children: ReactNode }): ReactElement {
   const def = screenDef(id);
@@ -48,7 +49,7 @@ export function FrameHost({ id, context, state, pathname, children }: { readonly
           All screens and states
         </a>
       </div>
-      <ReviewShell appPath={pathname} context={context} script={script}>
+      <ReviewShell appPath={proposalOf(id)?.anonymous === true ? "/login" : pathname} context={context} script={script}>
         {children ?? (Prototype === undefined ? <NotDesigned id={id} /> : <Prototype ctx={ctx} state={stateDef?.key ?? "normal"} />)}
       </ReviewShell>
     </>
