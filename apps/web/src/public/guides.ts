@@ -9,7 +9,7 @@ import { INPUT_LIMITS } from "./limits.ts";
 import { POLICY_SNAPSHOT } from "./policy-snapshot.ts";
 import { formatDays } from "./retention.ts";
 
-export const GUIDES_VERSION = "1.2";
+export const GUIDES_VERSION = "1.3";
 /** The date the guides last changed, in UTC. */
 export const GUIDES_CHANGED = "2026-10-20";
 

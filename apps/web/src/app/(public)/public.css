@@ -2775,79 +2775,6 @@ body:has(> .kauro-site-header) {
   color: var(--kauro-color-text-muted);
 }
 
-/* Counts: a figure and what it counts. */
-.kauro-site-frag-counts {
-  display: grid;
-  gap: 0.375rem;
-}
-.kauro-site-frag-count {
-  display: grid;
-  grid-template-columns: 4.25rem minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.75rem;
-}
-.kauro-site-frag-count .kauro-site-frag-figure {
-  text-align: end;
-}
-
-/* A change waiting for approval, and the control that would approve it. */
-.kauro-site-frag-approval {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.375rem 0.75rem;
-}
-.kauro-site-frag-change {
-  font-weight: 650;
-}
-.kauro-site-frag-waiting {
-  grid-column: 1;
-  color: var(--kauro-color-primary);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-.kauro-site-frag-button {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  padding: 0.4375rem 0.875rem;
-  border-radius: 0.3125rem;
-  background: var(--kauro-color-primary);
-  color: var(--kauro-color-on-primary);
-  font-weight: 650;
-}
-
-/* A sum that reconciles. */
-.kauro-site-frag-reconcile {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.375rem 0.625rem;
-}
-.kauro-site-frag-arrow::before {
-  content: "\2192";
-  color: var(--kauro-color-text-muted);
-}
-.kauro-site-frag-figure--out {
-  color: var(--kauro-color-primary);
-}
-.kauro-site-frag-ok {
-  flex-basis: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--kauro-color-success-text);
-  font-weight: 600;
-}
-.kauro-site-frag-ok::before {
-  content: "";
-  inline-size: 0.3125rem;
-  block-size: 0.5625rem;
-  margin-inline: 0.125rem 0.25rem;
-  border: solid currentColor;
-  border-width: 0 1.5px 1.5px 0;
-  transform: translateY(-0.125rem) rotate(45deg);
-}
-
 /* Files in import order, joined by a rule. */
 .kauro-site-frag-order {
   display: grid;
@@ -5441,8 +5368,8 @@ body:has(> .kauro-site-header) {
 
 /* Motion on the public pages (Order 10, owner review, fifth pass). As on Home, things answer the pointer and almost nothing moves on its
    own: no object appears or plays as the page is scrolled, with two exceptions that tell the product. On Data handling the file is redacted
-   line by line while the reader has the whole card in view. On How it works the steps are walked down one by one beside a single window
-   of the product, which is brought up to date at each step (how-flow.tsx). Everything else is still until it is pointed at:
+   line by line while the reader has the whole card in view. How it works is a reference and plays nothing (Home tells the process).
+   Everything else is still until it is pointed at:
      the cards of a choice (services, prices, what is included) lift a little; a table answers row by row; the box of what is counted lights
      the column pointed at; the redacted file straightens like the tilted cards of Home.
    The status lamps come on once, in turn, on load. Nothing moves for a visitor who asked for less motion. */
@@ -5471,75 +5398,9 @@ body:has(> .kauro-site-header) {
     clip-path: inset(0 0 0 0);
   }
 }
-/* How it works, the window's scenes: a file drops into place, a bar measures, a thing is shown or hidden at a moment (never half), a
-   control is pressed, a step is taken, a line is drawn, the team receives */
-@keyframes kauro-drop {
-  from {
-    transform: translateY(-0.75rem);
-    clip-path: inset(0 0 100% 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
 @keyframes kauro-grow {
   from {
     transform: scaleX(0);
-  }
-}
-@keyframes kauro-shown-until {
-  0% {
-    visibility: visible;
-  }
-  100% {
-    visibility: hidden;
-  }
-}
-@keyframes kauro-hidden-until {
-  0% {
-    visibility: hidden;
-  }
-  100% {
-    visibility: visible;
-  }
-}
-@keyframes kauro-press {
-  0%,
-  70% {
-    visibility: visible;
-    transform: scale(1);
-  }
-  78% {
-    visibility: visible;
-    transform: scale(0.94);
-  }
-  88% {
-    visibility: visible;
-    transform: scale(1);
-  }
-  100% {
-    visibility: hidden;
-  }
-}
-@keyframes kauro-order-on {
-  from {
-    background-color: transparent;
-    color: var(--kauro-color-primary);
-  }
-}
-@keyframes kauro-lay {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-@keyframes kauro-team-on {
-  0% {
-    border-color: var(--kauro-color-border);
-    background-color: transparent;
-    color: var(--kauro-color-text-muted);
   }
 }
 
@@ -8837,7 +8698,6 @@ body:has(> .kauro-site-header) {
 }
 .kauro-how-ledger tbody td:first-of-type {
   font-weight: 600;
-  white-space: nowrap;
 }
 .kauro-how-ledger--price tbody td:first-of-type {
   text-align: end;
@@ -8859,9 +8719,10 @@ body:has(> .kauro-site-header) {
     grid-column: 1 / -1;
   }
 }
-@media (max-width: 39.99rem) {
+@media (min-width: 75rem) {
+  /* a figure keeps to one line only where the ledger is wide enough for it */
   .kauro-how-ledger tbody td:first-of-type {
-    white-space: normal;
+    white-space: nowrap;
   }
 }
 @media (hover: hover) {

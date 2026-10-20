@@ -11,8 +11,8 @@
 
 ## Verdict
 
-The public web is visually finished and technically clean, but it is **not ready for production**. Known blockers remain (section 3), and
-none of them is visual. The How it works guide (review log, row 25) waits for the owner's look before PR #117 is merged.
+The public web is technically clean and visually finished apart from How it works (UI02), which waits for the owner's look; it is **not ready for production**. Known blockers remain (section 3), and
+none of them is visual. PR #117 is merged only after the owner's look at the How it works guide (review log, row 25).
 
 ## 1. Public design
 
@@ -71,8 +71,25 @@ none of them is visual. The How it works guide (review log, row 25) waits for th
     component.
 - **Home:** both calls to action, **Request a free data health check**, now lead to the fit form (`/contact`), as A3 3.2 requires. They no
   longer go to sign-in.
-- **Help:** the file limits now name the 5 GB limit for the set and the 500,000 billable source units. Guide version 1.2, with its new
-  digest recorded.
+- **Help:** the file limits now name the 5 GB limit for the set and the 500,000 billable source units; "Pay for a project" no longer says
+  a payment is confirmed by the payment provider (Payments V1: the launch route is a reconciled bank transfer). It now says the payment is
+  confirmed once Kauro has matched the money received to the exact amount, and names no route. Guide version 1.3, with its new digest
+  recorded.
+- **Independent review of the candidate** (one must-fix, six should-fix, nits), applied:
+  - the excluded data on How it works is no longer a closed list: it adds other sensitive personal data and points to the service terms
+    for every excluded category;
+  - the stages name no destination (A3 3.3: only the capability publication does, on Supported services). The invented example names its
+    service from the sample's mode;
+  - stage 01 states the account and onboarding that come after the fit form;
+  - the check is started by the team and run by Kauro (CMD020);
+  - the three counts stay in the contacts file; the companies file is folded into the note under the price;
+  - the index numbers are hidden from screen readers;
+  - a new version of the files, not "files changed", after an approval;
+  - the policy figure of one check at a time is no longer typed into the copy;
+  - a ledger figure wraps below 75rem;
+  - dead CSS from the removed animation is gone (seven keyframes, the fragments, a stale comment).
+
+  The card of who acts keeps its pointer response, as every card on the table does.
 - **Removed:** `how-flow.tsx`, its CSS and three fragments only it used.
 - **Kept from earlier rounds:** the pricing estimator above the launch envelope, the sample's "group" and consecutive trace, the Contact
   resend rule, the Status description, and "Minimised".
@@ -105,11 +122,11 @@ Every open item from the previous audit is classified here. **Resolved** ones ar
 | # | Item | Kind | Who decides | State |
 | --- | --- | --- | --- | --- |
 | O-1 | Home's call to action went to sign-in (A3 3.2) | copy and contract | — | **Resolved**: to the fit form |
-| O-2 | Help's limits left out the 5 GB set | versioned guide | — | **Resolved**: guide 1.2 |
+| O-2 | Help's limits left out the 5 GB set | versioned guide | — | **Resolved**: guide 1.2, then 1.3 |
 | O-3 | How it works: the lead, the units, approved versus unified | copy | — | **Resolved** (row 25) |
 | O-4 | Data processing terms: activity records (LC-1) | legal | counsel, at the next re-issue | Recorded; blocker 2 |
-| O-5 | Help, "Pay for a project": "confirmed by the payment provider" and "if a payment page closes". This follows the hosted-checkout design that Payments V1 superseded for launch, where the route is a reconciled bank transfer. | versioned guide, payments | owner, with Payments V1 | Open: raise the guide to 1.3 when the launch payment route is proven. ACH must not be named before then. |
-| O-6 | Data that must not be uploaded: the public list (credentials, card data, health data) is narrower than ToS 5.2, which also excludes sensitive data and data of children and adolescents | legal and copy | counsel and owner | Open |
+| O-5 | Help, "Pay for a project": "confirmed by the payment provider" and "if a payment page closes" followed the hosted-checkout design that Payments V1 superseded for launch | versioned guide, payments | — | **Resolved**: guide 1.3 names no route. ACH stays unnamed until it is proven on the real account. |
+| O-6 | Data that must not be uploaded: the lists on Help and Data handling (credentials, card data, health data) are narrower than ToS 5.2, which also excludes sensitive data and data of children and adolescents | legal and copy | counsel and owner | Open for Help and Data handling. How it works already says "such as" and points to the service terms. |
 | O-7 | Paid enrichment: ToS 3.5 says Kauro does none, while Supported services says it stays off unless the customer enables a supported setting | legal | counsel | Open |
 | O-8 | Where the free check pauses: A3 3.2 says at 90% of the ceiling; ToS 3.3 says when the budget is exhausted; the policy has no key for 90% | authority | owner (A3) and counsel | Open. The site states neither. |
 | O-9 | The downloadable health check report is specified but not built (UI18 is a screen) | functional | private screens | Open. The site promises no download. |

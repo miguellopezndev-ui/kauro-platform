@@ -245,6 +245,8 @@ test("How it works is the buyer's guide: six stages, each with the same five fie
     "The check is bounded",
     "never a confirmed duplicate",
     "cannot approve anything",
+    "Your team starts the check; Kauro runs it",
+    "The service terms list every excluded category",
     "Pressing Enter never approves anything",
     "there is no quote before the plan is approved",
     "Returning to a page never confirms a payment",
@@ -254,6 +256,7 @@ test("How it works is the buyer's guide: six stages, each with the same five fie
   ])
     assert.ok(text.includes(claim), claim);
   assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "no stage names a duration");
+  assert.doesNotMatch(text.slice(0, text.indexOf("A worked example")), /HubSpot|Salesforce/, "the stages name a destination only through the capability publication, on Supported services; the invented example names its service");
   assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
   assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
   assert.deepEqual(linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary")).map((link) => `${link.text}|${link.href}`), [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "start the fit assessment (A3 3.2)");
@@ -275,10 +278,10 @@ test("How it works: the worked example keeps candidate groups, approved unificat
     `${formatCount(pairs + triples - pairsKeptApart)} of ${formatCount(pairs + triples)} groups`,
     `kept ${formatCount(pairsKeptApart)} groups apart`,
     `${formatCount(contacts.source)} source rows become ${formatCount(contacts.rows)} delivered rows`,
-    `${formatCount(companies.source)} source rows become ${formatCount(companies.rows)} delivered rows`,
     `the price counts ${formatCount(units)} units, while the delivery holds ${formatCount(contacts.rows + companies.rows)} rows`,
     formatUsd(priceOf(band, SAMPLE_MODE)),
     "Invented figures.",
+    "prepared for an import with the HubSpot service",
   ])
     assert.ok(text.includes(fact), fact);
 });
@@ -543,7 +546,7 @@ test("Help: an index of seven static guides that link to their sections, each wi
   const targets = hrefsOf(index);
   assert.deepEqual(targets, ["#guide-files", "#guide-target", "#guide-approval", "#guide-payment", "#guide-stages", "#guide-retention", "#guide-support"]);
   assert.deepEqual(headings(html).filter((heading) => heading.level === 2).map((heading) => heading.text), ["Prepare your files", "Confirm your target settings", "Approve the plan", "Pay for a project", "Import in stages and return receipts", "How long files stay", "Ask for help"]);
-  assert.match(text, /Guide version 1\.2, last changed 2026-10-20/);
+  assert.match(text, /Guide version 1\.3, last changed 2026-10-20/);
   for (const claim of ["up to 50 files in one set, up to 2 GB for each file and 5 GB for the whole set, up to 800 columns in a table, and up to 500,000 billable source units in one project at launch", "180 days after the last confirmation", "The quote stays valid for 14 days", "Pressing Enter never approves anything", "An arbitrary file marked as a success is not proof", "Never email a CRM export or a password"]) assert.ok(text.includes(claim), claim);
   assert.ok(hrefsOf(html).includes(ROUTE.contact));
   assert.doesNotMatch(html, /<form|<input|<button|type="search"/, "search is not offered yet");

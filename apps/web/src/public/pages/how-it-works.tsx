@@ -3,13 +3,15 @@
 // decisions and the import stay with the customer, the preparation is Kauro's). Then six stages in one ordered list, each with the same five
 // fields (who acts, what it needs, what happens, what you get, what stops it), an index beside them on a wide screen as in Help, and a worked
 // example on the synthetic sample that keeps apart the three counts a reader confuses (candidate groups, approved unifications, unified
-// rows) and shows the price from the billable source units. Every figure comes from the policy snapshot, the input limits or the sample.
+// rows, all three in the contacts file) and shows the price from the billable source units. The destinations are named only by the
+// capability publication (Supported services), so a stage says "a destination Kauro qualifies"; the example names its invented service. Every figure comes from the policy snapshot, the input limits or the sample.
 //
 // A3 3.2: the check is free, bounded and never promised as immediate, and the call to action leads to the fit form. A3 3.6: no fixed
 // duration. UI02's exceptions: nothing here implies that software approves or that Kauro writes to a production CRM.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../../copy/public.ts";
 import { INPUT_LIMITS } from "../limits.ts";
+import { modeName } from "../estimate-text.ts";
 import { DataTable, LinkButton, PageHead, Section } from "../parts.tsx";
 import { bandIndexOf, bandLabel, formatCount, formatUsd, priceOf } from "../pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
@@ -54,7 +56,7 @@ const STAGES: readonly Stage[] = [
     heading: "how.stage.files.heading",
     summary: "how.stage.files.summary",
     who: "how.stage.files.who",
-    needs: ["how.stage.files.needs.exports", { id: "help.files.limits", values: LIMITS }, "how.stage.files.needs.right", "how.stage.files.needs.target"],
+    needs: ["how.stage.files.needs.account", "how.stage.files.needs.exports", { id: "help.files.limits", values: LIMITS }, "how.stage.files.needs.right", "how.stage.files.needs.target"],
     happens: ["how.stage.files.happens.read", "how.stage.files.happens.inspect", "how.stage.files.happens.choose", "how.stage.files.happens.seal"],
     gets: ["how.stage.files.gets.count", "how.stage.files.gets.scope"],
     stops: ["how.stage.files.stops.format", "help.files.large", "how.stage.files.stops.excluded", "how.stage.files.stops.change"],
@@ -65,7 +67,7 @@ const STAGES: readonly Stage[] = [
     heading: "how.stage.check.heading",
     summary: "how.stage.check.summary",
     who: "how.stage.check.who",
-    needs: ["how.stage.check.needs.sealed", "how.stage.check.needs.one"],
+    needs: ["how.stage.check.needs.sealed"],
     happens: ["how.stage.check.happens.measure", "how.stage.check.happens.propose", "how.stage.check.happens.signal"],
     gets: ["how.stage.check.gets.result", "how.stage.check.gets.apart"],
     stops: ["how.stage.check.stops.bounded", "how.stage.check.stops.budget", "how.stage.check.stops.scope"],
@@ -235,11 +237,6 @@ function Example(): ReactElement | null {
             head: PUBLIC_COPY["how.example.unified.label"],
             cells: [n(contacts.unified), copy("how.example.unified.meaning", { source: n(contacts.source), output: n(contacts.rows) })],
           },
-          {
-            key: "companies",
-            head: PUBLIC_COPY["how.example.companies.label"],
-            cells: [n(companies.unified), copy("how.example.companies.meaning", { source: n(companies.source), output: n(companies.rows) })],
-          },
         ]}
       />
       <DataTable
@@ -251,7 +248,7 @@ function Example(): ReactElement | null {
           { key: "companies", head: PUBLIC_COPY["how.example.price.companies"], cells: [n(companies.source)] },
           { key: "units", head: PUBLIC_COPY["how.example.price.units"], cells: [n(units)] },
           { key: "band", head: PUBLIC_COPY["how.example.price.band"], cells: [bandLabel(band)] },
-          { key: "mode", head: PUBLIC_COPY["how.example.price.mode"], cells: [PUBLIC_COPY["services.hubspot.name"]] },
+          { key: "mode", head: PUBLIC_COPY["how.example.price.mode"], cells: [modeName(SAMPLE_MODE)] },
           { key: "total", head: PUBLIC_COPY["how.example.price.total"], cells: [formatUsd(priceOf(band, SAMPLE_MODE))] },
         ]}
       />
@@ -275,7 +272,9 @@ export function HowItWorksPage(): ReactElement {
               {STAGES.map((stage, index) => (
                 <li key={stage.key} className={`kauro-how-toc-item--${stage.actor}`}>
                   <a href={`#stage-${stage.key}`}>
-                    <span className="kauro-how-toc-number">{numberOf(index)}</span>
+                    <span className="kauro-how-toc-number" aria-hidden="true">
+                      {numberOf(index)}
+                    </span>
                     {PUBLIC_COPY[stage.heading]}
                   </a>
                 </li>
@@ -297,7 +296,7 @@ export function HowItWorksPage(): ReactElement {
           </div>
         </div>
       </section>
-      <Section id="how-example" heading={PUBLIC_COPY["how.example.heading"]} lead={PUBLIC_COPY["how.example.lead"]} tone="sunken" variant="kauro-how-example-band">
+      <Section id="how-example" heading={PUBLIC_COPY["how.example.heading"]} lead={copy("how.example.lead", { mode: modeName(SAMPLE_MODE) })} tone="sunken" variant="kauro-how-example-band">
         <Example />
       </Section>
       <Section id="how-responsibility" heading={PUBLIC_COPY["how.responsibility.heading"]} layout="split" tone="inverse" variant="kauro-site-band-grain">
