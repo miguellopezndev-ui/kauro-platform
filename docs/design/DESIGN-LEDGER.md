@@ -24,6 +24,7 @@ for the next review.
 | Surface | Piece | Status |
 | --- | --- | --- |
 | Whole site | Palette, light and dark themes, theme switch, typography and weight contrast | approved |
+| Whole site | Narrow-screen corrections (Order 10): tables of four columns stacked on phones; hero window, report pile, journey sheet heads, sign-in control. The web keeps its system families (owner, 2026-10-19) | implemented 2026-10-19; under the owner's interactive review (Order 10) |
 | Whole site | Header with the menu card (no numbers, quiet type, dimmed page) | revised |
 | Whole site | Footer (small wordmark, tagline, links) | approved |
 | Whole site | Motion: first impression, arrival, response; alternating card tilts | revised |

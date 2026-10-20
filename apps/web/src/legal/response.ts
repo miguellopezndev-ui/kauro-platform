@@ -26,6 +26,7 @@ body { display: flex; flex-direction: column; min-height: 100dvh; margin: 0; bac
 .kauro-legal-bar a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--kauro-color-text); font-family: var(--kauro-display-family); font-size: 1.5rem; font-weight: 650; letter-spacing: -0.035em; text-decoration: none; }
 .kauro-legal-main { box-sizing: border-box; max-width: 46rem; margin: 0 auto; padding: clamp(2.5rem, 6vw, 5rem) clamp(1.25rem, 4.5vw, 3rem) var(--kauro-space-8); }
 .kauro-legal-main:focus { outline: none; }
+.kauro-legal-main:has(.kauro-legal-card) { display: flex; flex-direction: column; justify-content: center; padding-block: clamp(2rem, 6vw, 4rem); }
 .kauro-legal-main h1 { margin: 0 0 var(--kauro-space-4); font-family: var(--kauro-display-family); font-size: clamp(2.25rem, 1.6rem + 2.6vw, 3.25rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.035em; text-wrap: balance; }
 .kauro-legal-main h2 { margin: var(--kauro-space-7) 0 var(--kauro-space-3); padding-top: var(--kauro-space-5); border-top: 1px solid var(--kauro-color-border); font-family: var(--kauro-display-family); font-size: 1.375rem; font-weight: 600; line-height: var(--kauro-line-height-heading); letter-spacing: -0.02em; }
 .kauro-legal-main p, .kauro-legal-main li { margin: 0 0 var(--kauro-space-3); line-height: 1.65; overflow-wrap: anywhere; }

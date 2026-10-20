@@ -14,12 +14,12 @@ test("nothing typed is a prompt, and text that is not a number of units is an er
   }
 });
 
-test("zero units is no project, and a count beyond the ladder needs a written scope", () => {
+test("zero units is no project, and a count beyond the ladder is told the launch limit and to ask in writing", () => {
   assert.equal(describeEstimate("0", "HUBSPOT", "AVAILABLE").kind, "NOTICE");
   assert.match(describeEstimate("0", "HUBSPOT", "AVAILABLE").text, /^Zero units is not a project\./);
   assert.deepEqual(describeEstimate("1,000,001", "CLEAN", "AVAILABLE"), {
     kind: "NOTICE",
-    text: "Above 1,000,000 units a project is outside the published bands and needs a written scope. Ask in writing.",
+    text: "At launch a project holds up to 500,000 billable source units. If yours is larger, ask in writing.",
     notes: [],
   });
 });
@@ -37,13 +37,13 @@ test("an offered band shows its indicative price for the mode, with the words es
   for (const units of ["1", "42000", "500000"]) assert.doesNotMatch(describeEstimate(units, "CLEAN", "AVAILABLE").text, /\bquote\b/i, "an estimate never calls itself a quote");
 });
 
-test("the band that is not offered at launch has no price at all", () => {
+test("the band that is not offered at launch has no price at all, and says the launch limit and what to do", () => {
   for (const mode of ["CLEAN", "HUBSPOT", "SALESFORCE"] as const) {
     const view = describeEstimate("500,001", mode, "AVAILABLE");
-    assert.deepEqual(view, { kind: "NOTICE", text: "This band is not offered at launch.", notes: [] }, mode);
+    assert.deepEqual(view, { kind: "NOTICE", text: "At launch a project holds up to 500,000 billable source units. If yours is larger, ask in writing.", notes: [] }, mode);
     assert.doesNotMatch(view.text, /USD/);
   }
-  assert.equal(describeEstimate("1,000,000", "CLEAN", "AVAILABLE").text, "This band is not offered at launch.");
+  assert.equal(describeEstimate("1,000,000", "CLEAN", "AVAILABLE").text, "At launch a project holds up to 500,000 billable source units. If yours is larger, ask in writing.");
 });
 
 test("a mode that is not available, or whose availability cannot be read, is said so beside the estimate, never instead of it", () => {

@@ -4,7 +4,8 @@
 // estimate and never instead of it; nothing here reads as a quote.
 import { copy } from "../copy/public.ts";
 import type { Availability } from "./capabilities.ts";
-import { BANDS, bandLabel, estimateBand, formatCount, formatUsd, type ServiceMode } from "./pricing-bands.ts";
+import { bandLabel, estimateBand, formatCount, formatUsd, type ServiceMode } from "./pricing-bands.ts";
+import { POLICY_SNAPSHOT } from "./policy-snapshot.ts";
 
 export interface EstimateView {
   readonly kind: "EMPTY" | "INVALID" | "NOTICE" | "RESULT";
@@ -41,9 +42,10 @@ export function describeEstimate(units: string, mode: ServiceMode, availability:
     case "NO_UNITS":
       return { kind: "NOTICE", text: copy("pricing.estimate.zero"), notes: notesFor(mode, availability) };
     case "BEYOND_LADDER":
-      return { kind: "NOTICE", text: copy("pricing.estimate.beyond", { units: formatCount(BANDS[BANDS.length - 1]?.maximum ?? 0) }), notes: notesFor(mode, availability) };
+      // above the ladder, as above the launch limit: the project is larger than a project can be at launch
+      return { kind: "NOTICE", text: copy("pricing.estimate.not-offered", { units: formatCount(POLICY_SNAPSHOT.launchSourceUnits) }), notes: notesFor(mode, availability) };
     case "BAND":
-      if (!estimate.offered) return { kind: "NOTICE", text: copy("pricing.estimate.not-offered"), notes: notesFor(mode, availability) };
+      if (!estimate.offered) return { kind: "NOTICE", text: copy("pricing.estimate.not-offered", { units: formatCount(POLICY_SNAPSHOT.launchSourceUnits) }), notes: notesFor(mode, availability) };
       return {
         kind: "RESULT",
         text: copy("pricing.estimate.result", { band: bandLabel(estimate.band), price: formatUsd(estimate.minor), mode: modeName(mode) }),

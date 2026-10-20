@@ -80,26 +80,32 @@ Bands:
 
 ## 3. Typography
 
-**Agreed direction (owner, 2026-10-18):**
-- a wordmark set in type only ("Kauro", no symbol);
-- **Inter** for the brand, headings and text;
-- **JetBrains Mono** for technical information where it helps legibility;
-- no third face, and no serif.
+**Decision (owner, 2026-10-19): the web keeps its system families.**
+- On 2026-10-18 the owner agreed Inter and JetBrains Mono, believing the web already used them.
+- When Order 10 put Inter on the web, the owner compared the two and kept the families the site had been designed and reviewed with:
+  they read better, and that decides.
+- **Inter and JetBrains Mono remain the faces of printed documents** (the B13 report, §13), which embed them.
+- The web serves no font. Its families are the system faces below.
+- The wordmark is "Kauro" in the display family. No custom letterform is drawn.
 
-The custom "a" of the wordmark is never applied to running text.
+The record of the decision is A10 §11.
 
-**Discrepancy recorded:** the web still uses the system families in the table below, so the agreed faces are **not yet implemented on
-the web**. Changing the web's fonts is a separate visual integration, with its own tests. Printed documents already use the agreed
-faces, embedded (§13).
-
-| Role | Family | Notes |
+| Role | Family (token) | Notes |
 | --- | --- | --- |
-| Body | `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` | 16 px, line height 1.5; dense metadata never below 14 px |
-| Display (headings, figures, wordmark) | `"Segoe UI Variable Display", system-ui, …` | tight tracking (−0.02 to −0.05 em), weights 300 to 700 |
-| Mono (file names, hashes, references, counters) | `ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, …` | 0.6875–0.875 rem; hashes break anywhere |
-| Editor's note | `Georgia, "Iowan Old Style", "Times New Roman", serif`, italic | margin notes and quiet asides only |
+| Body | `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` (`--kauro-font-family`) | 16 px, line height 1.5; dense metadata never below 14 px |
+| Display (headings, figures, wordmark) | `"Segoe UI Variable Display", system-ui, …` (`--kauro-display-family`) | tight tracking (−0.02 to −0.05 em), weights 300 to 700 |
+| Mono (file names, hashes, references, counters) | `ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, …` (`--kauro-mono-family`) | 0.6875–0.875 rem; hashes break anywhere |
+| Editor's note | `Georgia, "Iowan Old Style", "Times New Roman", serif`, italic (`--kauro-note-family`) | margin notes and quiet asides only |
 
 There are no web fonts and no font request to another origin (`font-src 'self'`).
+
+**Narrow screens (Order 10):**
+- A table of four columns or more is laid out row by row below 40 rem, each value beside its column's name (`DataTable`), so no word
+  breaks inside a narrow column.
+- The hero window, the report pile, the journey sheet's heads and the sign-in control have their own narrow-screen rules.
+- These corrections were kept with the system families.
+
+**Type roles:**
 - **Headline in two weights:** the last words of an h1 are set light in the primary colour (`PageHead accent`, `Headline`). The text is
   the registry's own sentence, unchanged.
 - **Figures:** prices and counts are display at weight 300, with tabular numbers. A currency code is set small and raised (`PriceFigure`).

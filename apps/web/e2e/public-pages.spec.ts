@@ -80,6 +80,17 @@ async function assertDocument(page: Page, response: Response | null, status: num
 }
 
 async function assertAccessible(page: Page): Promise<void> {
+  // axe measures the page as a reader sees it once it rests. Home's walk plays its first step on arrival (the owner's film timeline), and
+  // a row caught while it fades in from opacity 0 fails contrast on a colour nobody reads. So the check waits for every finite animation
+  // to end: a condition, never a fixed time (Order 10, proof in order10/tools/flake-proof.mjs: mid-fade 5/5 fail, settled 5/5 clean).
+  // Only what runs on the document's clock can end by itself: a scroll-driven animation rests where the scroll leaves it, and a paused
+  // one rests where it stopped, so neither is waited for. The condition is read on every frame (an animation's finished promise does
+  // not always settle inside the test's evaluation).
+  await page.waitForFunction(
+    () => document.getAnimations().every((animation) => animation.timeline !== document.timeline || animation.playState !== "running" || !Number.isFinite(animation.effect?.getComputedTiming().endTime ?? Infinity)),
+    undefined,
+    { polling: "raf" },
+  );
   const result = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   expect(result.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(" | ")}`)).toEqual([]);
 }
@@ -116,6 +127,37 @@ test("every page reflows to one column at 320 CSS pixels with no horizontal scro
   const summary = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   expect(summary.scroll, "the error summary reflows").toBeLessThanOrEqual(summary.client);
 });
+
+// The web keeps the system families it was designed and reviewed with (owner, 2026-10-19; Inter is the printed report's face only): no page
+// downloads a font, body and headings use the system stacks, and the notes use the Georgia stack. Checked on a root-layout page and a legal page.
+for (const route of ["/sample-delivery", "/legal/terms"]) {
+  test(`the web serves no font and keeps its system families (${route}) (owner's decision, 2026-10-19)`, async ({ page }) => {
+    const fonts: string[] = [];
+    page.on("request", (r) => {
+      if (r.resourceType() === "font") fonts.push(r.url());
+    });
+    await page.goto(route);
+    await page.evaluate(() => document.fonts.ready);
+    const facts = await page.evaluate(() => {
+      const family = (selector: string): string | null => {
+        const el = document.querySelector(selector);
+        return el === null ? null : getComputedStyle(el).fontFamily;
+      };
+      return { body: family("body"), h1: family("h1"), note: family(".kauro-site-margin"), faces: ((): number => {
+        let count = 0;
+        document.fonts.forEach(() => {
+          count += 1;
+        });
+        return count;
+      })() };
+    });
+    expect(fonts).toEqual([]);
+    expect(facts.faces).toBe(0);
+    expect(facts.body).toMatch(/^system-ui,/);
+    expect(facts.h1).toMatch(/^"Segoe UI Variable Display", system-ui,|^system-ui,/);
+    if (route === "/sample-delivery") expect(facts.note).toMatch(/^Georgia,/);
+  });
+}
 
 test("the pages give the same reading twice in a row: the publication is read on every request, never cached", async ({ page }) => {
   api.publish([["CLEAN", "AVAILABLE"]]);

@@ -2,8 +2,10 @@
 
 // What the team receives (Home, A10 §8): the delivery package as a pile of its four documents, drawn from the synthetic sample: the report's
 // counts, the cleaned file with a change it explains, the manifest that adds up and traces rows, the import steps in order. Choosing one in
-// the list beside the pile brings its sheet to the top; the others stay underneath with their titles showing. Every name and sentence is in
-// the list, and the pile is a picture of it. Without the script the report lies on top.
+// the list beside the pile (anywhere on its row) brings its sheet to the top; the others stay underneath with their titles showing, and a
+// pointer can also pull one out by its sheet or its tab. Pointing at a row or at a sheet underneath lifts that sheet a little out of the
+// pile, so the visitor sees which document they are about to open. Every name and sentence is in the list, and the pile is a picture of
+// it (keyboard and screen readers use the list). Without the script the report lies on top.
 import { useEffect, useState, type ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../copy/public.ts";
 import { FileName } from "./parts.tsx";
@@ -128,6 +130,7 @@ function Doc({ doc }: { readonly doc: DocKey }): ReactElement {
 
 export function PackageFolder({ sampleHref, sampleLabel }: { readonly sampleHref: string; readonly sampleLabel: string }): ReactElement {
   const [active, setActive] = useState(0);
+  const [peek, setPeek] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   return (
@@ -137,7 +140,13 @@ export function PackageFolder({ sampleHref, sampleLabel }: { readonly sampleHref
           // how far a sheet lies under the one on top: 0 is the top sheet
           const depth = (index - active + DOCS.length) % DOCS.length;
           return (
-            <div key={doc.key} className={cx("kauro-pack-sheet", `kauro-pack-sheet--${depth}`)}>
+            <div
+              key={doc.key}
+              className={cx("kauro-pack-sheet", `kauro-pack-sheet--${depth}`, ready && depth !== 0 && peek === index && "is-peek")}
+              onClick={ready && depth !== 0 ? () => setActive(index) : undefined}
+              onMouseEnter={ready && depth !== 0 ? () => setPeek(index) : undefined}
+              onMouseLeave={ready ? () => setPeek(null) : undefined}
+            >
               <span className="kauro-pack-sheet-tab">{PUBLIC_COPY[doc.name]}</span>
               <Doc key={depth === 0 ? `${doc.key}-top-${active}` : doc.key} doc={doc.key} />
             </div>
@@ -147,13 +156,13 @@ export function PackageFolder({ sampleHref, sampleLabel }: { readonly sampleHref
       <div className="kauro-pack-list">
         <ol aria-label={PUBLIC_COPY["home.package.label"]}>
           {DOCS.map((doc, index) => (
-            <li key={doc.key} className={cx("kauro-pack-item", index === active && "is-current")}>
+            <li key={doc.key} className={cx("kauro-pack-item", index === active && "is-current")} onMouseEnter={ready ? () => setPeek(index) : undefined} onMouseLeave={ready ? () => setPeek(null) : undefined}>
               <span className="kauro-pack-number" aria-hidden="true">
                 {String(index + 1).padStart(2, "0")}
               </span>
               <h3>
                 {ready ? (
-                  <button type="button" aria-pressed={index === active} onClick={() => setActive(index)}>
+                  <button type="button" aria-pressed={index === active} onClick={() => setActive(index)} onFocus={() => setPeek(index)} onBlur={() => setPeek(null)}>
                     {PUBLIC_COPY[doc.name]}
                   </button>
                 ) : (

@@ -16,9 +16,12 @@ export function OptOutForm({ token }: { readonly token: string }): ReactElement 
   }
   if (state === "DONE") {
     return (
-      <div role="status" id="unsubscribe-done">
+      <div role="status" id="unsubscribe-done" className="kauro-optout-done">
         <h2>{PUBLIC_COPY["unsubscribe.done.heading"]}</h2>
         <p>{PUBLIC_COPY["unsubscribe.done.body"]}</p>
+        <span className="kauro-optout-stamp" aria-hidden="true">
+          {PUBLIC_COPY["unsubscribe.done.stamp"]}
+        </span>
       </div>
     );
   }

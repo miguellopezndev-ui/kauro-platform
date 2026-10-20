@@ -1301,6 +1301,8 @@ body:has(> .kauro-site-header) {
   font-family: var(--kauro-mono-family);
   font-size: 0.8125rem;
   font-weight: 500;
+  /* a file name is never broken at its hyphen (it fits from 640 px up; narrower, the table is laid out row by row) */
+  white-space: nowrap;
 }
 .kauro-site-table-region--retention tbody th {
   inline-size: 38%;
@@ -2265,7 +2267,7 @@ body:has(> .kauro-site-header) {
     border-radius: 0.25rem;
     background: var(--kauro-color-background);
     color: var(--kauro-color-primary);
-    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-family: var(--kauro-note-family);
     font-size: 1.125rem;
     font-style: italic;
     line-height: 1.2;
@@ -2773,79 +2775,6 @@ body:has(> .kauro-site-header) {
   color: var(--kauro-color-text-muted);
 }
 
-/* Counts: a figure and what it counts. */
-.kauro-site-frag-counts {
-  display: grid;
-  gap: 0.375rem;
-}
-.kauro-site-frag-count {
-  display: grid;
-  grid-template-columns: 4.25rem minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.75rem;
-}
-.kauro-site-frag-count .kauro-site-frag-figure {
-  text-align: end;
-}
-
-/* A change waiting for approval, and the control that would approve it. */
-.kauro-site-frag-approval {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.375rem 0.75rem;
-}
-.kauro-site-frag-change {
-  font-weight: 650;
-}
-.kauro-site-frag-waiting {
-  grid-column: 1;
-  color: var(--kauro-color-primary);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-.kauro-site-frag-button {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  padding: 0.4375rem 0.875rem;
-  border-radius: 0.3125rem;
-  background: var(--kauro-color-primary);
-  color: var(--kauro-color-on-primary);
-  font-weight: 650;
-}
-
-/* A sum that reconciles. */
-.kauro-site-frag-reconcile {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.375rem 0.625rem;
-}
-.kauro-site-frag-arrow::before {
-  content: "\2192";
-  color: var(--kauro-color-text-muted);
-}
-.kauro-site-frag-figure--out {
-  color: var(--kauro-color-primary);
-}
-.kauro-site-frag-ok {
-  flex-basis: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: var(--kauro-color-success-text);
-  font-weight: 600;
-}
-.kauro-site-frag-ok::before {
-  content: "";
-  inline-size: 0.3125rem;
-  block-size: 0.5625rem;
-  margin-inline: 0.125rem 0.25rem;
-  border: solid currentColor;
-  border-width: 0 1.5px 1.5px 0;
-  transform: translateY(-0.125rem) rotate(45deg);
-}
-
 /* Files in import order, joined by a rule. */
 .kauro-site-frag-order {
   display: grid;
@@ -2939,7 +2868,7 @@ body:has(> .kauro-site-header) {
   gap: 0.625rem;
   margin-block-start: 0.75rem;
   color: var(--kauro-color-primary);
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-family: var(--kauro-note-family);
   font-size: 1.0625rem;
   font-style: italic;
   line-height: 1.2;
@@ -3353,7 +3282,7 @@ body:has(> .kauro-site-header) {
 }
 .kauro-answer-ask {
   color: var(--kauro-color-text-muted);
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-family: var(--kauro-note-family);
   font-size: 1.125rem;
   font-style: italic;
 }
@@ -3421,7 +3350,7 @@ body:has(> .kauro-site-header) {
 .kauro-redact-note {
   margin-block-start: 0.375rem;
   color: var(--kauro-color-text-muted);
-  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-family: var(--kauro-note-family);
   font-size: 0.9375rem;
   font-style: italic;
 }
@@ -3455,34 +3384,10 @@ body:has(> .kauro-site-header) {
 
 /* ---- the walk (Home: the process) --------------------------------------------------------------------------------------------- */
 
-.kauro-walk {
-  display: grid;
-  grid-template-areas: "window" "controls" "steps";
-  gap: var(--kauro-space-5);
-  margin-block-start: var(--kauro-space-6);
-}
-@media (min-width: 62rem) {
-  .kauro-walk {
-    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "steps window" "controls window";
-    column-gap: clamp(2.5rem, 5vw, 5rem);
-    row-gap: var(--kauro-space-5);
-    align-items: start;
-  }
-}
-.kauro-walk:not(.is-ready) {
-  grid-template-areas: "steps" "window";
-}
-@media (min-width: 62rem) {
-  .kauro-walk:not(.is-ready) {
-    grid-template-areas: "steps window";
-  }
-}
 
-/* The four steps, read as a column: every sentence stays on the page, the current one lit. */
+
+/* The six steps as a list: what assistive technology reads, and what a page without the script shows. */
 .kauro-walk-steps {
-  grid-area: steps;
   display: grid;
   margin: 0;
   padding: 0;
@@ -3512,7 +3417,7 @@ body:has(> .kauro-site-header) {
   background: var(--kauro-color-accent);
 }
 .kauro-walk-step-number {
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   display: grid;
   place-items: center;
   inline-size: 2.25rem;
@@ -3549,22 +3454,36 @@ body:has(> .kauro-site-header) {
   letter-spacing: -0.015em;
   line-height: 1.3;
 }
-.kauro-walk-step h3 button {
-  padding: 0;
-  border: 0;
-  background: none;
+.kauro-site-main .kauro-walk.is-ready .kauro-walk-step:not(.is-current) h3 {
   color: var(--kauro-color-text-muted);
-  font: inherit;
-  letter-spacing: inherit;
-  text-align: start;
-  cursor: pointer;
-  transition: color 0.25s ease;
+  font-size: 1.0625rem;
+  font-weight: 600;
 }
-.kauro-walk-step h3 button:hover {
-  color: var(--kauro-color-text);
+.kauro-site-main .kauro-walk-step-actor {
+  margin: 0;
+  padding-block-start: 0.375rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
-.kauro-walk-step.is-current h3 button {
-  color: var(--kauro-color-text);
+.kauro-walk-step--team .kauro-walk-step-actor {
+  color: var(--kauro-color-accent);
+}
+.kauro-walk-step-actor + h3 {
+  grid-column: 2;
+}
+.kauro-site-main .kauro-walk-step-actor + h3 {
+  padding-block-start: 0.125rem;
+}
+/* with the script, the steps not being shown keep only their name: the column never grows past the window beside it */
+.kauro-walk.is-ready .kauro-walk-step:not(.is-current) :is(.kauro-walk-step-actor, .kauro-walk-step-body) {
+  display: none;
+}
+.kauro-site-main .kauro-walk.is-ready .kauro-walk-step:not(.is-current) h3 {
+  padding-block-start: 0.4375rem;
 }
 .kauro-site-main .kauro-walk-step p {
   max-inline-size: 34ch;
@@ -3572,44 +3491,6 @@ body:has(> .kauro-site-header) {
   color: var(--kauro-color-text-muted);
   font-size: 0.9375rem;
   line-height: 1.5;
-}
-
-.kauro-walk-controls {
-  grid-area: controls;
-}
-.kauro-walk-next {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-block-size: 2.75rem;
-  padding: 0.5rem 1.125rem;
-  border: 1px solid var(--kauro-color-accent);
-  border-radius: var(--kauro-radius-medium, 0.375rem);
-  background: var(--kauro-color-accent);
-  color: var(--kauro-color-on-primary);
-  font: inherit;
-  font-weight: 650;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.kauro-walk-next::after {
-  content: "\2192";
-  transition: transform 0.2s ease;
-}
-.kauro-walk-next:hover {
-  background: var(--kauro-color-primary-hover);
-}
-.kauro-walk-next:hover::after {
-  transform: translateX(3px);
-}
-.kauro-walk.is-step-3 .kauro-walk-next::after {
-  content: "\21BA";
-}
-@media (max-width: 61.99rem) {
-  .kauro-walk-next {
-    inline-size: 100%;
-    justify-content: center;
-  }
 }
 
 /* The window: one sheet of paper on the carbon band, the same size at every step. */
@@ -3630,11 +3511,7 @@ body:has(> .kauro-site-header) {
     box-shadow: 0 2.5rem 4rem -1.5rem color-mix(in srgb, #000 80%, transparent), 0 0 0 1px var(--kauro-color-border);
   }
 }
-@media (min-width: 62rem) {
-  .kauro-walk.is-ready .kauro-walk-window {
-    block-size: 29rem;
-  }
-}
+
 
 .kauro-walk-bar {
   display: flex;
@@ -3684,7 +3561,7 @@ body:has(> .kauro-site-header) {
   animation: kauro-fade-in 0.3s ease 1.6s backwards;
 }
 
-.kauro-walk-sheet {
+.kauro-walk-work {
   display: grid;
   align-content: start;
   gap: 0.75rem;
@@ -3704,8 +3581,8 @@ body:has(> .kauro-site-header) {
   color: var(--kauro-color-text-muted);
   font-variant-numeric: tabular-nums;
 }
-.kauro-walk.is-step-2 .kauro-walk-rows,
-.kauro-walk.is-step-3 .kauro-walk-rows {
+.kauro-walk.is-step-4 .kauro-walk-rows,
+.kauro-walk.is-step-5 .kauro-walk-rows {
   color: var(--kauro-color-primary);
   font-weight: 650;
 }
@@ -3806,19 +3683,19 @@ body:has(> .kauro-site-header) {
   background: color-mix(in srgb, var(--kauro-color-accent) 22%, transparent);
   box-shadow: inset 0 -2px 0 var(--kauro-color-accent);
 }
-.kauro-walk.is-step-0 .kauro-walk-cell.is-flag {
+.kauro-walk.is-step-1 .kauro-walk-cell.is-flag {
   animation: kauro-walk-flag 0.6s ease backwards;
 }
-.kauro-walk.is-step-0 .kauro-walk-row:nth-child(3) .is-flag {
+.kauro-walk.is-step-1 .kauro-walk-row:nth-child(3) .is-flag {
   animation-delay: 0.15s;
 }
-.kauro-walk.is-step-0 .kauro-walk-row:nth-child(4) .is-flag {
+.kauro-walk.is-step-1 .kauro-walk-row:nth-child(4) .is-flag {
   animation-delay: 0.3s;
 }
-.kauro-walk.is-step-0 .kauro-walk-row:nth-child(5) .is-flag {
+.kauro-walk.is-step-1 .kauro-walk-row:nth-child(5) .is-flag {
   animation-delay: 0.45s;
 }
-.kauro-walk.is-step-0 .kauro-walk-row:nth-child(6) .is-flag {
+.kauro-walk.is-step-1 .kauro-walk-row:nth-child(6) .is-flag {
   animation-delay: 0.6s;
 }
 @keyframes kauro-walk-flag {
@@ -3831,8 +3708,8 @@ body:has(> .kauro-site-header) {
   animation: none;
 }
 /* in prepare and import, what the report lists and nobody approved to change stays marked, but quieter */
-.kauro-walk.is-step-2 .kauro-walk-cell.is-flag,
-.kauro-walk.is-step-3 .kauro-walk-cell.is-flag {
+.kauro-walk.is-step-4 .kauro-walk-cell.is-flag,
+.kauro-walk.is-step-5 .kauro-walk-cell.is-flag {
   background: transparent;
   box-shadow: inset 0 -1px 0 var(--kauro-color-accent);
 }
@@ -3885,9 +3762,6 @@ body:has(> .kauro-site-header) {
   border-block-start: 1px solid var(--kauro-color-border);
   background: var(--kauro-color-surface);
   font-size: 0.8125rem;
-}
-.kauro-walk.is-ready .kauro-walk-tray > * {
-  animation: kauro-rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
 .kauro-walk-metrics,
 .kauro-walk-proposals,
@@ -3978,17 +3852,13 @@ body:has(> .kauro-site-header) {
   font: inherit;
   font-size: 0.75rem;
   font-weight: 650;
-  cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
-.kauro-walk-approve:hover {
-  background: var(--kauro-color-accent-surface);
-}
-.kauro-walk-approve[aria-pressed="true"] {
+.kauro-walk-approve.is-on {
   background: var(--kauro-color-primary);
   color: var(--kauro-color-on-primary);
 }
-.kauro-walk-approve[aria-pressed="true"]::before {
+.kauro-walk-approve.is-on::before {
   content: "";
   inline-size: 0.3125rem;
   block-size: 0.5625rem;
@@ -4420,10 +4290,18 @@ body:has(> .kauro-site-header) {
   display: grid;
   padding: 3.25rem 2.75rem 0.5rem 0;
 }
+/* each sheet's place in the pile is a shift and a tilt; the pointer can add a small lift (--lift) and open the pile a little (--fan) */
 .kauro-pack-sheet {
+  --kauro-x: 0rem;
+  --kauro-y: 0rem;
+  --kauro-r: 0deg;
+  --kauro-lift: 0rem;
+  --kauro-fan: 1;
   position: relative;
   grid-area: 1 / 1;
   display: grid;
+  transform: translate(calc(var(--kauro-x) * var(--kauro-fan) + var(--kauro-lift)), calc(var(--kauro-y) - var(--kauro-lift)))
+    rotate(calc(var(--kauro-r) * var(--kauro-fan)));
   transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.5s ease;
 }
 .kauro-pack-sheet .kauro-doc {
@@ -4433,23 +4311,29 @@ body:has(> .kauro-site-header) {
   animation: none;
 }
 .kauro-pack-sheet--0 {
+  --kauro-r: -1deg;
   z-index: 4;
-  transform: rotate(-1deg);
 }
 .kauro-pack.is-ready .kauro-pack-sheet--0 .kauro-doc {
   animation: kauro-doc-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
 .kauro-pack-sheet--1 {
+  --kauro-x: 0.875rem;
+  --kauro-y: -1rem;
+  --kauro-r: 1.5deg;
   z-index: 3;
-  transform: translate(0.875rem, -1rem) rotate(1.5deg);
 }
 .kauro-pack-sheet--2 {
+  --kauro-x: 1.75rem;
+  --kauro-y: -2rem;
+  --kauro-r: 3.5deg;
   z-index: 2;
-  transform: translate(1.75rem, -2rem) rotate(3.5deg);
 }
 .kauro-pack-sheet--3 {
+  --kauro-x: 2.625rem;
+  --kauro-y: -3rem;
+  --kauro-r: 5.5deg;
   z-index: 1;
-  transform: translate(2.625rem, -3rem) rotate(5.5deg);
 }
 /* the sheets underneath show only their paper and their title */
 .kauro-pack-sheet:not(.kauro-pack-sheet--0) .kauro-doc > * {
@@ -4558,8 +4442,41 @@ body:has(> .kauro-site-header) {
   text-align: start;
   cursor: pointer;
 }
-.kauro-pack-item h3 button:hover {
+/* the whole row chooses its document, not only its name */
+.kauro-pack-item h3 button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.kauro-pack-item:hover h3 button,
+.kauro-pack-item h3 button:focus-visible {
   color: var(--kauro-color-primary);
+}
+.kauro-pack.is-ready .kauro-pack-item:hover .kauro-pack-number {
+  color: var(--kauro-color-primary);
+}
+.kauro-pack.is-ready .kauro-pack-item:not(.is-current):hover::before {
+  opacity: 0.35;
+}
+/* a sheet underneath can be pulled out by the pointer; the one the visitor points at (in the pile or in the list) lifts out a little */
+.kauro-pack.is-ready .kauro-pack-sheet:not(.kauro-pack-sheet--0) {
+  cursor: pointer;
+}
+.kauro-pack-sheet.is-peek {
+  --kauro-lift: 0.5rem;
+}
+.kauro-pack-sheet.is-peek .kauro-pack-sheet-tab {
+  border-color: var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+@media (hover: hover) {
+  /* pointed at, the pile opens a little, as a folder does when it is leafed through, and the top sheet straightens */
+  .kauro-pack.is-ready .kauro-pack-pile:hover .kauro-pack-sheet {
+    --kauro-fan: 1.25;
+  }
+  .kauro-pack.is-ready .kauro-pack-pile:hover .kauro-pack-sheet--0 {
+    --kauro-r: -0.25deg;
+  }
 }
 .kauro-pack-item.is-current h3 button {
   color: var(--kauro-color-primary);
@@ -4574,13 +4491,19 @@ body:has(> .kauro-site-header) {
     padding: 2.75rem 1.75rem 0 0;
   }
   .kauro-pack-sheet--1 {
-    transform: translate(0.5rem, -0.75rem) rotate(1.5deg);
+    --kauro-x: 0.5rem;
+    --kauro-y: -0.75rem;
+    --kauro-r: 1.5deg;
   }
   .kauro-pack-sheet--2 {
-    transform: translate(1rem, -1.5rem) rotate(3deg);
+    --kauro-x: 1rem;
+    --kauro-y: -1.5rem;
+    --kauro-r: 3deg;
   }
   .kauro-pack-sheet--3 {
-    transform: translate(1.5rem, -2.25rem) rotate(4.5deg);
+    --kauro-x: 1.5rem;
+    --kauro-y: -2.25rem;
+    --kauro-r: 4.5deg;
   }
   .kauro-pack-sheet-tab {
     display: none;
@@ -4927,7 +4850,7 @@ body:has(> .kauro-site-header) {
   --kauro-color-text-muted: #5f5955;
   --kauro-color-background: #f8f6f3;
   --kauro-color-surface: #f1ede8;
-  --kauro-color-raised: #ffffff;
+  --kauro-color-raised: #faf8f5;
   --kauro-color-border: #e3dcd4;
   --kauro-color-primary: #653a46;
   --kauro-color-on-primary: #f8f6f3;
@@ -5061,30 +4984,6 @@ body:has(> .kauro-site-header) {
   line-height: 1.7;
 }
 
-.kauro-steps .kauro-step {
-  padding-block-end: clamp(2.5rem, 5vw, 3.5rem);
-}
-.kauro-steps .kauro-step:last-child {
-  padding-block-end: 0;
-}
-.kauro-step-pane .kauro-site-frag {
-  margin-block-start: var(--kauro-space-4);
-}
-@media (min-width: 62rem) {
-  .kauro-steps .kauro-step {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
-    column-gap: clamp(2.5rem, 5vw, 5rem);
-    align-items: start;
-  }
-  .kauro-site-main .kauro-step-text > p:last-child {
-    max-inline-size: 56ch;
-  }
-  .kauro-step-pane .kauro-site-frag {
-    margin-block-start: 0;
-  }
-}
-
 /* Supported services: three cards side by side, CLEAN the wine one, none wider than the others */
 @media (min-width: 62rem) {
   .kauro-site-cards--three {
@@ -5192,7 +5091,7 @@ body:has(> .kauro-site-header) {
   .kauro-walk-metrics {
     align-content: start;
   }
-  .kauro-walk-sheet {
+  .kauro-walk-work {
     padding-inline: 0.875rem;
   }
 }
@@ -5218,9 +5117,14 @@ body:has(> .kauro-site-header) {
     transform: translateY(1.75rem) rotate(0deg);
   }
 }
+/* a stamp is not there until it lands, and lands only a little larger than it is, so it never leaves its card or the page on the way */
 @keyframes kauro-thunk {
-  from {
-    transform: scale(1.7) rotate(0deg);
+  0% {
+    transform: scale(1.12) rotate(0deg);
+    clip-path: inset(50%);
+  }
+  1% {
+    clip-path: inset(0);
   }
 }
 
@@ -5262,12 +5166,10 @@ body:has(> .kauro-site-header) {
     }
   }
   .kauro-site-button:active,
-  .kauro-walk-next:active,
   .kauro-walk-approve:active {
     transform: scale(0.97);
   }
   .kauro-site-button,
-  .kauro-walk-next,
   .kauro-walk-approve {
     transition-property: background-color, border-color, color, transform;
   }
@@ -5286,7 +5188,6 @@ body:has(> .kauro-site-header) {
     .kauro-redact,
     .kauro-answer,
     .kauro-site-service,
-    .kauro-step-pane,
     .kauro-site-rung {
       animation: kauro-settle linear backwards;
       animation-timeline: view();
@@ -5328,4 +5229,3515 @@ body:has(> .kauro-site-header) {
 /* a stamp mid-landing is larger than its place for an instant; it never widens the page */
 .kauro-site-main {
   overflow-x: clip;
+}
+
+/* =================================================================================================================================== */
+/* Order 10: the agreed faces on the web, and what they changed on narrow screens.                                                      */
+/* =================================================================================================================================== */
+
+/* A control's label never breaks inside the header. */
+.kauro-site-signin {
+  white-space: nowrap;
+}
+
+/* The hero window on a phone: each phase's detail goes under its name instead of squeezing it into a sliver. */
+@media (max-width: 30rem) {
+  .kauro-site-window-phases li {
+    grid-template-columns: 1.125rem minmax(0, 1fr);
+    row-gap: 0.0625rem;
+  }
+  .kauro-site-window-meta {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: start;
+  }
+  .kauro-site-window-head {
+    letter-spacing: 0.02em;
+  }
+  .kauro-site-window-row > .kauro-site-outcome {
+    white-space: normal;
+  }
+  /* the name and its result share the narrow window evenly, so the column heads keep their words */
+  .kauro-site-window-records {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+/* The window's address column holds the longest sample address wherever the window shows it (above 30rem). */
+@media (min-width: 30.0625rem) {
+  .kauro-site-window-records {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  }
+}
+
+/* The journey's sheet is a picture of a spreadsheet: an address too long for its cell is cut with an ellipsis, never mid-glyph. */
+.kauro-walk-cell--mono {
+  display: block;
+  align-content: center;
+  text-overflow: ellipsis;
+}
+@media (max-width: 39.99rem) {
+  /* the sheet keeps its three phone columns (main's rule above); its column heads fit their cells */
+  .kauro-walk-row--head .kauro-walk-cell {
+    font-size: 0.625rem;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* The report sheet in the document pile: on a narrow card the share goes under its label. */
+@media (max-width: 30rem) {
+  .kauro-doc-lines li {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.625rem;
+    row-gap: 0.125rem;
+  }
+  .kauro-doc-figure {
+    grid-row: span 2;
+    align-self: start;
+  }
+  .kauro-doc-share {
+    grid-column: 2;
+  }
+}
+
+/* A table of four columns or more on a phone: one block per row, its head first, then each value beside its column's name. The column
+   names stay in the table head for assistive technology (visually hidden); the visible labels are generated with an empty alternative, so
+   a screen reader does not hear them twice. */
+@media (max-width: 39.99rem) {
+  .kauro-site-table--stack,
+  .kauro-site-table--stack tbody,
+  .kauro-site-table--stack tr {
+    display: block;
+  }
+  .kauro-site-table--stack caption {
+    display: block;
+  }
+  .kauro-site-table--stack thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .kauro-site-table--stack tbody tr {
+    padding-block: var(--kauro-space-3);
+    border-block-start: 1px solid var(--kauro-color-border);
+  }
+  .kauro-site-table--stack tbody th,
+  .kauro-site-table--stack tbody td {
+    display: block;
+    padding-block: 0;
+    border: 0;
+    hyphens: manual;
+  }
+  .kauro-site-table--stack tbody th {
+    margin-block-end: var(--kauro-space-1);
+  }
+  .kauro-site-table--stack tbody td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--kauro-space-4);
+    padding-block: 0.125rem;
+    text-align: end;
+  }
+  .kauro-site-table--stack tbody td::before {
+    content: attr(data-label); /* a browser without alternative text for content still shows the label */
+    content: attr(data-label) / "";
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: start;
+    text-transform: uppercase;
+  }
+  .kauro-site-main .kauro-site-table--stack :is(th, td),
+  .kauro-site-main .kauro-site-table--stack :is(th, td):is(:first-child, :last-child) {
+    padding-inline: var(--kauro-space-4);
+  }
+  .kauro-site-main .kauro-site-sheet .kauro-site-table--stack :is(th, td),
+  .kauro-site-main .kauro-site-sheet .kauro-site-table--stack :is(th, td):is(:first-child, :last-child) {
+    padding-inline: var(--kauro-space-2);
+  }
+}
+@media (max-width: 39.99rem) {
+  /* the sample report's quiet bands follow the stacked rows */
+  .kauro-site-sheet .kauro-site-table--stack tbody tr:nth-child(even) {
+    background: var(--kauro-color-surface);
+  }
+}
+
+/* Motion on the public pages (Order 10, owner review, fifth pass). As on Home, things answer the pointer and almost nothing moves on its
+   own: no object appears or plays as the page is scrolled, with two exceptions that tell the product. On Data handling the file is redacted
+   line by line while the reader has the whole card in view. How it works is a reference and plays nothing (Home tells the process).
+   Everything else is still until it is pointed at:
+     the cards of a choice (services, prices, what is included) lift a little; a table answers row by row; the box of what is counted lights
+     the column pointed at; the redacted file straightens like the tilted cards of Home.
+   The status lamps come on once, in turn, on load. Nothing moves for a visitor who asked for less motion. */
+@keyframes kauro-redact {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes kauro-lamp {
+  from {
+    background-color: var(--kauro-color-border);
+  }
+}
+@keyframes kauro-mark {
+  from {
+    background-color: transparent;
+    border-color: transparent;
+  }
+}
+/* the window of How it works prints its new state, top to bottom, when the reader reaches a step */
+@keyframes kauro-print {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kauro-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Pricing: the strike over "not counted" is a drawn line */
+.kauro-site-units-col--not .kauro-site-frag-figure {
+  position: relative;
+  justify-self: start;
+  text-decoration: none;
+}
+.kauro-site-units-col--not .kauro-site-frag-figure::after {
+  content: "";
+  position: absolute;
+  inset-inline: -0.125rem;
+  inset-block-start: 52%;
+  block-size: 2px;
+  background: var(--kauro-color-primary);
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* the arrival of main (A10 §9) does not apply on these pages: the objects are in place when the page is read */
+  .kauro-site-service,
+  .kauro-site-rung,
+  .kauro-status-panel,
+  .kauro-redact,
+  .kauro-answer,
+  .kauro-answer-stamp {
+    animation: none;
+  }
+
+  /* Status: each lamp comes on in turn, as its service is read */
+  .kauro-site-status-state::before {
+    animation: kauro-lamp 0.5s ease-out 0.35s backwards;
+  }
+  .kauro-site-status-row:nth-child(2) .kauro-site-status-state::before {
+    animation-delay: 0.6s;
+  }
+  .kauro-site-status-row:nth-child(3) .kauro-site-status-state::before {
+    animation-delay: 0.85s;
+  }
+  .kauro-site-status-row:nth-child(n + 4) .kauro-site-status-state::before {
+    animation-delay: 1.1s;
+  }
+
+  @media (hover: hover) {
+    /* a card of a choice lifts a little when it is pointed at */
+    .kauro-site-service,
+    .kauro-site-rung:not(.kauro-site-rung--repeat),
+    .kauro-site-scope-column--in,
+    .kauro-site-frag--units,
+    :not(.kauro-site-sheet) > .kauro-site-table-region,
+    .kauro-redact {
+      transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.45s ease, border-color 0.3s ease;
+    }
+    .kauro-site-service:hover,
+    .kauro-site-rung:not(.kauro-site-rung--repeat):hover,
+    .kauro-site-scope-column--in:hover,
+    .kauro-site-frag--units:hover,
+    :not(.kauro-site-sheet) > .kauro-site-table-region:hover {
+      transform: translateY(-0.25rem);
+      box-shadow: 0 1.75rem 2.5rem -2rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent);
+    }
+    /* what is included takes the accent; what is not included stays as it is */
+    .kauro-site-scope-column--in:hover {
+      border-color: var(--kauro-color-accent);
+    }
+    /* the redacted file straightens like the tilted cards of Home */
+    .kauro-redact:hover {
+      transform: rotate(0deg) translateY(-0.25rem);
+    }
+    /* a table answers row by row: the row pointed at is marked in wine at its start */
+    .kauro-site-main .kauro-site-table tbody tr > :is(th, td) {
+      transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .kauro-site-main .kauro-site-table tbody tr:hover > :is(th, td) {
+      background: var(--kauro-color-accent-surface);
+    }
+    .kauro-site-main .kauro-site-table tbody tr:hover > :first-child {
+      box-shadow: inset 3px 0 0 var(--kauro-color-primary);
+    }
+    /* the box of what is counted lights the column pointed at */
+    .kauro-site-units-col {
+      transition: background-color 0.25s ease;
+    }
+    .kauro-site-units-col:hover {
+      background: var(--kauro-color-accent-surface);
+    }
+  }
+}
+
+/* Data handling: the file is redacted line by line, top to bottom, once the whole card is in view (the pace follows the space the screen
+   leaves around the card), and the one line a model may see stays, marked last */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .kauro-redact {
+      view-timeline-name: --kauro-redact;
+    }
+    .kauro-redact-line:not(.kauro-redact-line--seen) {
+      transform-origin: left center;
+      animation: kauro-redact linear both;
+      animation-timeline: --kauro-redact;
+    }
+    .kauro-redact-line:nth-child(2) {
+      animation-range: contain 0% contain 9%;
+    }
+    .kauro-redact-line:nth-child(3) {
+      animation-range: contain 9% contain 18%;
+    }
+    .kauro-redact-line:nth-child(4) {
+      animation-range: contain 18% contain 27%;
+    }
+    .kauro-redact-line:nth-child(6) {
+      animation-range: contain 27% contain 36%;
+    }
+    .kauro-redact-line:nth-child(7) {
+      animation-range: contain 36% contain 45%;
+    }
+    .kauro-redact-line:nth-child(8) {
+      animation-range: contain 45% contain 54%;
+    }
+    .kauro-redact-line--seen {
+      animation: kauro-mark linear both;
+      animation-timeline: --kauro-redact;
+      animation-range: contain 54% contain 62%;
+    }
+  }
+}
+
+/* ---- One card of the product in the middle of the page (Service status, Communication preferences; Order 10, owner review) -------- */
+/* As the not-found page: a sheet of the product left on the desk, a little tilted, its bar in ink, everything the page says on it. It
+   straightens when it is pointed at. */
+.kauro-cardpage {
+  display: grid;
+  place-items: center;
+  padding: clamp(1.5rem, 5vh, 3rem) var(--kauro-site-gutter, 1rem);
+}
+.kauro-cardsheet {
+  position: relative;
+  box-sizing: border-box;
+  inline-size: min(100%, 44rem);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 1rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  box-shadow: 0 3rem 6rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent), 0 0.75rem 1.5rem -1rem color-mix(in srgb, var(--kauro-color-ink) 35%, transparent);
+  transform: rotate(-1.5deg);
+}
+.kauro-site-main p.kauro-cardsheet-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-inline-size: none;
+  margin: 0;
+  padding: 0.875rem clamp(1.25rem, 4vw, 2.25rem);
+  border-start-start-radius: inherit;
+  border-start-end-radius: inherit;
+  background: var(--kauro-color-ink);
+  color: var(--kauro-color-on-ink);
+  font-size: 0.875rem;
+}
+.kauro-cardsheet-brand {
+  font-family: var(--kauro-display-family);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kauro-cardsheet-title {
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-ink-border);
+  color: var(--kauro-color-ink-muted);
+}
+.kauro-cardsheet-body {
+  display: grid;
+  gap: 0.875rem;
+  padding: clamp(1.5rem, 4vw, 2.25rem) clamp(1.25rem, 4vw, 2.25rem) clamp(1.25rem, 3vw, 1.75rem);
+}
+.kauro-site-main .kauro-cardsheet h1 {
+  margin: 0 0 0.25rem;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+.kauro-site-main .kauro-cardsheet h2.kauro-cardsheet-label {
+  max-inline-size: none;
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-cardsheet p:not(.kauro-cardsheet-bar) {
+  max-inline-size: 52ch;
+  margin: 0;
+}
+.kauro-site-main .kauro-cardsheet p.kauro-cardsheet-empty {
+  color: var(--kauro-color-text-muted);
+  font-size: 1.0625rem;
+}
+.kauro-cardsheet-part {
+  display: grid;
+  gap: 0.875rem;
+  justify-items: start;
+}
+/* the services on the board, each with its lamp */
+.kauro-cardsheet-list.kauro-site-status-list {
+  border-block-start: 2px solid var(--kauro-color-text);
+}
+.kauro-cardsheet-list .kauro-site-status-row {
+  padding-block: 1.125rem;
+}
+.kauro-cardsheet-list .kauro-site-status-state::before {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent);
+}
+.kauro-cardsheet-note {
+  display: grid;
+  gap: 0.375rem;
+  margin-block-start: 0.5rem;
+}
+.kauro-site-main .kauro-cardsheet-note p {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+/* nothing to show: the board's rows are drawn empty */
+.kauro-cardsheet-blank {
+  display: grid;
+  gap: 0.5rem;
+  margin-block-start: 0.5rem;
+}
+.kauro-cardsheet-blank span {
+  block-size: 0.75rem;
+  border: 1px dashed var(--kauro-color-control-border);
+  border-radius: 0.25rem;
+}
+.kauro-cardsheet-blank span:nth-child(2) {
+  inline-size: 82%;
+}
+.kauro-cardsheet-blank span:nth-child(3) {
+  inline-size: 64%;
+}
+.kauro-cardsheet-foot {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  padding: 1.25rem clamp(1.25rem, 4vw, 2.25rem) 1.5rem;
+  border-block-start: 1px dashed var(--kauro-color-control-border);
+}
+.kauro-site-main .kauro-cardsheet-foot p {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+/* the stopped request, stamped on the card */
+.kauro-optout-done {
+  position: relative;
+  display: grid;
+  gap: 0.375rem;
+  padding-inline-end: 8rem;
+}
+.kauro-site-main .kauro-optout-done h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-optout-stamp {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: 50%;
+  padding: 0.5rem 0.875rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.3125rem;
+  box-shadow: inset 0 0 0 3px var(--kauro-color-raised), inset 0 0 0 4px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: translateY(-50%) rotate(-8deg);
+}
+@media (max-width: 30rem) {
+  .kauro-optout-done {
+    padding-inline-end: 0;
+    padding-block-end: 3.5rem;
+  }
+  .kauro-optout-stamp {
+    inset-block: auto 0;
+    transform: rotate(-8deg);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .kauro-optout-stamp {
+    animation: kauro-optout-land 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 0.3s both;
+  }
+  @media (hover: hover) {
+    .kauro-cardsheet {
+      transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.45s ease;
+    }
+    .kauro-cardsheet:hover {
+      transform: rotate(0deg) translateY(-0.25rem);
+    }
+  }
+}
+@keyframes kauro-optout-land {
+  0% {
+    clip-path: inset(50%);
+    scale: 1.12;
+  }
+  1% {
+    clip-path: inset(0);
+  }
+}
+
+/* ---- Supported services, redesigned (Order 10, owner review) ----------------------------------------------------------------------- */
+
+/* the availability in the head, as the product shows it: one row a service, its state beside it; a row takes the reader to the service */
+.kauro-choose {
+  overflow: hidden;
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  box-shadow: 0 2.5rem 4rem -2rem color-mix(in srgb, #000 55%, transparent), 0 0 0 1px var(--kauro-color-border);
+}
+.kauro-site-main p.kauro-choose-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  max-inline-size: none;
+  margin: 0;
+  padding: 0.75rem 1.25rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+  font-size: 0.8125rem;
+}
+.kauro-choose-brand {
+  font-family: var(--kauro-display-family);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kauro-choose-title {
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-choose-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-choose-list li + li {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-choose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 1.125rem 1.25rem;
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-choose-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--kauro-display-family);
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.kauro-choose-name::after {
+  content: "\2193" / "";
+  color: var(--kauro-color-primary);
+  font-size: 0.8em;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+}
+.kauro-choose-row:focus-visible {
+  outline: 2px solid var(--kauro-color-focus);
+  outline-offset: -2px;
+}
+.kauro-choose-row:is(:hover, :focus-visible) {
+  background: var(--kauro-color-accent-surface);
+}
+.kauro-choose-row:is(:hover, :focus-visible) .kauro-choose-name::after {
+  opacity: 1;
+  transform: none;
+}
+.kauro-choose-row .kauro-site-state {
+  margin: 0;
+}
+
+/* each service a spread: what it delivers beside the piece of the product that shows it, the side alternating */
+.kauro-site-spreads {
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+}
+.kauro-site-spreads > .kauro-site-service {
+  display: grid;
+  align-content: start;
+  padding: clamp(1.75rem, 4vw, 3rem);
+}
+.kauro-site-spreads > .kauro-site-service:nth-child(2) {
+  border-block-start: 4px solid var(--kauro-color-primary);
+}
+.kauro-site-spreads > .kauro-site-service:nth-child(3) {
+  border-block-start: 4px solid var(--kauro-color-text);
+}
+.kauro-site-spreads > :is(.kauro-site-service--closed, .kauro-site-service--unread) {
+  border-block-start-color: var(--kauro-color-border);
+}
+.kauro-site-spreads .kauro-site-service-top {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.kauro-site-main .kauro-site-spreads .kauro-site-service h3 {
+  font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
+  letter-spacing: -0.035em;
+}
+.kauro-site-main .kauro-site-spreads .kauro-site-service p {
+  max-inline-size: 58ch;
+}
+.kauro-site-spreads .kauro-site-service .kauro-site-frag {
+  max-inline-size: none;
+  margin-block: var(--kauro-space-4);
+  padding: 1.5rem 1.625rem;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+}
+@media (min-width: 56rem) {
+  .kauro-site-spreads > .kauro-site-service {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
+  }
+  .kauro-site-spreads > .kauro-site-service > * {
+    grid-column: 1;
+  }
+  .kauro-site-spreads > .kauro-site-service > .kauro-site-frag {
+    grid-column: 2;
+    grid-row: 1 / span 8;
+    align-self: center;
+    margin: 0;
+  }
+  .kauro-site-spreads > .kauro-site-service:nth-child(even) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+  .kauro-site-spreads > .kauro-site-service:nth-child(even) > * {
+    grid-column: 2;
+  }
+  .kauro-site-spreads > .kauro-site-service:nth-child(even) > .kauro-site-frag {
+    grid-column: 1;
+  }
+}
+
+/* the limits of a project, as a sheet of figures */
+.kauro-site-specs.kauro-site-specs--plate {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  border: 0;
+}
+.kauro-site-specs--plate li {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.kauro-site-specs--plate .kauro-site-figure {
+  color: var(--kauro-color-text);
+  font-size: 1.75em;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .kauro-choose-row,
+  .kauro-choose-name::after {
+    transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.25s ease;
+  }
+}
+/* a row of the availability lands on its service below the header */
+.kauro-site-spreads > .kauro-site-service {
+  scroll-margin-block-start: 6rem;
+}
+
+/* ---- How it works on Home: one composition, held while the project moves through its six phases (Order 10, owner review) -------- */
+
+/* the heading and the step being told on the left, the product on the right: one scene, no part above or below another */
+.kauro-walk {
+  display: grid;
+  grid-template-areas: "story" "window";
+  gap: var(--kauro-space-5);
+}
+@media (min-width: 62rem) {
+  .kauro-walk {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+    grid-template-areas: "story window";
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
+    align-items: center;
+  }
+}
+.kauro-walk-story {
+  grid-area: story;
+  display: grid;
+  align-content: center;
+  min-inline-size: 0;
+}
+.kauro-walk-story .kauro-site-eyebrow {
+  margin-block-end: var(--kauro-space-3);
+}
+.kauro-site-main .kauro-walk-story h2 {
+  margin: 0;
+  max-inline-size: 16ch;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2rem, 1.3rem + 2vw, 3rem);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+.kauro-walk-story .kauro-walk-steps {
+  margin-block-start: var(--kauro-space-6);
+}
+/* with the script the list is read by assistive technology only; what is seen is the step being told */
+.kauro-walk.is-ready .kauro-walk-steps {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.kauro-walk-now {
+  display: grid;
+  align-content: start;
+  gap: 0.625rem;
+  min-block-size: 12.5rem;
+  margin-block-start: clamp(1.75rem, 3.5vw, 2.75rem);
+  padding-block-start: clamp(1.25rem, 2.5vw, 1.75rem);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main p.kauro-walk-now-count {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-walk-now-count > span:first-child {
+  color: var(--kauro-color-accent);
+  font-size: 1.125rem;
+}
+.kauro-walk-now-actor {
+  margin-inline-start: 0.875rem;
+  padding-inline-start: 0.875rem;
+  border-inline-start: 1px solid var(--kauro-color-border);
+  font-family: var(--kauro-font-family);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kauro-walk-now--team .kauro-walk-now-actor {
+  color: var(--kauro-color-accent);
+}
+.kauro-site-main p.kauro-walk-now-name {
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.75rem, 1.3rem + 1.4vw, 2.375rem);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.kauro-site-main p.kauro-walk-now-body {
+  max-inline-size: 36ch;
+  color: var(--kauro-color-text-muted);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+
+/* the window: the project as the product shows it, its phases on a rail and its file beside them */
+.kauro-walk-window {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.kauro-walk-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 0;
+}
+.kauro-walk-rail {
+  display: none;
+  margin: 0;
+  padding: 0.75rem 0;
+  list-style: none;
+  border-inline-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+@media (min-width: 62rem) {
+  .kauro-walk-body {
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+  }
+  /* the six phases share the height of the window */
+  .kauro-walk-rail {
+    display: grid;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+  }
+}
+.kauro-walk-phase {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  gap: 0.125rem 0.625rem;
+  padding: 0.5rem 0.875rem 0.5rem 0.75rem;
+  border-inline-start: 3px solid transparent;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+.kauro-walk-phase-number {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 50%;
+  font-family: var(--kauro-mono-family);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+.kauro-walk-phase.is-done {
+  color: var(--kauro-color-text);
+}
+.kauro-walk-phase.is-done .kauro-walk-phase-number {
+  border-color: var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+.kauro-walk-phase.is-done .kauro-walk-phase-name::after {
+  content: "  \2713" / "";
+  color: var(--kauro-color-primary);
+  font-weight: 700;
+}
+/* the result a done phase leaves on the rail */
+.kauro-walk-phase-result {
+  grid-column: 2;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.kauro-walk-phase.is-current {
+  border-inline-start-color: var(--kauro-color-primary);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  font-weight: 650;
+}
+.kauro-walk-phase.is-current .kauro-walk-phase-number {
+  border-color: var(--kauro-color-primary);
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-walk-work {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: 1rem 1.125rem 0;
+}
+.kauro-walk-sealed {
+  margin-inline-end: auto;
+  padding: 0 0.4375rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 0.25rem;
+  color: var(--kauro-color-primary);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kauro-site-main p.kauro-walk-file {
+  justify-content: flex-start;
+  gap: 0.25rem 0.75rem;
+}
+.kauro-walk-rows {
+  margin-inline-start: auto;
+}
+/* the tray: the tool of the phase, the full width of the file, always the same height and always filled */
+.kauro-walk-work > .kauro-walk-tray {
+  display: grid;
+  align-content: center;
+  margin-inline: -1.125rem;
+  padding: 1rem 1.125rem;
+}
+
+/* Upload: each source file read in to its last row, then the set sealed */
+.kauro-walk-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.25rem;
+}
+.kauro-walk-sources {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-sources li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.375rem 1rem;
+  padding: 0.5rem 0.75rem 0.625rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.375rem;
+  background: var(--kauro-color-raised);
+}
+.kauro-walk-source-rows {
+  color: var(--kauro-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-walk-source-read {
+  grid-column: 1 / -1;
+  block-size: 3px;
+  border-radius: 62.5rem;
+  background: var(--kauro-color-primary);
+  transform-origin: left center;
+}
+.kauro-walk-seal {
+  padding: 0.375rem 0.75rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.3125rem;
+  box-shadow: inset 0 0 0 2px var(--kauro-color-surface), inset 0 0 0 3px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+}
+
+/* Quote: the sealed rows in the band that prices them, and the price */
+.kauro-walk-quote {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+}
+.kauro-walk-quote-units {
+  display: grid;
+  gap: 0.5rem;
+}
+.kauro-site-main p.kauro-walk-quote-figure {
+  font-family: var(--kauro-display-family);
+  font-size: 1.625rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.kauro-walk-quote-figure span {
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.kauro-walk-quote-meter {
+  display: block;
+  inline-size: 100%;
+  block-size: 0.5rem;
+  border-radius: 62.5rem;
+  overflow: hidden;
+}
+.kauro-walk-quote-band {
+  fill: var(--kauro-color-border);
+}
+.kauro-walk-quote-fill {
+  fill: var(--kauro-color-primary);
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+.kauro-site-main p.kauro-walk-quote-band-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-walk-quote-total {
+  display: grid;
+  justify-items: end;
+  gap: 0.25rem;
+}
+.kauro-site-main p.kauro-walk-quote-price {
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2rem, 1.6rem + 1vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.kauro-walk-quote-currency {
+  font-size: 0.4em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  vertical-align: 0.95em;
+}
+.kauro-site-main p.kauro-walk-quote-valid {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* held: the track is as tall as the composition plus one stretch of scrolling for each phase after the first; the composition holds in
+   the middle of the screen under the header for as long as the track lasts. Going back up, the track gives up its extra length. */
+.kauro-walk-track {
+  --kauro-walk-h: 33rem;
+  --kauro-walk-stretch: 32vh;
+  position: relative;
+  block-size: calc(var(--kauro-walk-h) + 5 * var(--kauro-walk-stretch));
+}
+.kauro-walk-track.is-collapsed {
+  block-size: var(--kauro-walk-h);
+}
+.kauro-walk-track > .kauro-walk {
+  position: sticky;
+  inset-block-start: calc(4.75rem + max(0rem, (100vh - 4.75rem - var(--kauro-walk-h)) / 2));
+  box-sizing: border-box;
+  block-size: var(--kauro-walk-h);
+}
+.kauro-walk-track .kauro-walk-window {
+  block-size: 100%;
+  min-block-size: 0;
+  animation: none;
+}
+@media (max-width: 61.99rem) {
+  .kauro-walk-track {
+    --kauro-walk-h: min(46rem, calc(100vh - 6rem));
+  }
+  .kauro-walk-track > .kauro-walk {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--kauro-space-4);
+  }
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    max-inline-size: none;
+    font-size: 1.5rem;
+  }
+  .kauro-walk-track .kauro-walk-story .kauro-site-eyebrow {
+    margin-block-end: var(--kauro-space-2);
+  }
+  .kauro-walk-track .kauro-walk-now {
+    min-block-size: 0;
+    gap: 0.375rem;
+    margin-block-start: var(--kauro-space-3);
+    padding-block-start: var(--kauro-space-3);
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-name {
+    font-size: 1.5rem;
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-body {
+    font-size: 0.9375rem;
+  }
+}
+/* on a short phone the step keeps its number and name, and the window has the room */
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now-body,
+  .kauro-walk-track .kauro-walk-story .kauro-site-eyebrow {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* the step being told prints in place */
+  .kauro-walk-now > * {
+    animation: kauro-print 0.4s cubic-bezier(0.5, 0, 0.2, 1) both;
+  }
+  .kauro-walk-now > :nth-child(2) {
+    animation-delay: 0.08s;
+  }
+  .kauro-walk-now > :nth-child(3) {
+    animation-delay: 0.16s;
+  }
+  /* the rail moves on */
+  .kauro-walk-phase,
+  .kauro-walk-phase-number {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+  /* the tool of the phase prints under the file */
+  .kauro-walk.is-ready .kauro-walk-tray > * {
+    animation: kauro-print 0.4s cubic-bezier(0.5, 0, 0.2, 1) 0.05s both;
+  }
+  /* upload: the files are read in, then sealed */
+  .kauro-walk.is-ready .kauro-walk-source-read {
+    animation: kauro-grow 1s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+  }
+  .kauro-walk.is-ready .kauro-walk-sources li + li .kauro-walk-source-read {
+    animation-delay: 0.45s;
+  }
+  .kauro-walk.is-ready.is-step-0 .kauro-walk-seal {
+    animation: kauro-thunk 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 1.35s both;
+  }
+  /* quote: the rows find their place in the band */
+  .kauro-walk.is-ready .kauro-walk-quote-fill {
+    animation: kauro-grow 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s both;
+  }
+}
+/* on a phone the held composition keeps one shape at every phase: the step told in a fixed height, the window with the room left */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-story .kauro-site-eyebrow {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    min-block-size: 10.5rem;
+  }
+  .kauro-walk-track .kauro-walk-cell {
+    min-block-size: 2.125rem;
+    padding-block: 0.3125rem;
+  }
+  .kauro-walk-track .kauro-walk-work {
+    gap: 0.5rem;
+    padding-block-start: 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-work > .kauro-walk-tray {
+    padding-block: 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-proposals {
+    gap: 0.3125rem;
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    min-block-size: 0;
+  }
+  .kauro-walk-track .kauro-walk-cell {
+    min-block-size: 1.875rem;
+    padding-block: 0.25rem;
+  }
+  .kauro-walk-track .kauro-walk-proposal {
+    padding-block: 0.1875rem;
+  }
+}
+
+/* ---- Pages that take only the room they need (Order 10, owner review) ------------------------------------------------------------ */
+/* The main area fills the space between the header and the footer and holds its content in the middle of it: with little to say, the
+   whole page, footer included, is in view without scrolling; with more, the page grows and scrolls as any page does. */
+.kauro-site-main:has(> .kauro-fitpage) {
+  display: flex;
+  flex-direction: column;
+}
+.kauro-fitpage {
+  flex: 1 0 auto;
+  box-sizing: border-box;
+}
+
+/* ---- Service status: an ordinary page; each service a small card whose edge glows with its state ------------------------------- */
+.kauro-statuspage {
+  display: grid;
+  align-content: center;
+  padding-block: clamp(2rem, 6vh, 4rem);
+}
+.kauro-statuspage-inner {
+  display: grid;
+  gap: clamp(1.75rem, 4vh, 2.75rem);
+}
+.kauro-site-main .kauro-statuspage h1 {
+  margin: 0;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2.25rem, 1.5rem + 3vw, 3.75rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+.kauro-site-main .kauro-statuspage h2.kauro-statuspage-label {
+  max-inline-size: none;
+  margin: 0 0 0.875rem;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-statuspage-empty {
+  max-inline-size: 60ch;
+  color: var(--kauro-color-text-muted);
+  font-size: 1.0625rem;
+}
+.kauro-statuspage-services {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* the card: the name, then its state with the lamp; the edge glows in the colour of the state */
+.kauro-site-status-row.kauro-statuspage-service {
+  --kauro-glow: var(--kauro-color-success-text);
+  display: grid;
+  justify-content: start;
+  gap: 0.625rem;
+  padding: 1.25rem 1.375rem;
+  border: 1px solid color-mix(in srgb, var(--kauro-glow) 55%, var(--kauro-color-border));
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kauro-glow) 10%, transparent), 0 0 1.5rem -0.5rem color-mix(in srgb, var(--kauro-glow) 45%, transparent);
+}
+.kauro-statuspage-service.kauro-site-status-row--limited {
+  --kauro-glow: var(--kauro-color-warning-text);
+}
+.kauro-statuspage-service:is(.kauro-site-status-row--closed, .kauro-site-status-row--unread) {
+  --kauro-glow: var(--kauro-color-danger-text);
+}
+.kauro-statuspage-service:is(.kauro-site-status-row--closed, .kauro-site-status-row--unread) .kauro-site-status-state {
+  color: var(--kauro-color-danger-text);
+}
+.kauro-site-status-row.kauro-statuspage-service strong {
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+.kauro-statuspage-service .kauro-site-status-state {
+  font-size: 0.9375rem;
+}
+.kauro-statuspage-service .kauro-site-status-state::before {
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent);
+}
+.kauro-statuspage-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem clamp(1.5rem, 4vw, 3rem);
+  padding-block-start: clamp(1.25rem, 3vh, 1.75rem);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-statuspage-note {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 0.375rem;
+}
+.kauro-statuspage-note .kauro-statuspage-label {
+  margin-block-end: 0.25rem;
+}
+.kauro-site-main .kauro-statuspage-note p {
+  max-inline-size: 48ch;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .kauro-statuspage-service {
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s ease;
+  }
+  .kauro-statuspage-service:hover {
+    transform: translateY(-0.1875rem);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--kauro-glow) 16%, transparent), 0 0 2rem -0.5rem color-mix(in srgb, var(--kauro-glow) 60%, transparent);
+  }
+}
+
+/* ---- How it works on Home: one sheet that does each step itself (Order 10, owner review, third design) ----------------------------- */
+/* No rail and no tool area under the file: the sheet is the whole window. Its last column says what the step does to each row and its
+   last line carries the step's total, so the step happens inside the file rather than beside or below it. */
+.kauro-walk-window {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.kauro-walk-work {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  min-inline-size: 0;
+  padding: 1rem 1.25rem 1.25rem;
+}
+.kauro-site-main p.kauro-walk-file {
+  font-size: 0.875rem;
+}
+.kauro-walk-table {
+  grid-template-rows: auto repeat(5, auto) minmax(0, 1fr);
+}
+.kauro-walk-row {
+  grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.15fr);
+}
+.kauro-walk-cell {
+  min-block-size: 2.625rem;
+  font-size: 0.875rem;
+}
+.kauro-walk-cell--mono {
+  font-size: 0.8125rem;
+}
+.kauro-walk-row--head .kauro-walk-cell {
+  min-block-size: 2.25rem;
+  font-size: 0.6875rem;
+}
+/* the step's own column: a quiet tint marks it as the place where the step happens */
+.kauro-walk-cell--step {
+  border-inline-start: 1px solid var(--kauro-color-border);
+  background: color-mix(in srgb, var(--kauro-color-accent) 7%, transparent);
+}
+.kauro-walk-row--head .kauro-walk-cell--step {
+  color: var(--kauro-color-primary);
+}
+.kauro-walk-read::before {
+  content: "\2713  " / "";
+  color: var(--kauro-color-success-text);
+  font-weight: 700;
+}
+.kauro-walk-finding {
+  overflow: hidden;
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+.kauro-walk-quiet {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-walk-unit {
+  font-family: var(--kauro-mono-family);
+  font-weight: 650;
+}
+.kauro-walk-done {
+  color: var(--kauro-color-success-text);
+  font-weight: 650;
+}
+.kauro-walk-done::before {
+  content: "\2713  " / "";
+}
+.kauro-walk-cell--step .kauro-walk-approve {
+  min-block-size: 1.625rem;
+  padding: 0.0625rem 0.625rem;
+}
+
+/* the sheet's last line: the total of the step */
+.kauro-walk-foot {
+  display: grid;
+  align-content: center;
+  min-block-size: 4.5rem;
+  padding: 0.875rem 1rem;
+  border-block-start: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+  font-size: 0.875rem;
+}
+.kauro-walk-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-total ul,
+.kauro-walk-total ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-main .kauro-walk-total p {
+  max-inline-size: none;
+  margin: 0;
+}
+.kauro-walk-total-figure {
+  font-family: var(--kauro-display-family);
+  font-size: 1.5rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+.kauro-walk-total-share {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-walk-total--findings {
+  justify-content: flex-start;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-walk-total--findings li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+.kauro-walk-total--findings .kauro-walk-total-figure {
+  color: var(--kauro-color-text);
+}
+.kauro-walk-total--decide {
+  justify-content: flex-start;
+}
+.kauro-walk-total--decide li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kauro-color-text-muted);
+  font-weight: 600;
+}
+.kauro-walk-total--decide li.is-approved {
+  color: var(--kauro-color-text);
+}
+.kauro-site-main p.kauro-walk-total-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  font-family: var(--kauro-display-family);
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.kauro-walk-total-currency {
+  align-self: flex-start;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+.kauro-walk-total-price .kauro-walk-quiet {
+  margin-inline-start: 0.5rem;
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+}
+.kauro-walk-total-sum {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: var(--kauro-display-family);
+  font-size: 1.25rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-walk-total-sum .kauro-walk-total-figure {
+  color: var(--kauro-color-primary);
+  font-weight: 500;
+}
+.kauro-site-main p.kauro-walk-ok {
+  color: var(--kauro-color-success-text);
+  font-weight: 650;
+}
+.kauro-walk-ok::before {
+  content: "\2713  " / "";
+}
+.kauro-walk-total--import ol {
+  counter-reset: walk-order;
+}
+.kauro-walk-total--import li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  counter-increment: walk-order;
+}
+.kauro-walk-total--import li::before {
+  content: counter(walk-order) / "";
+  display: grid;
+  place-items: center;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 50%;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+.kauro-walk-total--upload .kauro-walk-seal {
+  font-size: 0.75rem;
+}
+
+/* the controls beside the step: back, the six steps, next */
+.kauro-walk-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-walk-arrow {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--kauro-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.kauro-walk-arrow::before {
+  content: "\2190";
+}
+.kauro-walk-arrow--next::before {
+  content: "\2192";
+}
+.kauro-walk-arrow:disabled {
+  color: var(--kauro-color-text-muted);
+  cursor: default;
+  opacity: 0.45;
+}
+.kauro-walk-arrow:focus-visible,
+.kauro-walk-dot:focus-visible {
+  outline: 2px solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+.kauro-walk-dots {
+  display: flex;
+  flex: 1;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-dots li {
+  flex: 1;
+}
+/* a step: a bar with room around it for the pointer; done and current in wine */
+.kauro-walk-dot {
+  display: block;
+  inline-size: 100%;
+  block-size: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: linear-gradient(var(--kauro-color-border), var(--kauro-color-border)) center / 100% 3px no-repeat;
+  cursor: pointer;
+}
+.kauro-walk-dot.is-done,
+.kauro-walk-dot.is-current {
+  background-image: linear-gradient(var(--kauro-color-accent), var(--kauro-color-accent));
+}
+.kauro-walk-dot.is-current {
+  background-size: 100% 5px;
+}
+@media (hover: hover) {
+  .kauro-walk-arrow:not(:disabled):hover {
+    border-color: var(--kauro-color-accent);
+    color: var(--kauro-color-accent);
+  }
+  .kauro-walk-dot:hover {
+    background-size: 100% 5px;
+  }
+}
+
+/* on a phone: the company column gives way to the step's own column, and the sheet stays within the screen */
+@media (max-width: 39.99rem) {
+  .kauro-walk-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+  .kauro-walk-row > .kauro-walk-cell--company {
+    display: none;
+  }
+  .kauro-walk-row > .kauro-walk-cell:nth-child(4) {
+    display: none;
+  }
+  .kauro-walk-row > .kauro-walk-cell--step {
+    display: flex;
+  }
+}
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-cell {
+    min-block-size: 2rem;
+    font-size: 0.8125rem;
+  }
+  .kauro-walk-track .kauro-walk-cell--mono {
+    font-size: 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-work {
+    padding: 0.75rem 0.875rem 0.875rem;
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    min-block-size: 0;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+  .kauro-walk-track .kauro-walk-total-figure {
+    font-size: 1.25rem;
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-total-price {
+    font-size: 1.5rem;
+  }
+  .kauro-walk-track .kauro-walk-controls {
+    margin-block-start: var(--kauro-space-3);
+  }
+  .kauro-walk-track .kauro-walk-arrow {
+    inline-size: 2.25rem;
+    block-size: 2.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* the step's column changes row by row, top to bottom, and its total prints under the rows */
+  .kauro-walk.is-ready .kauro-walk-cell--step > * {
+    animation: kauro-print 0.35s cubic-bezier(0.5, 0, 0.2, 1) both;
+  }
+  .kauro-walk.is-ready .kauro-walk-row:nth-child(2) .kauro-walk-cell--step > * {
+    animation-delay: 0.1s;
+  }
+  .kauro-walk.is-ready .kauro-walk-row:nth-child(3) .kauro-walk-cell--step > * {
+    animation-delay: 0.2s;
+  }
+  .kauro-walk.is-ready .kauro-walk-row:nth-child(4) .kauro-walk-cell--step > * {
+    animation-delay: 0.3s;
+  }
+  .kauro-walk.is-ready .kauro-walk-row:nth-child(5) .kauro-walk-cell--step > * {
+    animation-delay: 0.4s;
+  }
+  .kauro-walk.is-ready .kauro-walk-row:nth-child(6) .kauro-walk-cell--step > * {
+    animation-delay: 0.5s;
+  }
+  .kauro-walk.is-ready .kauro-walk-foot > * {
+    animation: kauro-print 0.4s cubic-bezier(0.5, 0, 0.2, 1) 0.55s both;
+  }
+  .kauro-walk.is-ready.is-step-0 .kauro-walk-seal {
+    animation: kauro-thunk 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 1.2s both;
+  }
+  .kauro-walk-dot,
+  .kauro-walk-arrow {
+    transition: background-size 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+}
+/* the sheet takes the room its five columns need; the story column keeps a reading measure */
+@media (min-width: 62rem) {
+  .kauro-walk {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 9fr);
+  }
+}
+/* the room these pages take is only what their content needs: on a screen 900 px tall the whole page, footer included, is in view */
+.kauro-statuspage {
+  padding-block: clamp(1rem, 3vh, 1.75rem);
+}
+.kauro-statuspage-inner {
+  gap: clamp(1.25rem, 3vh, 2rem);
+}
+.kauro-site-main .kauro-statuspage h1 {
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+}
+.kauro-cardpage {
+  padding-block: clamp(1rem, 3vh, 2rem);
+}
+.kauro-cardsheet-body {
+  gap: 0.75rem;
+  padding-block: clamp(1.25rem, 3vh, 1.875rem) clamp(1rem, 2.5vh, 1.5rem);
+}
+.kauro-site-main .kauro-cardsheet h1 {
+  font-size: clamp(1.875rem, 1.3rem + 2vw, 2.625rem);
+}
+.kauro-cardsheet-foot {
+  padding-block: 1rem 1.25rem;
+}
+/* on a phone the told step keeps the height of its longest explanation, so the sheet under it never moves between steps */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-now {
+    min-block-size: 11.5rem;
+  }
+}
+/* three service cards side by side from a tablet up */
+.kauro-statuspage-services {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    min-block-size: 5.5rem;
+  }
+}
+/* Service status is an ordinary page: it reads from the top, not from the middle of the space */
+.kauro-statuspage {
+  align-content: start;
+  padding-block: clamp(2rem, 5vh, 3.5rem);
+}
+
+/* ---- How it works on Home: the held section fills the screen, and nothing in it moves but what a step changes (fourth design) ------ */
+
+/* the section is the screen under the header for as long as the reader is in the process: nothing grows above it, nothing is missing
+   below it, and the previous section is already gone when the hold begins */
+.kauro-site-process:has(> .kauro-site-wrap > .kauro-walk-track) {
+  padding-block: 0;
+}
+.kauro-walk-track {
+  --kauro-walk-stretch: 34vh;
+  --kauro-walk-window: clamp(30rem, calc(100vh - 15rem), 38rem);
+  --kauro-walk-row: clamp(2.5rem, 4.8vh, 3.125rem);
+  block-size: calc(100vh + 6 * var(--kauro-walk-stretch));
+}
+.kauro-walk-track.is-collapsed {
+  block-size: 100vh;
+}
+.kauro-walk-track > .kauro-walk {
+  inset-block-start: 0;
+  block-size: 100vh;
+  align-content: center;
+  padding-block: 5.5rem 1.5rem;
+}
+@media (min-width: 62rem) {
+  .kauro-walk {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+    align-items: center;
+  }
+}
+
+/* the left column keeps the same heights at every step, so the controls never move */
+.kauro-walk-track .kauro-walk-story {
+  align-content: start;
+}
+.kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+  max-inline-size: 14ch;
+  font-size: clamp(2rem, 1.2rem + 1.8vw, 2.75rem);
+}
+.kauro-walk-track .kauro-walk-now {
+  block-size: 13rem;
+  min-block-size: 0;
+  overflow: hidden;
+}
+.kauro-walk-track .kauro-walk-controls {
+  margin-block-start: var(--kauro-space-4);
+}
+
+/* the sheet: one size at every step; the rows never fold, the last line is always three figures */
+.kauro-walk-track .kauro-walk-window {
+  block-size: var(--kauro-walk-window);
+}
+.kauro-walk-track .kauro-walk-work {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0.875rem 1.25rem 1.25rem;
+}
+.kauro-walk-track p.kauro-walk-file {
+  margin-block-end: 0.75rem;
+}
+.kauro-walk-sealed.is-waiting {
+  visibility: hidden;
+}
+.kauro-walk-track .kauro-walk-table {
+  grid-template-rows: auto repeat(5, var(--kauro-walk-row));
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+.kauro-walk-track .kauro-walk-row {
+  max-block-size: none;
+}
+.kauro-walk-track .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell {
+  min-block-size: 0;
+  block-size: var(--kauro-walk-row);
+}
+/* the row unified into another keeps its place, struck through */
+.kauro-walk-row.is-merged .kauro-walk-cell:not(.kauro-walk-cell--step):not(.kauro-walk-cell--mark) {
+  color: var(--kauro-color-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--kauro-color-primary);
+}
+.kauro-walk-row.is-merged {
+  background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
+}
+.kauro-walk-cell--step {
+  white-space: normal;
+}
+.kauro-walk-findings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.kauro-walk-finding {
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid color-mix(in srgb, var(--kauro-color-primary) 45%, transparent);
+  border-radius: 0.25rem;
+  color: var(--kauro-color-primary);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* the last line, joined to the rows: three figures in the same places at every step */
+.kauro-walk-track .kauro-walk-foot {
+  display: grid;
+  align-content: center;
+  min-block-size: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--kauro-color-border);
+  border-block-start: 1px dashed var(--kauro-color-control-border);
+  border-end-start-radius: 0.5rem;
+  border-end-end-radius: 0.5rem;
+  background: var(--kauro-color-surface);
+}
+.kauro-walk-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-figure {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0.1875rem;
+  min-inline-size: 0;
+  padding-inline: 1rem;
+}
+.kauro-walk-figure:first-child {
+  padding-inline-start: 0;
+}
+.kauro-walk-figure + .kauro-walk-figure {
+  border-inline-start: 1px solid var(--kauro-color-border);
+}
+.kauro-walk-figure-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.375rem, 1rem + 1vw, 1.875rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.kauro-walk-figures--sum .kauro-walk-figure:last-child .kauro-walk-figure-value {
+  color: var(--kauro-color-primary);
+  font-weight: 500;
+}
+.kauro-walk-figure-label {
+  max-inline-size: 100%;
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+}
+.kauro-walk-figure-note {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-walk-figure--seal {
+  justify-items: center;
+}
+.kauro-walk-currency {
+  align-self: flex-start;
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+.kauro-walk-mark.kauro-walk-mark--large {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  font-size: 0.75rem;
+}
+.kauro-walk-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 0.3125rem;
+  color: var(--kauro-color-primary);
+}
+.kauro-walk-state.is-on {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+
+/* a phone: the told step and the controls at fixed heights above the sheet; the sheet takes what is left of the screen */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 21.5rem);
+    --kauro-walk-row: 2.125rem;
+  }
+  .kauro-walk-track > .kauro-walk {
+    align-content: start;
+    padding-block: 5.75rem 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 8.75rem;
+  }
+  .kauro-walk-track .kauro-walk-controls {
+    margin-block-start: var(--kauro-space-2);
+  }
+  .kauro-walk-track .kauro-walk-work {
+    padding: 0.625rem 0.75rem 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    padding: 0.5rem 0.625rem;
+  }
+  .kauro-walk-figure {
+    padding-inline: 0.5rem;
+  }
+  .kauro-walk-figure-value {
+    font-size: 1.0625rem;
+  }
+  .kauro-walk-figure-label {
+    font-size: 0.6875rem;
+  }
+  .kauro-walk-figure-note {
+    font-size: 0.625rem;
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 15.5rem);
+    --kauro-walk-row: 1.875rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 3.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* the three figures of the last line come one after the other */
+  .kauro-walk.is-ready .kauro-walk-foot > * {
+    animation: none;
+  }
+  .kauro-walk.is-ready .kauro-walk-figure {
+    animation: kauro-print 0.4s cubic-bezier(0.5, 0, 0.2, 1) 0.45s both;
+  }
+  .kauro-walk.is-ready .kauro-walk-figure:nth-child(2) {
+    animation-delay: 0.6s;
+  }
+  .kauro-walk.is-ready .kauro-walk-figure:nth-child(3) {
+    animation-delay: 0.75s;
+  }
+  .kauro-walk-row,
+  .kauro-walk-row .kauro-walk-cell {
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+}
+/* the told step has room for its longest explanation; the address column for its longest address */
+.kauro-walk-track .kauro-walk-now {
+  block-size: 15.5rem;
+}
+@media (min-width: 62rem) {
+  .kauro-walk-row {
+    grid-template-columns: 2rem minmax(0, 0.95fr) minmax(0, 1.45fr) minmax(0, 0.8fr) minmax(0, 1.15fr);
+  }
+}
+/* a phone keeps the contact and what the step does to it; the told step is compact, and the sheet takes the rest of the screen */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1.25fr);
+  }
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--mono,
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--company {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--step {
+    display: flex;
+  }
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    max-inline-size: none;
+    font-size: 1.375rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 7.75rem;
+    gap: 0.25rem;
+    margin-block-start: var(--kauro-space-3);
+    padding-block-start: var(--kauro-space-3);
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-name {
+    font-size: 1.375rem;
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-body {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 21.25rem);
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 3.75rem;
+  }
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 16.25rem);
+  }
+}
+/* a medium screen: the company column gives way, so no address or finding is cut */
+@media (min-width: 62rem) and (max-width: 79.99rem) {
+  .kauro-walk-track .kauro-walk-row {
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.2fr);
+  }
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--company {
+    display: none;
+  }
+}
+/* a phone: the header row loses the same columns as the rows; the sheet takes exactly the space left under the told step */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--email {
+    display: none;
+  }
+  .kauro-walk-track > .kauro-walk {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .kauro-walk-track .kauro-walk-window {
+    block-size: auto;
+    min-block-size: 0;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 10.25rem;
+  }
+  .kauro-walk-figure-label .kauro-site-file {
+    font-size: 0.5625rem;
+    letter-spacing: -0.02em;
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 4rem;
+  }
+  .kauro-walk-track {
+    --kauro-walk-row: 1.75rem;
+  }
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    font-size: 1.25rem;
+  }
+}
+/* phones: a file name in the last line may wrap instead of being cut */
+@media (max-width: 61.99rem) {
+  .kauro-walk-figure-label {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+/* phones under 800 px tall: tighter rows */
+@media (max-width: 61.99rem) and (max-height: 50rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.875rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 9.75rem;
+  }
+  .kauro-walk-track .kauro-walk-bar {
+    padding-block: 0.5rem;
+  }
+  .kauro-walk-track p.kauro-walk-file {
+    margin-block-end: 0.375rem;
+  }
+}
+/* short phones: the told step keeps its number and name; the last line keeps its figures and names */
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.75rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 5.5rem;
+  }
+  .kauro-walk-track .kauro-walk-figure-note {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-work {
+    padding: 0.5rem 0.625rem 0.625rem;
+  }
+}
+/* the narrowest phones (360 px and less): smaller figures, tighter rows */
+@media (max-width: 22.5rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.75rem;
+  }
+  .kauro-walk-track .kauro-walk-figure-value {
+    font-size: 0.9375rem;
+  }
+  .kauro-walk-track .kauro-walk-figure-label {
+    font-size: 0.625rem;
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-body {
+    font-size: 0.8125rem;
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    padding-block: 0.375rem;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 45rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.625rem;
+  }
+}
+@media (max-width: 22.5rem) {
+  /* the note under a figure repeats what the rows above already say; on the narrowest phones it gives its line to the figure's name */
+  .kauro-walk-track .kauro-walk-figure-note {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 10.5rem;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 5.5rem;
+  }
+  .kauro-walk-track {
+    --kauro-walk-row: 1.5rem;
+  }
+}
+@media (max-width: 22.5rem) {
+  .kauro-walk-track > .kauro-walk {
+    gap: var(--kauro-space-2);
+  }
+  .kauro-walk-track .kauro-walk-controls {
+    margin-block-start: var(--kauro-space-1, 0.25rem);
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    padding-block: 0.25rem;
+  }
+}
+/* the smallest phones (320 by 640): the section's heading is kept for assistive technology and gives its room to the sheet */
+@media (max-width: 22.5rem) and (max-height: 45rem) {
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    margin-block-start: 0;
+    padding-block-start: 0;
+    border: 0;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 50rem) and (min-height: 45.0625rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.625rem;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 50rem) and (min-height: 45.0625rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.5rem;
+  }
+}
+/* the rows no longer fold, so the table needs no minimum height of its own: it is exactly its rows */
+.kauro-walk-track .kauro-walk-table {
+  min-block-size: 0;
+}
+
+/* ---- How it works on Home, as an ordinary section with a film to play (Order 10, owner review, fifth design) ----------------------- */
+/* Nothing holds the section while the page scrolls. The window is Home's own: the bar, the file and its rows, changed in place; nothing
+   under it. The left column keeps fixed heights and the window fixed rows, so nothing changes size or place from one step to the next. */
+.kauro-site-process:has(.kauro-walk--book) {
+  padding-block: clamp(3rem, 6vw, 5rem);
+}
+.kauro-walk.kauro-walk--book {
+  display: grid;
+  grid-template-areas: "story" "window";
+  gap: var(--kauro-space-6);
+  margin: 0;
+}
+@media (min-width: 62rem) {
+  .kauro-walk.kauro-walk--book {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+    grid-template-areas: "story window";
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
+    align-items: center;
+  }
+}
+.kauro-walk--book .kauro-walk-story {
+  align-content: start;
+}
+.kauro-site-main .kauro-walk--book .kauro-walk-story h2 {
+  max-inline-size: 14ch;
+  font-size: clamp(2rem, 1.2rem + 1.8vw, 2.75rem);
+}
+.kauro-walk--book .kauro-walk-now {
+  block-size: 15rem;
+  min-block-size: 0;
+  overflow: hidden;
+}
+.kauro-walk--book .kauro-walk-controls {
+  margin-block-start: var(--kauro-space-4);
+}
+
+/* play: the steps follow one another by themselves; the current mark fills while its step lasts */
+.kauro-walk-play {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.625rem;
+  margin-block-start: var(--kauro-space-4);
+  padding: 0.5625rem 1.125rem 0.5625rem 0.875rem;
+  border: 1px solid var(--kauro-color-accent);
+  border-radius: 62.5rem;
+  background: transparent;
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.kauro-walk-play::before {
+  content: "";
+  inline-size: 0;
+  block-size: 0;
+  border-block: 0.375rem solid transparent;
+  border-inline-start: 0.625rem solid var(--kauro-color-accent);
+}
+.kauro-walk-play.is-playing::before {
+  inline-size: 0.625rem;
+  block-size: 0.75rem;
+  border: 0;
+  background: linear-gradient(90deg, var(--kauro-color-accent) 0 35%, transparent 35% 65%, var(--kauro-color-accent) 65%);
+}
+.kauro-walk-play:focus-visible {
+  outline: 2px solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .kauro-walk-play:hover {
+    background: color-mix(in srgb, var(--kauro-color-accent) 14%, transparent);
+  }
+}
+.kauro-walk-dot {
+  position: relative;
+}
+.kauro-walk--book.is-playing .kauro-walk-dot.is-current {
+  background-image: linear-gradient(var(--kauro-color-border), var(--kauro-color-border));
+}
+.kauro-walk--book.is-playing .kauro-walk-dot.is-current::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(50% - 2.5px);
+  block-size: 5px;
+  background: var(--kauro-color-accent);
+  transform-origin: left center;
+  animation: kauro-grow linear both;
+}
+.kauro-walk--book.is-playing.is-step-0 .kauro-walk-dot.is-current::after,
+.kauro-walk--book.is-playing.is-step-3 .kauro-walk-dot.is-current::after {
+  animation-duration: 4.2s;
+}
+.kauro-walk--book.is-playing.is-step-1 .kauro-walk-dot.is-current::after,
+.kauro-walk--book.is-playing.is-step-5 .kauro-walk-dot.is-current::after {
+  animation-duration: 4.5s;
+}
+.kauro-walk--book.is-playing.is-step-2 .kauro-walk-dot.is-current::after,
+.kauro-walk--book.is-playing.is-step-4 .kauro-walk-dot.is-current::after {
+  animation-duration: 4.8s;
+}
+
+/* the window: Home's own, the bar, the file and its rows; one size at every step */
+.kauro-walk--book .kauro-walk-window {
+  grid-area: window;
+  grid-template-rows: auto auto;
+  block-size: auto;
+  min-block-size: 0;
+}
+.kauro-walk--book .kauro-walk-work {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 0.875rem;
+  padding: 1.125rem 1.375rem 1.375rem;
+}
+.kauro-site-main .kauro-walk--book p.kauro-walk-file {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.kauro-walk--book .kauro-walk-sealed {
+  visibility: visible;
+}
+.kauro-walk--book .kauro-walk-table {
+  grid-template-rows: auto repeat(5, 3rem);
+  min-block-size: 0;
+  border-radius: 0.5rem;
+}
+.kauro-walk--book .kauro-walk-row {
+  grid-template-columns: 2.5rem minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.85fr);
+  max-block-size: none;
+}
+.kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell {
+  min-block-size: 0;
+  block-size: 3rem;
+  padding-inline: 0.75rem;
+  font-size: 0.9375rem;
+}
+.kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--mono {
+  font-size: 0.8125rem;
+}
+.kauro-walk--book .kauro-walk-row--head .kauro-walk-cell {
+  min-block-size: 2.5rem;
+  padding-inline: 0.75rem;
+  font-size: 0.6875rem;
+}
+.kauro-walk--book .kauro-walk-cell--mark {
+  padding-inline: 0;
+}
+/* the duplicate pair is bracketed at the very edge of the row, so the number in the margin is never cut */
+.kauro-walk--book .kauro-walk-row.is-pair .kauro-walk-cell--mark::before {
+  inset-inline-start: 0;
+}
+.kauro-walk--book .kauro-walk-mark {
+  flex: none;
+}
+
+/* a medium screen: the company column narrows; a phone: it gives way, and a renamed name shows only its new form */
+@media (min-width: 62rem) and (max-width: 79.99rem) {
+  .kauro-walk--book .kauro-walk-row {
+    grid-template-columns: 2.25rem minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 0.8fr);
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell {
+    font-size: 0.875rem;
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--mono {
+    font-size: 0.75rem;
+  }
+}
+@media (max-width: 61.99rem) {
+  .kauro-site-main .kauro-walk--book .kauro-walk-story h2 {
+    max-inline-size: none;
+    font-size: clamp(1.625rem, 1.2rem + 2vw, 2.25rem);
+  }
+  .kauro-walk--book .kauro-walk-now {
+    block-size: 10.5rem;
+  }
+  .kauro-walk--book .kauro-walk-row {
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1.35fr);
+  }
+  .kauro-walk--book .kauro-walk-row > .kauro-walk-cell--company {
+    display: none;
+  }
+  .kauro-walk--book .kauro-walk-row > .kauro-walk-cell--email {
+    display: flex;
+  }
+  .kauro-walk--book .kauro-walk-table {
+    grid-template-rows: auto repeat(5, 2.625rem);
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell {
+    block-size: 2.625rem;
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--mono {
+    font-size: 0.75rem;
+  }
+  .kauro-walk--book .kauro-walk-row--head .kauro-walk-cell {
+    padding-inline: 0.5rem;
+  }
+  .kauro-walk--book .kauro-walk-cell s {
+    display: none;
+  }
+  .kauro-walk--book .kauro-walk-work {
+    padding: 0.875rem 0.875rem 1rem;
+  }
+}
+@media (max-width: 22.5rem) {
+  .kauro-walk--book .kauro-walk-now {
+    block-size: 11.75rem;
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--mono {
+    font-size: 0.6875rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* upload: the rows are read in, then the seal lands on the file */
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-sealed {
+    animation: kauro-thunk 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 1.25s both;
+  }
+  /* the file line's figure prints when it changes meaning */
+  .kauro-walk--book.is-ready .kauro-walk-rows {
+    animation: kauro-print 0.35s cubic-bezier(0.5, 0, 0.2, 1) both;
+  }
+}
+/* below 1280 px the unified row is told by its colour; its tag would crowd the name */
+@media (max-width: 79.99rem) {
+  .kauro-walk--book .kauro-walk-tag {
+    display: none;
+  }
+}
+@media (min-width: 62rem) and (max-width: 79.99rem) {
+  .kauro-walk--book .kauro-walk-row {
+    grid-template-columns: 2.25rem minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell,
+  .kauro-walk--book .kauro-walk-row--head .kauro-walk-cell {
+    padding-inline: 0.5rem;
+  }
+}
+/* tablets and phones: the told step has room for its longest explanation; the file's figure has a line of its own, so the window keeps
+   one height whatever the figure says */
+@media (max-width: 61.99rem) {
+  .kauro-walk--book .kauro-walk-now {
+    block-size: 13.5rem;
+  }
+  .kauro-site-main .kauro-walk--book p.kauro-walk-file {
+    flex-wrap: wrap;
+  }
+  .kauro-walk--book .kauro-walk-rows {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--mono {
+    padding-inline: 0.375rem;
+    font-size: 0.6875rem;
+  }
+}
+/* narrow phones: the name and the address share one cell, one above the other, so neither is cut */
+@media (max-width: 30rem) {
+  .kauro-walk--book .kauro-walk-row {
+    grid-template-columns: 2rem minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: center;
+  }
+  .kauro-walk--book .kauro-walk-row > .kauro-walk-cell--mark {
+    grid-row: 1 / span 2;
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--name,
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--email {
+    block-size: auto;
+    padding-block: 0;
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--email {
+    padding-inline: 0.5rem;
+    color: var(--kauro-color-text-muted);
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell--email.is-flag {
+    color: var(--kauro-color-text);
+  }
+  .kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) {
+    block-size: 3rem;
+  }
+  .kauro-walk--book .kauro-walk-table {
+    grid-template-rows: auto repeat(5, 3rem);
+  }
+  .kauro-walk--book .kauro-walk-row--head > .kauro-walk-cell--email {
+    display: none;
+  }
+}
+@media (max-width: 22.5rem) {
+  .kauro-walk--book .kauro-walk-now {
+    block-size: 14.5rem;
+  }
+}
+@media (max-width: 22.5rem) {
+  .kauro-walk--book .kauro-walk-now {
+    block-size: 14.75rem;
+  }
+  .kauro-walk--book .kauro-walk-rows {
+    font-size: 0.6875rem;
+    white-space: nowrap;
+  }
+}
+/* the window is exactly its bar, its file line and its rows: an earlier fixed height (31rem) does not apply to it */
+.kauro-walk.kauro-walk--book.is-ready .kauro-walk-window {
+  block-size: auto;
+  align-self: center;
+}
+
+/* ---- How it works on Home: the window of the film, a tool under the file at each step (Order 10, owner review, sixth design) ------- */
+
+/* while playing, each mark fills for exactly as long as its step stays (journey.tsx STEPS ms) */
+.kauro-walk--book.is-playing.is-step-0 .kauro-walk-dot.is-current::after,
+.kauro-walk--book.is-playing.is-step-1 .kauro-walk-dot.is-current::after {
+  animation-duration: 2.9s;
+}
+.kauro-walk--book.is-playing.is-step-2 .kauro-walk-dot.is-current::after {
+  animation-duration: 3s;
+}
+.kauro-walk--book.is-playing.is-step-3 .kauro-walk-dot.is-current::after {
+  animation-duration: 3.1s;
+}
+.kauro-walk--book.is-playing.is-step-4 .kauro-walk-dot.is-current::after,
+.kauro-walk--book.is-playing.is-step-5 .kauro-walk-dot.is-current::after {
+  animation-duration: 3.3s;
+}
+
+/* the holder is as tall as the tallest step and sits centred beside the text; the window hangs from its top and is as tall as its step */
+.kauro-walk--book .kauro-walk-holder {
+  grid-area: window;
+  display: grid;
+  align-self: center;
+  min-inline-size: 0;
+}
+.kauro-walk.kauro-walk--book .kauro-walk-holder > .kauro-walk-window {
+  grid-area: 1 / 1;
+  align-self: start;
+  block-size: auto;
+  min-inline-size: 0;
+}
+.kauro-walk--book .kauro-walk-holder > .kauro-walk-sizer {
+  visibility: hidden;
+  pointer-events: none;
+}
+.kauro-walk--book .kauro-walk-sizer .kauro-walk-tools {
+  display: grid;
+}
+.kauro-walk--book .kauro-walk-sizer .kauro-walk-tools > * {
+  grid-area: 1 / 1;
+}
+.kauro-walk--book .kauro-walk-sizer,
+.kauro-walk--book .kauro-walk-sizer * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* the file: rows of their own height; the row unified into another folds away */
+.kauro-walk.kauro-walk--book .kauro-walk-table {
+  position: relative;
+  grid-template-rows: none;
+  min-block-size: 0;
+}
+.kauro-walk.kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) {
+  max-block-size: 3rem;
+  transition: max-block-size 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s, opacity 0.35s ease 0.15s, background-color 0.4s ease;
+}
+.kauro-walk.kauro-walk--book .kauro-walk-row.is-folded {
+  max-block-size: 0;
+  opacity: 0;
+  border-block-start-color: transparent;
+}
+/* the free check's measuring line, once across the file */
+.kauro-walk-scan {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  background: var(--kauro-color-accent);
+  box-shadow: 0 0 1.25rem 0.25rem color-mix(in srgb, var(--kauro-color-accent) 35%, transparent);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* the tool under the file */
+.kauro-walk--book .kauro-walk-tools {
+  min-inline-size: 0;
+}
+.kauro-walk-tool {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-main .kauro-walk-tool p {
+  max-inline-size: none;
+  margin: 0;
+}
+
+/* 01 the source files read in to their last row, and the seal on the set */
+.kauro-walk-tool--upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+}
+.kauro-walk-reads {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-reads li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 0.625rem 0.875rem 0.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  background: var(--kauro-color-surface);
+  font-size: 0.9375rem;
+}
+.kauro-walk-read-rows {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-walk-read-bar {
+  grid-column: 1 / -1;
+  block-size: 3px;
+  border-radius: 62.5rem;
+  background: var(--kauro-color-accent);
+  transform-origin: left center;
+}
+.kauro-walk-stamp {
+  margin-inline-end: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 2px solid var(--kauro-color-accent);
+  border-radius: 0.3125rem;
+  box-shadow: inset 0 0 0 3px var(--kauro-color-raised), inset 0 0 0 4px var(--kauro-color-accent);
+  color: var(--kauro-color-accent);
+  font-family: var(--kauro-mono-family);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+}
+
+/* 02 the findings, counted, with their share of the file */
+.kauro-walk--book .kauro-walk-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  block-size: auto;
+}
+.kauro-walk--book .kauro-walk-metric-figure {
+  font-size: clamp(1.875rem, 1.4rem + 1.2vw, 2.5rem);
+}
+.kauro-walk--book .kauro-walk-metric-label {
+  font-size: 0.8125rem;
+}
+.kauro-walk--book .kauro-walk-metric-share {
+  font-size: 0.8125rem;
+}
+
+/* 03 the three changes, each approved by the team in turn */
+.kauro-walk--book .kauro-walk-proposals {
+  display: grid;
+  gap: 0.5rem;
+}
+.kauro-walk--book .kauro-walk-proposal {
+  grid-template-columns: 1.5rem minmax(0, auto) minmax(0, 1fr) auto;
+  gap: 0.875rem;
+  padding: 0.4375rem 0.5rem 0.4375rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--kauro-color-surface);
+  font-size: 0.9375rem;
+}
+.kauro-walk--book .kauro-walk-proposal .kauro-walk-mark {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  font-size: 0.6875rem;
+}
+.kauro-walk--book .kauro-walk-proposal-detail {
+  font-size: 0.75rem;
+}
+.kauro-walk--book .kauro-walk-approve {
+  justify-content: center;
+  min-inline-size: 6.5rem;
+  font-size: 0.8125rem;
+}
+
+/* 04 the sealed rows lead to their price: units, band, then the quote */
+.kauro-walk-tool--quote {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.kauro-walk-tool--quote .kauro-walk-quote-units {
+  display: grid;
+  flex: 0 1 18rem;
+  gap: 0.5rem;
+  min-inline-size: 0;
+}
+.kauro-site-main .kauro-walk-tool--quote p.kauro-walk-quote-figure {
+  font-size: 2rem;
+  white-space: nowrap;
+}
+.kauro-walk-tool--quote .kauro-walk-quote-figure span {
+  font-size: 0.8125rem;
+}
+.kauro-walk-tool--quote .kauro-walk-quote-total {
+  justify-items: start;
+}
+.kauro-site-main .kauro-walk-tool--quote p.kauro-walk-quote-price {
+  font-size: clamp(2.5rem, 1.9rem + 1.6vw, 3.25rem);
+}
+.kauro-walk-tool-arrow {
+  position: relative;
+  flex: none;
+  inline-size: 2.75rem;
+  block-size: 0.75rem;
+  background: linear-gradient(var(--kauro-color-accent), var(--kauro-color-accent)) left center / calc(100% - 0.5rem) 2px no-repeat;
+}
+.kauro-walk-tool-arrow::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: 50%;
+  border-block: 0.375rem solid transparent;
+  border-inline-start: 0.5625rem solid var(--kauro-color-accent);
+  transform: translateY(-50%);
+}
+
+/* 05 what came in, less what was unified, is what goes out */
+.kauro-site-main .kauro-walk-tool--prepare p.kauro-walk-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.875rem;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2.25rem, 1.6rem + 1.8vw, 3rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.kauro-walk-sum-op {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-walk-sum-total {
+  color: var(--kauro-color-accent);
+  font-weight: 500;
+}
+.kauro-site-main .kauro-walk-tool--prepare p.kauro-walk-ok {
+  margin-block-start: 0.5rem;
+  color: var(--kauro-color-success-text);
+  font-weight: 650;
+}
+.kauro-walk-tool--prepare .kauro-walk-ok::before {
+  content: "\2713  " / "";
+}
+
+/* 06 the package, then the files in their order to the team's own account */
+.kauro-walk-tool--import {
+  display: grid;
+  gap: 0.875rem;
+}
+.kauro-walk-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-docs li {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.375rem;
+  background: var(--kauro-color-surface);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-walk-handover {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-order {
+  display: grid;
+  flex: none;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: walk-handover;
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-order li {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  counter-increment: walk-handover;
+  font-size: 0.875rem;
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-order li::before {
+  content: counter(walk-handover) / "";
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1px solid var(--kauro-color-accent);
+  border-radius: 50%;
+  background: var(--kauro-color-accent);
+  color: var(--kauro-color-on-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-order li::after {
+  content: none;
+}
+.kauro-site-main .kauro-walk-tool p.kauro-walk-crm {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.875rem 1.125rem;
+  border: 2px solid var(--kauro-color-accent);
+  border-radius: 0.625rem;
+  background: color-mix(in srgb, var(--kauro-color-accent) 10%, transparent);
+  color: var(--kauro-color-accent);
+  font-weight: 700;
+  text-align: center;
+}
+.kauro-walk-crm span {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* a narrow screen: the tools fold onto their own lines */
+@media (max-width: 39.99rem) {
+  .kauro-walk-tool--upload {
+    gap: 0.75rem;
+  }
+  .kauro-walk-stamp {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+  .kauro-walk--book .kauro-walk-metrics {
+    gap: 0.75rem;
+  }
+  .kauro-walk--book .kauro-walk-metric {
+    padding-inline-start: 0.5rem;
+  }
+  .kauro-walk--book .kauro-walk-metric-figure {
+    font-size: 1.5rem;
+  }
+  .kauro-walk--book .kauro-walk-metric-label {
+    font-size: 0.6875rem;
+  }
+  .kauro-walk--book .kauro-walk-proposal {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+  .kauro-walk--book .kauro-walk-proposal-detail {
+    display: none;
+  }
+  .kauro-walk--book .kauro-walk-approve {
+    min-inline-size: 5.75rem;
+    padding-inline: 0.5rem;
+    font-size: 0.75rem;
+  }
+  .kauro-walk-tool--quote {
+    gap: 0.75rem;
+  }
+  .kauro-site-main .kauro-walk-tool--quote p.kauro-walk-quote-figure {
+    font-size: 1.375rem;
+  }
+  .kauro-walk-tool--quote .kauro-walk-quote-figure span {
+    display: block;
+    font-size: 0.6875rem;
+  }
+  .kauro-site-main .kauro-walk-tool--quote p.kauro-walk-quote-price {
+    font-size: 2rem;
+  }
+  .kauro-walk-tool-arrow {
+    inline-size: 1.75rem;
+  }
+  .kauro-walk-handover {
+    gap: 0.75rem;
+  }
+  .kauro-walk--book .kauro-walk-tool--import .kauro-walk-order li {
+    font-size: 0.75rem;
+  }
+  .kauro-site-main .kauro-walk-tool p.kauro-walk-crm {
+    padding: 0.625rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+  .kauro-walk-docs li {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* the narrowest phones: the import order and the account stack, so neither leaves the window */
+@media (max-width: 22.5rem) {
+  .kauro-walk-handover {
+    flex-wrap: wrap;
+  }
+  .kauro-walk-tool--import .kauro-walk-tool-arrow {
+    display: none;
+  }
+  .kauro-site-main .kauro-walk-tool p.kauro-walk-crm {
+    flex: 1 1 100%;
+  }
+}
+/* a sizer is never seen, whatever its parts say about their own visibility */
+.kauro-walk--book .kauro-walk-holder > .kauro-walk-sizer * {
+  visibility: hidden !important;
+}
+/* the window does not settle as the page scrolls: it is simply there, and moves only inside */
+.kauro-walk.kauro-walk--book .kauro-walk-window {
+  animation: none;
+}
+
+/* ---- How it works on Home: each step plays the owner-approved film exactly, at its speed (Order 10, owner review) ------------------ */
+/* The moments are the film's, in seconds from the start of the step (journey.tsx AT and STEPS use the same); the effects are the film's:
+   fade, rise, wipe (left to right), print (top to bottom), pop, grow, stamp; each lasts 0.55 s, eased out, unless said otherwise. */
+
+/* while playing, each mark fills for exactly as long as its step stays */
+.kauro-walk--book.is-playing.is-step-0 .kauro-walk-dot.is-current::after {
+  animation-duration: 7.6s;
+}
+.kauro-walk--book.is-playing.is-step-1 .kauro-walk-dot.is-current::after,
+.kauro-walk--book.is-playing.is-step-3 .kauro-walk-dot.is-current::after {
+  animation-duration: 5.6s;
+}
+.kauro-walk--book.is-playing.is-step-2 .kauro-walk-dot.is-current::after {
+  animation-duration: 7.8s;
+}
+.kauro-walk--book.is-playing.is-step-4 .kauro-walk-dot.is-current::after {
+  animation-duration: 9s;
+}
+.kauro-walk--book.is-playing.is-step-5 .kauro-walk-dot.is-current::after {
+  animation-duration: 6.6s;
+}
+
+/* 01: the seal lands on the files, as in the film */
+.kauro-walk-tool--upload {
+  position: relative;
+  display: block;
+}
+.kauro-walk-tool--upload .kauro-walk-stamp {
+  position: absolute;
+  inset-inline-end: 1.5rem;
+  inset-block-start: 2.75rem;
+  margin: 0;
+  background: var(--kauro-color-raised);
+}
+/* 05: the row folding away takes the film's second */
+.kauro-walk.kauro-walk--book .kauro-walk-row:not(.kauro-walk-row--head) {
+  transition: max-block-size 1s cubic-bezier(0.33, 1, 0.68, 1), opacity 1s cubic-bezier(0.33, 1, 0.68, 1), background-color 0.55s ease;
+}
+/* 05: until the preparation reaches them, the findings keep their full mark */
+.kauro-walk.kauro-walk--book.is-step-4:not(.is-applied) .kauro-walk-cell.is-flag {
+  background: color-mix(in srgb, var(--kauro-color-accent) 22%, transparent);
+  box-shadow: inset 0 -2px 0 var(--kauro-color-accent);
+}
+.kauro-walk.kauro-walk--book .kauro-walk-cell.is-flag {
+  transition: background-color 0.55s ease, box-shadow 0.55s ease;
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-tool-arrow {
+  transform-origin: left center;
+}
+
+@keyframes kauro-f-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes kauro-f-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+}
+@keyframes kauro-f-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kauro-f-print {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kauro-f-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+@keyframes kauro-f-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes kauro-f-growy {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes kauro-f-stamp {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) scale(1.5);
+  }
+  33% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-6deg) scale(1);
+  }
+}
+@keyframes kauro-f-stamp-s {
+  0% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+  33% {
+    opacity: 1;
+  }
+}
+@keyframes kauro-f-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes kauro-f-muted {
+  from {
+    color: var(--kauro-color-text-muted);
+    font-weight: 400;
+  }
+}
+@keyframes kauro-f-fill {
+  from {
+    background-color: transparent;
+    color: var(--kauro-color-accent);
+  }
+}
+/* the measuring line: across the file in 2.4 s, there 0.2 s more, then gone in 0.35 s */
+@keyframes kauro-f-scan {
+  0% {
+    left: 0;
+    opacity: 1;
+    visibility: visible;
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  81% {
+    left: calc(100% - 3px);
+    opacity: 1;
+  }
+  88% {
+    left: calc(100% - 3px);
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 3px);
+    opacity: 0;
+    visibility: visible;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kauro-walk--book.is-ready {
+    --kauro-f: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  /* 01 Upload: the file is named, the two sources rise and fill their bars, the file prints and its rows are laid in, the count runs,
+     the seal lands, the file is sealed, the state reads Sealed */
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-file .kauro-site-file {
+    animation: kauro-f-wipe 0.55s var(--kauro-f) both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-reads li {
+    animation: kauro-f-up 0.55s var(--kauro-f) 0.2s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-reads li + li {
+    animation-delay: 0.6s;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-read-bar {
+    animation: kauro-f-grow 3.2s var(--kauro-f) 0.8s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-reads li + li .kauro-walk-read-bar {
+    animation-duration: 3s;
+    animation-delay: 1.2s;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-rows {
+    animation: kauro-f-fade 0.55s var(--kauro-f) 1s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-table {
+    animation: kauro-f-print 0.7s var(--kauro-f) 1.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-row:not(.kauro-walk-row--head) {
+    animation: kauro-f-wipe 0.55s var(--kauro-f) 2s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-row:nth-child(3) {
+    animation-delay: 2.3s;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-row:nth-child(4) {
+    animation-delay: 2.6s;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-row:nth-child(5) {
+    animation-delay: 2.9s;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-row:nth-child(6) {
+    animation-delay: 3.2s;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-stamp {
+    animation: kauro-f-stamp 0.55s var(--kauro-f) 5.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-sealed {
+    animation: kauro-f-stamp-s 0.55s var(--kauro-f) 5.8s both;
+  }
+  .kauro-walk--book.is-ready.is-step-0 .kauro-walk-chip {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 6s both;
+  }
+
+  /* 02 Measure: the line measures the file; the findings are marked as it passes; the three counts rise and run; the state reads Measured */
+  .kauro-walk--book.is-ready .kauro-walk-scan {
+    animation: kauro-f-scan 2.95s both;
+  }
+  .kauro-walk.kauro-walk--book.is-ready.is-step-1 .kauro-walk-cell.is-flag {
+    animation: kauro-walk-flag 0.55s var(--kauro-f) 0.6s both;
+  }
+  .kauro-walk.kauro-walk--book.is-ready.is-step-1 .kauro-walk-row:nth-child(5) .kauro-walk-cell.is-flag {
+    animation-delay: 1.4s;
+  }
+  .kauro-walk.kauro-walk--book.is-ready.is-step-1 .kauro-walk-row:nth-child(6) .kauro-walk-cell.is-flag {
+    animation-delay: 1.8s;
+  }
+  .kauro-walk--book.is-ready.is-step-1 .kauro-walk-row.is-pair .kauro-walk-cell--mark::before {
+    transform-origin: top center;
+    animation: kauro-f-growy 0.3s linear 1s both;
+  }
+  .kauro-walk--book.is-ready.is-step-1 .kauro-walk-row.is-pair + .kauro-walk-row.is-pair .kauro-walk-cell--mark::before {
+    animation-delay: 1.3s;
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  .kauro-walk--book.is-ready.is-step-1 .kauro-walk-metric {
+    animation: kauro-f-up 0.55s var(--kauro-f) 2.3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-1 .kauro-walk-metric:nth-child(2) {
+    animation-delay: 2.6s;
+  }
+  .kauro-walk--book.is-ready.is-step-1 .kauro-walk-metric:nth-child(3) {
+    animation-delay: 2.9s;
+  }
+  .kauro-walk--book.is-ready.is-step-1 .kauro-walk-chip {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 3.2s both;
+  }
+
+  /* 03 Decide: Awaiting your approval; the three changes rise; their numbers appear in the margin; the team approves one, two, three;
+     the state reads Approved: 3/3 */
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-chip {
+    animation: kauro-f-pop 0.55s var(--kauro-f) both;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-proposal {
+    animation: kauro-f-up 0.55s var(--kauro-f) 0.3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-proposal:nth-child(2) {
+    animation-delay: 0.6s;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-proposal:nth-child(3) {
+    animation-delay: 0.9s;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-row--head .kauro-walk-mark {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 1s both;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-row:nth-child(3) .kauro-walk-mark {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 1.3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-row:nth-child(4) .kauro-walk-mark,
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-row:nth-child(5) .kauro-walk-mark {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 1.6s both;
+  }
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-table .kauro-walk-mark.is-approved,
+  .kauro-walk--book.is-ready.is-step-2 .kauro-walk-approve.is-on {
+    animation: kauro-f-pop 0.55s var(--kauro-f) both;
+  }
+
+  /* 04 Quote: the units rise and are counted, they find their place in the band, the arrow leads to the price, which prints */
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-chip {
+    animation: kauro-f-pop 0.55s var(--kauro-f) both;
+  }
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-quote-units {
+    animation: kauro-f-up 0.55s var(--kauro-f) 0.3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-quote-fill {
+    animation: kauro-f-grow 1.2s var(--kauro-f) 2s both;
+  }
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-quote-band-label {
+    animation: kauro-f-fade 0.55s var(--kauro-f) 2.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-tool-arrow {
+    animation: kauro-f-wipe 0.45s var(--kauro-f) 3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-quote-price {
+    animation: kauro-f-print 0.8s var(--kauro-f) 3.3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-3 .kauro-walk-quote-valid {
+    animation: kauro-f-fade 0.55s var(--kauro-f) 4s both;
+  }
+
+  /* 05 Prepare: Preparing; the clean file is named; the name is normalised, the column renamed; the rows run down; the duplicate folds;
+     the pair is one row, Unified; the sum is written term by term and reconciles; Prepared for import */
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-chip {
+    animation: kauro-f-pop 0.55s var(--kauro-f) both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-chip--swap .kauro-walk-chip-now {
+    animation: kauro-f-out 0.35s ease 6s forwards;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-chip--swap .kauro-walk-chip-then {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 6.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-file .kauro-site-file {
+    animation: kauro-f-wipe 0.55s var(--kauro-f) 0.6s both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-swap {
+    animation: kauro-f-wipe 0.55s var(--kauro-f) both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-rows {
+    animation: kauro-f-muted 0.01s linear 3.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-tag {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 0.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-sum > span {
+    animation: kauro-f-wipe 0.55s var(--kauro-f) 5.6s both;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-sum > span:nth-child(2) {
+    animation-name: kauro-f-fade;
+    animation-delay: 6s;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-sum > span:nth-child(3) {
+    animation-delay: 6.2s;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-sum > span:nth-child(4) {
+    animation-name: kauro-f-fade;
+    animation-delay: 6.6s;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-sum > span:nth-child(5) {
+    animation-delay: 6.8s;
+  }
+  .kauro-walk--book.is-ready.is-step-4 .kauro-walk-ok {
+    animation: kauro-f-up 0.55s var(--kauro-f) 7.4s both;
+  }
+
+  /* 06 Import: Ready for your team; the package; the files rise and are taken one, two, three; the arrow; your CRM account */
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-chip {
+    animation: kauro-f-pop 0.55s var(--kauro-f) both;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-docs li {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 0.3s both;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-docs li:nth-child(2) {
+    animation-delay: 0.5s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-docs li:nth-child(3) {
+    animation-delay: 0.7s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-docs li:nth-child(4) {
+    animation-delay: 0.9s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-order li {
+    animation: kauro-f-up 0.55s var(--kauro-f) 1.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-order li:nth-child(2) {
+    animation-delay: 1.6s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-order li:nth-child(3) {
+    animation-delay: 1.8s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-order li::before {
+    animation: kauro-f-fill 0.55s var(--kauro-f) 2.4s both;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-order li:nth-child(2)::before {
+    animation-delay: 3.2s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-order li:nth-child(3)::before {
+    animation-delay: 4s;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-tool--import .kauro-walk-tool-arrow {
+    animation: kauro-f-grow 0.6s var(--kauro-f) 4.6s both;
+  }
+  .kauro-walk--book.is-ready.is-step-5 .kauro-walk-crm {
+    animation: kauro-f-pop 0.55s var(--kauro-f) 5s both;
+  }
+}
+/* as in the film: a finished state reads in green; the import order is plain text; a new value is written without a highlight; the
+   unified row takes the film's faint green */
+.kauro-walk--book .kauro-walk-chip.is-ok {
+  border-color: var(--kauro-color-success-text);
+  color: var(--kauro-color-success-text);
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-order li {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.kauro-walk--book .kauro-walk-tool--import .kauro-walk-order .kauro-site-file::before {
+  display: none;
+}
+.kauro-walk--book .kauro-walk-new {
+  animation: none;
+}
+.kauro-walk.kauro-walk--book .kauro-walk-row.is-unified {
+  background: color-mix(in srgb, var(--kauro-color-success-text) 14%, transparent);
+}
+/* below 1280 px the normalised name shows only its new form, so it is never cut */
+.kauro-walk-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-inline-size: 0;
+}
+@media (max-width: 79.99rem) {
+  .kauro-walk--book .kauro-walk-cell--name .kauro-walk-swap s {
+    display: none;
+  }
+}
+/* text on the window takes the paper's primary, wine on the light paper and clay on the dark one, so it always reads (WCAG AA) */
+.kauro-walk--book .kauro-walk-stamp {
+  border-color: var(--kauro-color-primary);
+  box-shadow: inset 0 0 0 3px var(--kauro-color-raised), inset 0 0 0 4px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+.kauro-walk--book .kauro-walk-sum-total,
+.kauro-site-main .kauro-walk--book .kauro-walk-tool p.kauro-walk-crm {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-main .kauro-walk--book .kauro-walk-tool p.kauro-walk-crm {
+  border-color: var(--kauro-color-primary);
+  background: color-mix(in srgb, var(--kauro-color-primary) 10%, transparent);
+}
+
+/* ---- How it works: the buyer's guide (Order 10, the owner's final decision) --------------------------------------------------------- */
+
+/* A reference page, as serious as Help and Contact: nothing plays on arrival or on scroll. The head keeps its card of who acts (it only
+   straightens when pointed at, like every card on the table); below it an index beside six sheets, each with the same five fields, then
+   a worked example in ledgers. Home tells the process as a film; this page is its reference. */
+.kauro-site-pagehead.kauro-site-head-how .kauro-acts {
+  animation: none;
+}
+.kauro-how-guide {
+  padding-block-start: var(--kauro-site-section-space-tight);
+}
+.kauro-site-main .kauro-how-stages > h2 {
+  margin-block-end: var(--kauro-space-3);
+  font-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.5rem);
+  letter-spacing: -0.02em;
+}
+.kauro-how-stages > .kauro-site-guide-summary {
+  max-inline-size: 62ch;
+}
+
+/* the index: numbered like the sheets, the actor's colour on the number */
+.kauro-how-toc a {
+  gap: var(--kauro-space-3);
+  line-height: 1.3;
+}
+.kauro-how-toc-number {
+  flex: none;
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-how-toc-item--kauro .kauro-how-toc-number {
+  color: var(--kauro-color-accent-text);
+}
+.kauro-how-toc .kauro-site-legend {
+  margin-block-start: var(--kauro-space-5);
+}
+
+/* the six sheets */
+.kauro-stage-list {
+  display: grid;
+  gap: var(--kauro-space-5);
+  margin: var(--kauro-space-6) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-stage {
+  scroll-margin-block-start: 6rem;
+}
+.kauro-stage-sheet {
+  overflow: hidden;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-stage-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  background: var(--kauro-color-surface);
+}
+.kauro-stage--kauro .kauro-stage-head {
+  border-inline-start-color: var(--kauro-color-accent);
+}
+.kauro-stage-number {
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-display-family);
+  font-size: 1.75rem;
+  font-weight: 300;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-stage--kauro .kauro-stage-number {
+  color: var(--kauro-color-accent-text);
+}
+.kauro-site-main .kauro-stage-head h3 {
+  margin: 0;
+  font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
+  letter-spacing: -0.015em;
+}
+.kauro-site-main p.kauro-stage-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.kauro-stage-actor::before {
+  content: "";
+  box-sizing: border-box;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  background: var(--kauro-color-primary);
+}
+.kauro-stage--kauro .kauro-stage-actor::before {
+  border-color: var(--kauro-color-accent);
+  background: transparent;
+}
+.kauro-site-main p.kauro-stage-summary {
+  max-inline-size: 68ch;
+  padding: var(--kauro-space-5) var(--kauro-space-5) var(--kauro-space-4);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+.kauro-stage-fields {
+  margin: 0;
+  padding: 0 var(--kauro-space-5) var(--kauro-space-3);
+}
+.kauro-stage-field {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding-block: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-stage-field dt {
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-stage-field dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+.kauro-site-main .kauro-stage-field dd p {
+  max-inline-size: 68ch;
+}
+.kauro-stage-field ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 68ch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-stage-field li {
+  position: relative;
+  padding-inline-start: 1.125rem;
+}
+.kauro-stage-field li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0.7em;
+  inline-size: 0.5rem;
+  block-size: 1px;
+  background: var(--kauro-color-control-border);
+}
+/* what stops a stage is the one field set apart: its label in the primary colour, its lines marked with a short bar of it */
+.kauro-stage-field--stops dt {
+  color: var(--kauro-color-primary);
+}
+.kauro-stage-field--stops li::before {
+  inset-block-start: 0.35em;
+  inline-size: 2px;
+  block-size: 0.9em;
+  background: var(--kauro-color-primary);
+}
+@media (min-width: 48rem) {
+  .kauro-stage-field {
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    column-gap: var(--kauro-space-5);
+  }
+  .kauro-stage-field dt {
+    padding-block-start: 0.2em;
+  }
+}
+@media (max-width: 29.99rem) {
+  .kauro-stage-head {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-inline: var(--kauro-space-4);
+  }
+  .kauro-site-main p.kauro-stage-actor {
+    grid-column: 2;
+  }
+  .kauro-site-main p.kauro-stage-summary {
+    padding-inline: var(--kauro-space-4);
+  }
+  .kauro-stage-fields {
+    padding-inline: var(--kauro-space-4);
+  }
+}
+
+/* the worked example: two ledgers, the counts beside the price on a wide screen */
+.kauro-how-example {
+  display: grid;
+  gap: var(--kauro-space-5);
+}
+.kauro-how-ledger tbody td:first-of-type {
+  font-weight: 600;
+}
+.kauro-how-ledger--price tbody td:first-of-type {
+  text-align: end;
+}
+.kauro-how-ledger--price tbody tr:last-child :is(th, td) {
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-primary);
+  font-weight: 700;
+}
+.kauro-site-main p.kauro-how-example-note {
+  max-inline-size: 68ch;
+}
+@media (min-width: 62rem) {
+  .kauro-how-example {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+    align-items: start;
+  }
+  .kauro-how-example > p {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 75rem) {
+  /* a figure keeps to one line only where the ledger is wide enough for it */
+  .kauro-how-ledger tbody td:first-of-type {
+    white-space: nowrap;
+  }
+}
+@media (hover: hover) {
+  /* a ledger is read, not chosen: it does not lift under the pointer */
+  .kauro-site-main .kauro-how-ledger:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+@media (max-width: 39.99rem) {
+  /* on a phone a ledger row reads top to bottom: each value under its column's name, a sentence never squeezed beside a label */
+  .kauro-how-ledger .kauro-site-table--stack tbody td {
+    display: grid;
+    gap: 0.125rem;
+    padding-block: var(--kauro-space-2) 0;
+    text-align: start;
+  }
 }

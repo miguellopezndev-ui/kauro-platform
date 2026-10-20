@@ -36,8 +36,9 @@ import { ContactPage } from "../src/public/pages/contact.tsx";
 import { UnsubscribePage } from "../src/public/pages/unsubscribe.tsx";
 import { submitOptOut } from "../src/public/opt-out.ts";
 import { NavList, SiteFrame } from "../src/public/frame.tsx";
-import { BANDS, formatUsd } from "../src/public/pricing-bands.ts";
+import { BANDS, bandIndexOf, formatCount, formatUsd, priceOf } from "../src/public/pricing-bands.ts";
 import { RETENTION_ROWS } from "../src/public/retention.ts";
+import { MANIFEST_FILES, SAMPLE, SAMPLE_GROUPS, SAMPLE_MODE } from "../src/public/sample-data.ts";
 import { FOOTER_NAV, MAIN_NAV, ROUTE, SITE_PAGES, type PageKey } from "../src/public/site.ts";
 import { registryScreens } from "./support/registry.ts";
 
@@ -72,7 +73,7 @@ interface PageCase {
 
 const TOKEN = "1.0123456789abcdef0123456789abcdef.AbC-_dEf";
 const PAGES: readonly PageCase[] = [
-  { key: "home", screen: "UI01", html: (read) => render(createElement(HomePage, { publication: read, signInHref: SIGN_IN })) },
+  { key: "home", screen: "UI01", html: (read) => render(createElement(HomePage, { publication: read })) },
   { key: "how", screen: "UI02", html: () => render(createElement(HowItWorksPage)) },
   { key: "services", screen: "UI03", html: (read) => render(createElement(SupportedServicesPage, { publication: read })) },
   { key: "pricing", screen: "UI04", html: (read) => render(createElement(PricingPage, { publication: read, signInHref: SIGN_IN })) },
@@ -205,7 +206,7 @@ test("Home: the job line, one call to action, the sample and pricing beside it, 
   assert.equal(PUBLIC_COPY["public.cta.request-health-check.cta"], HEALTH_CHECK_CTA);
   const primary = linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary"));
   assert.ok(primary.length >= 1 && primary.length <= 2, "the same call to action at the top and at the end at most");
-  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${SIGN_IN}`], "one call to action, and it leads to sign-in");
+  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "one call to action, and it leads to the fit form (A3 3.2), never to an anonymous upload");
   assert.match(text, /The free data health check creates no obligation to buy\./);
   assert.ok(text.indexOf("View the synthetic sample") > 0 && hrefsOf(html).includes(ROUTE.sample) && hrefsOf(html).includes(ROUTE.pricing));
   const ai = text.indexOf(PERMITTED_AI_SENTENCE);
@@ -229,15 +230,60 @@ test("Home lists the services the publication lists, and says so plainly when it
 
 // ---- How it works ---------------------------------------------------------------------------------------------------------------------
 
-test("How it works: six steps in an ordered list, the check bounded and free, approval named, the quote from the server, and the import the agency's own", () => {
+test("How it works is the buyer's guide: six stages, each with the same five fields, and nothing that plays", () => {
   const html = page("how").html(ALL);
   const text = textOf(html);
-  assert.equal(count(html, "<ol"), 1);
-  assert.equal((/<ol[\s\S]*?<\/ol>/.exec(html)?.[0].match(/<li[\s>]/g) ?? []).length, 6);
-  assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text), ["Upload your source files", "Get the free data health check", "You decide", "Review the quote and pay", "Kauro prepares the delivery", "Your team imports"]);
-  for (const claim of ["free and creates no obligation to buy", "is bounded", "A duplicate candidate is never treated as a confirmed duplicate", "cannot approve anything", "The server prices the project", "confirmed by the payment provider", "Kauro does not write to your CRM at any step"]) assert.ok(text.includes(claim), claim);
-  assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "the check names no duration");
-  assert.ok(hrefsOf(html).includes(ROUTE.services));
+  assert.equal(count(html, "<ol"), 1, "the stages are one ordered list");
+  assert.equal(count(html, 'class="kauro-stage kauro-stage--'), 6);
+  assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text), ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"]);
+  const sheets = [...html.matchAll(/<article class="kauro-stage-sheet"[\s\S]*?<\/article>/g)];
+  assert.equal(sheets.length, 6);
+  for (const sheet of sheets) assert.deepEqual([...sheet[0].matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["Who acts", "What it needs", "What happens", "What you get", "What stops it"]);
+  assert.doesNotMatch(html, /kauro-flow|kauro-scene/, "the long animation of the process is retired: Home tells it");
+  for (const claim of [
+    "free and creates no obligation to buy",
+    "The check is bounded",
+    "never a confirmed duplicate",
+    "cannot approve anything",
+    "Your team starts the check; Kauro runs it",
+    "The service terms list every excluded category",
+    "Pressing Enter never approves anything",
+    "there is no quote before the plan is approved",
+    "Returning to a page never confirms a payment",
+    "Kauro does not write to your CRM at any step",
+    "The project stays prepared for import until your team reports the result",
+    "for CLEAN, standard files with no steps for a particular CRM",
+  ])
+    assert.ok(text.includes(claim), claim);
+  assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "no stage names a duration");
+  assert.doesNotMatch(text.slice(0, text.indexOf("A worked example")), /HubSpot|Salesforce/, "the stages name a destination only through the capability publication, on Supported services; the invented example names its service");
+  assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
+  assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
+  assert.deepEqual(linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary")).map((link) => `${link.text}|${link.href}`), [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "start the fit assessment (A3 3.2)");
+  for (const stage of ["files", "check", "decide", "quote", "prepare", "import"]) assert.ok(hrefsOf(html).includes(`#stage-${stage}`), `the index links to stage ${stage}`);
+});
+
+test("How it works: the worked example keeps candidate groups, approved unifications and unified rows apart, and prices the billable units", () => {
+  const text = textOf(page("how").html(ALL));
+  const { pairs, triples, pairsKeptApart } = SAMPLE_GROUPS;
+  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
+  const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
+  assert.ok(contacts !== undefined && companies !== undefined);
+  const units = contacts.source + companies.source;
+  assert.equal(units, 15_684, "both sealed files are counted, before anything is unified");
+  const band = bandIndexOf(units);
+  assert.ok(band !== null);
+  for (const fact of [
+    `${formatCount(pairs + triples)} groups holding ${formatCount(pairs * 2 + triples * 3)} contacts`,
+    `${formatCount(pairs + triples - pairsKeptApart)} of ${formatCount(pairs + triples)} groups`,
+    `kept ${formatCount(pairsKeptApart)} groups apart`,
+    `${formatCount(contacts.source)} source rows become ${formatCount(contacts.rows)} delivered rows`,
+    `the price counts ${formatCount(units)} units, while the delivery holds ${formatCount(contacts.rows + companies.rows)} rows`,
+    formatUsd(priceOf(band, SAMPLE_MODE)),
+    "Invented figures.",
+    "prepared for an import with the HubSpot service",
+  ])
+    assert.ok(text.includes(fact), fact);
 });
 
 // ---- Supported services ---------------------------------------------------------------------------------------------------------------
@@ -254,7 +300,8 @@ test("Supported services: CLEAN stands beside HubSpot and Salesforce as one of t
   assert.deepEqual(h3, ["CLEAN", "HubSpot", "Salesforce"]);
   assert.equal(count(html, "<article"), 3);
   for (const name of ["CLEAN", "HubSpot", "Salesforce"]) assert.match(card(html, name), /Available for new projects/);
-  assert.match(textOf(html), /Read from the capability publication at 2026-10-02 09:30 UTC\./);
+  // the read time is not shown on this page (owner review, Order 10); Service status keeps it
+  assert.doesNotMatch(textOf(html), /Read from the capability publication at/);
   assert.match(card(html, "HubSpot"), /Publication version 2026\.10\.0, available since 2026-10-01 15:00 UTC\./);
   assert.match(card(html, "CLEAN"), /Kauro qualifies imports only for HubSpot and Salesforce\./);
   assert.match(card(html, "HubSpot"), /marketing-contact status and paid enrichment stay switched off/);
@@ -392,7 +439,7 @@ test("Sample delivery: it says at the top that everything is invented, and its n
     ["companies-clean.csv", "2,951", "3,204", "253"],
   ]);
   assert.match(text, /12,480 source rows, less 214 unified with approval, leave 12,266 output contacts\./);
-  assert.match(text, /A duplicate candidate is a pair worth reviewing, not a confirmed duplicate\./);
+  assert.match(text, /A duplicate candidate group is worth reviewing; it is not a confirmed duplicate\./);
   assert.equal(count(html, "<ol"), 1);
   assert.match(text, /It is not a check of your own data: the free data health check is\./);
   assert.match(text, /Compare the counts in the destination with the counts in the report\./);
@@ -471,9 +518,10 @@ test("Contact: a labelled fit form with the buyer-type question, the api's vocab
 
 // ---- Service status -------------------------------------------------------------------------------------------------------------------
 
-test("Service status: the published services and the time observed, or an honest unavailable state that claims neither running nor down", () => {
+test("Service status: the published services, or an honest unavailable state that claims neither running nor down", () => {
   const read = textOf(page("status").html(ALL));
-  assert.match(read, /Observed at 2026-10-02 09:30 UTC\. Reload this page for a new reading; it does not update on a schedule\./);
+  // the read time is not shown (owner review, Order 10)
+  assert.doesNotMatch(read, /Observed at/);
   assert.match(read, /CLEAN.*Available for new projects.*HubSpot.*Available for new projects.*Salesforce.*Available for new projects/);
   assert.match(read, /No incident summary is published on this page yet\. That is not a statement that none is open\./);
   const limited = textOf(page("status").html(publication(entry("CLEAN", "AVAILABLE_LIMITED"))));
@@ -498,8 +546,8 @@ test("Help: an index of seven static guides that link to their sections, each wi
   const targets = hrefsOf(index);
   assert.deepEqual(targets, ["#guide-files", "#guide-target", "#guide-approval", "#guide-payment", "#guide-stages", "#guide-retention", "#guide-support"]);
   assert.deepEqual(headings(html).filter((heading) => heading.level === 2).map((heading) => heading.text), ["Prepare your files", "Confirm your target settings", "Approve the plan", "Pay for a project", "Import in stages and return receipts", "How long files stay", "Ask for help"]);
-  assert.match(text, /Guide version 1\.1, last changed 2026-10-13/);
-  for (const claim of ["up to 50 files, up to 2 GB for each file, up to 800 columns in a table", "180 days after the last confirmation", "The quote stays valid for 14 days", "Pressing Enter never approves anything", "An arbitrary file marked as a success is not proof", "Never email a CRM export or a password"]) assert.ok(text.includes(claim), claim);
+  assert.match(text, /Guide version 1\.3, last changed 2026-10-20/);
+  for (const claim of ["up to 50 files in one set, up to 2 GB for each file and 5 GB for the whole set, up to 800 columns in a table, and up to 500,000 billable source units in one project at launch", "180 days after the last confirmation", "The quote stays valid for 14 days", "Pressing Enter never approves anything", "An arbitrary file marked as a success is not proof", "Never email a CRM export or a password"]) assert.ok(text.includes(claim), claim);
   assert.ok(hrefsOf(html).includes(ROUTE.contact));
   assert.doesNotMatch(html, /<form|<input|<button|type="search"/, "search is not offered yet");
 });

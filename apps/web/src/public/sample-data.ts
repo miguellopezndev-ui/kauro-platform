@@ -2,6 +2,7 @@
 // quote or import). Every number here is invented, and they reconcile: a shown percentage is its count over the population beside it, and
 // each output file's rows are its source rows less the rows unified with approval, so the sample teaches the manifest correctly.
 import type { PublicCopyId } from "../copy/public.ts";
+import type { ServiceMode } from "./policy-snapshot.ts";
 
 export const SAMPLE = Object.freeze({
   contacts: 12_480,
@@ -35,6 +36,16 @@ export const MANIFEST_FILES: readonly ManifestFile[] = Object.freeze([
   { name: SAMPLE.contactsFile, rows: 12_266, source: SAMPLE.contacts, unified: 214 },
   { name: "companies-clean.csv", rows: 2_951, source: 3_204, unified: 253 },
 ]);
+
+/**
+ * How the 428 contacts in duplicate candidate groups fall into groups, and which groups the team approved to unify (How it works keeps the
+ * three counts apart: candidate groups, approved unifications, unified rows). An approved group keeps one row and unifies the others into
+ * it, so the unified rows are the approved pairs plus two for each approved triple; test/public-data.test.ts checks both sums.
+ */
+export const SAMPLE_GROUPS = Object.freeze({ pairs: 193, triples: 14, pairsKeptApart: 7 });
+
+/** The service the synthetic project is quoted for: an import into a CRM (associations, an import order), so not CLEAN. */
+export const SAMPLE_MODE: ServiceMode = "HUBSPOT";
 
 /** What the preparation did to a record of the synthetic file, as the product window on Home shows it. */
 export type RecordResult = "valid" | "normalised" | "candidate";
@@ -77,8 +88,8 @@ export const SAMPLE_COLUMN = Object.freeze({ from: "E-mail", to: "Email" });
 /** Three lines of the synthetic manifest: an output row, the source row it came from, and the rows unified into it with approval. */
 export const SAMPLE_TRACE: ReadonlyArray<{ readonly output: number; readonly source: number; readonly unified: number | null }> = Object.freeze([
   { output: 1204, source: 1204, unified: null },
-  { output: 1205, source: 1207, unified: 1209 },
-  { output: 1206, source: 1210, unified: null },
+  { output: 1205, source: 1205, unified: 1207 },
+  { output: 1206, source: 1206, unified: null },
 ]);
 
 /** What the health check flags on a row of the synthetic file the Home journey works on. */

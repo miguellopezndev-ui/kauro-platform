@@ -35,7 +35,8 @@ export const COLOR = Object.freeze({
   textMuted: "#5F5955",
   background: BRAND.porcelain,
   surface: "#F1EDE8",
-  raised: "#FFFFFF",
+  /** A warm porcelain white for cards and documents (owner, 2026-10-19: pure white is not in the palette and made carbon read as black). */
+  raised: "#FAF8F5",
   border: "#E3DCD4",
   controlBorder: "#8C837D",
   primary: BRAND.wine,
@@ -140,11 +141,17 @@ export const THEMES = Object.freeze({ light: COLOR, dark: COLOR_DARK, inverse: C
 
 export type ThemeName = keyof typeof THEMES;
 
+/**
+ * The web's families (owner, 2026-10-19): the system faces the site was designed and reviewed with, kept by the owner's decision after
+ * comparing them with Inter (which stays the face of the printed B13 report). No web font is served.
+ */
 export const TYPOGRAPHY = Object.freeze({
   fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   /** Headlines: the optical display cut of the system face where the platform has one by name, else the same system face. */
   displayFamily: '"Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   monoFamily: 'ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace',
+  /** The editor's notes (margin notes and quiet asides), set in italic by their rules. */
+  noteFamily: 'Georgia, "Iowan Old Style", "Times New Roman", serif',
   bodySizePx: 16,
   bodyLineHeight: 1.5,
   denseSizePx: 14,
@@ -257,6 +264,7 @@ export function renderTokenCss(): string {
   lines.push(`  --kauro-font-family: ${TYPOGRAPHY.fontFamily};`);
   lines.push(`  --kauro-display-family: ${TYPOGRAPHY.displayFamily};`);
   lines.push(`  --kauro-mono-family: ${TYPOGRAPHY.monoFamily};`);
+  lines.push(`  --kauro-note-family: ${TYPOGRAPHY.noteFamily};`);
   lines.push(`  --kauro-font-size-body: ${TYPOGRAPHY.bodySizePx}px;`);
   lines.push(`  --kauro-font-size-dense: ${TYPOGRAPHY.denseSizePx}px;`);
   lines.push(`  --kauro-line-height-body: ${TYPOGRAPHY.bodyLineHeight};`);

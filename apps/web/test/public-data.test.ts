@@ -11,7 +11,7 @@ import { test } from "node:test";
 import { PUBLIC_COPY, placeholdersOf } from "../src/copy/public.ts";
 import { GUIDES_CHANGED, GUIDES_VERSION, guideText, guides } from "../src/public/guides.ts";
 import { INPUT_LIMITS, formatBytes } from "../src/public/limits.ts";
-import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, sharePercent } from "../src/public/sample-data.ts";
+import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_GROUPS, sharePercent } from "../src/public/sample-data.ts";
 import { FOOTER_NAV, MAIN_NAV, ROUTE, SITE_PAGES, pageMetadata } from "../src/public/site.ts";
 import { signInUrl } from "../src/server/public-origins.ts";
 import { registryScreens } from "./support/registry.ts";
@@ -41,11 +41,15 @@ test("the synthetic sample reconciles: the report's shares are its counts over i
   assert.deepEqual([contacts?.source, contacts?.unified, contacts?.rows], [SAMPLE.contacts, 214, 12_266]);
   assert.equal(new Set(MANIFEST_FILES.map((file) => file.name)).size, MANIFEST_FILES.length);
   for (const file of MANIFEST_FILES) assert.match(file.name, /^[a-z]+-clean\.csv$/);
+  // How it works keeps three counts apart: the contacts in candidate groups, the groups approved to unify, and the rows unified
+  const { pairs, triples, pairsKeptApart } = SAMPLE_GROUPS;
+  assert.equal(pairs * 2 + triples * 3, REPORT_ROWS.find((row) => row.label === "sample.report.duplicates")?.count, "the groups hold the contacts the report counts");
+  assert.equal(pairs - pairsKeptApart + triples * 2, contacts?.unified, "an approved group keeps one row and unifies the others into it");
 });
 
 // The recorded digest of the guides' rendered text. A change to any guide, or to a number a guide states from the policy, changes the digest:
 // this test then fails until the version and the date are raised and the digest below is recorded, which is what "versioned" means.
-const RECORDED_GUIDES = { version: "1.1", changed: "2026-10-13", sha256: "609a73c89f3b45a90a716d25beeae6bb3c856496a16253972f07a405176648c3" } as const;
+const RECORDED_GUIDES = { version: "1.3", changed: "2026-10-20", sha256: "c2e5e18d398d038b7316a4d37dc5be47418ca76396efeb339bee210c077e1c78" } as const;
 
 test("the guides are versioned: their text has a recorded digest under a version and a date, and it is kept in step", () => {
   assert.equal(GUIDES_VERSION, RECORDED_GUIDES.version);

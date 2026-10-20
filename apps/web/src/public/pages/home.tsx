@@ -19,7 +19,6 @@ import { ROUTE } from "../site.ts";
 
 export interface HomePageProps {
   readonly publication: Publication;
-  readonly signInHref: string;
 }
 
 const RESULT: Readonly<Record<RecordResult, PublicCopyId>> = {
@@ -188,7 +187,7 @@ function ModesSection({ publication }: { readonly publication: Publication }): R
   );
 }
 
-export function HomePage({ publication, signInHref }: HomePageProps): ReactElement {
+export function HomePage({ publication }: HomePageProps): ReactElement {
   return (
     <>
       <PageHead
@@ -200,7 +199,7 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
         aside={<ProductWindow />}
       >
         <div className="kauro-site-actions">
-          <LinkButton href={signInHref} primary>
+          <LinkButton href={ROUTE.contact} primary>
             {PUBLIC_COPY["public.cta.request-health-check.cta"]}
           </LinkButton>
           <LinkButton href={ROUTE.sample}>{PUBLIC_COPY["home.hero.sample.cta"]}</LinkButton>
@@ -217,14 +216,12 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
           ))}
         </ul>
       </div>
-      <Section id="home-process" heading={PUBLIC_COPY["home.process.heading"]} eyebrow={PUBLIC_COPY["nav.how.label"]} tone="inverse" variant="kauro-site-process">
-        <Journey />
-        <p className="kauro-site-links">
-          <LinkButton href={ROUTE.how} kind="text">
-            {PUBLIC_COPY["nav.how.label"]}
-          </LinkButton>
-        </p>
-      </Section>
+      {/* How it works is one composition: its heading belongs to the held scene, not above it (journey.tsx) */}
+      <section id="home-process" className="kauro-site-section kauro-inverse kauro-site-tone-band kauro-site-process" aria-labelledby="home-process-heading">
+        <div className="kauro-site-wrap">
+          <Journey eyebrow={PUBLIC_COPY["nav.how.label"]} heading={PUBLIC_COPY["home.process.heading"]} headingId="home-process-heading" />
+        </div>
+      </section>
       <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]} variant="kauro-site-buyer-section">
         <Audience />
       </Section>
@@ -263,7 +260,7 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
         lead={PUBLIC_COPY["home.closing.body"]}
         headExtra={
           <div className="kauro-site-actions">
-            <LinkButton href={signInHref} primary>
+            <LinkButton href={ROUTE.contact} primary>
               {PUBLIC_COPY["public.cta.request-health-check.cta"]}
             </LinkButton>
           </div>

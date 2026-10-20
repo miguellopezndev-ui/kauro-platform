@@ -5,7 +5,7 @@
   --kauro-color-text-muted: #5F5955;
   --kauro-color-background: #F8F6F3;
   --kauro-color-surface: #F1EDE8;
-  --kauro-color-raised: #FFFFFF;
+  --kauro-color-raised: #FAF8F5;
   --kauro-color-border: #E3DCD4;
   --kauro-color-control-border: #8C837D;
   --kauro-color-primary: #653A46;
@@ -34,6 +34,7 @@
   --kauro-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --kauro-display-family: "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --kauro-mono-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --kauro-note-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --kauro-font-size-body: 16px;
   --kauro-font-size-dense: 14px;
   --kauro-line-height-body: 1.5;

@@ -164,3 +164,21 @@ right, toward its headline, and the redacted file leans right after the stamp th
 The rules decided in §1–§9 are consolidated as identity version 1.0 in `docs/design/KAURO_VISUAL_IDENTITY.md`, which is the visual
 authority for new work. The screens that follow it are listed in `docs/design/KAURO_SCREEN_COVERAGE.md`. Who directed and who built it is
 recorded in `docs/design/KAURO_VISUAL_PROVENANCE.md`. This amendment remains the record of how each decision was reached.
+
+## 11. Typography on the web: the system families kept (Order 10, 2026-10-19)
+
+- **The confusion:** on 2026-10-18 the owner agreed Inter and JetBrains Mono, believing the web already used them. In fact the web had
+  always used the system families of §1–§10, and those are what the owner designed and approved.
+- **The comparison:** Order 10 implemented Inter on the web (PR #117, commits up to f3147b05). The owner compared that candidate with the
+  previous web and decided to **keep the previous families**, because they read better.
+- **What changed:**
+  - the web serves no font again; the tokens name the system stacks;
+  - the editor's notes keep Georgia italic, now named by a token (`--kauro-note-family`) instead of four repeated declarations;
+  - Inter and JetBrains Mono remain the faces of the printed B13 report, which embeds them (KAURO_VISUAL_IDENTITY.md §13), unchanged.
+- **What was kept from the Inter attempt:** the narrow-screen corrections it exposed. They were checked again with the system families,
+  and they fix defects that existed before: tables stacked on phones; the hero window; the report pile; the journey sheet's heads; the
+  sign-in control. They are recorded in KAURO_VISUAL_IDENTITY.md §3, "Narrow screens".
+- **The wordmark** stays "Kauro" in the display family; no custom glyph is invented.
+
+From this order on, every visual decision is reviewed by the owner in a running review environment (`tools/review/serve.mjs`, local only,
+outside the product build) before it is merged.
