@@ -1222,3 +1222,633 @@ fieldset.kauro-notice-form {
 .kauro-main > .kauro-banner {
   margin-block-end: var(--kauro-space-5);
 }
+
+/* ===== UI17 Target setup: how to give the settings, what Kauro read, what is not known ===== */
+.kauro-main .kauro-target-steps {
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-target-steps h2 {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-target-steps ol {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: target;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-target-steps ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.kauro-main .kauro-target-steps li {
+  position: relative;
+  display: grid;
+  gap: var(--kauro-space-1);
+  max-inline-size: none;
+  padding: var(--kauro-space-4) var(--kauro-space-4) var(--kauro-space-4) 3.25rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  counter-increment: target;
+}
+.kauro-target-steps li::before {
+  content: counter(target);
+  position: absolute;
+  inset-block-start: var(--kauro-space-4);
+  inset-inline-start: var(--kauro-space-4);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.625rem;
+  block-size: 1.625rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-target-steps li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-unknown {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 48rem;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px dashed var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-unknown p {
+  margin: 0;
+}
+.kauro-unknown-tag {
+  margin-inline-end: var(--kauro-space-2);
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-text);
+  color: var(--kauro-color-warning-surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ===== The plan (UI19 to UI22): its parts as a task list, then each part's page ===== */
+.kauro-main .kauro-plan-tasks {
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-plan-tasks ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: plan;
+}
+.kauro-main .kauro-plan-task {
+  max-inline-size: none;
+  margin: 0;
+  counter-increment: plan;
+}
+.kauro-plan-task a {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  block-size: 100%;
+  box-sizing: border-box;
+  padding: var(--kauro-space-3) var(--kauro-space-4) var(--kauro-space-3) 2.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-plan-task a:hover {
+  border-color: var(--kauro-color-control-border);
+}
+.kauro-plan-task a::before {
+  content: counter(plan);
+  position: absolute;
+  inset-block-start: var(--kauro-space-3);
+  inset-inline-start: var(--kauro-space-3);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  border: 1.5px solid var(--kauro-color-control-border);
+  border-radius: 50%;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-plan-task--done a::before {
+  content: "\2713";
+  border-color: var(--kauro-color-success-text);
+  background: var(--kauro-color-success-text);
+  color: var(--kauro-color-success-surface);
+}
+.kauro-plan-task--blocked a::before {
+  content: "!";
+  border-color: var(--kauro-color-danger-text);
+  color: var(--kauro-color-danger-text);
+}
+.kauro-plan-task.is-current a {
+  border-color: var(--kauro-color-primary);
+  box-shadow: inset 0 -3px 0 var(--kauro-color-primary);
+}
+.kauro-plan-task.is-current a::before {
+  border-color: var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+.kauro-plan-task--done.is-current a::before {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-plan-task-name {
+  font-weight: 600;
+}
+.kauro-plan-task-state {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-plan-task--done .kauro-plan-task-state {
+  color: var(--kauro-color-success-text);
+}
+.kauro-plan-task--blocked .kauro-plan-task-state {
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+
+/* UI19: the files as tabs, one row a source column */
+.kauro-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-1);
+  margin: 0 0 var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-tab {
+  display: grid;
+  gap: 0.125rem;
+  margin-block-end: -1px;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border: 0;
+  border-block-end: 3px solid transparent;
+  background: none;
+  color: var(--kauro-color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+.kauro-tab span {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+}
+.kauro-tab[aria-selected="true"] {
+  border-block-end-color: var(--kauro-color-primary);
+  color: var(--kauro-color-text);
+}
+.kauro-tab:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+.kauro-main .kauro-mapping th[scope="row"] {
+  min-inline-size: 13rem;
+  font-weight: 400;
+}
+.kauro-mapping-column {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  font-weight: 600;
+}
+.kauro-mapping-position {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.5rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.kauro-mapping-samples {
+  display: block;
+  max-inline-size: 18rem;
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kauro-mapping-flag,
+.kauro-mapping-error {
+  display: inline-block;
+  margin-block-start: var(--kauro-space-1);
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.kauro-mapping-flag {
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-mapping-error {
+  display: block;
+  inline-size: fit-content;
+  background: var(--kauro-color-danger-surface);
+  color: var(--kauro-color-danger-text);
+}
+.kauro-mapping select {
+  min-inline-size: 11rem;
+  min-block-size: 2.5rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+}
+.kauro-mapping td.kauro-table-end {
+  white-space: nowrap;
+}
+.kauro-mapping tr.is-left-out :is(th, td) {
+  background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
+}
+.kauro-mapping tr.is-left-out td:not(:has(select)) {
+  color: var(--kauro-color-text-muted);
+}
+
+/* UI20 and UI21: the counts as a row of figures */
+.kauro-main .kauro-identity-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-identity-counts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0.125rem;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-identity-counts dt {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-identity-counts dd {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-identity-counts dd:first-of-type {
+  color: var(--kauro-color-text);
+  font-size: clamp(1.5rem, 1.3rem + 0.6vw, 1.875rem);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+/* UI20: one group, its proof, its records side by side, the decision */
+.kauro-main .kauro-group {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-group > * {
+  margin: 0;
+}
+.kauro-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-3);
+}
+.kauro-main .kauro-group-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-group-proof code {
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-group-consent {
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-inline-start: 3px solid var(--kauro-color-warning-text);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-main .kauro-group .kauro-table-region {
+  background: var(--kauro-color-background);
+}
+.kauro-group-choice {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+.kauro-group-choice legend {
+  grid-column: 1 / -1;
+}
+.kauro-compare-keep {
+  margin-inline-start: var(--kauro-space-1);
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-success-surface);
+  color: var(--kauro-color-success-text);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-compare td:last-child {
+  font-weight: 600;
+}
+.kauro-compare-empty {
+  color: var(--kauro-color-text-muted);
+  font-style: italic;
+}
+.kauro-compare tr.is-conflict th {
+  box-shadow: inset 3px 0 0 var(--kauro-color-warning-text);
+}
+
+/* UI21: companies and contacts joined by their links */
+.kauro-main .kauro-links > h2 {
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-links-map {
+  display: grid;
+  grid-template-columns: auto minmax(4rem, 1fr) auto;
+  align-items: center;
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-5);
+}
+.kauro-links-node {
+  display: grid;
+  justify-items: center;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-links-node strong {
+  color: var(--kauro-color-text);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-links-edge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  block-size: 2px;
+  background: var(--kauro-color-primary);
+}
+.kauro-links-edge span {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-import-order {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.5rem;
+}
+
+/* UI22: the plan read back, part by part, each with its way to change it */
+.kauro-main .kauro-answers {
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-answers-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-answers-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-answers-part {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+}
+.kauro-answers-part + .kauro-answers-part {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-answers-part h3 {
+  margin: 0;
+  font-family: var(--kauro-font-family);
+  font-size: 1rem;
+}
+.kauro-answers-part ul {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  padding-inline-start: 1.125rem;
+}
+.kauro-answers-part > a {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  font-weight: 600;
+}
+@media (min-width: 48rem) {
+  .kauro-answers-part {
+    grid-template-columns: 11rem minmax(0, 1fr) auto;
+  }
+  .kauro-answers-part ul {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .kauro-answers-part > a {
+    grid-column: 3;
+  }
+}
+.kauro-answers-part--out {
+  border-end-start-radius: var(--kauro-radius-large);
+  border-end-end-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-surface);
+}
+.kauro-answers-part--out ul {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-approve {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-approve > * {
+  margin: 0;
+}
+.kauro-main .kauro-approve > .kauro-button,
+.kauro-approve-code .kauro-button {
+  justify-self: start;
+}
+.kauro-approve-code {
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-approve-code .kauro-field {
+  margin: 0;
+}
+.kauro-main .kauro-approved {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  max-inline-size: 48rem;
+  margin: 0;
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-success-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-approved > :is(h2, p) {
+  margin: 0;
+}
+.kauro-main .kauro-approved > h2 {
+  padding-inline-end: 7rem;
+}
+.kauro-main .kauro-approved .kauro-stamp {
+  position: absolute;
+  inset-block-start: var(--kauro-space-5);
+  inset-inline-end: var(--kauro-space-5);
+  transform: rotate(-4deg);
+}
+@media (max-width: 40rem) {
+  .kauro-main .kauro-approved > h2 {
+    padding-inline-end: 0;
+  }
+  .kauro-main .kauro-approved .kauro-stamp {
+    position: static;
+    transform: none;
+  }
+}
+
+/* a note under a table, and a choice after a section, keep their distance */
+.kauro-main .kauro-table-region + .kauro-muted {
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-screen-choice {
+  margin-block: var(--kauro-space-6) var(--kauro-space-5);
+}
+
+/* on a phone, each source column of the mapping is a card: the column, its destination, then what changes */
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-mapping,
+  .kauro-mapping tbody,
+  .kauro-mapping tr,
+  .kauro-mapping :is(th, td) {
+    display: block;
+  }
+  .kauro-mapping thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-mapping tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-mapping tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main .kauro-mapping :is(th, td) {
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .kauro-main .kauro-mapping th[scope="row"] {
+    grid-column: 1 / -1;
+    min-inline-size: 0;
+    margin-block-end: var(--kauro-space-3);
+  }
+  .kauro-mapping td:has(select) {
+    grid-column: 1 / -1;
+    margin-block-end: var(--kauro-space-3);
+  }
+  .kauro-mapping select {
+    inline-size: 100%;
+  }
+  .kauro-mapping td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .kauro-mapping td:has(select)::before {
+    margin-block-end: var(--kauro-space-1);
+  }
+  .kauro-main .kauro-mapping td.kauro-table-end {
+    padding-inline-start: var(--kauro-space-3);
+  }
+  .kauro-mapping-samples {
+    max-inline-size: 100%;
+  }
+  .kauro-main .kauro-mapping tr.is-left-out :is(th, td) {
+    background: none;
+  }
+  .kauro-main .kauro-mapping tr.is-left-out {
+    background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
+  }
+  /* the records of a group stay side by side: the table scrolls inside its frame */
+  .kauro-main .kauro-compare {
+    min-inline-size: 34rem;
+  }
+  .kauro-main .kauro-compare :is(th, td) {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}
+
+/* a column heading over numbers never breaks inside its word */
+.kauro-main .kauro-table thead th.kauro-table-end {
+  white-space: nowrap;
+}
