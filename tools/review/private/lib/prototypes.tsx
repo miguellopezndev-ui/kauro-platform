@@ -29,6 +29,20 @@ import { OwnerSettings, P04_STATES } from "../prototypes/p04-owner.tsx";
 import { P05_STATES, SignUp } from "../prototypes/p05-sign-up.tsx";
 import { P06_STATES, ResetPassword } from "../prototypes/p06-reset.tsx";
 import { HealthResults, P07_STATES } from "../prototypes/p07-results.tsx";
+import { PrivateHome, UI33_STATES } from "../prototypes/ui33-home.tsx";
+import { Prospects, UI34_STATES } from "../prototypes/ui34-prospects.tsx";
+import { AgencyRelationship, UI35_STATES } from "../prototypes/ui35-relationship.tsx";
+import { Commissions, UI36_STATES } from "../prototypes/ui36-commissions.tsx";
+import { SellerLifecycle, UI37_STATES } from "../prototypes/ui37-seller.tsx";
+import { OwnerActions, UI38_STATES } from "../prototypes/ui38-owner-actions.tsx";
+import { Jobs, UI40_STATES } from "../prototypes/ui40-jobs.tsx";
+import { Deletion, UI41_STATES } from "../prototypes/ui41-deletion.tsx";
+import { Incidents, UI42_STATES } from "../prototypes/ui42-incidents.tsx";
+import { Releases, UI43_STATES } from "../prototypes/ui43-releases.tsx";
+import { OperatingReview, UI44_STATES } from "../prototypes/ui44-review.tsx";
+import { Resources, UI53_STATES } from "../prototypes/ui53-resources.tsx";
+import { Outreach, UI54_STATES } from "../prototypes/ui54-outreach.tsx";
+import { SupportOperations, UI55_STATES } from "../prototypes/ui55-support.tsx";
 import type { PrototypeProps } from "./screens.tsx";
 
 export interface PrototypeEntry {
@@ -55,6 +69,20 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   UI28: { Component: ImportResults, states: UI28_STATES },
   UI29: { Component: Lifecycle, states: UI29_STATES, contexts: ["agency", "company", "operator"] },
   UI13: { Component: Overview, states: UI13_STATES, contexts: ["agency", "company", "admin", "operator", "newcomer"] },
+  UI33: { Component: PrivateHome, states: UI33_STATES, contexts: ["owner", "seller"] },
+  UI34: { Component: Prospects, states: UI34_STATES, contexts: ["seller", "owner"] },
+  UI35: { Component: AgencyRelationship, states: UI35_STATES, contexts: ["owner"] },
+  UI36: { Component: Commissions, states: UI36_STATES, contexts: ["seller", "owner"] },
+  UI37: { Component: SellerLifecycle, states: UI37_STATES, contexts: ["owner"] },
+  UI38: { Component: OwnerActions, states: UI38_STATES, contexts: ["owner"] },
+  UI40: { Component: Jobs, states: UI40_STATES, contexts: ["owner"] },
+  UI41: { Component: Deletion, states: UI41_STATES, contexts: ["owner"] },
+  UI42: { Component: Incidents, states: UI42_STATES, contexts: ["owner"] },
+  UI43: { Component: Releases, states: UI43_STATES, contexts: ["owner"] },
+  UI44: { Component: OperatingReview, states: UI44_STATES, contexts: ["owner"] },
+  UI53: { Component: Resources, states: UI53_STATES, contexts: ["seller"] },
+  UI54: { Component: Outreach, states: UI54_STATES, contexts: ["seller", "owner"] },
+  UI55: { Component: SupportOperations, states: UI55_STATES, contexts: ["owner"] },
   "P-01": { Component: PersonalSettings, states: P01_STATES, contexts: ["agency", "company", "operator"] },
   "P-02": { Component: OrganisationSettings, states: P02_STATES, contexts: ["agency", "company", "admin", "operator"] },
   "P-03": { Component: SellerSettings, states: P03_STATES, contexts: ["seller"] },

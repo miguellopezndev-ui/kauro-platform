@@ -62,7 +62,7 @@ function nextOf(state: string, actions: readonly string[]): Next {
 const EVENTS: readonly { readonly at: string; readonly what: string; readonly from: ProjectStage }[] = [
   { at: "21 Oct 2026, 16:20", what: "Package verified and published: 2 files, the report, the manifest and the importer's steps", from: "import" },
   { at: "21 Oct 2026, 09:30", what: "Payment matched to the exact amount: USD 1,295.00", from: "prepare" },
-  { at: "20 Oct 2026, 13:00", what: "Quote issued: USD 1,295.00, valid until 27 Oct", from: "quote" },
+  { at: "20 Oct 2026, 13:00", what: "Quote issued: USD 1,295.00, valid until 3 Nov", from: "quote" },
   { at: "20 Oct 2026, 12:40", what: "Plan approved by Samuel Osei (approver)", from: "quote" },
   { at: "20 Oct 2026, 11:05", what: "Free data health check ready: 207 possible duplicate groups", from: "decide" },
   { at: "20 Oct 2026, 09:58", what: "Set sealed: 2 files, 15,684 billable source units", from: "check" },
@@ -131,7 +131,7 @@ export function Overview({ ctx, state }: PrototypeProps): ReactElement {
               ["Service", "Prepare for HubSpot"],
               ["Sealed set", `${EXAMPLE.sources.length} files · ${EXAMPLE.unitsText} billable source units`],
               ["Plan", stage === "files" || stage === "check" ? "Not yet" : stage === "decide" ? "Ready for approval" : "Approved 20 Oct 2026"],
-              ["Quote", stage === "quote" || stage === "prepare" || stage === "import" ? `${EXAMPLE.price} · valid until 27 Oct 2026` : "After the plan is approved"],
+              ["Quote", stage === "quote" || stage === "prepare" || stage === "import" ? `${EXAMPLE.price} · valid until 3 Nov 2026` : "After the plan is approved"],
               ["Files kept until", stage === "files" ? "Set when the files are sealed" : "3 Nov 2026"],
             ]}
           />

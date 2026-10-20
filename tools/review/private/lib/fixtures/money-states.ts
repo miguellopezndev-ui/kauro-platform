@@ -40,7 +40,7 @@ const units = EXAMPLE.units;
 const base = EXAMPLE.priceCents;
 
 function quoteOf(agency: string, overrides: Partial<QuoteView> = {}): QuoteView {
-  return quote({ agencyId: agency, billableUnits: units, baseServiceCents: cents(base), serviceCents: cents(base), totalCents: cents(base), issuedAt: "2026-10-20T13:00:00Z", expiresAt: "2026-10-27T13:00:00Z", sourceAvailableUntil: "2026-11-03T09:00:00Z", ...overrides });
+  return quote({ agencyId: agency, billableUnits: units, baseServiceCents: cents(base), serviceCents: cents(base), totalCents: cents(base), issuedAt: "2026-10-20T13:00:00Z", expiresAt: "2026-11-03T13:00:00Z", sourceAvailableUntil: "2026-11-03T09:00:00Z", ...overrides });
 }
 
 const quoteState = (overrides: Partial<QuoteView>) => (ctx: ReviewContext): Script => ({ GetQuote: () => READ(quoteOf(agencyOf(ctx), overrides)) });
@@ -70,8 +70,8 @@ const instructions = {
     amountCents: cents(base),
     currency: "USD",
     reference: "K0123456789ABCDEFGHJKMN",
-    sendBy: "2026-10-24T23:59:59.000Z",
-    transferExpiresAt: "2026-10-27T13:00:00.000Z",
+    sendBy: "2026-10-30T23:59:59.000Z",
+    transferExpiresAt: "2026-11-03T13:00:00.000Z",
     routeVersion: 1,
   },
 };

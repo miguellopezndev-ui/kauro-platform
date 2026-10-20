@@ -17,7 +17,7 @@ const item = (overrides: Partial<ProjectDashboardItem> & Pick<ProjectDashboardIt
 
 /** Northwind Data's projects, newest activity first. */
 export const AGENCY_PROJECTS: readonly ProjectDashboardItem[] = [
-  item({ projectId: IDS.project, clientId: CLIENT.larch, clientLabel: "Larch Studio", mode: "HUBSPOT", phase: "PURCHASE", requiredAction: "PAY_QUOTE", deadline: "2026-10-27T13:00:00Z", lastActivityAt: "2026-10-20T13:10:00Z" }),
+  item({ projectId: IDS.project, clientId: CLIENT.larch, clientLabel: "Larch Studio", mode: "HUBSPOT", phase: "PURCHASE", requiredAction: "PAY_QUOTE", deadline: "2026-11-03T13:00:00Z", lastActivityAt: "2026-10-20T13:10:00Z" }),
   item({ projectId: id(202), clientId: CLIENT.osprey, clientLabel: "Osprey Freight", mode: "SALESFORCE", phase: "PLAN", requiredAction: "APPROVE_PLAN", lastActivityAt: "2026-10-20T11:40:00Z" }),
   item({ projectId: id(203), clientId: CLIENT.tidewell, clientLabel: "Tidewell", mode: "CLEAN", phase: "HEALTH_CHECK", requiredAction: "NONE", lastActivityAt: "2026-10-20T10:02:00Z", revision: { revisionId: id(903), state: "SEALED" } }),
   item({ projectId: id(204), clientId: CLIENT.harbor, clientLabel: "Harbor Mill", mode: "HUBSPOT", phase: "SOURCES", requiredAction: "UPLOAD_SOURCES", lastActivityAt: "2026-10-19T17:25:00Z", revision: { revisionId: id(904), state: "UPLOADING" } }),
