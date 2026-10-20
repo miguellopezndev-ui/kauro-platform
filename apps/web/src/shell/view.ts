@@ -8,7 +8,7 @@
 //   - The navigation lists a screen only when its page exists in this build; an agency with no implemented entry has no navigation.
 import type { SessionPhase } from "../client/session.ts";
 import type { MessageId } from "../copy/en.ts";
-import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, pathOf, signInHref } from "../screens.ts";
+import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, originOfPath, pathOf, signInHref } from "../screens.ts";
 import type { AgencyContext, AgencyState } from "./agency-context.ts";
 
 export type RefusedAction = { readonly kind: "SIGN_IN"; readonly href: string } | { readonly kind: "CHECK_AGAIN" } | { readonly kind: "SIGN_OUT" } | { readonly kind: "NONE" };
@@ -79,7 +79,8 @@ export function viewOf(input: ShellInput): ShellView {
 }
 
 function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellView {
-  const switchHref = implemented.has("UI10") ? pathOf("UI10") : null;
+  // the agency switcher is a screen of the application origin: an operations page (the owner, a seller) has no agency to switch (Order 11 D-03)
+  const switchHref = implemented.has("UI10") && originOfPath(input.pathname) !== "OPS" ? pathOf("UI10") : null;
   const withPerson = { agency: null, navigation: [], switchHref, signOut: true } as const;
   // a client-side navigation that crossed into another agency (or out of one) is never drawn: the page waits for the hard navigation
   if (agencyOfPathname(input.pathname) !== input.activeAgency) return { gate: { kind: "WAIT", message: "shell.session.switching.body" }, ...withPerson };

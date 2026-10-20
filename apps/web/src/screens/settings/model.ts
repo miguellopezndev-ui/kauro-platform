@@ -17,7 +17,10 @@ export interface SettingsModel {
 
 export function settingsModel(agency: AgencyView): SettingsModel {
   const closing = agency.state === "CLOSING" || agency.state === "CLOSED";
-  const permitted = agency.permittedActions.includes("REQUEST_DELETION");
+  // CMD043 is the owner's alone (B06 D-AUTHZ-1). An admin also holds REQUEST_DELETION (for a project's deletion), so the closure is
+  // offered only where the server also lists MANAGE_AGENCY, which only an owner holds (Order 11 D-02: an admin saw a button that always
+  // failed with ROLE_INSUFFICIENT). The server still decides; this only stops offering what it will refuse.
+  const permitted = agency.permittedActions.includes("REQUEST_DELETION") && agency.permittedActions.includes("MANAGE_AGENCY");
   return { canClose: permitted && !closing, closing, mustAskOwner: !permitted && !closing };
 }
 

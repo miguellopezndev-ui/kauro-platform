@@ -32,7 +32,7 @@ const keyOf = (init: { headers: Readonly<Record<string, string>> }): string | un
 
 const form = (overrides: Partial<BillingViewProps["form"]> = {}): BillingViewProps["form"] => ({ reason: "", details: "", problems: [], submitting: false, onReasonChange: noop, onDetailsChange: noop, onSubmit: noop, ...overrides });
 const billing = (overrides: Partial<BillingViewProps> = {}): string => renderToStaticMarkup(createElement(BillingDetails, { agency: agency(), detail: orderDetail(), refund: null, form: form(), ...overrides }));
-const settings = (overrides: Partial<Parameters<typeof SettingsDetails>[0]> = {}): string => renderToStaticMarkup(createElement(SettingsDetails, { agency: agency(), onClose: noop, closing: false, closure: null, ...overrides }));
+const settings = (overrides: Partial<Parameters<typeof SettingsDetails>[0]> = {}): string => renderToStaticMarkup(createElement(SettingsDetails, { agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_AGENCY"] }), onClose: noop, closing: false, closure: null, ...overrides }));
 
 test("fixtures: the billing and settings DTOs are valid against the generated schemas (a drifted fixture cannot prove anything)", () => {
   const checks: readonly (readonly [string, unknown])[] = [
@@ -162,7 +162,11 @@ test("UI32/CMD043: closure is separated from display edits, needs a fresh step-u
   for (const text of ["It needs a fresh confirmation of your identity.", "Open quotes are withdrawn.", "Live authorizations for paid work are ended.", "stay with Kauro until they finish.", "scheduled for deletion."]) assert.ok(closing.includes(text), text);
 
   // only the server's permittedActions offer the control; a closing agency offers nothing
-  assert.deepEqual(settingsModel(agency()), { canClose: true, closing: false, mustAskOwner: false });
+  const owner = ["MANAGE_AGENCY", "MANAGE_TEAM", "MANAGE_CLIENTS", "CREATE_CLIENTS", "OPERATE_PROJECTS", "APPROVE_PLANS", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_BRANDING", "VIEW"] as const;
+  const admin = ["MANAGE_TEAM", "MANAGE_CLIENTS", "CREATE_CLIENTS", "OPERATE_PROJECTS", "REQUEST_DELETION", "MANAGE_BRANDING", "VIEW"] as const;
+  assert.deepEqual(settingsModel(agency({ permittedActions: [...owner] })), { canClose: true, closing: false, mustAskOwner: false });
+  // an admin holds REQUEST_DELETION but closure (CMD043) is the owner's: it is not offered, and the page says who can
+  assert.deepEqual(settingsModel(agency({ permittedActions: [...admin] })), { canClose: false, closing: false, mustAskOwner: true });
   const manager = settings({ agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING"] }) });
   assert.ok(manager.includes("Only an owner of the agency can request closure.") && !manager.includes("Request closure"));
   const already = settings({ agency: agency({ state: "CLOSING" }) });
@@ -198,7 +202,7 @@ test("UI32/CMD043: closure is separated from display edits, needs a fresh step-u
   const stale = harness(async (entry) => (entry.url === "/api/v1/assurance/step-ups" ? respond(201, { proofId: PROOF, expiresAt: "2026-10-14T01:00:00Z" }) : respond(403, problem(403, "ASSURANCE_REQUIRED", { reason: "STEP_UP_STALE" }))));
   const expired = await closeWithStepUp(stale.client, fastRunner(), agency(), async () => credential());
   assert.deepEqual(expired, { kind: "STEP_UP", cause: "PROOF_STALE" });
-  const kept = renderToStaticMarkup(createElement(StepUpPanel, { result: expired, onStepUp: noop }, createElement(SettingsDetails, { agency: agency(), onClose: noop, closing: false, closure: null })));
+  const kept = renderToStaticMarkup(createElement(StepUpPanel, { result: expired, onStepUp: noop }, createElement(SettingsDetails, { agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_AGENCY"] }), onClose: noop, closing: false, closure: null })));
   assert.match(kept, /data-state="STEP_UP"/);
   assert.ok(kept.includes("Confirm identity") && kept.includes("Acme Growth Partners") && kept.includes("Request closure"), "the page and its control are still there");
   assert.ok(!kept.includes("Closure requested"));

@@ -351,7 +351,9 @@ ul.kauro-actions > li {
   border-inline-start: 0.25rem solid var(--kauro-color-accent);
 }
 
-.kauro-button {
+/* The shell's own plain buttons (check again, sign out, a state's next step). A button of the design system carries its variant
+   (primary, secondary, danger) and keeps that look: this rule must not repaint it (Order 11: primary and danger buttons drew as neutral). */
+.kauro-button:not(.kauro-button-primary, .kauro-button-secondary, .kauro-button-danger) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -367,7 +369,7 @@ ul.kauro-actions > li {
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.kauro-button:hover {
+.kauro-button:not(.kauro-button-primary, .kauro-button-secondary, .kauro-button-danger):hover {
   border-color: var(--kauro-color-text);
 }
 

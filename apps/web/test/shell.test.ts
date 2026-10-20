@@ -129,6 +129,8 @@ test("11: the navigation lists only screens whose page exists, marks the current
     ],
   );
   assert.equal(some.switchHref, pathOf("UI10"));
+  // an operations page has no agency to switch: the switcher is offered on the application origin only
+  assert.equal(viewOf(input({ pathname: "/ops/finance", implemented: new Set(["UI10", "UI39"]) })).switchHref, null);
   // a deeper screen of the same section keeps its section current; a sibling section does not
   assert.deepEqual(viewOf(input({ pathname: `${PROJECTS}/p1`, implemented: new Set(["UI11", "UI12"]) })).navigation.map((item) => item.current), [true, false]);
   assert.deepEqual(viewOf(input({ pathname: `/agencies/${AGENCY}/clients`, implemented: new Set(["UI11", "UI12"]) })).navigation.map((item) => item.current), [false, true]);
