@@ -10,7 +10,7 @@ import { OptOutForm } from "../opt-out-form.tsx";
 
 export function UnsubscribePage({ token }: { readonly token: string }): ReactElement {
   return (
-    <section className="kauro-cardpage" aria-labelledby="unsubscribe-title">
+    <section className="kauro-fitpage kauro-cardpage" aria-labelledby="unsubscribe-title">
       <div className="kauro-cardsheet kauro-paper">
         <p className="kauro-cardsheet-bar" aria-hidden="true">
           <span className="kauro-cardsheet-brand">{PUBLIC_COPY["site.name"]}</span>
