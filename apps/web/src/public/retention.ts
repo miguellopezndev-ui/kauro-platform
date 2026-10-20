@@ -53,7 +53,7 @@ export const RETENTION_ROWS: readonly RetentionRow[] = Object.freeze([
     rule: `They are kept for ${formatDays(r.ordinaryLogsDays)} and contain no CRM content and no secrets.`,
   },
   {
-    subject: "Minimized security records",
+    subject: "Minimised security records",
     rule: `They are kept for ${formatDays(r.securityLogsDays)}, and longer only under an explicit legal basis.`,
   },
   {

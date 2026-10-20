@@ -77,8 +77,8 @@ export const SAMPLE_COLUMN = Object.freeze({ from: "E-mail", to: "Email" });
 /** Three lines of the synthetic manifest: an output row, the source row it came from, and the rows unified into it with approval. */
 export const SAMPLE_TRACE: ReadonlyArray<{ readonly output: number; readonly source: number; readonly unified: number | null }> = Object.freeze([
   { output: 1204, source: 1204, unified: null },
-  { output: 1205, source: 1207, unified: 1209 },
-  { output: 1206, source: 1210, unified: null },
+  { output: 1205, source: 1205, unified: 1207 },
+  { output: 1206, source: 1206, unified: null },
 ]);
 
 /** What the health check flags on a row of the synthetic file the Home journey works on. */

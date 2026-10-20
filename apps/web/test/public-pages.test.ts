@@ -393,7 +393,7 @@ test("Sample delivery: it says at the top that everything is invented, and its n
     ["companies-clean.csv", "2,951", "3,204", "253"],
   ]);
   assert.match(text, /12,480 source rows, less 214 unified with approval, leave 12,266 output contacts\./);
-  assert.match(text, /A duplicate candidate is a pair worth reviewing, not a confirmed duplicate\./);
+  assert.match(text, /A duplicate candidate group is worth reviewing; it is not a confirmed duplicate\./);
   assert.equal(count(html, "<ol"), 1);
   assert.match(text, /It is not a check of your own data: the free data health check is\./);
   assert.match(text, /Compare the counts in the destination with the counts in the report\./);
