@@ -7644,3 +7644,474 @@ body:has(> .kauro-site-header) {
     min-block-size: 5.5rem;
   }
 }
+/* Service status is an ordinary page: it reads from the top, not from the middle of the space */
+.kauro-statuspage {
+  align-content: start;
+  padding-block: clamp(2rem, 5vh, 3.5rem);
+}
+
+/* ---- How it works on Home: the held section fills the screen, and nothing in it moves but what a step changes (fourth design) ------ */
+
+/* the section is the screen under the header for as long as the reader is in the process: nothing grows above it, nothing is missing
+   below it, and the previous section is already gone when the hold begins */
+.kauro-site-process:has(> .kauro-site-wrap > .kauro-walk-track) {
+  padding-block: 0;
+}
+.kauro-walk-track {
+  --kauro-walk-stretch: 34vh;
+  --kauro-walk-window: clamp(30rem, calc(100vh - 15rem), 38rem);
+  --kauro-walk-row: clamp(2.5rem, 4.8vh, 3.125rem);
+  block-size: calc(100vh + 6 * var(--kauro-walk-stretch));
+}
+.kauro-walk-track.is-collapsed {
+  block-size: 100vh;
+}
+.kauro-walk-track > .kauro-walk {
+  inset-block-start: 0;
+  block-size: 100vh;
+  align-content: center;
+  padding-block: 5.5rem 1.5rem;
+}
+@media (min-width: 62rem) {
+  .kauro-walk {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+    align-items: center;
+  }
+}
+
+/* the left column keeps the same heights at every step, so the controls never move */
+.kauro-walk-track .kauro-walk-story {
+  align-content: start;
+}
+.kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+  max-inline-size: 14ch;
+  font-size: clamp(2rem, 1.2rem + 1.8vw, 2.75rem);
+}
+.kauro-walk-track .kauro-walk-now {
+  block-size: 13rem;
+  min-block-size: 0;
+  overflow: hidden;
+}
+.kauro-walk-track .kauro-walk-controls {
+  margin-block-start: var(--kauro-space-4);
+}
+
+/* the sheet: one size at every step; the rows never fold, the last line is always three figures */
+.kauro-walk-track .kauro-walk-window {
+  block-size: var(--kauro-walk-window);
+}
+.kauro-walk-track .kauro-walk-work {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0.875rem 1.25rem 1.25rem;
+}
+.kauro-walk-track p.kauro-walk-file {
+  margin-block-end: 0.75rem;
+}
+.kauro-walk-sealed.is-waiting {
+  visibility: hidden;
+}
+.kauro-walk-track .kauro-walk-table {
+  grid-template-rows: auto repeat(5, var(--kauro-walk-row));
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+.kauro-walk-track .kauro-walk-row {
+  max-block-size: none;
+}
+.kauro-walk-track .kauro-walk-row:not(.kauro-walk-row--head) .kauro-walk-cell {
+  min-block-size: 0;
+  block-size: var(--kauro-walk-row);
+}
+/* the row unified into another keeps its place, struck through */
+.kauro-walk-row.is-merged .kauro-walk-cell:not(.kauro-walk-cell--step):not(.kauro-walk-cell--mark) {
+  color: var(--kauro-color-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--kauro-color-primary);
+}
+.kauro-walk-row.is-merged {
+  background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
+}
+.kauro-walk-cell--step {
+  white-space: normal;
+}
+.kauro-walk-findings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.kauro-walk-finding {
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid color-mix(in srgb, var(--kauro-color-primary) 45%, transparent);
+  border-radius: 0.25rem;
+  color: var(--kauro-color-primary);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* the last line, joined to the rows: three figures in the same places at every step */
+.kauro-walk-track .kauro-walk-foot {
+  display: grid;
+  align-content: center;
+  min-block-size: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--kauro-color-border);
+  border-block-start: 1px dashed var(--kauro-color-control-border);
+  border-end-start-radius: 0.5rem;
+  border-end-end-radius: 0.5rem;
+  background: var(--kauro-color-surface);
+}
+.kauro-walk-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-walk-figure {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0.1875rem;
+  min-inline-size: 0;
+  padding-inline: 1rem;
+}
+.kauro-walk-figure:first-child {
+  padding-inline-start: 0;
+}
+.kauro-walk-figure + .kauro-walk-figure {
+  border-inline-start: 1px solid var(--kauro-color-border);
+}
+.kauro-walk-figure-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.375rem, 1rem + 1vw, 1.875rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.kauro-walk-figures--sum .kauro-walk-figure:last-child .kauro-walk-figure-value {
+  color: var(--kauro-color-primary);
+  font-weight: 500;
+}
+.kauro-walk-figure-label {
+  max-inline-size: 100%;
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+}
+.kauro-walk-figure-note {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-walk-figure--seal {
+  justify-items: center;
+}
+.kauro-walk-currency {
+  align-self: flex-start;
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+.kauro-walk-mark.kauro-walk-mark--large {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  font-size: 0.75rem;
+}
+.kauro-walk-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 0.3125rem;
+  color: var(--kauro-color-primary);
+}
+.kauro-walk-state.is-on {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+
+/* a phone: the told step and the controls at fixed heights above the sheet; the sheet takes what is left of the screen */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 21.5rem);
+    --kauro-walk-row: 2.125rem;
+  }
+  .kauro-walk-track > .kauro-walk {
+    align-content: start;
+    padding-block: 5.75rem 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 8.75rem;
+  }
+  .kauro-walk-track .kauro-walk-controls {
+    margin-block-start: var(--kauro-space-2);
+  }
+  .kauro-walk-track .kauro-walk-work {
+    padding: 0.625rem 0.75rem 0.75rem;
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    padding: 0.5rem 0.625rem;
+  }
+  .kauro-walk-figure {
+    padding-inline: 0.5rem;
+  }
+  .kauro-walk-figure-value {
+    font-size: 1.0625rem;
+  }
+  .kauro-walk-figure-label {
+    font-size: 0.6875rem;
+  }
+  .kauro-walk-figure-note {
+    font-size: 0.625rem;
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 15.5rem);
+    --kauro-walk-row: 1.875rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 3.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* the three figures of the last line come one after the other */
+  .kauro-walk.is-ready .kauro-walk-foot > * {
+    animation: none;
+  }
+  .kauro-walk.is-ready .kauro-walk-figure {
+    animation: kauro-print 0.4s cubic-bezier(0.5, 0, 0.2, 1) 0.45s both;
+  }
+  .kauro-walk.is-ready .kauro-walk-figure:nth-child(2) {
+    animation-delay: 0.6s;
+  }
+  .kauro-walk.is-ready .kauro-walk-figure:nth-child(3) {
+    animation-delay: 0.75s;
+  }
+  .kauro-walk-row,
+  .kauro-walk-row .kauro-walk-cell {
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+}
+/* the told step has room for its longest explanation; the address column for its longest address */
+.kauro-walk-track .kauro-walk-now {
+  block-size: 15.5rem;
+}
+@media (min-width: 62rem) {
+  .kauro-walk-row {
+    grid-template-columns: 2rem minmax(0, 0.95fr) minmax(0, 1.45fr) minmax(0, 0.8fr) minmax(0, 1.15fr);
+  }
+}
+/* a phone keeps the contact and what the step does to it; the told step is compact, and the sheet takes the rest of the screen */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1.25fr);
+  }
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--mono,
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--company {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--step {
+    display: flex;
+  }
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    max-inline-size: none;
+    font-size: 1.375rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 7.75rem;
+    gap: 0.25rem;
+    margin-block-start: var(--kauro-space-3);
+    padding-block-start: var(--kauro-space-3);
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-name {
+    font-size: 1.375rem;
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-body {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 21.25rem);
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 3.75rem;
+  }
+  .kauro-walk-track {
+    --kauro-walk-window: calc(100vh - 16.25rem);
+  }
+}
+/* a medium screen: the company column gives way, so no address or finding is cut */
+@media (min-width: 62rem) and (max-width: 79.99rem) {
+  .kauro-walk-track .kauro-walk-row {
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.2fr);
+  }
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--company {
+    display: none;
+  }
+}
+/* a phone: the header row loses the same columns as the rows; the sheet takes exactly the space left under the told step */
+@media (max-width: 61.99rem) {
+  .kauro-walk-track .kauro-walk-row > .kauro-walk-cell--email {
+    display: none;
+  }
+  .kauro-walk-track > .kauro-walk {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .kauro-walk-track .kauro-walk-window {
+    block-size: auto;
+    min-block-size: 0;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 10.25rem;
+  }
+  .kauro-walk-figure-label .kauro-site-file {
+    font-size: 0.5625rem;
+    letter-spacing: -0.02em;
+  }
+}
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 4rem;
+  }
+  .kauro-walk-track {
+    --kauro-walk-row: 1.75rem;
+  }
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    font-size: 1.25rem;
+  }
+}
+/* phones: a file name in the last line may wrap instead of being cut */
+@media (max-width: 61.99rem) {
+  .kauro-walk-figure-label {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+/* phones under 800 px tall: tighter rows */
+@media (max-width: 61.99rem) and (max-height: 50rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.875rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 9.75rem;
+  }
+  .kauro-walk-track .kauro-walk-bar {
+    padding-block: 0.5rem;
+  }
+  .kauro-walk-track p.kauro-walk-file {
+    margin-block-end: 0.375rem;
+  }
+}
+/* short phones: the told step keeps its number and name; the last line keeps its figures and names */
+@media (max-width: 61.99rem) and (max-height: 45rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.75rem;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 5.5rem;
+  }
+  .kauro-walk-track .kauro-walk-figure-note {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-work {
+    padding: 0.5rem 0.625rem 0.625rem;
+  }
+}
+/* the narrowest phones (360 px and less): smaller figures, tighter rows */
+@media (max-width: 22.5rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.75rem;
+  }
+  .kauro-walk-track .kauro-walk-figure-value {
+    font-size: 0.9375rem;
+  }
+  .kauro-walk-track .kauro-walk-figure-label {
+    font-size: 0.625rem;
+  }
+  .kauro-site-main .kauro-walk-track p.kauro-walk-now-body {
+    font-size: 0.8125rem;
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    padding-block: 0.375rem;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 45rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.625rem;
+  }
+}
+@media (max-width: 22.5rem) {
+  /* the note under a figure repeats what the rows above already say; on the narrowest phones it gives its line to the figure's name */
+  .kauro-walk-track .kauro-walk-figure-note {
+    display: none;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 10.5rem;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 45rem) {
+  .kauro-walk-track .kauro-walk-now {
+    block-size: 5.5rem;
+  }
+  .kauro-walk-track {
+    --kauro-walk-row: 1.5rem;
+  }
+}
+@media (max-width: 22.5rem) {
+  .kauro-walk-track > .kauro-walk {
+    gap: var(--kauro-space-2);
+  }
+  .kauro-walk-track .kauro-walk-controls {
+    margin-block-start: var(--kauro-space-1, 0.25rem);
+  }
+  .kauro-walk-track .kauro-walk-foot {
+    padding-block: 0.25rem;
+  }
+}
+/* the smallest phones (320 by 640): the section's heading is kept for assistive technology and gives its room to the sheet */
+@media (max-width: 22.5rem) and (max-height: 45rem) {
+  .kauro-site-main .kauro-walk-track .kauro-walk-story h2 {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .kauro-walk-track .kauro-walk-now {
+    margin-block-start: 0;
+    padding-block-start: 0;
+    border: 0;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 50rem) and (min-height: 45.0625rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.625rem;
+  }
+}
+@media (max-width: 22.5rem) and (max-height: 50rem) and (min-height: 45.0625rem) {
+  .kauro-walk-track {
+    --kauro-walk-row: 1.5rem;
+  }
+}
+/* the rows no longer fold, so the table needs no minimum height of its own: it is exactly its rows */
+.kauro-walk-track .kauro-walk-table {
+  min-block-size: 0;
+}

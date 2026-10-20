@@ -3,16 +3,16 @@
 // How it works on Home (A10 §8; Order 10, owner review: the How it works page and Home's process made one section, designed again for
 // it). The section is one composition: on the left its heading, the step being told (who acts, what happens) and the controls that move
 // through the steps; on the right one sheet of the product, contacts.csv, the same from the first step to the last. The sheet has no
-// separate tool area: each step works inside it. Its last column says what the step does to each row (read, found, decided, counted,
-// prepared, delivered) and its last line carries the step's total (the files sealed, the findings, the approvals, the quote, the count
-// that reconciles, the order of the import). Decide shows the team approving the three changes: the visitor watches, nothing on this page
-// approves anything.
+// separate tool area: each step works inside it. Its last column says what the step does to each row and its last line, always three
+// figures in the same places, carries what the step comes to. Decide shows the team approving the three changes: the visitor watches,
+// nothing on this page approves anything. Nothing in the composition changes size or place from one step to the next.
 //
-// With the script the composition holds in the middle of the screen once it gets there, and the scroll moves the project one step at a
-// time, forwards going down and back going up. After the sixth step the page scrolls on; coming back up past a finished process never
-// holds again, and once the sheet has left the screen below, the process starts again from the first step. The buttons beside the step
-// move through the steps too, by moving the page to that step, so the scroll and the step always agree. Without the script the six steps
-// are listed beside the sheet at its first step.
+// With the script the section fills the screen under the header and holds there while the reader goes through the six steps, each step
+// one stretch of scrolling, the first included. With a mouse wheel one notch inside the process is one step, whatever the wheel is set to
+// scroll, like the frames of a video; a touchpad, a touch screen or the keyboard scroll as they always do. Going up inside the process goes
+// back one step. After the sixth the page scrolls on; coming back up past a finished process never holds, and once the sheet has left the
+// screen below the process starts again from the first step. The buttons beside the step move the page to that step, so the scroll and the
+// step always agree. Without the script the six steps are listed beside the sheet at its first step.
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../copy/public.ts";
 import { FileName } from "./parts.tsx";
@@ -39,10 +39,10 @@ const DECIDE = 2;
 const QUOTE = 3;
 const PREPARE = 4;
 const LAST = STEPS.length - 1;
-/** How much of a stretch of scrolling moves the project on: a short scroll past the start of a stretch is enough. */
-const AHEAD = 0.6;
 /** The pause between two approvals while the team decides. */
 const APPROVE_MS = 550;
+/** After a wheel notch moves the process one step, the wheel waits this long before it can move it again. */
+const NOTCH_MS = 650;
 
 const cx = (...names: ReadonlyArray<string | false>): string => names.filter((name) => name !== false && name !== "").join(" ");
 const two = (n: number): string => String(n).padStart(2, "0");
@@ -62,7 +62,7 @@ const PROPOSAL_NAME: Readonly<Record<ProposalId, () => string>> = {
   map: () => PUBLIC_COPY["home.journey.map"],
 };
 const FLAG_NAME: Readonly<Record<RowFlag, PublicCopyId>> = {
-  duplicate: "home.app.result.candidate",
+  duplicate: "home.journey.flag.duplicate",
   email: "home.journey.flag.email",
   company: "home.journey.flag.company",
   name: "home.journey.flag.name",
@@ -75,7 +75,17 @@ function stepCell(row: JourneyRow, step: number, approved: ReadonlySet<ProposalI
     case UPLOAD:
       return <span className="kauro-walk-read">{PUBLIC_COPY["home.journey.read"]}</span>;
     case MEASURE:
-      return row.flags.length === 0 ? <span className="kauro-walk-quiet">—</span> : <span className="kauro-walk-finding">{row.flags.map((flag) => PUBLIC_COPY[FLAG_NAME[flag]]).join(" · ")}</span>;
+      return row.flags.length === 0 ? (
+        <span className="kauro-walk-quiet">—</span>
+      ) : (
+        <span className="kauro-walk-findings">
+          {row.flags.map((flag) => (
+            <span key={flag} className="kauro-walk-finding">
+              {PUBLIC_COPY[FLAG_NAME[flag]]}
+            </span>
+          ))}
+        </span>
+      );
     case DECIDE:
       return proposal === undefined ? (
         <span className="kauro-walk-quiet">—</span>
@@ -86,11 +96,12 @@ function stepCell(row: JourneyRow, step: number, approved: ReadonlySet<ProposalI
       // every row of the sealed file is a billable source unit, duplicates included: they are counted before anything is unified
       return <span className="kauro-walk-unit">1</span>;
     case PREPARE:
+      if (row.id === "c4" && approved.has("unify")) return <span className="kauro-walk-quiet">{PUBLIC_COPY["home.journey.merged"]}</span>;
       if (row.id === "c3" && approved.has("unify")) return <span className="kauro-walk-done">{PUBLIC_COPY["home.journey.unified"]}</span>;
       if (proposal === "normalise" && approved.has("normalise")) return <span className="kauro-walk-done">{PUBLIC_COPY["home.app.result.normalised"]}</span>;
       return row.flags.length === 0 ? <span className="kauro-walk-quiet">{PUBLIC_COPY["home.app.result.valid"]}</span> : <span className="kauro-walk-quiet">{PUBLIC_COPY["home.journey.reported"]}</span>;
     default:
-      return <span className="kauro-walk-done">{PUBLIC_COPY["home.journey.ready"]}</span>;
+      return row.id === "c4" ? <span className="kauro-walk-quiet">{PUBLIC_COPY["home.journey.merged"]}</span> : <span className="kauro-walk-done">{PUBLIC_COPY["home.journey.ready"]}</span>;
   }
 }
 
@@ -98,7 +109,8 @@ function Row({ row, step, approved }: { readonly row: JourneyRow; readonly step:
   const applied = step >= PREPARE;
   const proposal = PROPOSAL_OF_ROW[row.id];
   const unified = applied && approved.has("unify");
-  const folded = unified && row.id === "c4";
+  // the row unified into another keeps its place, struck through, so the sheet never changes height
+  const merged = unified && row.id === "c4";
   const renamed = applied && approved.has("normalise") && row.name !== row.fixed;
   // nothing is flagged before the check has measured the file
   const flagged = (flag: RowFlag): boolean => step >= MEASURE && row.flags.includes(flag) && !(flag === "duplicate" && unified) && !(flag === "name" && renamed);
@@ -106,7 +118,7 @@ function Row({ row, step, approved }: { readonly row: JourneyRow; readonly step:
     <span className={cx("kauro-walk-mark", approved.has(proposal) && "is-approved")}>{markOf(proposal)}</span>
   );
   return (
-    <div className={cx("kauro-walk-row", folded && "is-folded", flagged("duplicate") && "is-pair", unified && row.id === "c3" && "is-unified")}>
+    <div className={cx("kauro-walk-row", merged && "is-merged", flagged("duplicate") && "is-pair", unified && row.id === "c3" && "is-unified")}>
       <span className="kauro-walk-cell kauro-walk-cell--mark">{mark}</span>
       <span className={cx("kauro-walk-cell", flagged("name") && "is-flag")}>
         {renamed ? (
@@ -118,55 +130,67 @@ function Row({ row, step, approved }: { readonly row: JourneyRow; readonly step:
           row.name
         )}
       </span>
-      <span className={cx("kauro-walk-cell kauro-walk-cell--mono", flagged("email") && "is-flag")}>{row.email}</span>
+      <span className={cx("kauro-walk-cell kauro-walk-cell--mono kauro-walk-cell--email", flagged("email") && "is-flag")}>{row.email}</span>
       <span className={cx("kauro-walk-cell kauro-walk-cell--company", flagged("company") && "is-flag")}>{row.company ?? "—"}</span>
       <span className="kauro-walk-cell kauro-walk-cell--step">{stepCell(row, step, approved)}</span>
     </div>
   );
 }
 
-function Finding({ label, count, run }: { readonly label: string; readonly count: number; readonly run: boolean }): ReactElement {
-  const shown = useCountUp(count, run);
+/** One of the three figures of the sheet's last line: the figure, then what it is. */
+function Figure({ figure, label, note }: { readonly figure: ReactNode; readonly label: ReactNode; readonly note?: ReactNode }): ReactElement {
   return (
-    <li>
-      <span className="kauro-walk-total-figure">{formatCount(shown)}</span> {label} <span className="kauro-walk-total-share">{sharePercent(count, SAMPLE.contacts)}</span>
+    <li className="kauro-walk-figure">
+      <span className="kauro-walk-figure-value">{figure}</span>
+      <span className="kauro-walk-figure-label">{label}</span>
+      {note === undefined ? null : <span className="kauro-walk-figure-note">{note}</span>}
     </li>
   );
 }
 
-/** The sheet's last line: what the step comes to, as a total. */
+function Count({ count, run }: { readonly count: number; readonly run: boolean }): ReactElement {
+  return <>{formatCount(useCountUp(count, run))}</>;
+}
+
+/** The sheet's last line: what the step comes to, always three figures in the same places. */
 function Total({ step, approved, run }: { readonly step: number; readonly approved: ReadonlySet<ProposalId>; readonly run: boolean }): ReactElement {
   switch (step) {
     case UPLOAD: {
       const rows = [SAMPLE.contacts, companies?.source ?? 0];
       return (
-        <div className="kauro-walk-total kauro-walk-total--upload">
-          <ul>
-            {SAMPLE_SOURCES.map((file, index) => (
-              <li key={file}>
-                <FileName>{file}</FileName> <span className="kauro-walk-quiet">{copy("home.files.rows", { count: formatCount(rows[index] ?? 0) })}</span>
-              </li>
-            ))}
-          </ul>
-          <span className="kauro-walk-seal">{PUBLIC_COPY["how.frag.sealed"]}</span>
-        </div>
+        <ul className="kauro-walk-figures">
+          {SAMPLE_SOURCES.map((file, index) => (
+            <Figure key={file} figure={formatCount(rows[index] ?? 0)} label={<FileName>{file}</FileName>} note={PUBLIC_COPY["sample.manifest.rows.label"]} />
+          ))}
+          <li className="kauro-walk-figure kauro-walk-figure--seal">
+            <span className="kauro-walk-seal">{PUBLIC_COPY["how.frag.sealed"]}</span>
+          </li>
+        </ul>
       );
     }
     case MEASURE:
       return (
-        <ul className="kauro-walk-total kauro-walk-total--findings">
-          <Finding label={PUBLIC_COPY["home.frag.candidates"]} count={countOf("sample.report.duplicates")} run={run} />
-          <Finding label={PUBLIC_COPY["home.frag.invalid"]} count={countOf("sample.report.emails")} run={run} />
-          <Finding label={PUBLIC_COPY["home.frag.company"]} count={countOf("sample.report.company")} run={run} />
+        <ul className="kauro-walk-figures">
+          {(["sample.report.duplicates", "sample.report.emails", "sample.report.company"] as const).map((id, index) => (
+            <Figure
+              key={id}
+              figure={<Count count={countOf(id)} run={run} />}
+              label={PUBLIC_COPY[(["home.frag.candidates", "home.frag.invalid", "home.frag.company"] as const)[index] ?? "home.frag.candidates"]}
+              note={sharePercent(countOf(id), SAMPLE.contacts)}
+            />
+          ))}
         </ul>
       );
     case DECIDE:
       return (
-        <ul className="kauro-walk-total kauro-walk-total--decide">
+        <ul className="kauro-walk-figures">
           {PROPOSALS.map((id) => (
-            <li key={id} className={cx(approved.has(id) && "is-approved")}>
-              <span className={cx("kauro-walk-mark", approved.has(id) && "is-approved")}>{markOf(id)}</span> {PROPOSAL_NAME[id]()}
-            </li>
+            <Figure
+              key={id}
+              figure={<span className={cx("kauro-walk-mark", "kauro-walk-mark--large", approved.has(id) && "is-approved")}>{markOf(id)}</span>}
+              label={PROPOSAL_NAME[id]()}
+              note={<span className={cx("kauro-walk-state", approved.has(id) && "is-on")}>{approved.has(id) ? PUBLIC_COPY["home.journey.approved"] : PUBLIC_COPY["home.frag.approve"]}</span>}
+            />
           ))}
         </ul>
       );
@@ -174,40 +198,36 @@ function Total({ step, approved, run }: { readonly step: number; readonly approv
       const band = bandIndexOf(SAMPLE.contacts) ?? 0;
       const [currency, ...amount] = formatUsd(priceOf(band, "CLEAN")).split(" ");
       return (
-        <div className="kauro-walk-total kauro-walk-total--quote">
-          <p>
-            <span className="kauro-walk-total-figure">{formatCount(SAMPLE.contacts)}</span> {PUBLIC_COPY["pricing.table.units.label"]} <span className="kauro-walk-quiet">· {bandLabel(band)}</span>
-          </p>
-          <p className="kauro-walk-total-price">
-            <span className="kauro-walk-total-currency">{currency}</span> {amount.join(" ")}
-            <span className="kauro-walk-quiet">{copy("how.frag.valid", { days: POLICY_SNAPSHOT.quoteDays })}</span>
-          </p>
-        </div>
+        <ul className="kauro-walk-figures">
+          <Figure figure={formatCount(SAMPLE.contacts)} label={PUBLIC_COPY["pricing.table.units.label"]} />
+          <Figure figure={bandLabel(band)} label={PUBLIC_COPY["home.journey.band"]} />
+          <Figure
+            figure={
+              <>
+                <span className="kauro-walk-currency">{currency}</span> {amount.join(" ")}
+              </>
+            }
+            label={copy("how.frag.valid", { days: POLICY_SNAPSHOT.quoteDays })}
+          />
+        </ul>
       );
     }
     case PREPARE:
       return (
-        <div className="kauro-walk-total kauro-walk-total--prepare">
-          <p className="kauro-walk-total-sum">
-            <span>{formatCount(sourceRows)}</span> <span className="kauro-walk-quiet">−</span> <span>{formatCount(contacts?.unified ?? 0)}</span> <span className="kauro-walk-quiet">=</span>{" "}
-            <span className="kauro-walk-total-figure">{formatCount(contacts?.rows ?? sourceRows)}</span>
-          </p>
-          <p className="kauro-walk-ok">{PUBLIC_COPY["home.journey.traced"]}</p>
-        </div>
+        <ul className="kauro-walk-figures kauro-walk-figures--sum">
+          <Figure figure={formatCount(sourceRows)} label={PUBLIC_COPY["sample.manifest.source.label"]} />
+          <Figure figure={`− ${formatCount(contacts?.unified ?? 0)}`} label={PUBLIC_COPY["sample.manifest.unified.label"]} />
+          <Figure figure={`= ${formatCount(contacts?.rows ?? sourceRows)}`} label={PUBLIC_COPY["home.app.phase.prepare.body"]} />
+        </ul>
       );
     default: {
       const files = [...MANIFEST_FILES.map((file) => file.name).reverse(), PUBLIC_COPY["home.frag.links"]];
       return (
-        <div className="kauro-walk-total kauro-walk-total--import">
-          <ol>
-            {files.map((file) => (
-              <li key={file}>
-                <FileName>{file}</FileName>
-              </li>
-            ))}
-          </ol>
-          <p className="kauro-walk-quiet">{PUBLIC_COPY["sample.guide.step.counts"]}</p>
-        </div>
+        <ul className="kauro-walk-figures">
+          {files.map((file, index) => (
+            <Figure key={file} figure={String(index + 1)} label={<FileName>{file}</FileName>} note={PUBLIC_COPY["home.frag.order"]} />
+          ))}
+        </ul>
       );
     }
   }
@@ -215,6 +235,14 @@ function Total({ step, approved, run }: { readonly step: number; readonly approv
 
 const STATE: readonly PublicCopyId[] = ["how.frag.sealed", "home.journey.measured", "home.journey.approved.count", "how.frag.quote", "home.journey.preparing", "home.frag.team"];
 const DONE: ReadonlyArray<PublicCopyId | null> = [null, null, null, null, "home.app.state.label", "home.journey.imported"];
+
+/** Where the held section is: the track's top relative to the screen, how far into the hold the reader is, one step's stretch. */
+function geometry(el: HTMLElement, held: HTMLElement): { readonly into: number; readonly stretch: number; readonly length: number; readonly trackTop: number } {
+  const holdAt = Number.parseFloat(window.getComputedStyle(held).top) || 0;
+  const trackTop = el.getBoundingClientRect().top;
+  const length = el.offsetHeight - held.offsetHeight;
+  return { into: holdAt - trackTop, stretch: length / STEPS.length, length, trackTop: trackTop + window.scrollY - holdAt };
+}
 
 export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: string; readonly heading: string; readonly headingId: string }): ReactElement {
   const [step, setStep] = useState(UPLOAD);
@@ -224,11 +252,14 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
   const stage = useRef<HTMLDivElement>(null);
   /** The reader has gone through the whole process and on past it; coming back up, the section no longer holds. */
   const finished = useRef(false);
+  const stepRef = useRef(UPLOAD);
+  stepRef.current = step;
   useEffect(() => setReady(true), []);
   useEffect(() => {
     if (!ready) return undefined;
     let frame = 0;
     let lastY = window.scrollY;
+    let quietUntil = 0;
     const read = (): void => {
       frame = 0;
       const el = track.current;
@@ -238,7 +269,7 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
       const up = y < lastY;
       lastY = y;
       const box = held.getBoundingClientRect();
-      // the sheet has left the screen below (the reader went back up past the section): it starts again from the first step
+      // the section has left the screen below (the reader went back up past it): it starts again from the first step
       if (box.top >= window.innerHeight) {
         el.classList.remove("is-collapsed");
         finished.current = false;
@@ -246,9 +277,7 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
         return;
       }
       if (el.classList.contains("is-collapsed")) return;
-      const holdAt = Number.parseFloat(window.getComputedStyle(held).top) || 0;
-      const into = holdAt - el.getBoundingClientRect().top;
-      const length = el.offsetHeight - held.offsetHeight;
+      const { into, stretch, length } = geometry(el, held);
       if (into > length + 1) finished.current = true;
       if (up && finished.current && into > 0) {
         // back up past a finished process: the track gives up its extra length, and the page moves by the same amount so nothing jumps
@@ -257,20 +286,44 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
         lastY = window.scrollY;
         return;
       }
-      const stretch = length / LAST;
       if (stretch <= 0) return;
-      // inside the process the scroll moves it both ways: forwards going down, one step back going up
-      setStep(Math.min(LAST, Math.max(0, Math.floor(into / stretch + AHEAD))));
+      // each step is one full stretch of the hold, the first included
+      setStep(Math.min(LAST, Math.max(0, Math.floor(into / stretch))));
     };
     const schedule = (): void => {
       if (frame === 0) frame = window.requestAnimationFrame(read);
     };
+    // a mouse wheel moves the process one step a notch, however many lines a notch scrolls; a touchpad's and a touch screen's own scrolling is
+    // left alone (a touchpad's many small events are taken as one notch at a time)
+    const wheel = (event: WheelEvent): void => {
+      const el = track.current;
+      const held = stage.current;
+      if (el === null || held === null || el.classList.contains("is-collapsed") || event.ctrlKey || event.deltaY === 0) return;
+      const { into, stretch, length, trackTop } = geometry(el, held);
+      const down = event.deltaY > 0;
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * window.innerHeight : event.deltaY;
+      // coming into the hold from above, a notch stops at its first step instead of running past it
+      const entering = down && into < 0 && into + delta > 0;
+      const inside = into >= 0 && into <= length;
+      if (!entering && !inside) return;
+      if (finished.current && !down) return;
+      event.preventDefault();
+      if (event.timeStamp < quietUntil) return;
+      quietUntil = event.timeStamp + NOTCH_MS;
+      const current = entering ? -1 : stepRef.current;
+      const next = current + (down ? 1 : -1);
+      // past either end the page is let go: just above the hold going up, just below it going down
+      const target = next < 0 ? trackTop - 2 : next > LAST ? trackTop + length + 2 : trackTop + next * stretch + stretch / 2;
+      window.scrollTo({ top: entering ? trackTop + stretch / 2 : target, behavior: reducedMotion() ? "auto" : "smooth" });
+    };
     read();
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
+    window.addEventListener("wheel", wheel, { passive: false });
     return () => {
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
+      window.removeEventListener("wheel", wheel);
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
   }, [ready]);
@@ -294,10 +347,8 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
       setStep(next);
       return;
     }
-    const holdAt = Number.parseFloat(window.getComputedStyle(held).top) || 0;
-    const stretch = (el.offsetHeight - held.offsetHeight) / LAST;
-    const top = el.getBoundingClientRect().top + window.scrollY - holdAt + next * stretch;
-    window.scrollTo({ top, behavior: reducedMotion() ? "auto" : "smooth" });
+    const { stretch, trackTop } = geometry(el, held);
+    window.scrollTo({ top: trackTop + next * stretch + stretch / 2, behavior: reducedMotion() ? "auto" : "smooth" });
   };
   const approvedCount = step < DECIDE ? 0 : step > DECIDE ? PROPOSALS.length : approvals;
   const approved: ReadonlySet<ProposalId> = new Set(PROPOSALS.slice(0, approvedCount));
@@ -370,7 +421,7 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
         <div className="kauro-walk-work">
           <p className="kauro-walk-file">
             <FileName key={fileName}>{fileName}</FileName>
-            {step === UPLOAD ? null : <span className="kauro-walk-sealed">{PUBLIC_COPY["how.frag.sealed"]}</span>}
+            <span className={cx("kauro-walk-sealed", step === UPLOAD && "is-waiting")}>{PUBLIC_COPY["how.frag.sealed"]}</span>
             <span className="kauro-walk-rows">{copy("home.files.rows", { count: formatCount(rows) })}</span>
           </p>
           <div className="kauro-walk-table">
@@ -379,7 +430,7 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
                 {step >= DECIDE ? <span className={cx("kauro-walk-mark", approved.has("map") && "is-approved")}>{markOf("map")}</span> : null}
               </span>
               <span className="kauro-walk-cell">{PUBLIC_COPY["home.app.contact.label"]}</span>
-              <span className={cx("kauro-walk-cell", mapped && "is-renamed")}>
+              <span className={cx("kauro-walk-cell kauro-walk-cell--email", mapped && "is-renamed")}>
                 {mapped ? (
                   <>
                     <s>{SAMPLE_COLUMN.from}</s>
@@ -397,15 +448,15 @@ export function Journey({ eyebrow, heading, headingId }: { readonly eyebrow: str
             {JOURNEY_ROWS.map((row) => (
               <Row key={row.id} row={row} step={step} approved={approved} />
             ))}
-            <div className="kauro-walk-foot" key={`total-${step}`}>
-              <Total step={step} approved={approved} run={ready && step === MEASURE} />
-            </div>
+          </div>
+          <div className="kauro-walk-foot" key={`total-${step}`}>
+            <Total step={step} approved={approved} run={ready && step === MEASURE} />
           </div>
         </div>
       </div>
     </div>
   );
-  // with the script, the composition is held in the middle of the screen while the reader scrolls through the steps
+  // with the script, the section fills the screen and holds while the reader goes through the steps
   return ready ? (
     <div ref={track} className="kauro-walk-track">
       {walk}
