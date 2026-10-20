@@ -7,7 +7,7 @@
 import { PUBLIC_COPY } from "@web/copy/public.ts";
 import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
 import { bandIndexOf, bandLabel, formatCount, formatUsd, priceOf } from "@web/public/pricing-bands.ts";
-import { MANIFEST_FILES, SAMPLE, SAMPLE_GROUPS, SAMPLE_SOURCES } from "@web/public/sample-data.ts";
+import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_GROUPS, SAMPLE_SOURCES } from "@web/public/sample-data.ts";
 
 const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
 const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
@@ -17,6 +17,11 @@ const units = contacts.source + companies.source;
 const band = bandIndexOf(units);
 if (band === null) throw new Error("the example's units fall outside every band");
 const groups = SAMPLE_GROUPS.pairs + SAMPLE_GROUPS.triples;
+const measured = (label: string): number => {
+  const row = REPORT_ROWS.find((one) => one.label === label);
+  if (row === undefined) throw new Error(`the public sample report lost ${label}`);
+  return row.count;
+};
 
 export const EXAMPLE = Object.freeze({
   name: "Example project",
@@ -33,6 +38,13 @@ export const EXAMPLE = Object.freeze({
   groups,
   approved: groups - SAMPLE_GROUPS.pairsKeptApart,
   outputs: MANIFEST_FILES.map((file) => file.name),
+  /** The free check's measures of contacts.csv, exactly as the public Sample delivery reports them. */
+  report: Object.freeze({
+    inGroups: measured("sample.report.duplicates"),
+    emailsInvalid: measured("sample.report.emails"),
+    noCompany: measured("sample.report.company"),
+    blockers: measured("sample.report.blockers"),
+  }),
 });
 
 /** How long the files of a free check stay when nothing is bought, from the policy: "7 days … 14 at the latest". */

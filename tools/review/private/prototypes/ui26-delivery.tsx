@@ -13,7 +13,7 @@ import type { StateDef } from "../lib/scenario.ts";
 import { CodeField } from "./auth.tsx";
 import { bytes, HARD_DEADLINE, LINK_MINUTES, OUTPUT, PACKAGE_FILES, READY_AT, SOFT_DEADLINE } from "./delivery.ts";
 import { moment, PageHead, ScreenButton, ScreenLink, Stamp } from "./kit.tsx";
-import { n } from "./plan.tsx";
+import { n, PLAN } from "./plan.tsx";
 
 export const UI26_STATES: readonly StateDef[] = [
   { key: "normal", label: "Ready to download", note: "Version 1, verified: seven files, their counts and fingerprints, and the date the package goes." },
@@ -46,7 +46,7 @@ export function Delivery({ ctx, state }: PrototypeProps): ReactElement {
       ) : null}
       {state === "corrected" ? (
         <Banner tone="info" title="Version 2 replaces version 1" announce="status">
-          <p>Version 1 named 3 companies twice in associations.csv; version 2 removes the repeated rows, so the file holds 11,906 links. Nothing else changed. Version 1 has no links any more; if your team imported it, the import steps say what to do.</p>
+          <p>Version 1 named 3 companies twice in associations.csv; version 2 removes the repeated rows, so the file holds {n(PLAN.links)} links. Nothing else changed. Version 1 has no links any more; if your team imported it, the import steps say what to do.</p>
         </Banner>
       ) : null}
       <section className="kauro-package" aria-labelledby="package-h">

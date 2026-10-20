@@ -48,7 +48,7 @@ export function ImportSteps({ ctx, state }: PrototypeProps): ReactElement {
       <PageHead title="Import steps" lead="Use the specified tool and settings for each stage." />
       {done ? (
         <Banner tone="success" title="The import is complete" announce="status">
-          <p>All three stages are verified against HubSpot&apos;s own results: 2,951 companies, 12,266 contacts and 11,906 links. The results page keeps each stage&apos;s figures.</p>
+          <p>All three stages are verified against HubSpot&apos;s own results: {n(STAGES[0]?.rows ?? 0)} companies, {n(STAGES[1]?.rows ?? 0)} contacts and {n(STAGES[2]?.rows ?? 0)} links. The results page keeps each stage&apos;s figures.</p>
         </Banner>
       ) : null}
       <section className="kauro-import-before" aria-labelledby="before-h">

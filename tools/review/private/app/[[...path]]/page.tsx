@@ -23,6 +23,7 @@ function screenAt(pathname: string, person: ContextKey, proposal: string | undef
   const match = matchRoute(pathname);
   if (match === null || match.screen.origin === "PUBLIC") return null;
   if (proposal === "P-02" && match.screen.id === "UI32") return { id: "P-02", params: match.params };
+  if (proposal === "P-07" && match.screen.id === "UI18") return { id: "P-07", params: match.params };
   return { id: match.screen.id, params: match.params };
 }
 

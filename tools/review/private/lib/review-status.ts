@@ -13,6 +13,7 @@ export const REVIEW_STATUS: Readonly<Record<string, Review>> = {
   "P-01": "REVISED_AWAITING_REVIEW",
   "P-05": "NOT_PRESENTED",
   "P-06": "NOT_PRESENTED",
+  "P-07": "NOT_PRESENTED",
   "P-02": "REVISED_AWAITING_REVIEW",
 };
 

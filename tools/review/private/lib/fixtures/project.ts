@@ -106,7 +106,7 @@ export function reviewInspection(agencyId: string, overrides: Partial<Inspection
   });
 }
 
-const POPULATIONS = { physicalSourceRows: EXAMPLE.units, logicalSourceRecords: EXAMPLE.units, billableSourceUnits: EXAMPLE.units, associationEdges: 11_906 } as const;
+const POPULATIONS = { physicalSourceRows: EXAMPLE.units, logicalSourceRecords: EXAMPLE.units, billableSourceUnits: EXAMPLE.units, associationEdges: EXAMPLE.contacts - EXAMPLE.report.noCompany } as const;
 
 /** The selection confirmed and evaluated: the archive sheet left out with its reason, the counts measured on the whole set. */
 export function reviewEvaluated(agencyId: string): InspectionView {

@@ -36,6 +36,7 @@ export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.
   const proposal = proposalOf(id);
   if (proposal !== undefined) {
     if (proposal.key === "P-02") return pathOf("UI32", { agencyId });
+    if (proposal.key === "P-07") return pathOf("UI18", { agencyId, id: project });
     if (proposal.key === "P-05") return "/signup";
     if (proposal.key === "P-06") return "/login/reset";
     return proposal.origin === "OPS" ? "/ops/settings" : "/account";

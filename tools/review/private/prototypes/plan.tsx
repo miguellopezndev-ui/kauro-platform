@@ -3,7 +3,10 @@
 // (UI22). The plan is reviewed as a task list (research: app-ui-patterns.md 3, GOV.UK's task list): the three parts can be reviewed in any
 // order and resumed; approval comes last and lists everything, each part with a way back to change it. Every figure is the public site's
 // worked example (sample-data.ts): 12,480 contacts and 3,204 companies, 207 duplicate candidate groups of which 200 are unified, 214
-// contact rows unified. The plan's body has no read in the api yet: these pages are its visual design (VISUAL PROTOTYPE).
+// contact rows unified; 191 invalid addresses and 1,137 contacts with an empty Company column, as the public sample report measures them.
+// What the plan adds on top (how many empty rows were unified away, which named companies are missing) is the review's own invention and
+// reconciles: every contact in the output is either linked or listed without a company. The plan's body has no read in the api yet: these
+// pages are its visual design (VISUAL PROTOTYPE).
 import { SAMPLE_GROUPS } from "@web/public/sample-data.ts";
 import Link from "next/link";
 import type { ReactElement } from "react";
@@ -40,6 +43,14 @@ export function PlanTasks({ ctx, current, states }: { readonly ctx: PrototypePro
 }
 
 const groups = SAMPLE_GROUPS.pairs + SAMPLE_GROUPS.triples;
+const unifiedRows = SAMPLE_GROUPS.pairs - SAMPLE_GROUPS.pairsKeptApart + SAMPLE_GROUPS.triples * 2;
+/** Of the contacts with an empty Company column: rows unified into a record, and kept rows that took the company of a row unified into them. */
+const EMPTY_UNIFIED = 61;
+const EMPTY_FILLED = 18;
+const emptyCompany = EXAMPLE.report.noCompany - EMPTY_UNIFIED - EMPTY_FILLED;
+/** Contacts whose Company names a company that companies.xlsx does not hold (the Relationships page lists them). */
+const NOT_FOUND = 163;
+const output = EXAMPLE.contacts - unifiedRows;
 /** The plan's figures, as one record: every page of the plan reads the same numbers. */
 export const PLAN = Object.freeze({
   contacts: EXAMPLE.contacts,
@@ -50,13 +61,18 @@ export const PLAN = Object.freeze({
   groupContacts: SAMPLE_GROUPS.pairs * 2 + SAMPLE_GROUPS.triples * 3,
   unifyGroups: groups - SAMPLE_GROUPS.pairsKeptApart,
   keptApart: SAMPLE_GROUPS.pairsKeptApart,
-  unifiedRows: SAMPLE_GROUPS.pairs - SAMPLE_GROUPS.pairsKeptApart + SAMPLE_GROUPS.triples * 2,
-  links: 11_906,
-  noCompany: 360,
-  notFound: 214,
+  unifiedRows,
+  output,
+  emptySource: EXAMPLE.report.noCompany,
+  emptyUnified: EMPTY_UNIFIED,
+  emptyFilled: EMPTY_FILLED,
+  emptyCompany,
+  notFound: NOT_FOUND,
+  noCompany: emptyCompany + NOT_FOUND,
+  links: output - emptyCompany - NOT_FOUND,
   namesCapitalised: 610,
   emailsLowercased: 1_104,
-  emailsInvalid: 37,
+  emailsInvalid: EXAMPLE.report.emailsInvalid,
 });
 
 export const n = (value: number): string => value.toLocaleString("en-US");

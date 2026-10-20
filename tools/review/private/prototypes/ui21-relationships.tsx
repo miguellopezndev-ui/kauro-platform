@@ -13,24 +13,25 @@ import { PageHead, ScreenButton } from "./kit.tsx";
 import { n, PLAN, PlanTasks } from "./plan.tsx";
 
 export const UI21_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Links to confirm", note: "11,906 contacts link to their company; 360 cannot, each reason counted and shown." },
+  { key: "normal", label: "Links to confirm", note: "Most contacts link to their company; the rest cannot, each reason counted, and the missing names listed." },
   { key: "confirmed", label: "Confirmed", note: "The links are approved for the plan, and the contacts without a company are imported without one, on purpose." },
 ];
 
 const NOT_FOUND = [
-  { name: "Harbour Mill Ltd", rows: 61, near: "Harbor Mill" },
-  { name: "Osprey Freight Group", rows: 48, near: "Osprey Freight" },
-  { name: "Larch Studios", rows: 37, near: "Larch Studio" },
-  { name: "Juniper & Co", rows: 29, near: null },
-  { name: "38 other names", rows: 39, near: null },
+  { name: "Harbour Mill Ltd", rows: 52, near: "Harbor Mill" },
+  { name: "Osprey Freight Group", rows: 41, near: "Osprey Freight" },
+  { name: "Larch Studios", rows: 28, near: "Larch Studio" },
+  { name: "Juniper & Co", rows: 19, near: null },
+  { name: "17 other names", rows: 23, near: null },
 ] as const;
+if (NOT_FOUND.reduce((sum, row) => sum + row.rows, 0) !== PLAN.notFound) throw new Error("the names not found do not add up");
 
 const STATES = { mapping: "done", identity: "done", relationships: "review", approval: "waiting" } as const;
 
 export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
   const agencyId = ctx.agency?.agencyId ?? "";
   const confirmed = state === "confirmed";
-  const output = PLAN.contacts - PLAN.unifiedRows;
+  const output = PLAN.output;
   return (
     <>
       <ProjectStages agencyId={agencyId} projectId={IDS.project} current="decide" />
@@ -40,7 +41,7 @@ export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
         <h2 id="links-h">Contacts and their companies</h2>
         <div className="kauro-links-map" aria-hidden="true">
           <span className="kauro-links-node">
-            Companies <strong>{n(PLAN.companies)}</strong>
+            Companies <strong>{n(PLAN.companies - 253)}</strong>
           </span>
           <span className="kauro-links-edge">
             <span>{n(PLAN.links)} links</span>
@@ -62,8 +63,10 @@ export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>No company named</dt>
-            <dd>{n(PLAN.noCompany - PLAN.notFound)}</dd>
-            <dd>The Company column is empty</dd>
+            <dd>{n(PLAN.emptyCompany)}</dd>
+            <dd>
+              The Company column is empty: {n(PLAN.emptySource)} in the file, less {n(PLAN.emptyUnified)} unified into a record and {n(PLAN.emptyFilled)} that took the company of a row unified into them
+            </dd>
           </div>
         </dl>
         <p className="kauro-muted">

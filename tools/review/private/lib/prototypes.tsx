@@ -28,6 +28,7 @@ import { P03_STATES, SellerSettings } from "../prototypes/p03-seller.tsx";
 import { OwnerSettings, P04_STATES } from "../prototypes/p04-owner.tsx";
 import { P05_STATES, SignUp } from "../prototypes/p05-sign-up.tsx";
 import { P06_STATES, ResetPassword } from "../prototypes/p06-reset.tsx";
+import { HealthResults, P07_STATES } from "../prototypes/p07-results.tsx";
 import type { PrototypeProps } from "./screens.tsx";
 
 export interface PrototypeEntry {
@@ -60,4 +61,5 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   "P-04": { Component: OwnerSettings, states: P04_STATES, contexts: ["owner"] },
   "P-05": { Component: SignUp, states: P05_STATES, contexts: ["newcomer"] },
   "P-06": { Component: ResetPassword, states: P06_STATES, contexts: ["agency"] },
+  "P-07": { Component: HealthResults, states: P07_STATES, contexts: ["agency", "company", "operator"] },
 };
