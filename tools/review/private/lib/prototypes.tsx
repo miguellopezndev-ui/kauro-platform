@@ -10,6 +10,9 @@ import { Invitation, UI51_STATES } from "../prototypes/ui51-invitation.tsx";
 import { AgencySetup, UI09_STATES } from "../prototypes/ui09-setup.tsx";
 import { AgencySwitcher, UI10_STATES } from "../prototypes/ui10-switcher.tsx";
 import { Team, UI31_STATES } from "../prototypes/ui31-team.tsx";
+import { Projects, UI11_STATES } from "../prototypes/ui11-projects.tsx";
+import { Overview, UI13_STATES } from "../prototypes/ui13-overview.tsx";
+import { Clients, UI12_STATES } from "../prototypes/ui12-clients.tsx";
 import { P01_STATES, PersonalSettings } from "../prototypes/p01-personal.tsx";
 import { OrganisationSettings, P02_STATES } from "../prototypes/p02-organisation.tsx";
 import { P03_STATES, SellerSettings } from "../prototypes/p03-seller.tsx";
@@ -30,6 +33,9 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   UI09: { Component: AgencySetup, states: UI09_STATES, contexts: ["newcomer", "company", "agency"] },
   UI10: { Component: AgencySwitcher, states: UI10_STATES, contexts: ["agency", "company", "newcomer"] },
   UI31: { Component: Team, states: UI31_STATES },
+  UI11: { Component: Projects, states: UI11_STATES, contexts: ["agency", "company", "admin", "operator"] },
+  UI12: { Component: Clients, states: UI12_STATES, contexts: ["agency", "company", "admin", "operator"] },
+  UI13: { Component: Overview, states: UI13_STATES, contexts: ["agency", "company", "admin", "operator", "newcomer"] },
   "P-01": { Component: PersonalSettings, states: P01_STATES, contexts: ["agency", "company", "operator"] },
   "P-02": { Component: OrganisationSettings, states: P02_STATES, contexts: ["agency", "company", "admin", "operator"] },
   "P-03": { Component: SellerSettings, states: P03_STATES, contexts: ["seller"] },

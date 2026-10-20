@@ -756,3 +756,469 @@ fieldset.kauro-notice-form {
   grid-row: 2;
   text-align: start;
 }
+
+/* ===== UI11 Projects: groups by who must act, one row a project with its one next step ===== */
+.kauro-board-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin-block-end: var(--kauro-space-6);
+}
+.kauro-board-tools .kauro-filter {
+  margin: 0;
+}
+.kauro-filter-chip {
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 62.5rem;
+  background: color-mix(in srgb, var(--kauro-color-primary) 6%, var(--kauro-color-raised));
+  color: var(--kauro-color-primary);
+  font: inherit;
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-board-repeat {
+  flex: 1 1 18rem;
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  text-align: end;
+}
+.kauro-main .kauro-board-repeat strong {
+  color: var(--kauro-color-text);
+}
+.kauro-main .kauro-board-group {
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 0;
+}
+.kauro-board-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  margin-block-end: var(--kauro-space-3);
+}
+.kauro-main .kauro-board-group-head h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-board-group-head p {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-board-count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-inline-start: var(--kauro-space-1);
+  padding-inline: 0.375rem;
+  border-radius: 62.5rem;
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  vertical-align: 0.125rem;
+}
+.kauro-main .kauro-board-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  list-style: none;
+  overflow: hidden;
+}
+.kauro-main .kauro-board-row {
+  max-inline-size: none;
+}
+.kauro-main .kauro-board-row + .kauro-board-row {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-board-link {
+  display: grid;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  align-items: center;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-board-link:hover {
+  background: color-mix(in srgb, var(--kauro-color-primary) 4%, var(--kauro-color-raised));
+}
+.kauro-board-link:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: calc(var(--kauro-focus-width) * -1);
+}
+@media (min-width: 62rem) {
+  .kauro-board-link {
+    grid-template-columns: minmax(11rem, 1.1fr) minmax(13rem, 1.3fr) minmax(10.5rem, 0.9fr) minmax(11rem, auto);
+  }
+}
+.kauro-board-client {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-3);
+  min-inline-size: 0;
+  font-weight: 650;
+}
+.kauro-board-client bdi {
+  overflow-wrap: anywhere;
+}
+.kauro-board-mode {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.kauro-board-example {
+  padding: 0.0625rem 0.5rem;
+  border: 1px dashed var(--kauro-color-accent);
+  border-radius: 62.5rem;
+  color: var(--kauro-color-accent-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.kauro-board-stage {
+  display: grid;
+  gap: 0.375rem;
+}
+.kauro-board-stage-name {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-stage-marks {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  max-inline-size: 12rem;
+}
+.kauro-stage-marks > span {
+  block-size: 0.3125rem;
+  border-radius: 1rem;
+  background: var(--kauro-color-border);
+}
+.kauro-stage-marks > .is-done {
+  background: var(--kauro-color-primary);
+}
+.kauro-stage-marks > .is-current {
+  background: color-mix(in srgb, var(--kauro-color-primary) 45%, var(--kauro-color-border));
+}
+.kauro-board-stopped {
+  justify-self: start;
+  padding: 0 0.5rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-danger-surface);
+  color: var(--kauro-color-danger-text);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-board-when {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-board-next {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+  font-size: 0.9375rem;
+}
+@media (min-width: 62rem) {
+  .kauro-board-next {
+    justify-self: end;
+    text-align: end;
+  }
+}
+.kauro-board-row--yours .kauro-board-link {
+  box-shadow: inset 3px 0 0 var(--kauro-color-primary);
+}
+.kauro-board-row--kauro .kauro-board-next,
+.kauro-board-row--others .kauro-board-next,
+.kauro-board-row--delivered .kauro-board-next {
+  color: var(--kauro-color-text);
+  font-weight: 500;
+}
+.kauro-board-row--others .kauro-board-next .kauro-go::after,
+.kauro-board-row--kauro .kauro-board-next .kauro-go::after {
+  content: none;
+}
+.kauro-board-row--example .kauro-board-link {
+  background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--kauro-color-accent) 7%, transparent) 10px 11px);
+}
+/* the first visit: the first project offered beside the example */
+.kauro-main .kauro-board-first {
+  display: grid;
+  gap: var(--kauro-space-5);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-board-first-start {
+  display: grid;
+  gap: var(--kauro-space-3);
+  justify-items: start;
+  max-inline-size: 40rem;
+}
+.kauro-main .kauro-board-first-start > :is(h2, p) {
+  margin: 0;
+}
+/* starting a project, on the board */
+.kauro-main .kauro-board-start {
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1.5rem 3rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
+}
+.kauro-main .kauro-board-start .kauro-form {
+  gap: var(--kauro-space-4);
+  max-inline-size: 48rem;
+}
+.kauro-main .kauro-board-start h2 {
+  margin: 0;
+}
+.kauro-main .kauro-board-start p {
+  margin: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-choice--row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--kauro-space-3);
+  }
+  .kauro-choice--row legend {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ===== UI13 Overview: where the project is, its next step, its facts and what happened ===== */
+.kauro-main .kauro-project-head h1 {
+  margin-block: var(--kauro-space-2) var(--kauro-space-4);
+}
+.kauro-main .kauro-next {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-7);
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1.5rem 3rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
+}
+.kauro-main .kauro-next > :is(h2, p) {
+  margin: 0;
+}
+.kauro-main .kauro-next h2 {
+  font-size: clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem);
+}
+.kauro-main .kauro-next-label {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-next-who {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-next-who span {
+  font-weight: 600;
+}
+.kauro-main .kauro-next .kauro-actions {
+  margin: var(--kauro-space-2) 0 0;
+}
+.kauro-project-grid {
+  display: grid;
+  gap: var(--kauro-space-6) var(--kauro-space-7);
+  margin-block-end: var(--kauro-space-6);
+}
+@media (min-width: 62rem) {
+  .kauro-project-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.kauro-main .kauro-project-grid > section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-project-grid h2 {
+  margin-block: 0 var(--kauro-space-3);
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-activity {
+  position: relative;
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0 0 0 var(--kauro-space-5);
+  list-style: none;
+}
+.kauro-main .kauro-activity::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.5rem;
+  inset-inline-start: 0.3125rem;
+  border-inline-start: 1.5px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-activity li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: none;
+}
+.kauro-main .kauro-activity li::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.375rem;
+  inset-inline-start: calc(var(--kauro-space-5) * -1);
+  box-sizing: border-box;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-activity li:first-child::before {
+  background: var(--kauro-color-primary);
+}
+.kauro-activity-when {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== UI12 Clients: one card a client, its projects and its authority; archiving shows its impact first ===== */
+.kauro-main .kauro-clients {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-client {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--kauro-space-3) var(--kauro-space-4);
+  box-sizing: border-box;
+  max-inline-size: none;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-client {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+.kauro-main .kauro-client--archived {
+  background: transparent;
+  border-style: dashed;
+}
+.kauro-client-main {
+  display: grid;
+  gap: 0.25rem;
+  min-inline-size: 0;
+}
+.kauro-main .kauro-client-main h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-client-main p {
+  margin: 0;
+}
+.kauro-client-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-client-authority {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+.kauro-client-authority code {
+  color: var(--kauro-color-text);
+  overflow-wrap: anywhere;
+}
+.kauro-client-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  grid-column: 1 / -1;
+}
+@media (min-width: 48rem) {
+  .kauro-client-actions {
+    grid-column: auto;
+  }
+}
+.kauro-main .kauro-client-impact {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-client-impact h3 {
+  margin: 0;
+}
+.kauro-main .kauro-client-impact ul {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-client-impact .kauro-actions {
+  margin: 0;
+}
+.kauro-main .kauro-clients-archived {
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-clients-archived summary {
+  display: flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  margin-block-end: var(--kauro-space-3);
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-clients-company {
+  display: grid;
+  gap: var(--kauro-space-3);
+  justify-items: start;
+  max-inline-size: 40rem;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-clients-company > :is(h2, p) {
+  margin: 0;
+}
+/* a banner at the top of a page keeps its distance from what follows */
+.kauro-main > .kauro-banner {
+  margin-block-end: var(--kauro-space-5);
+}

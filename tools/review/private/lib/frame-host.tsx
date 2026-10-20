@@ -5,6 +5,8 @@
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
 import { proposalOf } from "./proposals.ts";
+import { agencyFor } from "./world.ts";
+import { agencyOfPathname } from "@web/screens.ts";
 import { asHref, REVIEW } from "./links.ts";
 import { ReviewShell } from "./review-shell.tsx";
 import { scriptOf } from "./scenario.ts";
@@ -15,7 +17,10 @@ const PEOPLE: readonly ContextKey[] = ["newcomer", "agency", "company", "admin",
 export function FrameHost({ id, context, state, pathname, children }: { readonly id: string; readonly context: ContextKey; readonly state: string; readonly pathname: string; readonly children: ReactNode }): ReactElement {
   const def = screenDef(id);
   const stateDef = def.states.find((candidate) => candidate.key === state) ?? def.states[0];
-  const ctx = CONTEXTS[context];
+  // the workspace a prototype draws is the one its address names, as this person sees it (their own role there), never only their first
+  const base = CONTEXTS[context];
+  const pathAgency = agencyOfPathname(pathname);
+  const ctx = pathAgency === null ? base : { ...base, agency: agencyFor(context, pathAgency) ?? base.agency };
   const script = useMemo(() => {
     const fixed = stateDef === undefined ? {} : scriptOf(stateDef, context);
     return () => fixed;
