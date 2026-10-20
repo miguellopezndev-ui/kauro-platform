@@ -1,4 +1,4 @@
-PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026-10-20, review build of order11/private-review |# Order 11: the owner's review of the private screens
+# Order 11: the owner's review of the private screens
 
 **Base:** `main` at `f102de23` (PR #117 merged; CI 39441072761 green on Ubuntu and Windows). **Branch:** `order11/private-review`.
 
@@ -24,6 +24,8 @@ PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026
 | UI32 Settings `/settings` | IMPLEMENTED — REVIEW DATA | REVISED_AWAITING_REVIEW | 2026-10-20 (presented, then revised) | "Muchas de las páginas que ya has creado están mal, tienen muchos errores de diseño"; needs to navigate each person's full experience, not page by page | Redesign group A to the public site's standard; four navigable experiences (public to sign-in, agency or company, owner, seller) | Design brief (ORDER11-PRIVATE-DESIGN.md); private screens served at their real paths; one synthetic world; page redesigned on the shared design layer | 870 cases (5 widths × 2 themes × states × people): 0 issues; 10 expected by design (UI32 loading, held by the real shell); no motion; keyboard reaches the skip link and the page | Pending |
 | P-01 Personal settings `/account (proposed)` | PROPOSED | REVISED_AWAITING_REVIEW | 2026-10-20 (presented, then revised) | "Muchas de las páginas que ya has creado están mal, tienen muchos errores de diseño"; needs to navigate each person's full experience, not page by page | Redesign group A to the public site's standard; four navigable experiences (public to sign-in, agency or company, owner, seller) | Design brief (ORDER11-PRIVATE-DESIGN.md); private screens served at their real paths; one synthetic world; page redesigned on the shared design layer | 870 cases (5 widths × 2 themes × states × people): 0 issues; 10 expected by design (UI32 loading, held by the real shell); no motion; keyboard reaches the skip link and the page | Pending |
 | P-02 Organisation settings, complete (UI32 within its contract) `/agencies/{agencyId}/settings` | PROPOSED | REVISED_AWAITING_REVIEW | 2026-10-20 (presented, then revised) | "Muchas de las páginas que ya has creado están mal, tienen muchos errores de diseño"; needs to navigate each person's full experience, not page by page | Redesign group A to the public site's standard; four navigable experiences (public to sign-in, agency or company, owner, seller) | Design brief (ORDER11-PRIVATE-DESIGN.md); private screens served at their real paths; one synthetic world; page redesigned on the shared design layer | 870 cases (5 widths × 2 themes × states × people): 0 issues; 10 expected by design (UI32 loading, held by the real shell); no motion; keyboard reaches the skip link and the page | Pending |
+| P-05 Create account `/signup (proposed)` | PROPOSED | NOT_PRESENTED | — | — | — | — | — | Pending |
+| P-06 Reset password `/login/reset (proposed)` | PROPOSED | NOT_PRESENTED | — | — | — | — | — | Pending |
 
 ## Group B. Clients, projects and the service
 
@@ -37,6 +39,7 @@ PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026
 | UI16 Seal review `/projects/{id}/sources/seal` | IMPLEMENTED — REVIEW DATA | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI17 Target setup `/projects/{id}/target` | VISUAL PROTOTYPE — NOT FUNCTIONAL | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI18 Audit `/projects/{id}/audit` | IMPLEMENTED — REVIEW DATA | NOT_PRESENTED | — | — | — | — | — | Pending |
+| P-07 Health check results, beside UI18 `/projects/{id}/audit?review-proposal=P-07` | PROPOSED | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI19 Mapping `/projects/{id}/plan/mapping` | VISUAL PROTOTYPE — NOT FUNCTIONAL | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI20 Identity `/projects/{id}/plan/duplicates` | VISUAL PROTOTYPE — NOT FUNCTIONAL | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI21 Relationships `/projects/{id}/plan/relationships` | VISUAL PROTOTYPE — NOT FUNCTIONAL | NOT_PRESENTED | — | — | — | — | — | Pending |
@@ -90,9 +93,24 @@ PRESENTED | 2026-10-20, review build of order11/private-review |PRESENTED | 2026
 | D-01 | apps/web/src/shell/shell.css | The shell's `.kauro-button` rule, declared after the design tokens with the same specificity, repainted every primary and danger button of the application as a neutral outline (UI32's "Request closure" among them). | The rule applies only to a bare `kauro-button` without a variant. | Visual (group A audit); web unit tests 334/334 |
 | D-02 | apps/web/src/screens/settings/model.ts | UI32 offered "Request closure" to an admin, who holds REQUEST_DELETION, although closure (CMD043) is the owner's alone: the button always failed with ROLE_INSUFFICIENT. | Offered only where the server also lists MANAGE_AGENCY (owner only, B06 D-AUTHZ-1); an admin reads "Only an owner can request closure". The server still decides. | billing-settings-screens.test.ts: owner offered, admin not |
 | D-03 | apps/web/src/shell/view.ts | Once UI10 exists, the shell would offer "Switch agency" on the operations origin, where there is no agency. | The switcher is offered on application paths only. | shell.test.ts: an ops path has no switcher |
+| D-05 | apps/web/src/shell/shell.css | A heading inside an error summary or a banner took the section spacing of the page, so the box opened with an empty band. | Headings inside those boxes lose the top margin. | Visual (group B and C screens) |
+| D-06 | apps/web/src/shell/view.ts | The workspace switcher linked to itself from the switcher and from the setup, where there is nothing to switch from. | No switch link on the UI10 and UI09 paths. | shell.test.ts |
+
+## Defects found and fixed in the review data (groups B to E)
+
+| # | Where | Defect | Fix |
+| --- | --- | --- | --- |
+| D-07 | tools/review/private/lib/fixtures/money-states.ts | The review's quote expired 7 days after it was issued; the pricing policy's quoteDays is 14 (packages/domain quoteExpiresAt). The overview and the projects board repeated the wrong date. | The quote, its transfer instructions and every page that names the date now expire on 3 Nov 2026, 14 days after 20 Oct. |
+| D-08 | tools/review/private/prototypes/plan.tsx | The plan pages counted 37 invalid addresses and 360 contacts without a company, while the public Sample delivery reports 191 and 1,137 for the same synthetic file. | Those counts are read from the public report (REPORT_ROWS); what the plan adds is derived and reconciles: 11,045 links, 1,221 contacts without a company. |
 
 ## Findings for the owner (not changed here)
 
 | # | Where | Finding |
 | --- | --- | --- |
 | D-04 | packages/contracts/registry/screens.json, UI14 primaryCopy | "Upload files, then review what Kavo found." — "Kavo" is not the product's name. Registry text: corrected only through its own procedure. |
+| D-UI09-2 | UI09 setup; CMD002 | The design asks for billing details at the first quote, the first moment money is involved, not at setup. Today activation (CMD002) requires agreements_and_profile_accepted, so this needs the profile requirement moved from activation to the quote. Needs your approval before any contract change. |
+| D-UI11-1 | UI11 projects | The repeat-discount line ("1 more paid project for 5% off") needs a read of the workspace's paid projects in the lookback; the api has none. |
+| D-UI13-1 | UI13 overview | The project's activity (who did what, when) needs a read the api does not serve. |
+| D-P01-4 | P-01 personal settings | Sign-in methods, sessions and recovery codes need a read and commands of the identity provider. |
+| D-P03-1 | P-03 seller settings | The seller's name and address need a profile read. |
+| D-P07-1 | P-07 health check results | The findings (count, population, examples, consequence, fix) need a read model; UI18 serves progress and row counts only. |

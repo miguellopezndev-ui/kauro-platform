@@ -1,6 +1,6 @@
 # Order 11: the page map: who comes to each page, why, and where they go next
 
-**Status:** working document for the owner's review (2026-10-20). It guides every design of Order 11. The public pages are approved in Order
+**Status:** working document for the owner's review (2026-10-20; updated with groups B to E and the owner's correction on sign-up). It guides every design of Order 11. The public pages are approved in Order
 10 and are not redesigned here. They are listed so that the private pages can continue the path they start.
 
 **Sources:**
@@ -62,6 +62,14 @@ Every private page knows where it is on this path and what comes next.
   - ending other sessions.
 - **Sign-up** is public and self-serve for agencies and direct-buyer companies, without manual approval. A verified email, two-step
   verification and the business setup come before the private workspace opens.
+- **Any account may sign up** (owner's correction, 2026-10-20): any Google account, personal Gmail included, or any email. A business
+  identity is possible, never a condition; the person sets up the agency or company when they need it.
+- **Exploring before a workspace:** a new account explores Kauro and an interactive example with synthetic data, without setting up an
+  organisation. To upload real files and get the free check, a minimal workspace comes first: agency or direct buyer, the authorised
+  responsible person, and the applicable agreements including the DPA. No business domain, and no billing details in advance: each datum is
+  asked when it is needed.
+- **No setup questionnaire, no coupon:** the experience is personalised through the check itself, and the existing repeat ladder is shown
+  only after a first project, as reachable progress (research: onboarding-vs-discounts.md).
 - **Never through sign-up:** seller, Kauro staff, owner and administrator access. Those come only by invitation and specific authorisation.
   The operations sign-in therefore has no "Create account" link.
 
@@ -115,10 +123,11 @@ cards side by side. Each card reads in the same order:
 | Page | Who comes | Why | What they do | Next | Must not |
 | --- | --- | --- | --- | --- | --- |
 | **Sign in (UI50)** | A team member or a Kauro person returning; someone sent here by an expired session | To reach their work | Continue with Google, or enter email and password; then the six-digit code from their authenticator app | The page they were going to (an allow-listed route), else their home | Say whether an account exists; show "Create account" on the operations sign-in; accept an email in place of the code |
-| **Create account (P-05, proposed)** | A buyer after reading the site, often after the free check | To start their first project | Continue with Google, or full name, work email and password. Then verify the email with a code, then set up two-step verification and keep the recovery codes | Agency setup (UI09) | Ask for company details before the account exists; grant any seller or staff access; promise a price |
+| **Create account (P-05, proposed)** | A buyer after reading the site | To look inside and start a first project | Continue with Google, or name, any email and a strong password. Then verify the email with a code, then set up two-step verification and keep the recovery codes | The welcome (UI10 with no workspace) | Require a business email; ask for company details before they are needed; grant any seller or staff access; promise a price |
+| **Welcome (UI10 with no workspace)** | A new account with no agency or company yet | To understand Kauro before giving anything | Open the example workspace (synthetic, labelled); or set up a workspace to upload real files | The example's projects, or Agency setup (UI09) | Look empty; ask setup questions; offer a coupon |
 | **Reset password (P-06, proposed)** | A member who forgot their password | To get back in | Enter email; receive a code; set a new password; every other session ends | Sign in, then the Kauro code | Say whether the email has an account; skip the second factor |
 | **Accept invitation (UI51)** | A person invited by an owner or admin | To join that agency in the intended role | Sign in or create the account with the invited email; then accept | That agency's projects | Show the agency before the token and identity are checked; let a forwarded invitation in |
-| **Agency setup (UI09)** | A new account holder | To prepare a workspace that may hold client data | Say who buys (agency or company), name the workspace, the legal and billing profile, accept the terms | The projects board, with the first project offered | Join an agency by email domain; ask anything twice |
+| **Agency setup (UI09)**, "Set up your agency or company" | A new account ready to upload real files | To open a workspace that may hold client data | One form: the name, who buys (agency or company), the authorised responsible person, the agreements including the DPA. Billing details come at the first quote (proposed, D-UI09-2) | The projects board, with the first project offered | Join an agency by email domain; ask for a business domain; ask anything twice |
 | **Switcher (UI10)** | A person with more than one membership | To choose the workspace to work in | Pick one; create another eligible workspace | That workspace's projects | Show a workspace the person does not belong to; keep the old one's content on screen while switching |
 
 ### 3.3 The project (group B)
@@ -140,10 +149,11 @@ The project is the path's core. Its six stages are the same as on How it works:
 | **Selection (UI15, real)** | The same operator | To choose exactly what is included | Choose sheets and tables; settle parser choices; confirm | Seal review | Leave out content without a visible reason |
 | **Seal review (UI16, real)** | The operator, sometimes an approver | To fix this exact set of files | Seal the revision, or go back | Target setup, then the free check | Suggest that sealing has started a paid audit |
 | **Target setup (UI17)** | The operator with the destination's facts | To tell Kauro the actual destination | Give the instance's metadata; settle unknown facts | The free check | Turn an unknown fact into a guess |
-| **Audit (UI18, real)**, the free data health check | Every member; the moment the buyer sees their own data | To see what Kauro found and what it proposes | Open each finding; review the proposed decisions | The plan | Present a sample as the whole file; hide that a budget ran out |
-| **Mapping (UI19)** | The operator | To choose where each field goes | Map, keep or leave out each field; validate | Identity | Allow free text that bypasses the typed choices; invent a field |
-| **Identity (UI20)** | The operator, then the approver | To decide which records are the same | Approve a supported group; keep records apart; settle conflicts | Relationships | Merge on similarity alone; treat a sampled email as proof |
-| **Relationships (UI21)** | The operator | To keep records connected | Approve a representable link; hold back or reject | Approval | Show a missing parent as linked |
+| **Audit (UI18, real)**, the free data health check | Every member; the moment the buyer sees their own data | To follow the check while it runs | Watch its phases; read the counts of rows | The results | Present a sample as the whole file; hide that a budget ran out |
+| **Health check results (P-07, proposed)** | Every member, when the check is ready | To see what Kauro found before any price | Read one sentence, then each finding with its count, what it is out of, examples, the consequence and the fix; then the price | The plan (Fields) | Put the price before the findings; present a candidate group as a confirmed duplicate |
+| **Fields (UI19, Mapping)** | The operator | To choose where each field goes | Map, keep or leave out each field; validate | Identity | Allow free text that bypasses the typed choices; invent a field |
+| **Duplicates (UI20, Identity)** | The operator, then the approver | To decide which records are the same | Approve a supported group; keep records apart; settle conflicts | Relationships | Merge on similarity alone; treat a sampled email as proof |
+| **Links between records (UI21, Relationships)** | The operator | To keep records connected | Approve a representable link; hold back or reject | Approval | Show a missing parent as linked |
 | **Approval (UI22)** | The approver (or owner, admin) | To approve exactly these decisions | Confirm identity again (step-up); approve the exact disclosures | The quote | Hide an effect; approve with Enter on an undisclosed default |
 | **Processing (UI25, real)** | Any member, waiting | To know Kauro is working and when it will finish | Watch the stages; cancel if allowed; open support | Delivery | Show a heartbeat as a percentage |
 | **Delivery (UI26)** | The operator | To take the verified package | Download within the deadline; read the report; open the import guide | Import steps | Offer a link to an expired or revoked file |
@@ -195,8 +205,8 @@ The project is the path's core. Its six stages are the same as on How it works:
    - the facts.
 2. The project's six stages are drawn once, as the window's progress list. Every project page shows it, so the operator always knows where
    they are.
-3. The first visit is never empty. A new workspace sees one synthetic example project, labelled as an example, beside "Start your first
-   project".
+3. The first visit is never empty. A new account is welcomed with the example workspace (synthetic, labelled) and the way to set up its
+   own; a new workspace sees the example project beside "Start your first project".
 4. The free data health check is the moment of truth. It opens with the counts of the buyer's own data, then every finding with its one next
    step.
 5. Sign-in and sign-up follow the owner's decisions above: two methods, Kauro's own code always, the recovery codes kept at enrolment, and
@@ -211,3 +221,4 @@ None of these replaces a registered screen. Each is drawn in the review as "PROP
 | P-05 | Create account | Sign-up is public and self-serve (owner, 2026-10-20) | `/signup` (APP) |
 | P-06 | Reset password | Email and password need a safe recovery | `/login/reset` (APP and OPS) |
 | P-01 (extended) | Personal settings: sign-in methods, two-step verification, recovery codes, sessions | Ending other sessions and safe recovery (owner, 2026-10-20) | `/account` |
+| P-07 | Health check results | The check is where Kauro shows its value before a price; the api has no findings read | Beside UI18, `/projects/{id}/audit` |
