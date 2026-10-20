@@ -3,6 +3,7 @@
 export const PROCESSING_COPY = {
   "screen.processing.title": "Processing",
   "screen.processing.lead.body": "Your approved project is being prepared.",
+  "screen.processing.delivery.cta": "Open the delivery",
   "screen.processing.estimate.body": "The phases below show where the work is. Kauro shows no percentage and no estimate of when it will finish; the delivery deadline is the commitment.",
   "screen.processing.state.label": "Status",
   "screen.processing.state.QUEUED": "Waiting in the queue",

@@ -11,6 +11,8 @@ import { proposalOf } from "./proposals.ts";
 import { NOT_MEMBER, PENDING, READ, type StateDef, UNAVAILABLE, withShared } from "./scenario.ts";
 import { agencyFor } from "./world.ts";
 import { UI14_STATES, UI15_STATES, UI16_STATES } from "./fixtures/sources-states.ts";
+import { UI18_STATES, UI23_STATES, UI24_STATES, UI25_STATES } from "./fixtures/money-states.ts";
+import { UI30_STATES, UI39_STATES, UI52_STATES } from "./fixtures/account-states.ts";
 
 export interface PrototypeProps {
   readonly ctx: ReviewContext;
@@ -61,6 +63,13 @@ const REAL: Readonly<Record<string, readonly StateDef[]>> = {
   UI14: UI14_STATES,
   UI15: UI15_STATES,
   UI16: UI16_STATES,
+  UI18: UI18_STATES,
+  UI23: UI23_STATES,
+  UI24: UI24_STATES,
+  UI25: UI25_STATES,
+  UI30: UI30_STATES,
+  UI39: UI39_STATES,
+  UI52: UI52_STATES,
   UI32: [
     { key: "normal", label: "Normal", note: "The settings as this person sees them: the closure is offered to an owner only." },
     {

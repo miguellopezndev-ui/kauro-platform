@@ -50,16 +50,16 @@ function Details({ read, amountCents }: { readonly read: InstructionsRead; reado
     case "READY": {
       const d = read.instructions;
       return (
-        <section aria-labelledby="payment-instructions">
+        <section className="kauro-transfer" aria-labelledby="payment-instructions">
           <h2 id="payment-instructions">{message("screen.payment.instructions.heading")}</h2>
-          <dl>
+          <dl className="kauro-transfer-slip">
+            <div className="kauro-transfer-key"><dt>{message("screen.payment.amount.label")}</dt><dd><strong><Money minor={amountCents} currency="USD" /></strong> <span>{message("screen.payment.instructions.amount.hint")}</span></dd></div>
+            <div className="kauro-transfer-key"><dt>{message("screen.payment.instructions.reference.label")}</dt><dd><strong className="kauro-transfer-reference">{d.reference}</strong> <span>{message("screen.payment.instructions.reference.hint")}</span></dd></div>
             <div><dt>{message("screen.payment.instructions.beneficiary.label")}</dt><dd>{d.beneficiaryName}</dd></div>
             <div><dt>{message("screen.payment.instructions.bank.label")}</dt><dd>{d.bankName}</dd></div>
             <div><dt>{message("screen.payment.instructions.routing.label")}</dt><dd>{d.routingNumber}</dd></div>
             <div><dt>{message("screen.payment.instructions.account.label")}</dt><dd>{d.accountNumber}</dd></div>
             <div><dt>{message("screen.payment.instructions.type.label")}</dt><dd>{message(`screen.payment.instructions.type.${d.accountType}`)}</dd></div>
-            <div><dt>{message("screen.payment.amount.label")}</dt><dd><Money minor={amountCents} currency="USD" /> {message("screen.payment.instructions.amount.hint")}</dd></div>
-            <div><dt>{message("screen.payment.instructions.reference.label")}</dt><dd><strong>{d.reference}</strong> {message("screen.payment.instructions.reference.hint")}</dd></div>
             <div><dt>{message("screen.payment.instructions.send-by.label")}</dt><dd><Deadline at={d.sendBy} timeZone="UTC" /></dd></div>
             <div><dt>{message("screen.payment.instructions.expires.label")}</dt><dd><Deadline at={d.transferExpiresAt} timeZone="UTC" /></dd></div>
           </dl>
@@ -73,21 +73,21 @@ export function PaymentDetails({ order, instructions, onRefresh, refreshing, hre
   const model = paymentModel(order);
   return (
     <div className="kauro-payment">
-      <p>{message("screen.payment.lead.body")}</p>
-      <dl>
-        <div><dt>{message("screen.payment.order.label")}</dt><dd>{order.orderId}</dd></div>
-        <div><dt>{message("screen.payment.amount.label")}</dt><dd><Money minor={order.expectedAmountCents} currency={order.currency} /></dd></div>
+      <p className="kauro-screen-lead">{message("screen.payment.lead.body")}</p>
+      <dl className="kauro-payment-head">
+        <div className="kauro-payment-amount"><dt>{message("screen.payment.amount.label")}</dt><dd><Money minor={order.expectedAmountCents} currency={order.currency} /></dd></div>
+        <div><dt>{message("screen.payment.order.label")}</dt><dd><code>{order.orderId}</code></dd></div>
       </dl>
-      <section aria-labelledby="payment-status">
+      <section className="kauro-payment-status" aria-labelledby="payment-status">
         <h2 id="payment-status">
           <StatusBadge tone={TONE[model.status]}>{message(`screen.payment.status.${model.status}.label`)}</StatusBadge>
         </h2>
         <p role="status">{message(`screen.payment.status.${model.status}.body`)}</p>
-        {model.discouragesRepeat ? <p>{message("state.UNCERTAIN.body")}</p> : null}
+        {model.discouragesRepeat && model.status === "CHECKING" ? <p>{message("state.UNCERTAIN.body")}</p> : null}
       </section>
       {model.showsInstructions ? <Details read={instructions} amountCents={order.expectedAmountCents} /> : null}
-      <p>{message("screen.payment.return.hint")}</p>
-      <ul className="kauro-actions">
+      <p className="kauro-payment-hint">{message("screen.payment.return.hint")}</p>
+      <ul className="kauro-actions kauro-payment-actions">
         {model.actions.map((action) => (
           <li key={action}>
             {action === "REFRESH_STATUS" ? (
@@ -95,7 +95,7 @@ export function PaymentDetails({ order, instructions, onRefresh, refreshing, hre
                 <Button variant="secondary" disabled={refreshing} aria-busy={refreshing ? true : undefined} onClick={onRefresh}>
                   {message("screen.payment.action.REFRESH_STATUS.label")}
                 </Button>
-                <p>{message("screen.payment.refresh.hint")}</p>
+                <p className="kauro-payment-hint">{message("screen.payment.refresh.hint")}</p>
               </>
             ) : (
               <a href={hrefs[action]}>{message(`screen.payment.action.${action}.label`)}</a>

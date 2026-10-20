@@ -13,7 +13,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
     <>
       <ProjectStages agencyId={agencyId} projectId={id} current="check" />
       <h1>{message("health-check.title")}</h1>
-      <HealthCheckScreen auditId={idOrNull(audit)} />
+      <HealthCheckScreen auditId={idOrNull(audit)} agencyId={agencyId} projectId={id} />
     </>
   );
 }

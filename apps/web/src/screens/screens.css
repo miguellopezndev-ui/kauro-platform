@@ -509,3 +509,439 @@
   box-sizing: border-box;
   min-inline-size: 0;
 }
+
+/* ---- UI18 the free data health check: its phases in order, its dates and allowance in one block ---------------------------------- */
+
+.kauro-main .kauro-check-phases {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  list-style: none;
+  counter-reset: phase;
+}
+
+@media (min-width: 48rem) {
+  .kauro-main .kauro-check-phases {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.kauro-main .kauro-check-phase {
+  position: relative;
+  max-inline-size: none;
+  padding: var(--kauro-space-3) var(--kauro-space-3) var(--kauro-space-3) 2.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  counter-increment: phase;
+}
+
+.kauro-check-phase::before {
+  content: counter(phase);
+  position: absolute;
+  inset-block-start: var(--kauro-space-3);
+  inset-inline-start: var(--kauro-space-3);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1.5px solid var(--kauro-color-control-border);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.kauro-main .kauro-check-phase--done {
+  color: var(--kauro-color-text);
+}
+
+.kauro-check-phase--done::before {
+  content: "\2713";
+  border-color: var(--kauro-color-primary);
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+
+.kauro-main .kauro-check-phase--current {
+  border-color: var(--kauro-color-primary);
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
+
+.kauro-check-phase--current::before {
+  border: 2px solid var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kauro-check-phase--current::before {
+    animation: kauro-check-breathe 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes kauro-check-breathe {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--kauro-color-primary) 18%, transparent);
+  }
+}
+
+.kauro-main .kauro-facts-grid {
+  display: grid;
+  gap: var(--kauro-space-3) var(--kauro-space-6);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block: 1px solid var(--kauro-color-border);
+}
+
+@media (min-width: 48rem) {
+  .kauro-main .kauro-facts-grid {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
+}
+
+.kauro-main .kauro-facts-grid > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+
+.kauro-main .kauro-facts-grid dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kauro-main .kauro-facts-grid dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* codes the api names (a decision, a capability): each a quiet chip, never a sentence Kauro invents for it */
+.kauro-main .kauro-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kauro-main .kauro-codes li {
+  max-inline-size: none;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+  font-size: 0.8125rem;
+}
+
+/* ---- UI23 the quote: one sheet, the lines down to the total, the dates under it; the terms and the payment at its foot -------------- */
+
+.kauro-main .kauro-quote-sheet {
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1.5rem 3rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
+}
+
+.kauro-quote-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+
+.kauro-main .kauro-quote-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.kauro-main :is(.kauro-quote-scope, .kauro-quote-lines, .kauro-quote-dates) {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.kauro-main :is(.kauro-quote-scope, .kauro-quote-lines, .kauro-quote-dates) > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding: var(--kauro-space-3) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+
+.kauro-main .kauro-quote-scope > div {
+  gap: var(--kauro-space-2);
+  padding: 0;
+  border: 0;
+  color: var(--kauro-color-text-muted);
+}
+
+.kauro-main :is(.kauro-quote-scope, .kauro-quote-lines, .kauro-quote-dates) dt {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main :is(.kauro-quote-scope, .kauro-quote-lines, .kauro-quote-dates) dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.kauro-main .kauro-quote-lines .kauro-row--quiet dd {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-quote-lines .kauro-row--sub dd {
+  color: var(--kauro-color-success-text);
+}
+
+.kauro-main .kauro-quote-lines .kauro-row--total {
+  align-items: baseline;
+  padding-block: var(--kauro-space-4);
+  border-block-end: 0;
+  background: color-mix(in srgb, var(--kauro-color-primary) 6%, var(--kauro-color-raised));
+}
+
+.kauro-main .kauro-quote-lines .kauro-row--total dt {
+  color: var(--kauro-color-text);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.kauro-main .kauro-quote-lines .kauro-row--total dd {
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.5rem, 1.25rem + 0.8vw, 1.875rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.kauro-main .kauro-quote-dates {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+
+.kauro-main .kauro-quote-dates > div:last-child {
+  border-block-end: 0;
+}
+
+.kauro-main .kauro-quote-terms {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+
+.kauro-main .kauro-quote-terms > :is(h2, p) {
+  margin: 0;
+}
+
+.kauro-main .kauro-quote-hash {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-quote-accept {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1px dashed var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kauro-quote-accept input {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--kauro-color-primary);
+}
+
+.kauro-main .kauro-quote-bank,
+.kauro-main .kauro-quote-hint {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-quote-hint:empty {
+  display: none;
+}
+
+.kauro-quote-terms > .kauro-button {
+  justify-self: start;
+}
+
+/* ---- UI24 the payment: the amount first, the state once, the bank details as a transfer slip with the reference to copy ----------- */
+
+.kauro-main .kauro-payment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-3) var(--kauro-space-7);
+  margin: 0 0 var(--kauro-space-5);
+}
+
+.kauro-main .kauro-payment-head > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+
+.kauro-main .kauro-payment-head dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kauro-main .kauro-payment-head dd {
+  margin: 0;
+}
+
+.kauro-main .kauro-payment-amount dd {
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.75rem, 1.4rem + 1vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kauro-main .kauro-payment-head code {
+  font-size: var(--kauro-font-size-dense);
+  overflow-wrap: anywhere;
+}
+
+.kauro-main .kauro-payment-status {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+
+.kauro-main .kauro-payment-status > :is(h2, p) {
+  margin: 0;
+}
+
+.kauro-main .kauro-transfer {
+  margin: 0 0 var(--kauro-space-5);
+}
+
+.kauro-main .kauro-transfer-slip {
+  display: grid;
+  gap: 0;
+  max-inline-size: 44rem;
+  margin: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  overflow: hidden;
+}
+
+@media (min-width: 40rem) {
+  .kauro-main .kauro-transfer-slip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.kauro-main .kauro-transfer-slip > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+
+.kauro-main .kauro-transfer-slip dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kauro-main .kauro-transfer-slip dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* the amount and the reference are where a transfer goes wrong: each across the slip, large, with its warning under it */
+.kauro-main .kauro-transfer-slip > .kauro-transfer-key {
+  grid-column: 1 / -1;
+  background: color-mix(in srgb, var(--kauro-color-primary) 5%, var(--kauro-color-raised));
+}
+
+.kauro-main .kauro-transfer-key dd {
+  display: grid;
+  gap: var(--kauro-space-1);
+}
+
+.kauro-main .kauro-transfer-key strong {
+  font-size: 1.25rem;
+}
+
+.kauro-main .kauro-transfer-key span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-transfer-reference {
+  font-family: var(--kauro-mono-family);
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+
+.kauro-main .kauro-payment-hint {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-payment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kauro-main .kauro-payment-actions > li {
+  display: grid;
+  gap: var(--kauro-space-2);
+}
+
+/* ---- UI25 processing: the five phases as one quiet column, the facts in one block ------------------------------------------------ */
+
+.kauro-processing .kauro-phase-list {
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-5);
+}
+
+.kauro-main .kauro-processing-work {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

@@ -38,6 +38,8 @@ export interface ProcessingViewProps {
   readonly cancelling: boolean;
   /** CMD037 was recorded in this page: say so (the job read back may already show it). */
   readonly cancelRecorded: boolean;
+  /** The delivery's page, when this build has it: offered once the package is ready. */
+  readonly deliveryHref?: string | null;
 }
 
 function elapsedText(ms: number): string {
@@ -46,21 +48,23 @@ function elapsedText(ms: number): string {
   return minutes === 0 ? message("screen.processing.elapsed.under-minute.body") : message("screen.processing.elapsed.minutes.body", { minutes });
 }
 
-export function ProcessingDetails({ job, nowMs, readAt, supportHref, onRefresh, onCancel, cancelling, cancelRecorded }: ProcessingViewProps): ReactElement {
+export function ProcessingDetails({ job, nowMs, readAt, supportHref, onRefresh, onCancel, cancelling, cancelRecorded, deliveryHref = null }: ProcessingViewProps): ReactElement {
   const model = jobModel(job, nowMs);
   const phases: readonly Phase[] | null = model.phases === null ? null : model.phases.map((phase) => ({ id: phase.id, label: message(`screen.processing.phase.${phase.id}`), state: phase.status }));
   const advice = job.state === "QUEUED" || job.state === "ADMITTED" || job.state === "RUNNING" || job.state === "VERIFYING" ? null : (`screen.processing.next.${job.state}.body` as const);
   return (
     <div className="kauro-processing">
-      <p>{message("screen.processing.lead.body")}</p>
-      <section aria-labelledby="processing-status">
+      <p className="kauro-screen-lead">{message("screen.processing.lead.body")}</p>
+      <section className="kauro-set-status" aria-labelledby="processing-status">
         <h2 id="processing-status">{message("screen.processing.state.label")}</h2>
         <p role="status">
           <StatusBadge tone={TONE[job.state]}>{message(`screen.processing.state.${job.state}`)}</StatusBadge>
         </p>
+        {model.ended ? null : <p className="kauro-set-open">{message("screen.processing.estimate.body")}</p>}
+      </section>
+      <section className="kauro-processing-work" aria-label={message("screen.processing.phases.label")}>
         {phases === null ? null : <PhaseList label={message("screen.processing.phases.label")} phases={phases} copy={PHASE_COPY} />}
-        {model.ended ? null : <p>{message("screen.processing.estimate.body")}</p>}
-        <dl>
+        <dl className="kauro-facts-grid">
           <div><dt>{message("screen.processing.queued.label")}</dt><dd><Deadline at={job.queuedAt} timeZone="UTC" /></dd></div>
           {model.elapsedMs === null ? null : <div><dt>{message("screen.processing.elapsed.label")}</dt><dd>{elapsedText(model.elapsedMs)}</dd></div>}
           <div><dt>{message("screen.processing.updated.label")}</dt><dd><Deadline at={readAt} timeZone="UTC" /></dd></div>
@@ -87,6 +91,11 @@ export function ProcessingDetails({ job, nowMs, readAt, supportHref, onRefresh, 
         </section>
       )}
       <p className="kauro-actions">
+        {job.state === "READY" && deliveryHref !== null ? (
+          <LinkButton href={deliveryHref} variant="primary">
+            {message("screen.processing.delivery.cta")}
+          </LinkButton>
+        ) : null}{" "}
         {model.ended ? null : (
           <Button variant="secondary" onClick={onRefresh}>
             {message("screen.processing.refresh.label")}

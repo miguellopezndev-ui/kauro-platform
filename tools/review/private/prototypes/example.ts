@@ -29,6 +29,7 @@ export const EXAMPLE = Object.freeze({
   unitsText: formatCount(units),
   band: bandLabel(band),
   price: formatUsd(priceOf(band, "HUBSPOT")),
+  priceCents: priceOf(band, "HUBSPOT"),
   groups,
   approved: groups - SAMPLE_GROUPS.pairsKeptApart,
   outputs: MANIFEST_FILES.map((file) => file.name),

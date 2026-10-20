@@ -12,6 +12,7 @@ import SelectionPage from "@web/app/(app)/agencies/[agencyId]/projects/[id]/sour
 import SettingsPage from "@web/app/(app)/agencies/[agencyId]/settings/page.tsx";
 import SupportPage from "@web/app/(app)/agencies/[agencyId]/support/page.tsx";
 import FinancePage from "@web/app/(ops)/ops/finance/page.tsx";
+import { ROUTE_ID } from "./fixtures/account-states.ts";
 import { IDS } from "./ids.ts";
 
 type Query = Readonly<Record<string, string>>;
@@ -40,9 +41,9 @@ export async function realPage(id: string, agencyId: string, query: Query = {}, 
     case "UI32":
       return SettingsPage({ params: p({ agencyId }) });
     case "UI39":
-      return FinancePage({ searchParams: p({}) });
+      return FinancePage({ searchParams: p({ route: query["route"] ?? ROUTE_ID }) });
     case "UI52":
-      return SupportPage({ params: p({ agencyId }), searchParams: p(query["project"] === undefined ? {} : { project: query["project"] }) });
+      return SupportPage({ params: p({ agencyId }), searchParams: p({ project: query["project"] ?? IDS.project, ...(query["case"] === undefined ? {} : { case: query["case"] }) }) });
     default:
       return null;
   }
