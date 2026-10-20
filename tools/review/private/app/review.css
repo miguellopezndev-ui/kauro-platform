@@ -115,6 +115,10 @@
 .rv-tech--PROTOTYPE {
   color: var(--kauro-color-primary);
 }
+.rv-tech--PROPOSED {
+  color: var(--kauro-color-accent-text);
+  border-style: dashed;
+}
 .rv-tech--BLOCKED_EXTERNAL {
   color: var(--kauro-color-warning-text, #7a4d0c);
 }

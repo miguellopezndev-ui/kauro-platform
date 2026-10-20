@@ -7,6 +7,7 @@ import { AGENCY_ID, COMPANY_ID, CONTEXTS, type ContextKey, CONTEXTS_FOR, type Re
 import { IDS } from "./ids.ts";
 import { screenOf } from "./inventory.ts";
 import { PROTOTYPES } from "./prototypes.tsx";
+import { proposalOf } from "./proposals.ts";
 import { READ, readStates, type StateDef, withShared } from "./scenario.ts";
 
 export interface PrototypeProps {
@@ -27,6 +28,9 @@ export function appPathOf(id: string, ctx: ReviewContext): string {
   const screen = screenOf(id);
   if (screen === undefined) throw new RangeError(id);
   const agencyId = agencyOf(ctx);
+  // a proposal has no route of its own: it is drawn where it would live (the settings of the agency, or a path no screen owns yet)
+  const proposal = proposalOf(id);
+  if (proposal !== undefined) return proposal.key === "P-02" ? pathOf("UI32", { agencyId }) : proposal.origin === "OPS" ? "/ops/settings" : "/account";
   switch (id) {
     case "UI09":
     case "UI10":
@@ -66,7 +70,10 @@ export function screenDef(id: string): ScreenDef {
   const real = REAL[id];
   if (real !== undefined) return { states: withShared(real), contexts };
   const prototype = PROTOTYPES[id];
-  return { states: withShared(prototype?.states ?? PROTOTYPE_STATES), contexts: prototype?.contexts ?? contexts, ...(prototype === undefined ? {} : { Prototype: prototype.Component }) };
+  // the sign-in and the invitation are drawn without a session: the shell's session states do not apply to them
+  const anonymous = id === "UI50" || id === "UI51";
+  const states = prototype?.states ?? PROTOTYPE_STATES;
+  return { states: anonymous ? states : withShared(states), contexts: prototype?.contexts ?? contexts, ...(prototype === undefined ? {} : { Prototype: prototype.Component }) };
 }
 
 export { CONTEXTS };

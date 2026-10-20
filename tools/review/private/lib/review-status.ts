@@ -2,7 +2,17 @@
 // so the index can show it. Only the owner's unequivocal approval may set OWNER_APPROVED.
 import type { Review } from "./inventory.ts";
 
-export const REVIEW_STATUS: Readonly<Record<string, Review>> = {};
+export const REVIEW_STATUS: Readonly<Record<string, Review>> = {
+  // Group A, presented to the owner on 2026-10-20
+  UI50: "PRESENTED",
+  UI51: "PRESENTED",
+  UI09: "PRESENTED",
+  UI10: "PRESENTED",
+  UI31: "PRESENTED",
+  UI32: "PRESENTED",
+  "P-01": "PRESENTED",
+  "P-02": "PRESENTED",
+};
 
 export function reviewOf(id: string): Review {
   return REVIEW_STATUS[id] ?? "NOT_PRESENTED";

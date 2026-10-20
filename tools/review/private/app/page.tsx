@@ -31,7 +31,8 @@ export default function Index() {
       <p className="rx-legend">
         <span className="rv-tech rv-tech--IMPLEMENTED">{TECHNICAL_LABEL.IMPLEMENTED}</span> the application&apos;s own page and components, fed by an identified fixture.{" "}
         <span className="rv-tech rv-tech--PROTOTYPE">{TECHNICAL_LABEL.PROTOTYPE}</span> the designed screen, not wired to the api; nothing in it works for real.{" "}
-        <span className="rv-tech rv-tech--BLOCKED_EXTERNAL">{TECHNICAL_LABEL.BLOCKED_EXTERNAL}</span> designed, but its real behaviour needs a provider that is not connected.
+        <span className="rv-tech rv-tech--BLOCKED_EXTERNAL">{TECHNICAL_LABEL.BLOCKED_EXTERNAL}</span> designed, but its real behaviour needs a provider that is not connected.{" "}
+        <span className="rv-tech rv-tech--PROPOSED">{TECHNICAL_LABEL.PROPOSED}</span> a design you asked for that needs a new contract before it can be built.
       </p>
       {GROUPS.map((group) => (
         <section key={group.key} className="rx-group" aria-labelledby={`group-${group.key}`}>
@@ -76,11 +77,11 @@ export default function Index() {
           </table>
           {PROPOSALS.filter((proposal) => proposal.group === group.key).length === 0 ? null : (
             <div className="rx-proposals">
-              <h3>Proposed additions in this group (need your approval before any contract changes)</h3>
+              <h3>Proposed designs in this group — not in the registry; your visual approval comes before any contract change</h3>
               <ul>
                 {PROPOSALS.filter((proposal) => proposal.group === group.key).map((proposal) => (
                   <li key={proposal.key}>
-                    <a href={proposal.href}>
+                    <a href={viewerHref(proposal.key)}>
                       <span className="rv-id">{proposal.key}</span> {proposal.title}
                     </a>{" "}
                     — {proposal.why}

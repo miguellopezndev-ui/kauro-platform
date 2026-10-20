@@ -5,14 +5,16 @@ import registry from "../../../../packages/contracts/registry/screens.json";
 import groups from "./groups.json";
 import { IMPLEMENTED_SCREENS } from "@web/screens.ts";
 
-export type Technical = "IMPLEMENTED" | "PROTOTYPE" | "BLOCKED_EXTERNAL";
-export type Review = "NOT_PRESENTED" | "PRESENTED" | "CHANGES_REQUESTED" | "REVISED_AWAITING_REVIEW" | "OWNER_APPROVED";
-export type GroupKey = "A" | "B" | "C" | "D" | "E";
+import type { GroupKey, Review, Technical } from "./inventory-types.ts";
+import { PROPOSALS, proposalOf } from "./proposals.ts";
+
+export type { GroupKey, Review, Technical };
 
 export const TECHNICAL_LABEL: Readonly<Record<Technical, string>> = {
   IMPLEMENTED: "IMPLEMENTED — REVIEW DATA",
   PROTOTYPE: "VISUAL PROTOTYPE — NOT FUNCTIONAL",
   BLOCKED_EXTERNAL: "BLOCKED EXTERNAL",
+  PROPOSED: "PROPOSED — NOT IN THE REGISTRY",
 };
 
 /** The five review groups, in the owner's order (Order 11 §1); a JSON file so tools/test checks it against the registry without a build. */
@@ -58,11 +60,19 @@ export const INVENTORY_GAPS = {
   registryTotal: SCREENS.length,
 };
 
+/** A registry screen, or a proposal drawn like one (its "route" says it is proposed). */
 export function screenOf(id: string): PrivateScreen | undefined {
-  return PRIVATE_SCREENS.find((screen) => screen.id === id);
+  const screen = PRIVATE_SCREENS.find((candidate) => candidate.id === id);
+  if (screen !== undefined) return screen;
+  const proposal = proposalOf(id);
+  if (proposal === undefined) return undefined;
+  return { ...proposal, id: proposal.key, technical: "PROPOSED" };
 }
 
+/** The order the owner walks: the 42 screens, each proposal right after the screen it extends. */
+export const REVIEW_SEQUENCE: readonly string[] = PRIVATE_IDS.flatMap((id) => [id, ...PROPOSALS.filter((proposal) => proposal.anchor === id).map((proposal) => proposal.key)]);
+
 export function neighbours(id: string): { readonly previous: string | null; readonly next: string | null } {
-  const index = PRIVATE_IDS.indexOf(id);
-  return { previous: index > 0 ? (PRIVATE_IDS[index - 1] ?? null) : null, next: index >= 0 && index < PRIVATE_IDS.length - 1 ? (PRIVATE_IDS[index + 1] ?? null) : null };
+  const index = REVIEW_SEQUENCE.indexOf(id);
+  return { previous: index > 0 ? (REVIEW_SEQUENCE[index - 1] ?? null) : null, next: index >= 0 && index < REVIEW_SEQUENCE.length - 1 ? (REVIEW_SEQUENCE[index + 1] ?? null) : null };
 }

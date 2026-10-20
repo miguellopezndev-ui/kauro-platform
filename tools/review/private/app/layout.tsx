@@ -3,6 +3,7 @@
 import "@kauro/ui/tokens.css";
 import "@web/shell/shell.css";
 import "./review.css";
+import "../prototypes/prototypes.css";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
