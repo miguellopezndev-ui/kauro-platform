@@ -8,7 +8,7 @@ import { type ReactElement, useState } from "react";
 import { StepUpPanel } from "@web/screens/shared/step-up.tsx";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, Facts, ScreenLink } from "./kit.tsx";
+import { Badge, Facts, PageHead, ScreenLink } from "./kit.tsx";
 
 export const P03_STATES: readonly StateDef[] = [
   { key: "normal", label: "Seller settings", note: "An active seller with a verified payout destination and a verified sending identity." },
@@ -22,8 +22,8 @@ export function SellerSettings({ ctx, state }: PrototypeProps): ReactElement {
   const suspended = state === "suspended";
   return (
     <>
-      <h1>Your seller settings</h1>
-      <p className="kauro-lead">Your seller account, payouts and sending identity.</p>
+      <PageHead eyebrow="Kauro sales" title="Your seller settings" lead="Your seller account, payouts and sending identity." />
+      <div className="kauro-settings-split">
       {suspended ? (
         <Banner tone="warning" title="Your seller account is suspended" announce="status">
           <p>You can still read your statements. Outreach and new claims are stopped until Kauro lifts the suspension.</p>
@@ -99,6 +99,7 @@ export function SellerSettings({ ctx, state }: PrototypeProps): ReactElement {
           ))}
         </fieldset>
       </section>
+      </div>
     </>
   );
 }

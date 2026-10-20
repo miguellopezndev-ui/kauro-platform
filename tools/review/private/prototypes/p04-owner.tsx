@@ -8,7 +8,7 @@ import { type ReactElement } from "react";
 import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, Facts, ScreenButton, ScreenLink } from "./kit.tsx";
+import { Badge, Facts, PageHead, ScreenButton, ScreenLink } from "./kit.tsx";
 
 export const P04_STATES: readonly StateDef[] = [
   { key: "normal", label: "Owner settings", note: "Today's synthetic picture: the bank route verified in sandbox, sign-in and the cloud not connected." },
@@ -46,15 +46,27 @@ export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
   ];
   return (
     <>
-      <h1>Owner settings</h1>
-      <p className="kauro-lead">How Kauro is connected, protected and recovered.</p>
-      <nav className="kauro-local-nav" aria-label="Sections">
-        <a href="#owner-security">Your security</a>
-        <a href="#owner-providers">Providers</a>
-        <a href="#owner-parameters">Operating parameters</a>
-        <a href="#owner-controls">Security controls</a>
-        <a href="#owner-recovery">Recovery</a>
+      <PageHead eyebrow="Kauro operations" title="Owner settings" lead="How Kauro is connected, protected and recovered." />
+      <nav className="kauro-local-nav" aria-label="Sections of this page">
+        <ul>
+          <li>
+            <a href="#owner-security">Your security</a>
+          </li>
+          <li>
+            <a href="#owner-providers">Providers</a>
+          </li>
+          <li>
+            <a href="#owner-parameters">Operating parameters</a>
+          </li>
+          <li>
+            <a href="#owner-controls">Security controls</a>
+          </li>
+          <li>
+            <a href="#owner-recovery">Recovery</a>
+          </li>
+        </ul>
       </nav>
+      <div className="kauro-settings-split">
 
       <section id="owner-security" aria-labelledby="owner-security-h">
         <h2 id="owner-security-h">Your security</h2>
@@ -74,8 +86,8 @@ export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
           {providers.map((provider) => (
             <li key={provider.name}>
               <div>
-                <span className="kauro-member-name">{provider.name}</span>
-                <span className="kauro-member-sub">{provider.what}</span>
+                <span className="kauro-person">{provider.name}</span>
+                <span className="kauro-person-sub">{provider.what}</span>
               </div>
               <Badge tone={provider.state.tone}>{provider.state.label}</Badge>
               <p>{provider.detail}</p>
@@ -137,6 +149,7 @@ export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
           Restores and recovery of data follow the operating runbook; see <ScreenLink to="UI43" ctx={ctx}>Releases</ScreenLink> and <ScreenLink to="UI41" ctx={ctx}>Deletion</ScreenLink>.
         </p>
       </section>
+      </div>
     </>
   );
 }

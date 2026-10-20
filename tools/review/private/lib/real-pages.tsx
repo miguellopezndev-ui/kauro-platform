@@ -17,9 +17,9 @@ import { IDS } from "./ids.ts";
 type Query = Readonly<Record<string, string>>;
 const p = <T,>(value: T): Promise<T> => Promise.resolve(value);
 
-/** The real page of an implemented screen, with the ids of the review's synthetic project, or null for a screen not implemented. */
-export async function realPage(id: string, agencyId: string, query: Query = {}): Promise<ReactElement | null> {
-  const project = { agencyId, id: IDS.project };
+/** The real page of an implemented screen at the address's own parameters (the agency, the project, the order), or null. */
+export async function realPage(id: string, agencyId: string, query: Query = {}, params: Readonly<Record<string, string>> = {}): Promise<ReactElement | null> {
+  const project = { agencyId, id: params["id"] ?? IDS.project };
   switch (id) {
     case "UI14":
       return SourcesPage({ params: p(project) });
@@ -32,7 +32,7 @@ export async function realPage(id: string, agencyId: string, query: Query = {}):
     case "UI23":
       return PurchasePage({ params: p(project), searchParams: p({ quote: query["quote"] ?? IDS.quote }) });
     case "UI24":
-      return PaymentPage({ params: p({ agencyId, orderId: IDS.order }) });
+      return PaymentPage({ params: p({ agencyId, orderId: params["orderId"] ?? IDS.order }) });
     case "UI25":
       return ProcessingPage({ params: p(project), searchParams: p({ order: IDS.order, job: query["job"] ?? IDS.job }) });
     case "UI30":
@@ -42,7 +42,7 @@ export async function realPage(id: string, agencyId: string, query: Query = {}):
     case "UI39":
       return FinancePage({ searchParams: p({}) });
     case "UI52":
-      return SupportPage({ params: p({ agencyId }), searchParams: p({ project: IDS.project }) });
+      return SupportPage({ params: p({ agencyId }), searchParams: p(query["project"] === undefined ? {} : { project: query["project"] }) });
     default:
       return null;
   }

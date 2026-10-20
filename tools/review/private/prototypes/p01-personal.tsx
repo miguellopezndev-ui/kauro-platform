@@ -4,11 +4,10 @@
 // the session (getCurrentSession: mfaAt, idleExpiresAt, absoluteExpiresAt), signing out is the real sign-out. The profile read, signing
 // out other devices and notices have no contract: each is marked as proposed. No password, code or secret appears here, ever.
 import { Button } from "@kauro/ui";
-import { type ReactElement, useState } from "react";
-import { ThemeControl } from "@web/shell/theme-control.tsx";
+import { type ReactElement, useEffect, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, Facts, ScreenLink } from "./kit.tsx";
+import { Badge, Facts, PageHead, ScreenLink } from "./kit.tsx";
 
 export const P01_STATES: readonly StateDef[] = [
   { key: "normal", label: "Personal settings", note: "Every section with the person's synthetic data." },
@@ -29,20 +28,32 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
   const person = ctx.key === "company" ? { name: "Tomas Reyes", email: "tomas.reyes@halden.example" } : ctx.key === "operator" ? { name: "Priya Nair", email: "priya.nair@northwind.example" } : { name: "Lena Ortiz", email: "lena.ortiz@northwind.example" };
   return (
     <>
-      <h1>Your settings</h1>
-      <p className="kauro-lead">Your own settings, the same in every agency.</p>
-      <nav className="kauro-local-nav" aria-label="Sections">
-        <a href="#me-appearance">Appearance</a>
-        <a href="#me-profile">Profile</a>
-        <a href="#me-security">Security</a>
-        <a href="#me-sessions">Sessions</a>
-        <a href="#me-notices">Notices</a>
+      <PageHead eyebrow="Your account" title="Your settings" lead="Your own settings, the same in every agency." />
+      <nav className="kauro-local-nav" aria-label="Sections of this page">
+        <ul>
+          <li>
+            <a href="#me-appearance">Appearance</a>
+          </li>
+          <li>
+            <a href="#me-profile">Profile</a>
+          </li>
+          <li>
+            <a href="#me-security">Security</a>
+          </li>
+          <li>
+            <a href="#me-sessions">Sessions</a>
+          </li>
+          <li>
+            <a href="#me-notices">Notices</a>
+          </li>
+        </ul>
       </nav>
+      <div className="kauro-settings-split">
 
       <section id="me-appearance" aria-labelledby="me-appearance-h">
         <h2 id="me-appearance-h">Appearance</h2>
-        <p>Light or dark. Your choice is kept on this device and applies to every Kauro page.</p>
-        <ThemeControl className="kauro-button kauro-button-secondary" returnTo={null} mode="button" labels={{ toDark: "Use the dark theme", toLight: "Use the light theme", toggle: "Switch theme" }} />
+        <p>Your choice is kept on this device and applies to every Kauro page. With nothing chosen, Kauro follows your system.</p>
+        <Appearance />
       </section>
 
       <section id="me-profile" aria-labelledby="me-profile-h">
@@ -127,6 +138,38 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
       <p className="kauro-muted">
         Agency settings (name, logo, members, closure) are in each agency: <ScreenLink to="UI32" ctx={ctx}>open this agency&apos;s settings</ScreenLink>.
       </p>
+      </div>
     </>
+  );
+}
+
+/** Light or dark, each shown as a miniature of the product window; the choice goes to the web's own theme route (POST /preferences/theme). */
+function Appearance(): ReactElement {
+  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
+  useEffect(() => {
+    const stored = document.documentElement.dataset["theme"];
+    setTheme(stored === "light" || stored === "dark" ? stored : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  }, []);
+  const choose = (next: "light" | "dark"): void => {
+    document.documentElement.dataset["theme"] = next;
+    setTheme(next);
+    void fetch("/preferences/theme", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-kauro-theme": "1" }, body: `theme=${next}`, credentials: "same-origin" }).catch(() => undefined);
+  };
+  return (
+    <fieldset className="kauro-appearance">
+      <legend className="kauro-visually-hidden">Theme</legend>
+      {(["light", "dark"] as const).map((option) => (
+        <label key={option} className={`kauro-appearance-option kauro-appearance-option--${option}`}>
+          <input type="radio" name="theme" value={option} checked={theme === option} onChange={() => choose(option)} />
+          <span className="kauro-appearance-preview" aria-hidden="true">
+            <span className="kauro-appearance-bar">Kauro</span>
+            <span className="kauro-appearance-line" />
+            <span className="kauro-appearance-line kauro-appearance-line--short" />
+            <span className="kauro-appearance-ring" />
+          </span>
+          <span className="kauro-appearance-name">{option === "light" ? "Light" : "Dark"}</span>
+        </label>
+      ))}
+    </fieldset>
   );
 }

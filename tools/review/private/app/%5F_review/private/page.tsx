@@ -23,6 +23,28 @@ export default function Index() {
         Every private screen of the registry ({INVENTORY_GAPS.registryPrivate} of {INVENTORY_GAPS.registryTotal}), drawn on your machine with synthetic data. Nothing is sent or saved; no
         account, provider or CRM is touched. Open a screen, change the person, its state, the width and the theme, and move to the next one.
       </p>
+      <section className="rx-experiences" aria-labelledby="rx-walk">
+        <h2 id="rx-walk">Walk it as a person</h2>
+        <p>The application at its real addresses, as each person lives it. Use the links inside the pages; the strip at the top says who you are and lets you change it.</p>
+        <ul>
+          <li>
+            <a href="/">Public site, up to sign-in</a>
+            <span>From the home page to the contact form; its Sign in opens the review's sign-in.</span>
+          </li>
+          <li>
+            <a href="/__as/agency">Agency (Lena Ortiz, owner of Northwind Data)</a>
+            <span>Starts at her agencies. Also as a company, an admin or an operator from the strip.</span>
+          </li>
+          <li>
+            <a href="/__as/owner">Kauro owner</a>
+            <span>The operations area.</span>
+          </li>
+          <li>
+            <a href="/__as/seller">Seller (Daniel Kim)</a>
+            <span>The sales area.</span>
+          </li>
+        </ul>
+      </section>
       <p className="rx-counts">
         <strong>{counts.total}</strong> screens · <strong>{counts.implemented}</strong> implemented (real components, review data) · <strong>{counts.prototype}</strong> visual prototypes ·{" "}
         <strong>{counts.blocked}</strong> blocked by an external provider

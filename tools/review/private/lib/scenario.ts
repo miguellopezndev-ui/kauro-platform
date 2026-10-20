@@ -4,6 +4,7 @@
 import type { OperationId } from "@web/api/generated.ts";
 import { type ContextKey, CONTEXTS, type ReviewContext, sessionFor } from "./contexts.ts";
 import type { Reply, Script } from "./fixture-fetch.ts";
+import { agencyFor, workspaceOf } from "./world.ts";
 
 export interface StateDef {
   readonly key: string;
@@ -28,10 +29,16 @@ export function baseScript(ctx: ReviewContext, base: StateDef["base"] = "SIGNED_
   if (base === "SIGNED_OUT") return { getCurrentSession: { status: 401, problem: "AUTHENTICATION_REQUIRED", reason: "SUBJECT_UNAUTHENTICATED" } };
   if (base === "SESSION_UNAVAILABLE") return { getCurrentSession: UNAVAILABLE };
   const script: Script = { getCurrentSession: { status: 200, body: sessionFor(now) } };
-  if (ctx.agency !== null) {
-    script.GetAgency = ctx.refused || base === "AGENCY_REFUSED" ? NOT_MEMBER : READ(ctx.agency);
-    script.GetBuyerType = READ({ agencyId: ctx.agency.agencyId, buyerType: ctx.buyerType, forEconomicActivity: true, recordedAt: "2026-09-02T14:25:00Z", version: 2 });
-  }
+  // the agency the address names, as this person sees it in the review's world: their own role's actions, or a refusal
+  script.GetAgency = (call) => {
+    if (base === "AGENCY_REFUSED") return NOT_MEMBER;
+    const agency = agencyFor(ctx.key, call.params["agencyId"] ?? "");
+    return agency === null ? NOT_MEMBER : READ(agency);
+  };
+  script.GetBuyerType = (call) => {
+    const workspace = workspaceOf(call.params["agencyId"] ?? "");
+    return workspace === undefined ? NOT_MEMBER : READ({ agencyId: workspace.agencyId, buyerType: workspace.kind, forEconomicActivity: true, recordedAt: workspace.createdAt, version: 2 });
+  };
   return script;
 }
 

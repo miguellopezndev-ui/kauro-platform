@@ -1,13 +1,17 @@
 "use client";
-// What the frame of one screen draws (Order 11): the synthetic-data notice, then the screen inside the real application shell. A real
-// screen arrives as `children` (its own page, rendered by the server); a prototype is drawn here from the same state key.
+// What every review page draws (Order 11): the review strip (synthetic data, who the application is shown to, a way to change it, the way
+// back to the review's index), then the screen inside the real application shell. A real screen arrives as `children` (its own page,
+// rendered by the server); a prototype is drawn here from the state the review asks for.
 import { type ReactElement, type ReactNode, useMemo } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
+import { asHref, REVIEW } from "./links.ts";
 import { ReviewShell } from "./review-shell.tsx";
 import { scriptOf } from "./scenario.ts";
-import { appPathOf, screenDef } from "./screens.tsx";
+import { screenDef } from "./screens.tsx";
 
-export function FrameHost({ id, context, state, children }: { readonly id: string; readonly context: ContextKey; readonly state: string; readonly children: ReactNode }): ReactElement {
+const PEOPLE: readonly ContextKey[] = ["agency", "company", "admin", "operator", "owner", "seller", "outsider"];
+
+export function FrameHost({ id, context, state, pathname, children }: { readonly id: string; readonly context: ContextKey; readonly state: string; readonly pathname: string; readonly children: ReactNode }): ReactElement {
   const def = screenDef(id);
   const stateDef = def.states.find((candidate) => candidate.key === state) ?? def.states[0];
   const ctx = CONTEXTS[context];
@@ -18,12 +22,46 @@ export function FrameHost({ id, context, state, children }: { readonly id: strin
   const Prototype = def.Prototype;
   return (
     <>
-      <p className="kauro-review-notice" role="note">
-        Review — synthetic data, nothing is sent or saved. <span>{ctx.who}</span>
-      </p>
-      <ReviewShell appPath={appPathOf(id, ctx)} context={context} script={script}>
-        {children ?? (Prototype === undefined ? null : <Prototype ctx={ctx} state={stateDef?.key ?? "normal"} />)}
+      <div className="kauro-review-strip" role="note" aria-label="Review">
+        <span className="kauro-review-strip-tag">Review</span>
+        <span>Synthetic data. Nothing is sent or saved.</span>
+        <details className="kauro-review-who">
+          <summary>
+            Seen as <strong>{ctx.label}</strong>
+          </summary>
+          <ul>
+            {PEOPLE.map((key) => (
+              <li key={key}>
+                <a href={asHref(key)} aria-current={key === context ? "true" : undefined}>
+                  <strong>{CONTEXTS[key].label}</strong>
+                  <span>{CONTEXTS[key].who}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+        {id === "UI32" ? (
+          <a href={`${pathname}?review-proposal=P-02`}>See the proposed complete design of this page (P-02)</a>
+        ) : null}
+        {id === "P-02" ? <a href={pathname}>Back to the page as built (UI32)</a> : null}
+        <a className="kauro-review-strip-index" href={REVIEW}>
+          All screens and states
+        </a>
+      </div>
+      <ReviewShell appPath={pathname} context={context} script={script}>
+        {children ?? (Prototype === undefined ? <NotDesigned id={id} /> : <Prototype ctx={ctx} state={stateDef?.key ?? "normal"} />)}
       </ReviewShell>
     </>
+  );
+}
+
+/** A screen of a later group: said plainly, in the review's voice, never dressed as part of the product. */
+function NotDesigned({ id }: { readonly id: string }): ReactElement {
+  return (
+    <div className="kauro-review-pending">
+      <p className="kauro-review-strip-tag">Review</p>
+      <h1>{id} is not designed yet</h1>
+      <p>This screen belongs to a later review group. Group A is designed first; the rest follow once it is right.</p>
+    </div>
   );
 }

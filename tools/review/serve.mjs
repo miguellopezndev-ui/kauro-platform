@@ -90,13 +90,20 @@ table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--ru
 .cat{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;border:1px solid}.cat-IMPLEMENTED{color:#1d6b43;border-color:#1d6b43}.cat-SYNTHETIC{color:#7a4d0c;border-color:#7a4d0c}.cat-PROTOTYPE{color:#8a1c2b;border-color:#8a1c2b}
 .sw a{display:inline-block;margin:2px 4px 2px 0;padding:3px 10px;border:1px solid var(--rule);border-radius:4px;text-decoration:none}.sw a.on{background:var(--wine);color:var(--bg);border-color:var(--wine)}</style></head><body><main>
 <h1>Kauro review — public web</h1>
-<p><b>Private screens (Order 11):</b> <a href="/__review/private">all 42 private screens of the application</a>, with synthetic data.</p>
+<p><b>Private screens (Order 11):</b> <a href="/__review/private">all 42 private screens of the application</a>, with synthetic data. The public site's "Sign in" now opens the review's sign-in.</p>
 <p>This is the real web of the candidate branch (Order 10), served from the production build on your machine only (<code>127.0.0.1</code>). The pages, components and styles are the product's own. Use the site's own header: the menu, the light/dark switch and every link work as in production. This index is part of the review tool, not of the site.</p>
 <p><b>Categories.</b> <span class="cat cat-IMPLEMENTED">IMPLEMENTED</span> real route and components. <span class="cat cat-SYNTHETIC">IMPLEMENTED WITH SYNTHETIC DATA</span> real components fed by an identified fixture; nothing here proves the production backend. <span class="cat cat-PROTOTYPE">PROTOTYPE NOT IMPLEMENTED</span> none on this list.</p>
 <p class="sw"><b>Synthetic publication now:</b> ${switches} <br><small>open = all three services available · limited = HubSpot and Salesforce limited · clean = only CLEAN · none = nothing published · broken = the api fails. Reload the page after switching.</small></p>
 <table><tr><th>Page</th><th>Category</th><th>What is real here</th></tr>${rows}</table>
 <p>Phone view: open the browser's developer tools (F12) and its device toolbar (Ctrl+Shift+M), or narrow the window. Keyboard: Tab from the top of any page; the first stop is the skip link.</p>
 </main></body></html>`;
+}
+
+// The application's private paths (sign-in, invitation, setup, agencies, operations) are served by the review with synthetic data, so the
+// whole product can be walked from the public site; the public pages stay the real build's. The person switch and the review's index too.
+const PRIVATE_PREFIXES = ["/login", "/onboarding", "/invitations", "/agencies", "/ops", "/account", "/__as", "/__review/private"];
+function isPrivate(pathname) {
+  return PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 function forward(req, res, port = NEXT_PORT) {
@@ -121,7 +128,13 @@ const edge = http.createServer((req, res) => {
     res.end(index());
     return;
   }
-  if (url.pathname === "/__review/private" || url.pathname.startsWith("/__review/private/")) {
+  // the review's own assets: their prefix keeps them apart from the product's /_next
+  if (url.pathname.startsWith("/__review/assets/")) {
+    req.url = url.pathname.slice("/__review/assets".length) + url.search;
+    forward(req, res, PRIVATE_PORT);
+    return;
+  }
+  if (isPrivate(url.pathname)) {
     forward(req, res, PRIVATE_PORT);
     return;
   }

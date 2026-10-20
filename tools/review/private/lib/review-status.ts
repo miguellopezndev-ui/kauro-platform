@@ -3,15 +3,15 @@
 import type { Review } from "./inventory.ts";
 
 export const REVIEW_STATUS: Readonly<Record<string, Review>> = {
-  // Group A, presented to the owner on 2026-10-20
-  UI50: "PRESENTED",
-  UI51: "PRESENTED",
-  UI09: "PRESENTED",
-  UI10: "PRESENTED",
-  UI31: "PRESENTED",
-  UI32: "PRESENTED",
-  "P-01": "PRESENTED",
-  "P-02": "PRESENTED",
+  // Group A: presented on 2026-10-20; the owner asked for full navigable experiences and a redesign to perfection; revised the same day
+  UI50: "REVISED_AWAITING_REVIEW",
+  UI51: "REVISED_AWAITING_REVIEW",
+  UI09: "REVISED_AWAITING_REVIEW",
+  UI10: "REVISED_AWAITING_REVIEW",
+  UI31: "REVISED_AWAITING_REVIEW",
+  UI32: "REVISED_AWAITING_REVIEW",
+  "P-01": "REVISED_AWAITING_REVIEW",
+  "P-02": "REVISED_AWAITING_REVIEW",
 };
 
 export function reviewOf(id: string): Review {

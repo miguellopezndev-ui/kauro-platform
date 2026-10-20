@@ -8,7 +8,7 @@ import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
 import { type FormEvent, type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, day, Facts, ScreenButton, ScreenLink } from "./kit.tsx";
+import { Badge, day, Facts, PageHead, ScreenButton, ScreenLink } from "./kit.tsx";
 
 export const P02_STATES: readonly StateDef[] = [
   { key: "normal", label: "Settings", note: "Everything an owner manages for the organisation, each in its own section." },
@@ -44,15 +44,27 @@ export function OrganisationSettings({ ctx, state }: PrototypeProps): ReactEleme
 
   return (
     <>
-      <h1>Settings</h1>
-      <p className="kauro-lead">Manage {company ? "your company's" : "agency"} details and safe branding.</p>
-      <nav className="kauro-local-nav" aria-label="Sections">
-        <a href="#org-brand">Name and logo</a>
-        <a href="#org-buyer">Who buys</a>
-        <a href="#org-legal">Legal and billing</a>
-        <a href="#org-security">Security</a>
-        <a href="#org-closure">Closure</a>
+      <PageHead eyebrow={name} title="Settings" lead={company ? "Manage your company's details and safe branding." : "Manage agency details and safe branding."} />
+      <nav className="kauro-local-nav" aria-label="Sections of this page">
+        <ul>
+          <li>
+            <a href="#org-brand">Name and logo</a>
+          </li>
+          <li>
+            <a href="#org-buyer">Who buys</a>
+          </li>
+          <li>
+            <a href="#org-legal">Legal and billing</a>
+          </li>
+          <li>
+            <a href="#org-security">Security</a>
+          </li>
+          <li>
+            <a href="#org-closure">Closure</a>
+          </li>
+        </ul>
       </nav>
+      <div className="kauro-settings-split">
 
       <section id="org-brand" aria-labelledby="org-brand-h">
         <h2 id="org-brand-h">Name and logo</h2>
@@ -143,6 +155,7 @@ export function OrganisationSettings({ ctx, state }: PrototypeProps): ReactEleme
           <p>Only an owner of {name} can request closure.</p>
         )}
       </section>
+      </div>
     </>
   );
 }

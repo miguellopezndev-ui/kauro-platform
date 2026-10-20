@@ -3,10 +3,10 @@
 // session runtime, api client and agency context (createShell), the real frame (ShellFrame) and the real gate (viewOf), over a page whose
 // network is the scenario's fixture fetch and whose navigation never leaves the review. A link of the frame that names another screen
 // opens that screen's review frame instead. Nothing here is imported by the product.
+import Link from "next/link";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { BrowserPage } from "@web/client/browser-session.ts";
 import type { SessionPhase } from "@web/client/session.ts";
-import { matchRoute } from "@web/screens.ts";
 import type { AgencyContext } from "@web/shell/agency-context.ts";
 import { type AnchorComponent, type AnchorProps, ShellFrame } from "@web/shell/frame.tsx";
 import { ShellContext } from "@web/shell/shell-context.ts";
@@ -14,7 +14,6 @@ import { createShell, type Shell } from "@web/shell/shell-runtime.ts";
 import { viewOf } from "@web/shell/view.ts";
 import { fixtureFetch, type ReviewCall, type Script } from "./fixture-fetch.ts";
 import { PRIVATE_IDS } from "./inventory.ts";
-import { viewerHref } from "./links.ts";
 
 const CHECKING: SessionPhase = { kind: "CHECKING" };
 const LOADING: AgencyContext = { kind: "LOADING" };
@@ -83,16 +82,14 @@ export function ReviewShell({ appPath, context, script, children }: ReviewShellP
   const phase = useStore(shell, sessionOf, CHECKING);
   const agency = useStore(shell, agencyOf, LOADING);
   const view = viewOf({ phase, agency, pathname: appPath, activeAgency: shell === null ? null : shell.session.activeAgency(), implemented: ALL_PRIVATE });
+  // the application's own links: the review serves every private path, so they are followed exactly as in the product
   const Anchor: AnchorComponent = useCallback(
-    ({ href, "aria-current": current, children: label }: AnchorProps) => {
-      const target = matchRoute(href)?.screen.id;
-      return (
-        <a href={target === undefined ? "#" : viewerHref(target, context)} target="_top" {...(current === undefined ? {} : { "aria-current": current })}>
-          {label}
-        </a>
-      );
-    },
-    [context],
+    ({ href, "aria-current": current, children: label }: AnchorProps) => (
+      <Link href={href} prefetch={false} {...(current === undefined ? {} : { "aria-current": current })}>
+        {label}
+      </Link>
+    ),
+    [],
   );
   const actions = {
     signOut: () => void shell?.session.signOut(),

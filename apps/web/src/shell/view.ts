@@ -80,7 +80,8 @@ export function viewOf(input: ShellInput): ShellView {
 
 function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellView {
   // the agency switcher is a screen of the application origin: an operations page (the owner, a seller) has no agency to switch (Order 11 D-03)
-  const switchHref = implemented.has("UI10") && originOfPath(input.pathname) !== "OPS" ? pathOf("UI10") : null;
+  const ops = originOfPath(input.pathname) === "OPS" || input.pathname === "/ops" || input.pathname.startsWith("/ops/");
+  const switchHref = implemented.has("UI10") && !ops ? pathOf("UI10") : null;
   const withPerson = { agency: null, navigation: [], switchHref, signOut: true } as const;
   // a client-side navigation that crossed into another agency (or out of one) is never drawn: the page waits for the hard navigation
   if (agencyOfPathname(input.pathname) !== input.activeAgency) return { gate: { kind: "WAIT", message: "shell.session.switching.body" }, ...withPerson };

@@ -8,7 +8,8 @@ import { IDS } from "./ids.ts";
 import { screenOf } from "./inventory.ts";
 import { PROTOTYPES } from "./prototypes.tsx";
 import { proposalOf } from "./proposals.ts";
-import { READ, readStates, type StateDef, withShared } from "./scenario.ts";
+import { NOT_MEMBER, PENDING, READ, type StateDef, UNAVAILABLE, withShared } from "./scenario.ts";
+import { agencyFor } from "./world.ts";
 
 export interface PrototypeProps {
   readonly ctx: ReviewContext;
@@ -24,7 +25,7 @@ export interface ScreenDef {
 const agencyOf = (ctx: ReviewContext): string => ctx.agency?.agencyId ?? (ctx.key === "company" ? COMPANY_ID : AGENCY_ID);
 
 /** The screen's address in the application for this person (the shell decides from it, exactly as in production). */
-export function appPathOf(id: string, ctx: ReviewContext): string {
+export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.project): string {
   const screen = screenOf(id);
   if (screen === undefined) throw new RangeError(id);
   const agencyId = agencyOf(ctx);
@@ -45,20 +46,27 @@ export function appPathOf(id: string, ctx: ReviewContext): string {
       return pathOf(id, { id: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7c01" });
     default: {
       if (screen.origin === "OPS") return pathOf(id);
-      return screen.route.includes("{id}") ? pathOf(id, { agencyId, id: IDS.project }) : pathOf(id, { agencyId });
+      return screen.route.includes("{id}") ? pathOf(id, { agencyId, id: project }) : pathOf(id, { agencyId });
     }
   }
 }
 
 const REAL: Readonly<Record<string, readonly StateDef[]>> = {
-  UI32: readStates({ GetAgency: (ctx) => READ(ctx.agency) }, [
+  UI32: [
+    { key: "normal", label: "Normal", note: "The settings as this person sees them: the closure is offered to an owner only." },
     {
       key: "closing",
       label: "Closure requested",
       note: "The agency asked to close: the page says so and offers nothing more.",
-      script: (ctx) => ({ GetAgency: READ(ctx.agency === null ? null : { ...ctx.agency, state: "CLOSING" }) }),
+      script: (ctx) => ({ GetAgency: (call) => {
+        const agency = agencyFor(ctx.key, call.params["agencyId"] ?? "");
+        return agency === null ? NOT_MEMBER : READ({ ...agency, state: "CLOSING" });
+      } }),
     },
-  ]),
+    { key: "loading", label: "Loading", note: "The agency has not been read yet: the shell holds the page and says so.", script: () => ({ GetAgency: PENDING }) },
+    { key: "error", label: "Recoverable error", note: "The agency could not be read for a moment: the page offers to try again.", script: () => ({ GetAgency: UNAVAILABLE }) },
+    { key: "denied", label: "Not a member", note: "A signed-in person who is not a member of this agency: the shell refuses before anything is read.", base: "AGENCY_REFUSED" },
+  ],
 };
 
 const PROTOTYPE_STATES: readonly StateDef[] = [{ key: "normal", label: "Normal", note: "The designed screen with synthetic data." }];

@@ -5,8 +5,9 @@
 import { type ChangeEvent, type ReactElement, useEffect, useState } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
 import { neighbours, type PrivateScreen, TECHNICAL_LABEL, type Review } from "./inventory.ts";
-import { BASE, frameHref, viewerHref } from "./links.ts";
-import { screenDef } from "./screens.tsx";
+
+import { REVIEW, stateHref, viewerHref } from "./links.ts";
+import { appPathOf, screenDef } from "./screens.tsx";
 
 const WIDTHS = [
   { key: "full", label: "Fit window" },
@@ -51,7 +52,7 @@ export function Viewer({ screen, review, context, state, width }: ViewerProps): 
 
   const go = (ctx: string, st: string, w: string): void => {
     const query = new URLSearchParams({ ctx, state: st, w });
-    window.location.assign(`${BASE}/screen/${screen.id}?${query.toString()}`);
+    window.location.assign(`${REVIEW}/screen/${screen.id}?${query.toString()}`);
   };
   const onTheme = (): void => {
     const next = dark === true ? "light" : "dark";
@@ -63,11 +64,12 @@ export function Viewer({ screen, review, context, state, width }: ViewerProps): 
     });
   };
   const stateDef = def.states.find((candidate) => candidate.key === state) ?? def.states[0];
+  const src = stateHref(appPathOf(screen.id, CONTEXTS[context]), context, stateDef?.key, screen.technical === "PROPOSED" ? screen.id : undefined);
 
   return (
     <div className="rv">
       <header className="rv-bar">
-        <a className="rv-home" href={BASE}>
+        <a className="rv-home" href={REVIEW}>
           ← All 42 screens
         </a>
         <nav className="rv-step" aria-label="Screens">
@@ -116,14 +118,14 @@ export function Viewer({ screen, review, context, state, width }: ViewerProps): 
         <button type="button" onClick={onTheme}>
           {dark === null ? "Theme" : dark ? "Light theme" : "Dark theme"}
         </button>
-        <a href={frameHref(screen.id, context, stateDef?.key)} target="_blank" rel="noreferrer">
+        <a href={src} target="_blank" rel="noreferrer">
           Open alone
         </a>
       </form>
       {stateDef === undefined ? null : <p className="rv-state-note">{stateDef.note}</p>}
       <div className="rv-body">
         <div className={`rv-stage rv-stage--${width}`}>
-          <iframe key={frameKey} className="rv-frame" title={`${screen.id} ${screen.title}`} src={frameHref(screen.id, context, stateDef?.key)} />
+          <iframe key={frameKey} className="rv-frame" title={`${screen.id} ${screen.title}`} src={src} />
         </div>
         <aside className="rv-side" aria-label="What this screen is">
           <h2>Contract (registry)</h2>
