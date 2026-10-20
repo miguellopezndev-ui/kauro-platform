@@ -27,12 +27,12 @@ export interface BillingViewProps {
 function Document({ document }: { readonly document: TaxDocumentView }): ReactElement {
   const issued = isIssuedDocument(document);
   return (
-    <li>
-      <h3>{issued ? message(`screen.billing.document.kind.${document.kind}`) : message("screen.billing.document.unissued.label")}</h3>
-      <p>
+    <li className="kauro-ledger-item">
+      <div className="kauro-ledger-item-head">
+        <h3>{issued ? message(`screen.billing.document.kind.${document.kind}`) : message("screen.billing.document.unissued.label")}</h3>
         <StatusBadge tone={issued ? "success" : "info"}>{message(`screen.billing.document.state.${document.state}`)}</StatusBadge>
-      </p>
-      <dl>
+      </div>
+      <dl className="kauro-ledger-facts">
         {issued ? <div><dt>{message("screen.billing.document.number.label")}</dt><dd><code>{document.legalNumber}</code></dd></div> : null}
         {document.issuedAt === undefined ? null : <div><dt>{message("screen.billing.document.issued.label")}</dt><dd><Deadline at={document.issuedAt} timeZone="UTC" /></dd></div>}
         <div><dt>{message("screen.billing.document.service.label")}</dt><dd><Money minor={document.serviceCents} currency="USD" /></dd></div>
@@ -45,16 +45,18 @@ function Document({ document }: { readonly document: TaxDocumentView }): ReactEl
 
 function Refund({ refund }: { readonly refund: RefundView }): ReactElement {
   return (
-    <li>
-      <h3>{message(`screen.billing.refund.state.${refund.state}`)}</h3>
-      <dl>
+    <li className="kauro-ledger-item">
+      <div className="kauro-ledger-item-head">
+        <h3>{message(`screen.billing.refund.state.${refund.state}`)}</h3>
+      </div>
+      <dl className="kauro-ledger-facts">
         <div><dt>{message("screen.billing.refund.service.label")}</dt><dd><Money minor={refund.serviceCents} currency="USD" /></dd></div>
         <div><dt>{message("screen.billing.refund.tax.label")}</dt><dd><Money minor={refund.taxCents} currency="USD" /></dd></div>
         <div><dt>{message("screen.billing.refund.reason.label")}</dt><dd>{refund.reasonCode}</dd></div>
         <div><dt>{message("screen.billing.refund.requested.label")}</dt><dd><Deadline at={refund.requestedAt} timeZone="UTC" /></dd></div>
       </dl>
-      <p>{message(`screen.billing.refund.basis.${refund.amountsBasis}`)}</p>
-      {refund.reviewRequired ? <p>{message("screen.billing.refund.review.body")}</p> : null}
+      <p className="kauro-ledger-note">{message(`screen.billing.refund.basis.${refund.amountsBasis}`)}</p>
+      {refund.reviewRequired ? <p className="kauro-ledger-note">{message("screen.billing.refund.review.body")}</p> : null}
     </li>
   );
 }
@@ -62,6 +64,7 @@ function Refund({ refund }: { readonly refund: RefundView }): ReactElement {
 function RefundForm({ form }: { readonly form: RefundFormProps }): ReactElement {
   return (
     <form
+      className="kauro-panel-form"
       aria-labelledby="billing-refund-form"
       onSubmit={(event) => {
         event.preventDefault();
@@ -98,26 +101,28 @@ export function BillingDetails({ agency, detail, refund, form }: BillingViewProp
   const { order } = detail;
   return (
     <div className="kauro-billing">
-      <p>{message("screen.billing.lead.body")}</p>
-      <section aria-labelledby="billing-order">
+      <p className="kauro-screen-lead">{message("screen.billing.lead.body")}</p>
+      <section className="kauro-ledger-head" aria-labelledby="billing-order">
         <h2 id="billing-order">{message("screen.billing.order.heading")}</h2>
         <dl>
-          <div><dt>{message("screen.billing.order.reference.label")}</dt><dd>{order.orderId}</dd></div>
-          <div><dt>{message("screen.billing.order.amount.label")}</dt><dd><Money minor={order.expectedAmountCents} currency={order.currency} /></dd></div>
-          <div><dt>{message("screen.billing.order.state.label")}</dt><dd>{message(`screen.payment.status.${order.paymentStatus}.label`)}</dd></div>
+          <div className="kauro-ledger-amount"><dt>{message("screen.billing.order.amount.label")}</dt><dd><Money minor={order.expectedAmountCents} currency={order.currency} /></dd></div>
+          <div><dt>{message("screen.billing.order.state.label")}</dt><dd><StatusBadge tone={order.paymentStatus === "CONFIRMED" ? "success" : order.paymentStatus === "FAILED" ? "danger" : "info"}>{message(`screen.payment.status.${order.paymentStatus}.label`)}</StatusBadge></dd></div>
+          <div><dt>{message("screen.billing.order.reference.label")}</dt><dd><code>{order.orderId}</code></dd></div>
         </dl>
-        <p>{message("screen.billing.order.amount.hint")}</p>
+        <p className="kauro-ledger-note">{message("screen.billing.order.amount.hint")}</p>
       </section>
-      <section aria-labelledby="billing-captures">
+      <section className="kauro-screen-section" aria-labelledby="billing-captures">
         <h2 id="billing-captures">{message("screen.billing.captures.heading")}</h2>
         {detail.captures.length === 0 ? (
           <p>{message("screen.billing.captures.none.body")}</p>
         ) : (
-          <ul>
+          <ul className="kauro-ledger-list">
             {detail.captures.map((capture) => (
-              <li key={capture.captureId}>
-                <h3>{message(`screen.billing.capture.status.${capture.status}`)}</h3>
-                <dl>
+              <li key={capture.captureId} className="kauro-ledger-item">
+                <div className="kauro-ledger-item-head">
+                  <h3>{message(`screen.billing.capture.status.${capture.status}`)}</h3>
+                </div>
+                <dl className="kauro-ledger-facts">
                   <div><dt>{message("screen.billing.capture.amount.label")}</dt><dd><Money minor={capture.amountCents} currency={capture.currency} /></dd></div>
                   <div><dt>{message("screen.billing.capture.service.label")}</dt><dd><Money minor={capture.allocated.serviceCents} currency={capture.currency} /></dd></div>
                   <div><dt>{message("screen.billing.capture.tax.label")}</dt><dd><Money minor={capture.allocated.taxCents} currency={capture.currency} /></dd></div>
@@ -129,24 +134,24 @@ export function BillingDetails({ agency, detail, refund, form }: BillingViewProp
           </ul>
         )}
       </section>
-      <section aria-labelledby="billing-documents">
+      <section className="kauro-screen-section" aria-labelledby="billing-documents">
         <h2 id="billing-documents">{message("screen.billing.documents.heading")}</h2>
         {detail.taxDocuments.length === 0 ? (
           <p>{message("screen.billing.documents.none.body")}</p>
         ) : (
-          <ul>
+          <ul className="kauro-ledger-list">
             {detail.taxDocuments.map((document) => (
               <Document key={document.documentId} document={document} />
             ))}
           </ul>
         )}
       </section>
-      <section aria-labelledby="billing-refunds">
+      <section className="kauro-screen-section" aria-labelledby="billing-refunds">
         <h2 id="billing-refunds">{message("screen.billing.refunds.heading")}</h2>
         {refund === null ? (
           <p>{message("screen.billing.refunds.none.body")}</p>
         ) : (
-          <ul>
+          <ul className="kauro-ledger-list">
             <Refund refund={refund} />
           </ul>
         )}

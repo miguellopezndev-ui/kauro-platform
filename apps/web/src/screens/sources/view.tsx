@@ -323,8 +323,8 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
   const name = table.name ?? message("screen.sources.selection.table.unnamed.body", { ordinal: table.ordinal + 1 });
   const editable = file.admitted && props.revision.permittedActions.includes("SelectInputTables");
   return (
-    <li className={`kauro-table${choice.include ? " kauro-table--included" : ""}`}>
-      <div className="kauro-table-head">
+    <li className={`kauro-source-table${choice.include ? " kauro-source-table--included" : ""}`}>
+      <div className="kauro-source-table-head">
         <h3>
           <span className="kauro-visually-hidden-text">{message("screen.sources.selection.table.heading")} </span>
           {safe(name)}
@@ -334,11 +334,11 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
           <>
             {" "}
             <StatusBadge tone="warning">{message("screen.sources.selection.formulas.present")}</StatusBadge>{" "}
-            <span className="kauro-table-note">{message("screen.sources.selection.formulas.cache", { cache: message(`screen.sources.selection.formulas.cache.${table.formulaCache}`) })}</span>
+            <span className="kauro-source-table-note">{message("screen.sources.selection.formulas.cache", { cache: message(`screen.sources.selection.formulas.cache.${table.formulaCache}`) })}</span>
           </>
         ) : null}
       </div>
-      <p className="kauro-table-meta">
+      <p className="kauro-source-table-meta">
         {message("screen.sources.selection.counts.line", {
           columns: table.columnCount,
           rows: table.rowEstimate ?? message("screen.sources.selection.counts.rows.unknown"),
@@ -356,7 +356,7 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
           ))}
         </ul>
       )}
-      <h4 className="kauro-table-columns-heading">{message("screen.sources.selection.columns.heading")}</h4>
+      <h4 className="kauro-source-table-columns-heading">{message("screen.sources.selection.columns.heading")}</h4>
       <ol className="kauro-columns">
         {table.columns.map((column) => (
           <li key={column.ordinal} className={column.labelState === "PRESENT" ? undefined : "kauro-column--flag"}>
@@ -365,19 +365,19 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
         ))}
       </ol>
       {editable ? (
-        <div className="kauro-table-choice">
-          <label className="kauro-table-include">
+        <div className="kauro-source-table-choice">
+          <label className="kauro-source-table-include">
             <input type="checkbox" checked={choice.include} onChange={(event) => props.onChange(table.tableId, { include: event.currentTarget.checked })} />
             {message("screen.sources.selection.include.label")}
           </label>
           {choice.include && table.visibility !== "VISIBLE" ? (
-            <label className="kauro-table-include">
+            <label className="kauro-source-table-include">
               <input type="checkbox" checked={choice.hiddenAcknowledged} onChange={(event) => props.onChange(table.tableId, { hiddenAcknowledged: event.currentTarget.checked })} />
               {message("screen.sources.selection.hidden.ack.label")}
             </label>
           ) : null}
           {choice.include ? null : (
-            <label className="kauro-table-reason">
+            <label className="kauro-source-table-reason">
               {message("screen.sources.selection.reason.label")}
               <select value={choice.reason} onChange={(event) => props.onChange(table.tableId, { reason: event.currentTarget.value })}>
                 <option value="">{message("screen.sources.selection.reason.choose")}</option>
@@ -421,7 +421,7 @@ export function SelectionView(props: SelectionViewProps): ReactElement {
             {safe(names.get(file.fileId) ?? file.fileId)}
           </h2>
           {file.admitted ? null : <p role="alert">{message("screen.sources.selection.file.rejected.body")}</p>}
-          <ul className="kauro-tables">
+          <ul className="kauro-source-tables">
             {file.tables.map((table) => (
               <TableRow key={table.tableId} file={file} table={table} choice={draft[table.tableId] ?? { include: false, reason: "", hiddenAcknowledged: false }} props={props} />
             ))}

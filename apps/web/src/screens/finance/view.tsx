@@ -2,7 +2,7 @@
 // route shows its state, versions and evidence hash and only the commands its state permits; the queue shows one state's page of credits or
 // the shared state of a refusal, never both. Neither ever names the bank's account or routing numbers: the owner's views do not carry them.
 import type { ReactElement } from "react";
-import { Button } from "@kauro/ui";
+import { Button, StatusBadge } from "@kauro/ui";
 import { message } from "../../copy/en.ts";
 import { StatePanel } from "../shared/state-panel.tsx";
 import { type BankCreditState, type BankCreditView, type BankRouteView, type QueueRead, QUEUE_STATES, type CreditCommand, type RouteCommand, creditRow, routeCommands } from "./model.ts";
@@ -16,25 +16,42 @@ export interface RouteSectionProps {
 
 export function RouteSection({ route, busy, onCommand }: RouteSectionProps): ReactElement {
   return (
-    <section aria-labelledby="finance-route-title" data-route={route.routeId}>
-      <h2 id="finance-route-title">{message("screen.finance.route.title")}</h2>
-      <dl>
-        <dt>{message("screen.finance.route.state.label")}</dt>
-        <dd data-route-state={route.state}>{message(`screen.finance.route.state.${route.state}`)}</dd>
-        <dt>{message("screen.finance.route.account.label")}</dt>
-        <dd>{route.accountRef}</dd>
-        <dt>{message("screen.finance.route.environment.label")}</dt>
-        <dd>{route.environment}</dd>
-        <dt>{message("screen.finance.route.version.label")}</dt>
-        <dd>{String(route.routeVersion)}</dd>
-        <dt>{message("screen.finance.route.hash.label")}</dt>
-        <dd>
-          <code>{route.detailsEvidenceHash}</code>
-        </dd>
-        <dt>{message("screen.finance.route.rollout.label")}</dt>
-        <dd>{route.rollout ?? message("screen.finance.route.rollout.none")}</dd>
+    <section className="kauro-ledger-item kauro-route" aria-labelledby="finance-route-title" data-route={route.routeId}>
+      <div className="kauro-ledger-item-head">
+        <h2 id="finance-route-title">{message("screen.finance.route.title")}</h2>
+        <StatusBadge tone={route.state === "ENABLED" ? "success" : route.state === "DISABLED" ? "neutral" : "warning"}>{message(`screen.finance.route.state.${route.state}`)}</StatusBadge>
+      </div>
+      <dl className="kauro-ledger-facts">
+        <div>
+          <dt>{message("screen.finance.route.state.label")}</dt>
+          <dd data-route-state={route.state}>{message(`screen.finance.route.state.${route.state}`)}</dd>
+        </div>
+        <div>
+          <dt>{message("screen.finance.route.account.label")}</dt>
+          <dd>
+            <code>{route.accountRef}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>{message("screen.finance.route.environment.label")}</dt>
+          <dd>{message(`screen.finance.route.environment.${route.environment}`)}</dd>
+        </div>
+        <div>
+          <dt>{message("screen.finance.route.rollout.label")}</dt>
+          <dd>{route.rollout === null ? message("screen.finance.route.rollout.none") : message(`screen.finance.route.rollout.${route.rollout}`)}</dd>
+        </div>
+        <div>
+          <dt>{message("screen.finance.route.version.label")}</dt>
+          <dd>{String(route.routeVersion)}</dd>
+        </div>
+        <div className="kauro-ledger-wide">
+          <dt>{message("screen.finance.route.hash.label")}</dt>
+          <dd>
+            <code className="kauro-hash">{route.detailsEvidenceHash}</code>
+          </dd>
+        </div>
       </dl>
-      <div>
+      <div className="kauro-actions">
         {routeCommands(route).map((command) => (
           <Button key={command} variant={command === "DISABLE" ? "secondary" : "primary"} disabled={busy} aria-busy={busy ? true : undefined} onClick={() => (busy ? undefined : onCommand(command))}>
             {message(`screen.finance.route.command.${command}`)}
@@ -55,9 +72,9 @@ export interface CreditQueueProps {
 
 export function CreditQueue({ state, read, onState, onMore, onOpen }: CreditQueueProps): ReactElement {
   return (
-    <section aria-labelledby="finance-queue-title">
+    <section className="kauro-screen-section" aria-labelledby="finance-queue-title">
       <h2 id="finance-queue-title">{message("screen.finance.queue.title")}</h2>
-      <label>
+      <label className="kauro-filter">
         {message("screen.finance.queue.state.label")}{" "}
         <select value={state} onChange={(event) => onState(event.currentTarget.value as BankCreditState)}>
           {QUEUE_STATES.map((option) => (
@@ -73,12 +90,13 @@ export function CreditQueue({ state, read, onState, onMore, onOpen }: CreditQueu
         <p>{message("screen.finance.queue.empty")}</p>
       ) : (
         <>
-          <table>
+          <div className="kauro-table-region">
+          <table className="kauro-table kauro-credits">
             <thead>
               <tr>
                 <th scope="col">{message("screen.finance.credit.transaction.label")}</th>
-                <th scope="col">{message("screen.finance.credit.gross.label")}</th>
-                <th scope="col">{message("screen.finance.credit.fee.label")}</th>
+                <th scope="col" className="kauro-table-end">{message("screen.finance.credit.gross.label")}</th>
+                <th scope="col" className="kauro-table-end">{message("screen.finance.credit.fee.label")}</th>
                 <th scope="col">{message("screen.finance.credit.rail.label")}</th>
                 <th scope="col">{message("screen.finance.credit.reference.label")}</th>
                 <th scope="col">{message("screen.finance.credit.action.label")}</th>
@@ -89,12 +107,14 @@ export function CreditQueue({ state, read, onState, onMore, onOpen }: CreditQueu
                 const row = creditRow(credit);
                 return (
                   <tr key={credit.creditId} data-credit={credit.creditId}>
-                    <td>{credit.bankTransactionId}</td>
-                    <td>{row.gross}</td>
-                    <td>{row.fee}</td>
-                    <td>{credit.rail}</td>
-                    <td>{credit.reference ?? message("screen.finance.credit.reference.none")}</td>
                     <td>
+                      <code>{credit.bankTransactionId}</code>
+                    </td>
+                    <td className="kauro-table-end">{row.gross}</td>
+                    <td className="kauro-table-end">{row.fee}</td>
+                    <td>{message(`screen.finance.credit.rail.${credit.rail}`)}</td>
+                    <td>{credit.reference === null ? <span className="kauro-muted-text">{message("screen.finance.credit.reference.none")}</span> : <code>{credit.reference}</code>}</td>
+                    <td className="kauro-table-actions">
                       {row.commands.length === 0 ? (
                         <Button onClick={() => onOpen(credit, null)}>{message("screen.finance.credit.open.cta")}</Button>
                       ) : (
@@ -110,6 +130,7 @@ export function CreditQueue({ state, read, onState, onMore, onOpen }: CreditQueu
               })}
             </tbody>
           </table>
+          </div>
           {read.nextCursor === null ? null : (
             <Button onClick={() => (read.nextCursor === null ? undefined : onMore(read.nextCursor))}>{message("screen.finance.queue.more")}</Button>
           )}

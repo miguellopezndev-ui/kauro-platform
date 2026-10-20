@@ -263,7 +263,7 @@
   overflow-wrap: anywhere;
 }
 
-.kauro-main .kauro-tables {
+.kauro-main .kauro-source-tables {
   display: grid;
   gap: var(--kauro-space-3);
   margin: 0;
@@ -271,7 +271,7 @@
   list-style: none;
 }
 
-.kauro-main .kauro-table {
+.kauro-main .kauro-source-table {
   display: grid;
   gap: var(--kauro-space-3);
   max-inline-size: none;
@@ -281,38 +281,38 @@
   background: var(--kauro-color-raised);
 }
 
-.kauro-main .kauro-table--included {
+.kauro-main .kauro-source-table--included {
   box-shadow: inset 3px 0 0 var(--kauro-color-primary);
 }
 
-.kauro-table-head {
+.kauro-source-table-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--kauro-space-2) var(--kauro-space-3);
 }
 
-.kauro-main .kauro-table-head h3 {
+.kauro-main .kauro-source-table-head h3 {
   flex: 1 1 10rem;
   margin: 0;
   font-size: 1.0625rem;
   overflow-wrap: anywhere;
 }
 
-.kauro-table-note {
+.kauro-source-table-note {
   flex-basis: 100%;
   color: var(--kauro-color-warning-text);
   font-size: var(--kauro-font-size-dense);
 }
 
-.kauro-main .kauro-table-meta {
+.kauro-main .kauro-source-table-meta {
   margin: 0;
   color: var(--kauro-color-text-muted);
   font-size: var(--kauro-font-size-dense);
   font-variant-numeric: tabular-nums;
 }
 
-.kauro-main .kauro-table-columns-heading {
+.kauro-main .kauro-source-table-columns-heading {
   margin: 0;
   color: var(--kauro-color-text-muted);
   font-family: var(--kauro-font-family);
@@ -353,7 +353,7 @@
   background: var(--kauro-color-warning-surface);
 }
 
-.kauro-table-choice {
+.kauro-source-table-choice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -362,7 +362,7 @@
   border-block-start: 1px solid var(--kauro-color-border);
 }
 
-.kauro-table-include {
+.kauro-source-table-include {
   display: inline-flex;
   align-items: center;
   gap: var(--kauro-space-2);
@@ -371,14 +371,14 @@
   cursor: pointer;
 }
 
-.kauro-table-include input {
+.kauro-source-table-include input {
   inline-size: 1.25rem;
   block-size: 1.25rem;
   margin: 0;
   accent-color: var(--kauro-color-primary);
 }
 
-.kauro-table-reason {
+.kauro-source-table-reason {
   display: grid;
   gap: var(--kauro-space-1);
   min-inline-size: min(100%, 18rem);
@@ -386,7 +386,7 @@
   font-weight: 600;
 }
 
-.kauro-table-reason select {
+.kauro-source-table-reason select {
   min-block-size: 2.75rem;
   max-inline-size: 100%;
 }
@@ -502,10 +502,10 @@
 }
 
 /* a list of cards takes the column it is given, never the width of its widest card */
-.kauro-main :is(.kauro-files, .kauro-tables, .kauro-seal-tables) {
+.kauro-main :is(.kauro-files, .kauro-source-tables, .kauro-seal-tables) {
   grid-template-columns: minmax(0, 1fr);
 }
-.kauro-main :is(.kauro-file, .kauro-table, .kauro-seal-tables li) {
+.kauro-main :is(.kauro-file, .kauro-source-table, .kauro-seal-tables li) {
   box-sizing: border-box;
   min-inline-size: 0;
 }
@@ -944,4 +944,254 @@
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* ---- ledgers (UI30 billing, and the operations' money screens): a head with the amount, then one card a line with its facts in a grid */
+
+.kauro-main .kauro-ledger-head {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+
+.kauro-main .kauro-ledger-head h2 {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kauro-main .kauro-ledger-head dl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--kauro-space-3) var(--kauro-space-7);
+  margin: 0;
+}
+
+.kauro-main .kauro-ledger-head dl > div,
+.kauro-main .kauro-ledger-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+
+.kauro-main :is(.kauro-ledger-head, .kauro-ledger-facts) dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kauro-main :is(.kauro-ledger-head, .kauro-ledger-facts) dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.kauro-main .kauro-ledger-amount dd {
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.625rem, 1.3rem + 1vw, 2.125rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.kauro-main .kauro-ledger-head code {
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-ledger-note {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-ledger-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kauro-main .kauro-ledger-item {
+  display: grid;
+  gap: var(--kauro-space-3);
+  box-sizing: border-box;
+  min-inline-size: 0;
+  max-inline-size: none;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+
+.kauro-ledger-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-3);
+}
+
+.kauro-main .kauro-ledger-item-head h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.kauro-main .kauro-ledger-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin: 0;
+  padding-block-start: var(--kauro-space-3);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+
+.kauro-main .kauro-ledger-facts code {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* a form inside a page's work: one panel, its fields stacked, its one action at the foot */
+.kauro-main .kauro-panel-form {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  margin-block-start: var(--kauro-space-4);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+
+.kauro-main .kauro-panel-form > :is(h3, p) {
+  margin: 0;
+}
+
+.kauro-main .kauro-panel-form label {
+  display: grid;
+  gap: var(--kauro-space-1);
+  font-weight: 600;
+}
+
+.kauro-main .kauro-panel-form :is(input[type="text"], textarea, select) {
+  box-sizing: border-box;
+  inline-size: 100%;
+  font-weight: 400;
+}
+
+.kauro-main .kauro-panel-form textarea {
+  min-block-size: 7rem;
+}
+
+.kauro-main .kauro-panel-form > .kauro-button {
+  justify-self: start;
+}
+
+/* ---- UI52 support cases: each case headed by its own words, its facts under them ---------------------------------------------- */
+
+.kauro-main .kauro-case-summary {
+  flex: 1 1 18rem;
+  min-inline-size: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.kauro-main .kauro-case > :is(h2, h3, p) {
+  margin: 0;
+}
+
+.kauro-main .kauro-case h3 {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.kauro-main .kauro-case-text {
+  font-size: 1.0625rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- UI39 company finance: the route as one card, the credits as the design system's table ---------------------------------------- */
+
+.kauro-main .kauro-route {
+  margin-block-end: var(--kauro-space-6);
+}
+
+.kauro-main .kauro-route h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.kauro-main .kauro-ledger-wide {
+  grid-column: 1 / -1;
+}
+
+.kauro-main .kauro-hash {
+  font-size: 0.75rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.kauro-main .kauro-route .kauro-actions {
+  margin: 0;
+}
+
+.kauro-filter {
+  display: inline-grid;
+  gap: var(--kauro-space-1);
+  margin-block-end: var(--kauro-space-4);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+
+.kauro-filter select {
+  min-block-size: 2.75rem;
+  min-inline-size: 14rem;
+  font-weight: 400;
+}
+
+.kauro-main .kauro-table-region {
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+
+.kauro-main .kauro-table {
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-main .kauro-table tbody tr:last-child :is(th, td) {
+  border-block-end: 0;
+}
+
+.kauro-main .kauro-table tbody tr:hover {
+  background: color-mix(in srgb, var(--kauro-color-primary) 4%, transparent);
+}
+
+.kauro-main .kauro-table code {
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.kauro-main .kauro-table .kauro-table-actions {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.kauro-muted-text {
+  color: var(--kauro-color-text-muted);
 }
