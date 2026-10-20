@@ -1852,3 +1852,356 @@ fieldset.kauro-notice-form {
 .kauro-main .kauro-table thead th.kauro-table-end {
   white-space: nowrap;
 }
+
+/* ===== UI26 Delivery: the package as one verified version, its files, the way to download ===== */
+.kauro-main .kauro-package {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-success-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-package > * {
+  margin: 0;
+}
+.kauro-package-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-package-head :is(h2, p) {
+  margin: 0;
+}
+.kauro-main .kauro-package-head .kauro-stamp {
+  transform: rotate(-4deg);
+}
+.kauro-package-checks {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-package-checks li {
+  position: relative;
+  max-inline-size: 60rem;
+  padding-inline-start: 1.75rem;
+}
+.kauro-package-checks li::before {
+  content: "\2713";
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--kauro-color-success-text);
+  font-weight: 700;
+}
+.kauro-main .kauro-package-deadline {
+  display: grid;
+  gap: 0.125rem;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+}
+.kauro-package-deadline span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-package-files th[scope="row"] {
+  font-weight: 400;
+}
+.kauro-package-name {
+  display: block;
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.kauro-package-role {
+  display: block;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-package-pick {
+  inline-size: 2.5rem;
+}
+.kauro-package-pick input {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--kauro-color-primary);
+}
+.kauro-main .kauro-package-files td code {
+  white-space: nowrap;
+}
+.kauro-main .kauro-links-issued {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-links-issued > * {
+  margin: 0;
+}
+.kauro-links-issued ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-links-issued li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  padding-block-end: var(--kauro-space-2);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-links-issued li a {
+  font-weight: 600;
+}
+.kauro-links-issued li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-links-issued > .kauro-button {
+  justify-self: start;
+}
+.kauro-main .kauro-approve + .kauro-next,
+.kauro-main .kauro-links-issued + .kauro-next {
+  margin-block-start: var(--kauro-space-7);
+}
+
+/* ===== UI27 Import steps: the prerequisite, then the stages in order ===== */
+.kauro-main .kauro-import-before {
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-import-before h2 {
+  margin: 0 0 var(--kauro-space-3);
+}
+.kauro-main .kauro-import-before ul {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-import-stages {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-import-stage {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-import-stage > * {
+  margin: 0;
+}
+.kauro-import-stage--released,
+.kauro-import-stage--waiting {
+  border-color: var(--kauro-color-primary);
+  box-shadow: inset 4px 0 0 var(--kauro-color-primary);
+}
+.kauro-main .kauro-import-stage--locked {
+  background: transparent;
+  border-style: dashed;
+}
+.kauro-import-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+}
+.kauro-main .kauro-import-stage-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-import-stage-number {
+  margin-inline-end: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.kauro-import-stage-state {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-import-stage--released .kauro-import-stage-state {
+  color: var(--kauro-color-primary);
+}
+.kauro-import-stage--waiting .kauro-import-stage-state {
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-import-stage--verified .kauro-import-stage-state {
+  color: var(--kauro-color-success-text);
+}
+.kauro-import-stage--locked .kauro-import-stage-state,
+.kauro-import-stage--locked h2 {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-import-stage-file {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-import-stage-file code {
+  color: var(--kauro-color-text);
+}
+.kauro-main .kauro-import-stage-settings {
+  padding-inline-start: 1.125rem;
+}
+.kauro-main .kauro-import-stage .kauro-actions {
+  align-items: center;
+}
+
+/* ===== UI28 Import results: prepared beside what HubSpot holds ===== */
+.kauro-main .kauro-result-stage {
+  margin: 0 0 var(--kauro-space-5);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-result-stage strong {
+  color: var(--kauro-color-text);
+}
+.kauro-result-counts > .is-good {
+  border-block-start: 3px solid var(--kauro-color-success-text);
+}
+.kauro-result-counts > .is-bad {
+  border-block-start: 3px solid var(--kauro-color-danger-text);
+}
+.kauro-main .kauro-result-counts + .kauro-approved {
+  margin-block-start: 0;
+}
+
+/* ===== UI29 Data lifecycle: each kind of data, its date, its state ===== */
+.kauro-main .kauro-lifecycle th[scope="row"] {
+  font-weight: 400;
+}
+.kauro-lifecycle-what {
+  display: block;
+  font-weight: 600;
+}
+.kauro-lifecycle-holds,
+.kauro-lifecycle-rule {
+  display: block;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-lifecycle-actions {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: var(--kauro-space-6) 0;
+  padding: 0;
+  border: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-lifecycle-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-lifecycle-card {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-lifecycle-card > * {
+  margin: 0;
+}
+.kauro-main .kauro-lifecycle-card h2 {
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-lifecycle-card .kauro-actions {
+  margin: 0;
+}
+
+/* on a phone, the package and lifecycle tables are cards: each value under its column's name */
+@media (max-width: 47.99rem) {
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle),
+  :is(.kauro-package-files, .kauro-lifecycle) tbody,
+  :is(.kauro-package-files, .kauro-lifecycle) :is(th, td) {
+    display: block;
+  }
+  :is(.kauro-package-files, .kauro-lifecycle) thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  :is(.kauro-package-files, .kauro-lifecycle) tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--kauro-space-2) var(--kauro-space-3);
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle) tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle) :is(th, td) {
+    padding: 0;
+    border: 0;
+    text-align: start;
+  }
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle) :is(th, td):not(.kauro-package-pick) {
+    grid-column: 2;
+  }
+  .kauro-main .kauro-package-files .kauro-package-pick {
+    grid-row: 1;
+    inline-size: auto;
+  }
+  .kauro-main .kauro-lifecycle :is(th, td) {
+    grid-column: 1 / -1;
+  }
+  :is(.kauro-package-files, .kauro-lifecycle) td[data-label]::before {
+    content: attr(data-label) " ";
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .kauro-lifecycle td[data-label]::before {
+    display: block;
+  }
+}
+
+/* an action section after a table section keeps its distance */
+.kauro-main .kauro-screen-section + :is(.kauro-approve, .kauro-links-issued) {
+  margin-block-start: var(--kauro-space-6);
+}
+
+/* the state of a kind of data is one word, never broken */
+.kauro-main .kauro-lifecycle td:last-child {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+
+.kauro-result-stage code {
+  white-space: nowrap;
+}
+@media (max-width: 47.99rem) {
+  .kauro-lifecycle tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

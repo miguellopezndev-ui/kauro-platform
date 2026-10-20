@@ -18,6 +18,10 @@ import { Mapping, UI19_STATES } from "../prototypes/ui19-mapping.tsx";
 import { Identity, UI20_STATES } from "../prototypes/ui20-identity.tsx";
 import { Relationships, UI21_STATES } from "../prototypes/ui21-relationships.tsx";
 import { Approval, UI22_STATES } from "../prototypes/ui22-approval.tsx";
+import { Delivery, UI26_STATES } from "../prototypes/ui26-delivery.tsx";
+import { ImportSteps, UI27_STATES } from "../prototypes/ui27-import.tsx";
+import { ImportResults, UI28_STATES } from "../prototypes/ui28-results.tsx";
+import { Lifecycle, UI29_STATES } from "../prototypes/ui29-lifecycle.tsx";
 import { P01_STATES, PersonalSettings } from "../prototypes/p01-personal.tsx";
 import { OrganisationSettings, P02_STATES } from "../prototypes/p02-organisation.tsx";
 import { P03_STATES, SellerSettings } from "../prototypes/p03-seller.tsx";
@@ -45,6 +49,10 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   UI20: { Component: Identity, states: UI20_STATES },
   UI21: { Component: Relationships, states: UI21_STATES },
   UI22: { Component: Approval, states: UI22_STATES, contexts: ["agency", "company", "operator"] },
+  UI26: { Component: Delivery, states: UI26_STATES },
+  UI27: { Component: ImportSteps, states: UI27_STATES },
+  UI28: { Component: ImportResults, states: UI28_STATES },
+  UI29: { Component: Lifecycle, states: UI29_STATES, contexts: ["agency", "company", "operator"] },
   UI13: { Component: Overview, states: UI13_STATES, contexts: ["agency", "company", "admin", "operator", "newcomer"] },
   "P-01": { Component: PersonalSettings, states: P01_STATES, contexts: ["agency", "company", "operator"] },
   "P-02": { Component: OrganisationSettings, states: P02_STATES, contexts: ["agency", "company", "admin", "operator"] },
