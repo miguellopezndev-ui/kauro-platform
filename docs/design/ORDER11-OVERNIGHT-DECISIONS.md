@@ -53,6 +53,8 @@ which cites ToS §8 to §11 and PV1 §5), and the api's own views (`apps/web/src
 | N-24 | The review refuses finance reads to anyone but the owner, as the server does; the page then shows one refusal and no credit queue. | A seller saw the bank route with "Disable the route" and "Replace the bank details" because the review answered every person alike; the real page then drew the refusal twice beside an unusable filter. | — |
 | N-25 | The audit now flags text squeezed letter by letter (a box under 48 px wide, more than three lines tall). | The Finance defect passed every automated check: nothing overflowed and nothing was cut. Human inspection found it; the check keeps it from coming back. | Remove the check. |
 | N-40 | Incidents with none open: the closed incident links its affected jobs ("See the jobs"). | The page offered no action, and the keyboard check found nothing to reach in its main area; the jobs are where the delayed checks can be seen. | Remove the link. |
+| N-41 | Fields (UI19) are cards until the four columns fit beside the menu (under 72rem); the table from 1152 px. | At 768 px the change column was squeezed; at 1024 px a column was pushed out of sight inside the table's frame. The cards already served phones; a table that hides a column is worse than cards. | Restore the 48rem breakpoint. |
+| N-42 | The audits now also flag a sentence poured into a narrow strip, text with links included, and content hidden in an inner sideways scroll. | Each escaped the earlier checks and was found by eye (the contact authorisation, Fields at 1024 px); the checks keep them from returning. | — |
 
 ## Across groups
 

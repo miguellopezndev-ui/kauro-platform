@@ -125,6 +125,8 @@
 | D-27 | apps/web/src/screens/shared/project-header.tsx; prototypes/ui29-lifecycle.tsx, p08-activity.tsx | Data and deletion passed for step 6 of 6; Activity had no project header. | Both name their area and where the project stands; a test covers the header. |
 | D-28 | apps/web/src/screens/support/view.tsx, copy/screens/support.ts; lib/fixtures/account-states.ts | Support alone wrote times in Bogotá time; its hours were never stated; the review case was due outside them. | UTC; the hours in both zones; the case due at 10:00 Bogotá. |
 | D-29 | prototypes/p05-sign-up.tsx, p06-reset.tsx | The email code was promised as six digits, a property of an identity provider not yet chosen. | "A code". |
+| D-30 | tools/review/private/prototypes/ui42-incidents.tsx | With no incident open, the page had nothing a keyboard could reach in its main area. | The closed incident links its affected jobs. |
+| D-31 | tools/review/private/prototypes/pages.css (UI19) | At 768 px the change column of Fields was squeezed into a strip; at 1024 px the Affects column sat out of sight in the table's frame. | Cards until 72rem; the table fits from 1152 px. |
 
 ## Findings for the owner (not changed here)
 

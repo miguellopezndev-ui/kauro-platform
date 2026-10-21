@@ -71,14 +71,17 @@ findings in the review log (D-04, D-UI09-2, D-UI11-1, D-P01-4, D-P03-1).
 Automated, on the final build, every screen in every state and person at 320, 375, 768, 1280 and 1440 px in both themes (status, console
 errors, outside requests, overflow, text cut or squeezed, one h1, axe WCAG 2.2 AA at 375 and 1280, reduced motion, keyboard):
 
-| Group | Screens | Cases | Issues |
+| Group | Screens and proposals | Cases | Issues |
 | --- | --- | --- | --- |
 | A | 10 | 1,120 | 0 (10 expected by design) |
-| B | see the overnight report | | |
-| C | | | |
-| D | | | |
-| E | | | |
-| Public variants | 3 to 6 | 30+ | 0 |
+| B | 20 | 2,180 | 0 |
+| C | 4 | 450 | 0 |
+| D | 7 | 370 | 0 |
+| E | 10 | 450 | 0 |
+| Public variants | 5 | 50 | 0 |
+
+Motion and keyboard checks: none failing. The checks grew during the night (text squeezed letter by letter or poured into a strip, content
+hidden in an inner sideways scroll), each after a defect the eye found and the audit had missed; the figures above are with all of them.
 
 Human inspection: every page at 1280 and 375 px, light and dark, recorded with the corrections in the review log. Tests: web 336, design
 system 60, review inventory 2, review type-check clean.
