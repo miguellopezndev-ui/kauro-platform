@@ -9900,3 +9900,179 @@ body:has(> .kauro-site-header) {
     font-size: 0.8125rem;
   }
 }
+
+/* ==== Order 11 round 2: the header =====================================================================================================
+   As the B2B headers measured compose it (Linear, Stripe, Attio, Resend, Vercel, Mercury; 31 of 31 show their pages in one line on a wide
+   screen, 30 of 31 end in one filled button): the name, then the main pages beside it; on the right "Sign in" as a quiet link and the one
+   call to action. From 75rem the pages are in one line and there is no menu; from 48rem to 75rem "Sign in" and the button stay, the pages
+   go in the menu; under 48rem the header is the name and the menu, which then also carries "Sign in" and the button. 64 px tall, opaque. */
+.kauro-site-header {
+  background: var(--kauro-color-background);
+  backdrop-filter: none;
+}
+.kauro-site-header .kauro-site-header-inner {
+  flex-wrap: nowrap;
+  column-gap: var(--kauro-space-6);
+  min-block-size: 4rem;
+  padding-block: 0;
+}
+.kauro-site-header .kauro-site-brand {
+  flex: none;
+  font-size: 1.375rem;
+}
+.kauro-site-header-nav {
+  display: none;
+}
+.kauro-site-header .kauro-site-header-actions {
+  order: 3;
+  flex: none;
+  gap: var(--kauro-space-3);
+  margin-inline-start: auto;
+}
+.kauro-site-header .kauro-site-signin {
+  display: none;
+  min-block-size: 2.5rem;
+  padding-inline: var(--kauro-space-3);
+  border-color: transparent;
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
+.kauro-site-header .kauro-site-signin:hover {
+  border-color: transparent;
+  background: var(--kauro-color-surface);
+}
+.kauro-site-header .kauro-site-header-cta {
+  display: none;
+  min-block-size: 2.5rem;
+  padding: 0 var(--kauro-space-4);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.kauro-site-header .kauro-site-menu {
+  order: 0;
+  margin-inline-start: 0;
+}
+.kauro-site-header .kauro-site-menu-toggle {
+  min-block-size: 2.5rem;
+}
+/* the call to action and "Sign in" inside the menu, on a phone only */
+.kauro-site-menu-actions {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin-block-start: var(--kauro-space-2);
+  padding: var(--kauro-space-3) 0.375rem 0.25rem;
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-menu-actions .kauro-site-button {
+  justify-content: center;
+  inline-size: 100%;
+  white-space: normal;
+}
+.kauro-site-menu-signin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 2.75rem;
+  border-radius: 0.5rem;
+  color: var(--kauro-color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.kauro-site-menu-signin:hover {
+  background: var(--kauro-color-raised);
+}
+@media (min-width: 48rem) {
+  .kauro-site-header .kauro-site-signin,
+  .kauro-site-header .kauro-site-header-cta {
+    display: inline-flex;
+  }
+  .kauro-site-menu-actions {
+    display: none;
+  }
+}
+@media (min-width: 75rem) {
+  .kauro-site-header .kauro-site-menu {
+    display: none;
+  }
+  .kauro-site-header-nav {
+    display: flex;
+    order: 2;
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list {
+    gap: var(--kauro-space-1);
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list a,
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list li:first-child a {
+    min-block-size: 4rem;
+    padding-inline: var(--kauro-space-3);
+    color: var(--kauro-color-text-muted);
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list a:hover {
+    color: var(--kauro-color-text);
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list a[aria-current="page"] {
+    color: var(--kauro-color-text);
+    font-weight: 600;
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list a[aria-current="page"]::after,
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list li:first-child a[aria-current="page"]::after {
+    inset-inline: var(--kauro-space-3);
+    inset-block-end: -1px;
+  }
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav-list a:focus-visible {
+    outline-offset: -4px;
+  }
+}
+
+/* the footer's last row: the one-line limit of what Kauro does, and the theme control beside it */
+.kauro-site-footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+}
+.kauro-site-footer-row .kauro-site-theme button {
+  border-color: var(--kauro-color-border);
+}
+/* the pages sit beside the name, not floated in the middle; the menu button is outlined, so the call to action stays the one filled button */
+@media (min-width: 75rem) {
+  .kauro-site-header .kauro-site-header-nav .kauro-site-nav {
+    display: flex;
+    justify-content: flex-start;
+  }
+}
+.kauro-site-header .kauro-site-menu-toggle {
+  border: 1px solid var(--kauro-color-control-border);
+  background: transparent;
+  color: var(--kauro-color-text);
+}
+.kauro-site-header .kauro-site-menu-toggle:hover {
+  background: var(--kauro-color-surface);
+}
+.kauro-site-header .kauro-site-menu[open] .kauro-site-menu-toggle {
+  border-color: var(--kauro-color-text);
+  background: var(--kauro-color-text);
+  color: var(--kauro-color-background);
+}
+/* each link of the form's error summary is a target of at least 24 px (WCAG 2.5.8), however short its words */
+.kauro-site-panel--summary .kauro-site-list {
+  display: grid;
+  gap: var(--kauro-space-1);
+}
+.kauro-site-panel--summary .kauro-site-list a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 1.75rem;
+}

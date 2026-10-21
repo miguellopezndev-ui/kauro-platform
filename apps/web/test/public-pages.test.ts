@@ -39,7 +39,7 @@ import { NavList, SiteFrame } from "../src/public/frame.tsx";
 import { BANDS, bandIndexOf, formatCount, formatUsd, priceOf } from "../src/public/pricing-bands.ts";
 import { RETENTION_ROWS } from "../src/public/retention.ts";
 import { MANIFEST_FILES, SAMPLE, SAMPLE_GROUPS, SAMPLE_MODE } from "../src/public/sample-data.ts";
-import { FOOTER_NAV, MAIN_NAV, ROUTE, SITE_PAGES, type PageKey } from "../src/public/site.ts";
+import { FOOTER_NAV, HEADER_NAV, ROUTE, SITE_PAGES, type PageKey } from "../src/public/site.ts";
 import { registryScreens } from "./support/registry.ts";
 
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -656,7 +656,7 @@ function walk(directory: string): string[] {
 
 test("the frame: the skip link is first, one header, one main, one footer, two named navigations, the current page marked once, and a sign-in link", () => {
   const frame = (current: string | null): string =>
-    render(createElement(SiteFrame, { signInHref: SIGN_IN, nav: createElement(NavList, { items: MAIN_NAV, current, label: "site.nav.main.label" }), children: createElement("p", null, "Body") }));
+    render(createElement(SiteFrame, { signInHref: SIGN_IN, nav: createElement(NavList, { items: HEADER_NAV, current, label: "site.nav.main.label" }), children: createElement("p", null, "Body") }));
   const html = frame("/pricing");
   assert.match(html, /^<a class="kauro-site-skip" href="#kauro-main">Skip to main content<\/a>/);
   assert.equal(count(html, "<header"), 1);
@@ -668,7 +668,7 @@ test("the frame: the skip link is first, one header, one main, one footer, two n
   assert.match(html, /<a[^>]*href="\/pricing"[^>]*aria-current="page"[^>]*>Pricing<\/a>|<a[^>]*aria-current="page"[^>]*href="\/pricing"[^>]*>Pricing<\/a>/);
   assert.equal(count(frame(null), 'aria-current="page"'), 0);
   assert.equal(count(frame("/unsubscribe/anything"), 'aria-current="page"'), 0, "a page outside the navigation marks nothing");
-  assert.deepEqual(linkTexts(html).map((link) => link.text), ["Skip to main content", "Kauro", ...MAIN_NAV.map((item) => textOf(PUBLIC_COPY[item.label])), "Sign in", ...FOOTER_NAV.map((item) => PUBLIC_COPY[item.label])]);
+  assert.deepEqual(linkTexts(html).map((link) => link.text), ["Skip to main content", "Kauro", ...HEADER_NAV.map((item) => textOf(PUBLIC_COPY[item.label])), "Sign in", ...FOOTER_NAV.map((item) => PUBLIC_COPY[item.label])]);
   assert.deepEqual(linkTexts(html).filter((link) => link.text === "Sign in").map((link) => link.href), [SIGN_IN]);
   assert.match(textOf(html), /Kauro prepares exported CRM files\. It does not connect to, change or delete records in a live CRM\./);
   assert.doesNotMatch(html, /<html|<body|<head[ >]/, "the frame renders inside the document the root layout draws");

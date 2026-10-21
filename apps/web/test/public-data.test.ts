@@ -12,7 +12,7 @@ import { PUBLIC_COPY, placeholdersOf } from "../src/copy/public.ts";
 import { GUIDES_CHANGED, GUIDES_VERSION, guideText, guides } from "../src/public/guides.ts";
 import { INPUT_LIMITS, formatBytes } from "../src/public/limits.ts";
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_GROUPS, sharePercent } from "../src/public/sample-data.ts";
-import { FOOTER_NAV, MAIN_NAV, ROUTE, SITE_PAGES, pageMetadata } from "../src/public/site.ts";
+import { FOOTER_NAV, HEADER_NAV, MAIN_NAV, ROUTE, SITE_PAGES, pageMetadata } from "../src/public/site.ts";
 import { signInUrl } from "../src/server/public-origins.ts";
 import { registryScreens } from "./support/registry.ts";
 
@@ -93,15 +93,17 @@ test("the route table is the registry's: every public screen this package owns i
 
 test("the navigation names only routes of the public site, each once, in the order a buyer reads them, with a label in the catalogue", () => {
   const routes = new Set<string>(Object.values(ROUTE));
-  const items = [...MAIN_NAV, ...FOOTER_NAV];
+  // the header and the footer never repeat a page; the narrow-screen menu is the header plus Help and Contact (Order 11 round 2)
+  const items = [...HEADER_NAV, ...FOOTER_NAV];
   assert.equal(new Set(items.map((item) => item.href)).size, items.length, "no route is listed twice");
   for (const item of items) {
     assert.ok(routes.has(item.href), item.href);
     assert.ok(item.label in PUBLIC_COPY, item.label);
-    assert.match(item.label, /^nav\.[a-z]+\.label$/);
+    assert.match(item.label, /^nav\.[a-z]+(\.[a-z]+)?\.label$/);
   }
-  assert.deepEqual(MAIN_NAV.map((item) => item.href), ["/", "/how-it-works", "/supported-services", "/pricing", "/sample-delivery", "/security", "/help", "/contact"]);
-  assert.deepEqual(FOOTER_NAV.map((item) => item.href), ["/status", "/legal/terms", "/legal/privacy", "/legal/data-processing"]);
+  assert.deepEqual(HEADER_NAV.map((item) => item.href), ["/how-it-works", "/supported-services", "/pricing", "/sample-delivery", "/security"]);
+  assert.deepEqual(MAIN_NAV.map((item) => item.href), [...HEADER_NAV.map((item) => item.href), "/help", "/contact"]);
+  assert.deepEqual(FOOTER_NAV.map((item) => item.href), ["/help", "/contact", "/status", "/legal/terms", "/legal/privacy", "/legal/data-processing"]);
 });
 
 test("each page's metadata is its own title and description, from the catalogue", () => {

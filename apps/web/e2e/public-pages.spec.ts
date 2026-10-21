@@ -265,11 +265,13 @@ test("theme preference: the route stores a choice only for a page of this exact 
 
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
   await page.goto("/pricing");
-  // the main navigation is folded into the header's menu (amendment A10): open it, as a visitor does
-  await page.locator(".kauro-site-menu summary").click();
+  // on a wide screen the main pages are in the header's line and the menu is not drawn (Order 11 round 2): one "Main" navigation is visible
+  await expect(page.locator(".kauro-site-menu")).toBeHidden();
   const main = page.getByRole("navigation", { name: "Main" });
+  await expect(main).toHaveCount(1);
   await expect(main.locator('a[aria-current="page"]')).toHaveText("Pricing");
   await expect(main.locator('a[aria-current="page"]')).toHaveCount(1);
+  await expect(page.locator("header .kauro-site-header-cta")).toHaveAttribute("href", "/contact");
   const hrefs = await page.locator("header a, footer a").evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).getAttribute("href") ?? ""));
   expect(hrefs.length).toBeGreaterThan(8);
   for (const href of new Set(hrefs.filter((value) => value.startsWith("/") && value !== "/login"))) {

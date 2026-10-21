@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { PUBLIC_COPY } from "../../copy/public.ts";
 import { SiteFrame } from "../../public/frame.tsx";
 import { signInAddress } from "../../server/config/site-origins.ts";
-import { MainNav } from "./main-nav.tsx";
+import { HeaderCta, HeaderNav, MainNav } from "./main-nav.tsx";
 import { SiteThemeControl } from "./theme-control.tsx";
 
 // The frame of every page of the public origin (D-TOPO-1). The document itself (html, body, the nonce, the stored theme) is the root layout's;
@@ -18,8 +18,9 @@ const THEME_LABELS = {
 };
 
 export default function PublicLayout({ children }: { readonly children: ReactNode }) {
+  const signInHref = signInAddress();
   return (
-    <SiteFrame signInHref={signInAddress()} nav={<MainNav />} themeControl={<SiteThemeControl labels={THEME_LABELS} />}>
+    <SiteFrame signInHref={signInHref} nav={<HeaderNav />} cta={<HeaderCta />} menu={<MainNav signInHref={signInHref} />} themeControl={<SiteThemeControl labels={THEME_LABELS} />}>
       {children}
     </SiteFrame>
   );

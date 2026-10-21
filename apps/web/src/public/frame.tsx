@@ -1,5 +1,9 @@
-// The frame every public page shares (UI01-UI08, UI48, UI49): a skip link, the site header with its navigation, the theme control and the
-// sign-in link, the main region every page renders into, and a footer with the name, the one-line limit of what Kauro does and the service links.
+// The frame every public page shares (UI01-UI08, UI48, UI49): a skip link, the site header, the main region every page renders into, and a
+// footer with the name, the one-line limit of what Kauro does, the service links and the theme control.
+//
+// Order 11 round 2, the header as the best B2B headers measured compose it: the name on the left with the main pages beside it on a wide
+// screen; on the right "Sign in" as a quiet link and the site's one call to action as the only filled button; a menu only where the pages
+// no longer fit. The theme control moved to the footer, as on the sites that offer one, so the header holds only what a buyer navigates by.
 //
 // Pure markup with no router: the navigation that marks the current page and the theme control are handed in (the client components of
 // src/app/(public)/ read the path), so node:test renders this whole frame. Classes are all kauro-site-*: this frame and W3's application shell
@@ -37,8 +41,12 @@ export function NavList({ items, current, label }: NavListProps): ReactElement {
 export interface SiteFrameProps {
   /** Where "Sign in" leads (an absolute application address in a split deployment, see signInUrl). */
   readonly signInHref: string;
-  /** The header navigation. */
+  /** The header's pages in one line (shown on a wide screen). */
   readonly nav: ReactNode;
+  /** The site's call to action in the header (a client component hides it on the page it opens); none in a plain render. */
+  readonly cta?: ReactNode;
+  /** The menu of a narrow screen; none in a plain render. */
+  readonly menu?: ReactNode;
   /** The colour theme control (a client component); none in a render that has no browser. */
   readonly themeControl?: ReactNode;
   /** The footer navigation; the plain list when not given. */
@@ -46,7 +54,7 @@ export interface SiteFrameProps {
   readonly children: ReactNode;
 }
 
-export function SiteFrame({ signInHref, nav, themeControl, footerNav, children }: SiteFrameProps): ReactElement {
+export function SiteFrame({ signInHref, nav, cta, menu, themeControl, footerNav, children }: SiteFrameProps): ReactElement {
   return (
     <>
       <a className="kauro-site-skip" href={`#${MAIN_ID}`}>
@@ -59,10 +67,11 @@ export function SiteFrame({ signInHref, nav, themeControl, footerNav, children }
           </a>
           {nav}
           <div className="kauro-site-header-actions">
-            {themeControl}
             <a className="kauro-site-signin" href={signInHref}>
               {PUBLIC_COPY["nav.signin.label"]}
             </a>
+            {cta}
+            {menu}
           </div>
         </div>
       </header>
@@ -79,7 +88,10 @@ export function SiteFrame({ signInHref, nav, themeControl, footerNav, children }
           </div>
           <div className="kauro-site-footer-meta">
             {footerNav ?? <NavList items={FOOTER_NAV} current={null} label="site.nav.footer.label" />}
-            <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
+            <div className="kauro-site-footer-row">
+              <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
+              {themeControl}
+            </div>
           </div>
         </div>
       </footer>
