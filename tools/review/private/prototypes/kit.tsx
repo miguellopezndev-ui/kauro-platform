@@ -146,14 +146,18 @@ export function Note({ children }: { readonly children: ReactNode }): ReactEleme
   return <p className="kauro-note">{children}</p>;
 }
 
+/** A proposal drawn at a real screen's path is reached with the review's proposal query (P-02 on UI32, P-07 on UI18, P-09 on UI30, …). */
+const ON_REAL: ReadonlySet<string> = new Set(["P-02", "P-07", "P-09", "P-30", "P-31"]);
+const hrefOf = (to: string, ctx: ReviewContext, project?: string): string => `${appPathOf(to, ctx, project)}${ON_REAL.has(to) ? `?review-proposal=${to}` : ""}`;
+
 /** A link to another screen of the application, at its real path (the review serves every private path, as the product will). */
 export function ScreenLink({ to, ctx, project, children }: { readonly to: string; readonly ctx: ReviewContext; readonly project?: string; readonly children: ReactNode }): ReactElement {
-  return <Link href={appPathOf(to, ctx, project)}>{children}</Link>;
+  return <Link href={hrefOf(to, ctx, project)}>{children}</Link>;
 }
 
 export function ScreenButton({ to, ctx, project, variant = "secondary", children }: { readonly to: string; readonly ctx: ReviewContext; readonly project?: string; readonly variant?: ButtonVariant; readonly children: ReactNode }): ReactElement {
   return (
-    <LinkButton href={appPathOf(to, ctx, project)} variant={variant}>
+    <LinkButton href={hrefOf(to, ctx, project)} variant={variant}>
       {children}
     </LinkButton>
   );

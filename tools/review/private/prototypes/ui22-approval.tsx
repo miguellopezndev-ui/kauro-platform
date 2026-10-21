@@ -18,7 +18,8 @@ import type { StateDef } from "../lib/scenario.ts";
 import { EXAMPLE } from "./example.ts";
 import { moment, Only, ScreenButton, ScreenLink } from "./kit.tsx";
 import { can, onlyLine, soloWorkspace, whoCan } from "./people.ts";
-import { n, PLAN } from "./plan.tsx";
+import { CLASSES, deciders, n, PLAN, traceOf } from "./plan.tsx";
+import { MONEY } from "./money.ts";
 import { SERVICE } from "./service.ts";
 import { TIMELINE } from "./timeline.ts";
 import { CONFIRMED_AT } from "./ui17-target.tsx";
@@ -29,7 +30,51 @@ export const UI22_STATES: readonly StateDef[] = [
   { key: "changes", label: "Request changes", note: "The approver writes what should change and why: the plan stays open, no quote is issued." },
   { key: "sent", label: "Changes requested", note: "Sent back to the operator with the reason: the plan stays open and no quote exists until a revision is approved." },
   { key: "stale", label: "A newer revision", note: "The plan changed after the page was opened: revision 6 can no longer be approved; the new revision is reviewed first." },
+  { key: "revised", label: "Changed after approval", note: "(e) Revision 6 was approved and quoted; then one duplicate decision changed. The plan is now revision 7, which needs validation and approval; revision 6 and its approval stay in the record, and the quote for revision 6 does not apply to revision 7." },
 ];
+
+/** When the decision of group 188 changed after revision 6 was approved and quoted (a review value, before any payment). */
+const REVISED_AT = "2026-10-20T14:05:00Z";
+
+/** The record of who decided the duplicates, as Approval shows it before anyone approves. */
+function DecisionTrace({ ctx }: { readonly ctx: PrototypeProps["ctx"] }): ReactElement {
+  const who = deciders(ctx);
+  return (
+    <section className="kauro-pl-section" aria-labelledby="trace-h">
+      <h2 id="trace-h">Who decided the duplicates</h2>
+      <table className="kauro-rtable kauro-pl-rtable kauro-pl-trace">
+        <caption className="kauro-visually-hidden">Every decision on the duplicates of revision {PLAN.revision}, oldest first</caption>
+        <thead>
+          <tr>
+            <th scope="col">When (UTC)</th>
+            <th scope="col">Who</th>
+            <th scope="col">Decision</th>
+            <th scope="col" className="kauro-num">
+              Groups
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {traceOf(who.owner, who.operator).map((line) => (
+            <tr key={`${line.at}-${line.what}`}>
+              <th scope="row">{moment(line.at).replace(" UTC", "")}</th>
+              <td data-label="Who">{line.who}</td>
+              <td data-label="Decision">
+                <span>
+                  {line.what}
+                  <span className="kauro-sub">{line.evidence}</span>
+                </span>
+              </td>
+              <td data-label="Groups" className="kauro-num">
+                {n(line.groups)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 /** When the plan was last checked against the sealed files and the destination (a review value, between proposal and approval). */
 const CHECKED_AT = "2026-10-20T12:20:00Z";
@@ -76,6 +121,130 @@ export function Approval({ ctx, state, project }: PrototypeProps): ReactElement 
       : stale
         ? { tone: "warning", text: "A newer revision to review" }
         : { tone: "info", text: "Ready for approval" };
+
+  if (state === "revised") {
+    const who = deciders(ctx);
+    const r7 = PLAN.revision7;
+    const rows: readonly (readonly [string, string, string])[] = [
+      ["Duplicates", `${n(PLAN.unifyGroups)} unified, ${n(PLAN.keptApart)} kept apart`, `${n(r7.unify)} unified, ${n(r7.apart)} kept apart`],
+      ["Rows joining another record", n(PLAN.unifiedRows), n(r7.unifiedRows)],
+      ["Contacts prepared", n(PLAN.output), n(r7.output)],
+      ...(clean ? [] : ([["Contacts linked to their company", n(PLAN.links), n(r7.links)]] as const)),
+    ];
+    const operator = can(ctx, "operate");
+    return (
+      <>
+        <ProjectHeader
+          stage="plan"
+          title={`Revision ${PLAN.revision + 1} needs validation and approval`}
+          lead={`One decision changed after revision ${PLAN.revision} was approved, so the plan is a new revision. Nothing is prepared or quoted from it until it is validated and approved.`}
+          status={{ tone: "warning", text: `Revision ${PLAN.revision + 1} to approve` }}
+        />
+        <div className="kauro-focused">
+          <section className="kauro-pl-revised" aria-labelledby="revised-h">
+            <h2 id="revised-h">What changed</h2>
+            <p>
+              On {moment(REVISED_AT)}, {who.operator} kept group 188 apart instead of unifying it: &ldquo;Rows 2,207 and 10,861 are two people at Larch Studio who share a phone line.&rdquo;
+            </p>
+            <table className="kauro-rtable kauro-pl-rtable kauro-pl-diff">
+              <caption className="kauro-visually-hidden">
+                Revision {PLAN.revision} as approved, beside revision {PLAN.revision + 1}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Part</th>
+                  <th scope="col" className="kauro-num">
+                    Revision {PLAN.revision} (approved)
+                  </th>
+                  <th scope="col" className="kauro-num">
+                    Revision {PLAN.revision + 1}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([part, before, after]) => (
+                  <tr key={part}>
+                    <th scope="row">{part}</th>
+                    <td data-label={`Revision ${PLAN.revision}`} className="kauro-num">
+                      {before}
+                    </td>
+                    <td data-label={`Revision ${PLAN.revision + 1}`} className="kauro-num">
+                      {after}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          <section className="kauro-pl-section" aria-labelledby="quote-h">
+            <h2 id="quote-h">The quote</h2>
+            <p>
+              The quote issued on {moment(TIMELINE.quoteIssuedAt)} for revision {PLAN.revision} ({MONEY.quoteExact}) does not apply to revision {PLAN.revision + 1}: a quote is issued only from an
+              approved revision. Once revision {PLAN.revision + 1} is approved, {whoCan(ctx, "pay")} requests a new one. Nothing has been paid.
+            </p>
+          </section>
+          <section className="kauro-pl-section" aria-labelledby="now-h">
+            <h2 id="now-h">What happens now</h2>
+            <ol className="kauro-pl-order">
+              <li>
+                <strong>Validate revision {PLAN.revision + 1}</strong> · Kauro checks it against the sealed files{clean ? "" : ` and the ${crm} settings`}.
+              </li>
+              <li>
+                <strong>Approve revision {PLAN.revision + 1}</strong> · {whoCan(ctx, "approve")}, with the code, as for revision {PLAN.revision}.
+              </li>
+              <li>
+                <strong>A new quote</strong> · issued from revision {PLAN.revision + 1}.
+              </li>
+            </ol>
+            <p className="kauro-pl-meta">
+              Nothing has been written to {clean ? "any CRM" : crm} or anywhere else: the change only shapes the files Kauro will prepare, and the import stays your team&apos;s.
+            </p>
+          </section>
+          <section className="kauro-pl-section" aria-labelledby="record-h">
+            <h2 id="record-h">The record of this plan</h2>
+            <table className="kauro-rtable kauro-pl-rtable kauro-pl-trace">
+              <caption className="kauro-visually-hidden">What happened to the plan after the duplicates were decided, oldest first</caption>
+              <thead>
+                <tr>
+                  <th scope="col">When (UTC)</th>
+                  <th scope="col">Who</th>
+                  <th scope="col">What</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">{moment(TIMELINE.approvedAt).replace(" UTC", "")}</th>
+                  <td data-label="Who">{solo ? who.owner : "Samuel Osei (Approver)"}</td>
+                  <td data-label="What">Revision {PLAN.revision} approved. It stays in the record as approved.</td>
+                </tr>
+                <tr>
+                  <th scope="row">{moment(TIMELINE.quoteIssuedAt).replace(" UTC", "")}</th>
+                  <td data-label="Who">Kauro</td>
+                  <td data-label="What">
+                    Quote issued for revision {PLAN.revision}: {MONEY.quoteExact}
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">{moment(REVISED_AT).replace(" UTC", "")}</th>
+                  <td data-label="Who">{who.operator}</td>
+                  <td data-label="What">
+                    Group 188 changed from unified to kept apart: revision {PLAN.revision + 1} created. The approval and the quote of revision {PLAN.revision} no longer apply.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <div className="kauro-focused-foot">
+            <ScreenLink to="UI20" ctx={ctx} project={project.projectId}>
+              See the duplicates
+            </ScreenLink>
+            {operator ? <Button variant="primary">Validate revision {PLAN.revision + 1}</Button> : null}
+          </div>
+          {operator ? null : <Only>{onlyLine(ctx, "operate", `validate revision ${PLAN.revision + 1}`)}</Only>}
+        </div>
+      </>
+    );
+  }
 
   if (approved)
     return (
@@ -154,7 +323,7 @@ export function Approval({ ctx, state, project }: PrototypeProps): ReactElement 
         )}
         {stale ? (
           <Banner tone="warning" title="The plan changed after you opened this page" announce="alert">
-            <p>Revision 7 replaced revision 6 at 12:31 PM UTC: three groups of duplicates were decided again. Review the new revision before it can be approved.</p>
+            <p>Revision 7 replaced revision 6 at 12:31 PM UTC: the decision of group 188 changed. Review the new revision before it can be approved.</p>
             <p>
               <ScreenLink to="UI20" ctx={ctx} project={project.projectId}>
                 Review the duplicates again
@@ -196,6 +365,10 @@ export function Approval({ ctx, state, project }: PrototypeProps): ReactElement 
               <li>
                 Contacts: {n(PLAN.unifyGroups)} groups unified and {n(PLAN.keptApart)} kept apart, of {n(PLAN.groups)}; {n(PLAN.unifiedRows)} rows join another record
               </li>
+              <li>
+                {n(CLASSES[0].final.unified)} applied together as demonstrated identities; {n(PLAN.unifyGroups - CLASSES[0].final.unified)} probable duplicates unified by a person&apos;s decision;{" "}
+                {n(CLASSES.reduce((sum, one) => sum + one.blocked, 0))} kept out of every batch and kept apart
+              </li>
               <li>Companies: {n(PLAN.companiesUnified)} rows join another company with the same domain and name</li>
               <li>Marketing consent: where records disagree, the most restrictive choice is kept</li>
             </ul>
@@ -230,6 +403,7 @@ export function Approval({ ctx, state, project }: PrototypeProps): ReactElement 
             </ul>
           </Answer>
         </dl>
+        <DecisionTrace ctx={ctx} />
 
         {!approver || stale || step === "sent" ? (
           <div className="kauro-focused-foot">

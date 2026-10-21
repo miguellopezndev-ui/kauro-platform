@@ -197,3 +197,145 @@ synthetic refund (RF-2026-0007, Coastline Analytics) on UI36, UI37, UI35 and P-2
 marked "Pending legal review" on the owner's screens. **Code.** No field records the legal status of a policy rule
 (`packages/contracts/registry/policy.json` holds the values only). **Needs.** A status per rule group (validated or pending, with the
 date and reference of the validation), read by the owner's pages. **Status.** Drawn as a fixed marker (P-24; Settings, Commissions).
+
+## F-19. The one extension also for the free data health check (owner decision, 2026-10-21)
+
+**Decision.** A voluntary extension of up to 72 hours may also be requested for the files and results of a free check nothing was bought
+after. **Code (read).** The extension exists (CMD060, `kauro.retention_extensions`, at most one per project): `softDeadline =
+least(previousSoftDeadline + requestedSeconds, hardDeadline)`, and the hard deadline never moves (`packages/domain/src/model/source/records.ts`,
+`RetentionExtensionRow`; policy `retention.softExtensionsPerProject` 1, `softExtensionMaximumSeconds` 259200). The screens built so far
+never offer it before a purchase. **Opens.** policy (the one extension covers the unpaid class); api/backend (CMD060 accepted on an unpaid,
+sealed revision, owner or admin); DPA/legal text (ToS §13.1 and the public Data handling words: the free check's 7 days "or up to 3 days
+more on request"); deletion/retention jobs (the sweeper reads the extended soft deadline for the unpaid class); tests (one extension per
+project across the unpaid and paid classes; a request after the soft deadline is refused). **Depends on** F-20. **Status.** Drawn: P-30
+"extended", UI13 "extended", UI29 "check" and "check-extended".
+
+## F-20. An exceptional ceiling of 17 days from sealing, reached only through the extension (owner decision, 2026-10-21)
+
+**Decision.** The ordinary absolute limit of a free check's files stays 14 days from sealing; only when the extension is requested may they
+stay longer, to an exceptional maximum of 17 days from sealing. **Code (read).** `SOURCE_RETENTION.unpaidDaysHardFromSeal` 14 and
+`extendHardCap: false` (`packages/domain/src/model/source/policy.ts:39-46`; registry `retention.extendHardCap`); the extension is capped at
+the hard deadline, so today it can never pass 14 days. **Opens.** policy (a new key, for example `unpaidDaysExtendedCeilingFromSeal` 17,
+with the hard cap movable for the unpaid class only, as a new retention policy version, `RETENTION_POLICY_VERSION`); contracts/registry
+(policy.json and its drift test, `SNAPSHOT_PATHS`); DPA/legal text (ToS §13.1, the retention annex, and the public Data handling page through
+`apps/web/src/public/retention.ts`, the lead's); deletion/retention jobs (the hard deadline of an extended unpaid record becomes
+min(extended soft deadline, sealing + 17 days)); restoration (a backup restored after that deadline never brings the files back); tests (14
+days without the extension, at most 17 with it, never more). **Status.** Drawn with the "Proposed" marker on every date table (P-30, P-31,
+UI29).
+
+## F-21. A separate, limited hold while a sent bank transfer is confirmed (owner decision, 2026-10-21; value proposed)
+
+**Decision.** A transitional retention, separate from the free check's and from the paid project's, for an order whose bank transfer was
+legitimately initiated and waits for confirmation. Proposed initial value: five business days from the proof, to be checked against the
+enabled payment method (ACH and domestic wire through the Wise route, PV1) and the evidence that method really gives. **Code (read).** The
+bank-transfer extension of the payment order (`AWAITING_TRANSFER`, `PARTIALLY_RECEIVED`, `RECEIVED_REVIEW`) exists but is deliberately not
+wired (`packages/domain/src/commerce/machines.ts:206-226`); retention has no class for a pending payment; no command records the proof of an
+initiated transfer. **Opens.** policy (a hold class: business days of the published coverage calendar, anchored on the accepted proof, with
+its ceiling and uniqueness, F-22); payments (the proof intake: the bank's confirmation document and/or trace number, amount and reference;
+how it is checked against the route's evidence; the order states it moves); contracts/registry (a command such as RecordTransferProof,
+AGENCY_BILLING, step-up to be decided; its events; the order and retention views carry the hold); api/backend; deletion/retention jobs (a
+pending-payment retention record whose end deletes the files unless an exact credit was captured); restoration (a restored backup never
+revives files whose hold ended); DPA/legal text (ToS §8 and §13: the hold, that it is not payment, that a late transfer is reviewed and
+returned; the DPA retention annex: a new period and its purpose); tests. **Depends on** the PV1 qualification of the route and its evidence
+store, F-22, F-23. **Status.** Drawn: P-31 (all states), P-30 "held", UI13 "held", UI29 "held".
+
+## F-22. Abuse limits of the hold: a fictitious or repeated order never keeps files indefinitely (owner decision, 2026-10-21)
+
+**Decision.** A fictitious or repeated order must not prolong the files. Designed limits, all visible on the screens: the hold starts only
+with the proof of a transfer already sent, for the exact amount, with the order's reference; one hold per quote and per sealed set (another
+order on the same quote, a new quote for the same files or a second proof starts none); never renewed; never added to the extension (the
+files go on the later of the two dates, never their sum); never past 24 days from sealing whatever happens (proposed ceiling); a hold that
+ends without the money deletes the files, and a late credit is reviewed and returned. **Code.** None of this exists (no hold, F-21).
+**Opens.** abuse controls (uniqueness per quote and per sealed set enforced in the database, not only on the screen; a workspace counter of
+holds that ended unpaid, with owner review above a threshold the owner sets; an owner queue of proofs that never matched a credit); policy
+(the ceiling and the threshold); contracts/registry (refusal codes such as HOLD_ALREADY_USED, PROOF_REQUIRED, CEILING_REACHED); payments (a
+proof that does not match the route's evidence ends the hold early, decided by the owner); tests (adversarial: two orders on one quote, a new
+quote for the same sealed set, a proof after the files' date, a proof for another amount or reference, a hold asked for a deleted revision,
+concurrent requests). **Depends on** F-21. **Status.** Drawn as "What a hold can and cannot do" and the "second" state (P-31).
+
+## F-23. Preparation never starts on a hold
+
+**Decision.** Execution must not start until the payment is truly confirmed. **Code (read).** CMD036 ExecuteProject needs an ACTIVE commercial
+authorization, which exists only after capture (`apps/web/src/screens/processing/model.ts`, `executeOffer`; the paid entitlement in
+`packages/domain/src/commerce/machines.ts`). **Opens.** tests only, once F-21 exists: a hold, a partial or a pending credit never yields a
+commercial authorization; the preparation page and the Overview say that preparation starts only after Kauro confirms the payment (drawn).
+**Depends on** F-21. **Status.** Drawn (P-30 "held", P-31 "held", UI13 "held").
+
+## F-24. The five dates kept apart in every read and every screen
+
+**Decision.** Quote expiry, free-check retention, extension, pending-payment hold and paid-project retention are distinguished everywhere
+they appear. **Code (read).** The quote view carries `expiresAt` and `sourceAvailableUntil` only (`QuoteView`); no read gives the customer's
+screens a project's retention record, its extension or a hold (UI29 is drawn from fixtures). **Opens.** contracts/registry and api/backend
+(a project dates read: each of the five with its date, rule, state and who may act; the quote and order views link to it); web copy (one
+label per date on Quote, Payment, Overview, Projects, Data and deletion, Billing and Help); public Help and Data handling words (lead);
+DPA/legal text (the same five names in ToS §6.2, §8 and §13); tests (the five labels never merge; no screen shows a hold and an extension as
+added). **Depends on** F-19 to F-22. **Status.** Drawn as one shared table (`tools/review/private/prototypes/retention-dates.tsx`) on P-30,
+P-31 and UI29.
+
+## F-25. Batch unification: demonstrated identities applied together, probable duplicates decided in bulk by a person (owner decision, 2026-10-21)
+
+**Decision.** Decisions may be applied together where identity is demonstrated and no blocking conflict exists. Probable duplicates may be
+reviewed, selected and decided many groups at once, never treated automatically as demonstrated. A precise preview of effects, exclusions
+and conflicts always comes first; decisions can change before execution. **Code (read).** The plan has no read (`apps/web/src/screens/
+approval/model.ts:8-9`), and CreatePlan/RevisePlan are inert (`CORE_SERVICES_UNAVAILABLE`, kauro-baseline §5.1); there is no evidence class,
+no batch command and no preview. **Opens.** policy (the definition of a demonstrated identity, for example the same normalised email and the
+same normalised name; the blocking-conflict rules: existing separate CRM record IDs, shared or role addresses, consent conflicts; the kept
+record and field rules; a batch cap); contracts/registry (commands to apply a demonstrated batch, decide many probable groups, change one
+decision and undo a batch; the plan read with evidence class, paging and the preview; decision events); api/backend (a preview hash the apply
+must match; idempotent apply; undo before approval); cores (evidence classification; detection of existing CRM record IDs and shared
+addresses in the export; a deterministic kept-record rule); DPA/legal text ("demonstrated" is a technical class, not a guarantee; nothing is
+written to any CRM); abuse controls (only owner, admin and operator decide; batch caps; rate limits; every decision in the audit log). **Depends
+on** F-04 (findings read) and the plan read. **Status.** Drawn: UI20 "demonstrated", "normal", "blocked", "changed", "decided".
+
+## F-26. A change after approval is a new plan revision, validated and approved again (owner decision, 2026-10-21)
+
+**Decision.** Where applicable, a change after an approval needs a new plan version, its validation and its authorisation; the approved
+revision stays in the record, and its quote no longer applies to the new revision. Kauro never promises to revert anything already done in a
+CRM, because it never writes to one. **Code (read).** Approvals are bound to a revision and never reused (PUB:236; CMD025, CMD026), and
+CreateQuote refuses `PLAN_SUPERSEDED` / `APPROVAL_NOT_CURRENT` (`create-quote.ts:186-216`); RevisePlan is inert. **Opens.** contracts/registry
+(the revision event names what changed, with the decision trace); api/backend (RevisePlan wired; a new revision withdraws the open quote
+for the old one, with the reason shown); tests (a quote never survives its revision; an approval is never carried to a new revision).
+**Depends on** F-25. **Status.** Drawn: UI22 "revised"; "Who decided the duplicates" on every approval state.
+
+## F-27. Adversarial identity tests (owner decision, 2026-10-21)
+
+**Decision.** Keep traceability and adversarial identity tests. **Opens.** tests (shared and role addresses such as info@ and sales@;
+plus-addressing; look-alike characters and accents; chains of three or more records; existing CRM record IDs on both rows; consent
+conflicts; a batch prepared on stale data or applied twice concurrently; very large batches; undo then re-apply, with the trace kept);
+cores (a fixture set of synthetic adversarial files, never real data). **Depends on** F-25.
+
+## F-28. Salesforce dependent records without typing an ID: the route per object (owner decision, 2026-10-21)
+
+**Decision.** The customer never fills in AccountIds by hand. An External ID field already appropriate for the org is used when the
+confirmed org metadata shows one holding the source key (upsert; dependants name their parent by that key); no new field is ever a
+universal condition, and Kauro never has CRM access. **Code (read).** The target contract stores uploaded metadata (CMD018, CMD019;
+`packages/domain/src/model/target-contract.ts`); no rule reads External ID fields from it, and the Data Loader profile
+(`SALESFORCE_DATA_LOADER`) has no upsert or related-object path. **Opens.** cores (read External ID fields from the confirmed metadata;
+choose the route per object; an Upsert path with related-object lookups; a source-key column in every Salesforce file, left unmapped; the
+`.sdl` mapping files per stage); contracts/registry (the route per object in the plan and the import stage read); DPA/legal text (Salesforce
+record IDs become customer data Kauro processes); tests. **To verify:** the Upsert related-object step as Data Loader names it.
+**Status.** Drawn: UI27 "sf-external-id", "sf-chain".
+
+## F-29. Staged reconciliation of Salesforce results and the generated dependent package (owner decision, 2026-10-21)
+
+**Decision.** Where Salesforce-generated IDs are needed, the team imports the parent records and returns Data Loader's success and error
+files; Kauro reconciles them and generates the dependent package with IDs proved by that evidence. Ambiguous, rejected or unmatched rows are
+blocked, each with its action; this extends to Opportunities → Accounts and OpportunityContactRole → Contact and Opportunity. **Code (read).**
+Import stages exist (CMD040 receipt, CMD041 continue; states PREPARED … VERIFIED_SUCCESS / VERIFIED_PARTIAL / NEEDS_CORRECTION,
+kauro-baseline §5.3), but no reconciliation reads a success file, proves an ID or generates a file. **Opens.** contracts/registry (the import
+stage read: parent links, a generated flag, blocked rows with reason and action, held-back counts; CMD041 releases generated stages; a
+command to choose which ID to keep when a source key was imported twice); api/backend (a reconciliation engine: one success row per source
+key, the ID prefix of the object, 001 / 003 / 006; generating dependent and top-up files); cores (the generated files are built from proved
+IDs only, never a guessed link); retention (result files kept 7 days after their check, and while a dependent stage is still open: a new
+policy key); DPA/legal text (Salesforce IDs and error messages processed); abuse controls (size and row limits on returned files; a cap on
+resubmissions); tests (reconciliation edge cases: duplicate-rule and validation rejections, missing rows, a key imported twice, ambiguous
+matches; fingerprints of the evidence files). **To verify:** that Data Loader's success and error files repeat the unmapped source-key
+column. **Depends on** F-28. **Status.** Drawn: UI27 and UI28 "sf-reconciled".
+
+## F-30. HubSpot associations: no generated IDs, the returned error file still checked
+
+**Decision asked.** Say whether HubSpot associations benefit from the same evidence-based reconciliation. **Answer drawn.** HubSpot's
+importer links records across files by a shared unique value (email for contacts, company domain for companies), so Kauro generates no ID
+file; it still checks the error file of the linking stage and lists each link not made with its action. **Opens.** cores and api/backend
+(read HubSpot's error file for association errors); tests. **To verify:** whether a HubSpot export includes the associated company's record
+ID (it would let Kauro prove links, not only failures). **Status.** Drawn: UI27 "hs-links" and a permanent note on HubSpot import pages.

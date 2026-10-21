@@ -22,6 +22,7 @@ import { day, Facts, moment, NextStep, Only, ScreenButton, ScreenLink, type Step
 import { can, type Duty, onlyLine, soloWorkspace, whoCan } from "./people.ts";
 import { listPriceOf, PAID_PROJECTS, quotedPriceOf, repeatProgress, usd } from "./projects-data.ts";
 import { SERVICE } from "./service.ts";
+import { RETENTION } from "./retention.ts";
 import { FILES_END_FIRST, TIMELINE } from "./timeline.ts";
 
 export const UI13_STATES: readonly StateDef[] = [
@@ -32,10 +33,13 @@ export const UI13_STATES: readonly StateDef[] = [
   { key: "processing", label: "Kauro is preparing", note: "Paid and matched: Kauro prepares and verifies the package. Nothing is needed; no delivery time is promised." },
   { key: "delivered", label: "Ready to import", note: "The package is verified: download it before its date and import it stage by stage (or, for Clean your data, take the cleaned files)." },
   { key: "completed", label: "Completed", note: "Every stage verified: the next project for the same client, with the repeat discount said once." },
+  { key: "extended", label: "Free check extended (proposed)", note: "Owner decision of 2026-10-21: the one extension, now also for the free check, keeps the files 3 more days; the card says the new date and that no second one exists." },
+  { key: "held", label: "Transfer pending, within its hold (proposed)", note: "Owner decision of 2026-10-21: the transfer was sent and its proof given, so the files are held up to 5 business days; nothing is confirmed and preparation cannot start." },
+  { key: "hold-expired", label: "Hold ended (proposed)", note: "Owner decision of 2026-10-21: the hold ended without the money; the files are deleted and the way forward is a new upload." },
   { key: "changed", label: "Changed elsewhere", note: "Someone changed this project in another tab or session: the page asks to reload before anything consequential." },
 ];
 
-const STAGE: Readonly<Record<string, ProjectStage>> = { normal: "purchase", changed: "purchase", sources: "files", check: "check", plan: "plan", processing: "preparation", delivered: "delivery", completed: "delivery" };
+const STAGE: Readonly<Record<string, ProjectStage>> = { normal: "purchase", changed: "purchase", extended: "purchase", held: "purchase", "hold-expired": "purchase", sources: "files", check: "check", plan: "plan", processing: "preparation", delivered: "delivery", completed: "delivery" };
 const STAGES: readonly ProjectStage[] = ["files", "check", "plan", "purchase", "preparation", "delivery"];
 /** The way to look at a step's page for a person who cannot take the step. */
 const VIEW: Readonly<Record<string, string>> = { UI23: "See the quote", UI22: "See the plan", UI14: "See the files", UI27: "See the import steps", UI11: "Go to projects" };
@@ -43,6 +47,9 @@ const VIEW: Readonly<Record<string, string>> = { UI23: "See the quote", UI22: "S
 const STATUS: Readonly<Record<string, { readonly tone: "info" | "warning" | "success"; readonly text: string }>> = {
   normal: { tone: "warning", text: "Waiting for payment" },
   changed: { tone: "warning", text: "Waiting for payment" },
+  extended: { tone: "warning", text: "Waiting for payment" },
+  held: { tone: "warning", text: "Transfer pending" },
+  "hold-expired": { tone: "warning", text: "Files deleted" },
   sources: { tone: "info", text: "Waiting for files" },
   check: { tone: "info", text: "Kauro is checking" },
   plan: { tone: "warning", text: "Waiting for approval" },
@@ -67,6 +74,45 @@ function cardOf(key: string, ctx: PrototypeProps["ctx"], mode: "CLEAN" | "HUBSPO
   const clean = mode === "CLEAN";
   const price = usd(quotedPriceOf(mode));
   switch (key) {
+    case "extended":
+      return {
+        label: "Next step · proposed",
+        heading: `Pay before ${moment(RETENTION.extendedUntil)}`,
+        body: <p>The one extension was asked for on {moment(RETENTION.extensionRequestedAt)}: the free check&apos;s files stay until {moment(RETENTION.extendedUntil)}. The quote of {price} is unchanged, and no second extension exists.</p>,
+        facts: [
+          ["Who", whoCan(ctx, "pay")],
+          ["By", moment(RETENTION.extendedUntil)],
+          ["If not", "The files are deleted and the quote cannot be paid"],
+        ],
+        duty: "pay",
+        what: "pay the quote",
+        cta: { label: "Open the quote", screen: "P-30" },
+      };
+    case "held":
+      return {
+        label: "Waiting for the transfer · proposed",
+        heading: `Files held until ${moment(RETENTION.holdUntil)}`,
+        body: <p>A transfer for {price} was sent and its proof given on {moment(RETENTION.proofAt)}. Kauro holds the files while the money arrives. Nothing is confirmed yet, and the preparation cannot start until Kauro matches the exact amount.</p>,
+        facts: [
+          ["Who", "Kauro, when the money arrives"],
+          ["Held until", moment(RETENTION.holdUntil)],
+          ["If not", "The files are deleted and a late transfer is returned"],
+        ],
+        link: { label: "See the payment and its hold", screen: "P-31" },
+      };
+    case "hold-expired":
+      return {
+        label: "The files are gone · proposed",
+        heading: "Upload the files again for a new quote",
+        body: <p>The hold ended on {moment(RETENTION.holdUntil)} without a confirmed payment, so the files were deleted and this quote cannot be paid. A transfer that still arrives is reviewed and returned.</p>,
+        facts: [
+          ["Who", whoCan(ctx, "operate")],
+          ["Deleted", moment(RETENTION.holdUntil)],
+        ],
+        duty: "operate",
+        what: "upload the files",
+        cta: { label: "Upload the files again", screen: "UI14" },
+      };
     case "sources":
       return {
         heading: "Upload the exports",
@@ -296,7 +342,13 @@ export function Overview({ ctx, state, project }: PrototypeProps): ReactElement 
               ["Money", after("purchase") ? `${price}, paid ${moment(TIMELINE.paidAt)}` : stage === "purchase" ? `Quote ${price}, valid until ${moment(TIMELINE.quoteExpiresAt)}` : stage === "plan" ? `Estimate ${estimate} before the repeat discount; the quote comes after approval` : "Estimated after the check"],
               [
                 after("purchase") ? "Package kept until" : "Files kept until",
-                stage === "files"
+                key === "held"
+                  ? `Held until ${moment(RETENTION.holdUntil)} for the transfer (proposed)`
+                  : key === "extended"
+                    ? `${moment(RETENTION.extendedUntil)}, extended once (proposed)`
+                    : key === "hold-expired"
+                      ? `Deleted ${moment(RETENTION.holdUntil)}`
+                      : stage === "files"
                   ? "Set when the files are sealed"
                   : stage === "check"
                     ? "7 days after the check is ready, if nothing is bought"

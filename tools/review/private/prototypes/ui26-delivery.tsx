@@ -46,7 +46,7 @@ export function Delivery({ ctx, state, project }: PrototypeProps): ReactElement 
   };
   const all = chosen.length === files.length;
   const status = removed ? { tone: "neutral" as const, text: "Package deleted" } : { tone: "success" as const, text: version === 2 ? "Version 2 verified" : "Package verified" };
-  const later = stages.find((stage) => stage.releasedAfter);
+  const later = stages.filter((stage) => stage.generated);
 
   return (
     <>
@@ -204,10 +204,10 @@ export function Delivery({ ctx, state, project }: PrototypeProps): ReactElement 
             ))}
           </tbody>
         </table>
-        {later === undefined ? null : (
+        {later.length === 0 ? null : (
           <p className="kauro-dl-note">
-            Stage {later.sequence}&apos;s file, {later.file}, is not in the package yet: Kauro releases it once stage {later.sequence - 1} is verified, with each {later.name.toLowerCase().replace(/s$/, "")}&apos;s
-            AccountId taken from your stage {later.sequence - 1} success file.
+            Not in the package yet: the files of {later.map((stage) => `stage ${stage.sequence} (${stage.name.toLowerCase()})`).join(", ")}. Each needs the IDs Salesforce gives its parent records, so
+            Kauro generates it from the success file your team returns for the stage before, once that result is verified, and only for the rows whose parent it proves. Nobody types an ID.
           </p>
         )}
         {removed ? null : (
