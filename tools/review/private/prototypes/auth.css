@@ -127,23 +127,13 @@
   inline-size: 1.25rem;
   block-size: 1.25rem;
 }
-:root[data-theme="dark"] .kauro-google {
+:root .kauro-google {
   border-color: #8e918f;
   background: #131314;
   color: #e3e3e3;
 }
-:root[data-theme="dark"] .kauro-google:hover {
+:root .kauro-google:hover {
   background: #232325;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .kauro-google {
-    border-color: #8e918f;
-    background: #131314;
-    color: #e3e3e3;
-  }
-  :root:not([data-theme="light"]) .kauro-google:hover {
-    background: #232325;
-  }
 }
 
 /* the quiet line between the two ways in */

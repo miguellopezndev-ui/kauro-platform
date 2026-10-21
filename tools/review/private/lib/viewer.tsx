@@ -1,6 +1,6 @@
 "use client";
 // The owner's viewer of one screen (Order 11 §6): the screen in a frame at the chosen width, with the controls to change the person, the
-// state, the width and the theme, to go to the previous or next screen, and a panel with the registry's contract and every call the screen
+// state and the width, to go to the previous or next screen, and a panel with the registry's contract and every call the screen
 // made in review (all answered on this machine).
 import { type ChangeEvent, type ReactElement, useEffect, useState } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
@@ -26,21 +26,12 @@ export interface ViewerProps {
   readonly width: string;
 }
 
-function setTheme(next: "light" | "dark"): Promise<unknown> {
-  // the web's own theme route (the same cookie the product reads); the review sets nothing else
-  return fetch("/preferences/theme", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-kauro-theme": "1" }, body: `theme=${next}`, credentials: "same-origin" });
-}
-
 export function Viewer({ screen, review, context, state, width }: ViewerProps): ReactElement {
   const def = screenDef(screen.id);
   const { previous, next } = neighbours(screen.id);
   const [calls, setCalls] = useState<readonly string[]>([]);
-  const [frameKey, setFrameKey] = useState(0);
-  const [dark, setDark] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const stored = document.documentElement.dataset["theme"];
-    setDark(stored === "dark" ? true : stored === "light" ? false : window.matchMedia("(prefers-color-scheme: dark)").matches);
     const listen = (event: MessageEvent): void => {
       if (event.origin !== window.location.origin) return;
       const data = event.data as { kind?: string; detail?: string } | null;
@@ -53,15 +44,6 @@ export function Viewer({ screen, review, context, state, width }: ViewerProps): 
   const go = (ctx: string, st: string, w: string): void => {
     const query = new URLSearchParams({ ctx, state: st, w });
     window.location.assign(`${REVIEW}/screen/${screen.id}?${query.toString()}`);
-  };
-  const onTheme = (): void => {
-    const next = dark === true ? "light" : "dark";
-    void setTheme(next).then(() => {
-      document.documentElement.dataset["theme"] = next;
-      setDark(next === "dark");
-      setCalls([]);
-      setFrameKey((key) => key + 1);
-    });
   };
   const stateDef = def.states.find((candidate) => candidate.key === state) ?? def.states[0];
   const src = stateHref(appPathOf(screen.id, CONTEXTS[context]), context, stateDef?.key, screen.technical === "PROPOSED" ? screen.id : undefined);
@@ -115,9 +97,6 @@ export function Viewer({ screen, review, context, state, width }: ViewerProps): 
             ))}
           </select>
         </label>
-        <button type="button" onClick={onTheme}>
-          {dark === null ? "Theme" : dark ? "Light theme" : "Dark theme"}
-        </button>
         <a href={src} target="_blank" rel="noreferrer">
           Open alone
         </a>
@@ -125,7 +104,7 @@ export function Viewer({ screen, review, context, state, width }: ViewerProps): 
       {stateDef === undefined ? null : <p className="rv-state-note">{stateDef.note}</p>}
       <div className="rv-body">
         <div className={`rv-stage rv-stage--${width}`}>
-          <iframe key={frameKey} className="rv-frame" title={`${screen.id} ${screen.title}`} src={src} />
+          <iframe className="rv-frame" title={`${screen.id} ${screen.title}`} src={src} />
         </div>
         <aside className="rv-side" aria-label="What this screen is">
           <h2>Contract (registry)</h2>

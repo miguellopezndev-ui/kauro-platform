@@ -4,7 +4,7 @@
 //
 // Tones (amendment A10): a section is drawn on the page ("plain"), one step below it ("sunken"), on clay ("clay"), as a carbon band
 // ("inverse") or as a wine band ("wine"). The two bands are the design system's .kauro-inverse and .kauro-wine, so every token inside them
-// follows the band, in either theme.
+// follows the band.
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../copy/public.ts";
 import type { Availability } from "./capabilities.ts";

@@ -45,38 +45,36 @@ alone. Every text and non-text pair is checked against WCAG 2.2 AA in every pale
 
 | Name | Hex | Role |
 | --- | --- | --- |
-| Carbon | `#242426` | Text in the light theme; the background of the dark theme and of inverse bands. |
-| Porcelain | `#F8F6F3` | The page in the light theme; text on dark and wine. |
-| Wine | `#653A46` | The primary colour in the light theme; the middle colour that leads a page or a section; stamps; the CLEAN offer. |
-| Clay | `#C4A693` | Accent; the primary colour in the dark theme; flags, rails, numbers and the rock texture. |
+| Carbon | `#242426` | The page; text on clay. |
+| Porcelain | `#F8F6F3` | Text on wine. |
+| Wine | `#653A46` | The middle colour that leads a page or a section; stamps; the CLEAN offer. |
+| Clay | `#C4A693` | The primary colour and the focus; flags, rails, numbers and the rock texture. |
 
-### Palettes (token → light / dark)
+### Palette (token → value)
 
-| Token | Light | Dark | Use |
-| --- | --- | --- | --- |
-| text | `#242426` | `#F1ECE6` | body text |
-| textMuted | `#5F5955` | `#ADA59E` | secondary text, labels |
-| background | `#F8F6F3` | `#242426` | page |
-| surface | `#F1EDE8` | `#1D1D1F` | sunken sections, bars, table heads |
-| raised | `#FFFFFF` | `#2D2C2F` | cards, panels, inputs |
-| border | `#E3DCD4` | `#3A393D` | hairlines |
-| primary / onPrimary | `#653A46` / `#F8F6F3` | `#C4A693` / `#242426` | primary action, links, focus |
-| accent / accentText / accentSurface | `#C4A693` / `#7A5A45` / `#ECE2D9` | `#C4A693` / `#C4A693` / `#352E2A` | flags, rails, highlights |
-| wine / onWine / wineMuted | `#653A46` / `#F8F6F3` / `#E3D3D2` | the same | wine bands and cards |
-| status (danger, warning, success, info) | text + surface pairs | text + surface pairs | always with an icon or a word, never colour alone |
+| Token | Value | Use |
+| --- | --- | --- |
+| text | `#F1ECE6` | body text |
+| textMuted | `#ADA59E` | secondary text, labels |
+| background | `#242426` | page |
+| surface | `#1D1D1F` | sunken sections, bars, table heads |
+| raised | `#2D2C2F` | cards, panels, inputs |
+| border | `#3A393D` | hairlines |
+| primary / onPrimary | `#C4A693` / `#242426` | primary action, links, focus |
+| accent / accentText / accentSurface | `#C4A693` / `#C4A693` / `#352E2A` | flags, rails, highlights |
+| wine / onWine / wineMuted | `#653A46` / `#F8F6F3` / `#E3D3D2` | wine bands and cards |
+| status (danger, warning, success, info) | text + surface pairs | always with an icon or a word, never colour alone |
 
 Bands:
-- **Inverse** (`.kauro-inverse`): carbon, in either theme (`COLOR_INVERSE`, `COLOR_INVERSE_DARK`).
+- **Inverse** (`.kauro-inverse`, `COLOR_INVERSE`): a step below the page, so it still reads as a band.
 - **Wine** (`.kauro-wine`, `COLOR_WINE`): primary actions in porcelain with wine text, focus in clay.
-- **Paper** (`.kauro-paper`): a document that keeps the light palette on a dark or wine band in the light theme, and becomes a raised dark
-  sheet in the dark theme.
+- **Paper** (`.kauro-paper`): a raised sheet a step above any band, so a document reads as a document.
 
-### Themes
+### One theme
 
-- Light is the default. Dark applies when the stored preference says so (`kauro_theme` cookie → `<html data-theme>`), or when the system
-  asks and no preference is stored.
-- The switch is `ThemeControl`. It works without script; with script it is instant, and transitions are suspended during the switch
-  (`data-theme-switching`).
+Kauro is dark, with no light theme and no choice of theme (owner, 2026-10-21). There is no theme cookie, route, control or
+`data-theme` attribute. The light palette and its switch were set aside in `D:\Backups\Rollback\2026-10-21-kauro-light-theme` (and stay in
+git history before that date).
 
 ## 3. Typography
 
@@ -153,7 +151,7 @@ The public site (`apps/web/src/public/`):
   - the status panel (`pages/status.tsx`).
 
 The shell (`apps/web/src/shell/`):
-- the app header: wordmark, the agency label with its state, switch agency, theme, sign out;
+- the app header: wordmark, the agency label with its state, switch agency, the account menu (settings, sign out);
 - the agency tabs, a strip that scrolls inside itself on a phone;
 - the main area with its fact lists, sections and actions;
 - the refused and state panels;
@@ -161,7 +159,7 @@ The shell (`apps/web/src/shell/`):
 
 ## 6. Navigation and forms
 
-- **Public header:** wordmark, theme control, Sign in, and a Menu button. The menu is a native disclosure that drops a small carbon card
+- **Public header:** wordmark, the main pages, Sign in, the one call to action, and a Menu button where the pages no longer fit. The menu is a native disclosure that drops a small carbon card
   under its button. It dims the page a little, never covers or widens it, closes on Escape or a press outside, and shows no numbers.
 - **Footer:** small wordmark, tagline, links, the "does not connect to a live CRM" note.
 - **App navigation:** agency tabs under the header, the current one underlined in the primary colour.
@@ -175,7 +173,7 @@ The shell (`apps/web/src/shell/`):
 ## 7. Iconography and illustration
 
 Icons are the few line glyphs of `packages/ui` (16 px, 1.5 px stroke, `currentColor`), always beside a word. Other marks are drawn in CSS:
-the padlock, the check rings, the theme glyph and the menu glyph. Illustrations are the product fragments above. The rock and grain
+the padlock, the check rings and the menu glyph. Illustrations are the product fragments above. The rock and grain
 textures are generated SVG served from the site's own origin (`apps/web/src/app/(public)/textures/`), placed only under objects. No
 photograph, no external image, no `<img>` or `<svg>` in public page markup.
 
@@ -242,9 +240,9 @@ No piece changes size while its content changes, so the page never jumps. A stam
 1. Use the tokens and the existing components; add a token or a component only when nothing existing fits, and add it to the system
    (`packages/ui` or `apps/web/src/public/parts.tsx`), never as a page-local colour.
 2. Pick the register of its surface (§10). A public section gets one object from the product; an application screen gets none.
-3. Keep the hierarchy (one h1, h2 sections, no skipped level), AA contrast in both themes, visible focus, reduced motion, no inline style,
+3. Keep the hierarchy (one h1, h2 sections, no skipped level), AA contrast on the page and in each band, visible focus, reduced motion, no inline style,
    no remote resource.
-4. Check 320/375/768/1280 and both themes with axe before it is called done.
+4. Check 320/375/768/1280 with axe before it is called done.
 5. Add the screen to [KAURO_SCREEN_COVERAGE.md](KAURO_SCREEN_COVERAGE.md) and `docs/design/DESIGN-LEDGER.md` as "implemented, owner review
    pending" until the owner reviews it.
 6. A change to the palette, the typography, the motion language or the structure of a surface is an evolution of the identity: it needs

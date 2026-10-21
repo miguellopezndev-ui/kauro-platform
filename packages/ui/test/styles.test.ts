@@ -181,7 +181,7 @@ test("D-DS-1, D-DS-2: no rule hides or replaces the focus indicator, and a point
   assert.equal(field?.declarations.get("min-block-size"), "var(--kauro-target-size)");
 });
 
-test("D-DS-1: in both themes every text colour the component stylesheet pairs with a background reaches 4.5:1, and a text colour it sets alone reaches 4.5:1 on the page background and on a raised surface", () => {
+test("D-DS-1: on the page and in each band every text colour the component stylesheet pairs with a background reaches 4.5:1, and a text colour it sets alone reaches 4.5:1 on the page background and on a raised surface", () => {
   for (const [theme, palette] of Object.entries(THEMES)) {
     let pairs = 0;
     let alone = 0;

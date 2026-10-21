@@ -218,50 +218,16 @@ test("navigation: on a short screen (a phone in landscape) every link of the ope
   await expect(page).toHaveURL(/\/contact$/);
 });
 
-test("theme preference without JavaScript: the native form stores the choice and returns to the page it came from (independent review R-110-4)", async ({ browser }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false, ignoreHTTPSErrors: true });
-  const page = await context.newPage();
-  await page.goto("/pricing");
-  const before = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  const answered = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
-  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
-  expect((await answered).status(), "the site's own form is not refused (Origin: null under no-referrer)").toBe(303);
-  await expect(page).toHaveURL(/\/pricing$/);
-  const after = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  expect(after === "light" || after === "dark", "the stored theme is drawn").toBe(true);
-  expect(after).not.toBe(before);
-  expect((await context.cookies()).some((cookie) => cookie.name === "kauro_theme")).toBe(true);
-  await context.close();
-});
-
-test("theme preference with JavaScript: the choice is drawn at once and is still there after a reload (it was stored, not only drawn)", async ({ page }) => {
-  await page.goto("/pricing");
-  await page.waitForFunction(() => {
-    const form = document.querySelector("form[action^='/preferences/theme']");
-    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
-  });
-  const stored = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
-  // the footer names both themes (Order 11 round 2): choose the one not drawn now; choosing the drawn one sends nothing
-  await page.locator("form[action^='/preferences/theme'] button[type='submit'][aria-pressed='false']").click();
-  expect((await stored).status(), "the background post is accepted").toBe(204);
-  const chosen = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  expect(chosen === "light" || chosen === "dark").toBe(true);
-  await page.reload();
-  expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe(chosen);
-});
-
-test("theme preference: the route stores a choice only for a page of this exact origin, scheme included (independent review R-110-3)", async ({ request, baseURL }) => {
-  const own = new URL(baseURL ?? "https://localhost:44300").origin;
-  const other = own.replace(/^https:/, "http:");
-  const post = (headers: Record<string, string>) => request.post("/preferences/theme", { headers, form: { theme: "dark" }, maxRedirects: 0 });
-  const same = await post({ origin: own, "x-kauro-theme": "1" });
-  expect(same.status()).toBe(204);
-  expect(same.headers()["set-cookie"] ?? "").toContain("kauro_theme=dark");
-  for (const headers of [{ origin: other }, { origin: other, "x-kauro-theme": "1" }, { origin: "null" }, { origin: own, "sec-fetch-site": "cross-site" }]) {
-    const refused = await post(headers);
-    expect(refused.status(), JSON.stringify(headers)).toBe(403);
-    expect(refused.headers()["set-cookie"], JSON.stringify(headers)).toBeUndefined();
+test("one theme (owner, 2026-10-21): every page is dark, offers no theme choice, and the old preference route is gone", async ({ page, request }) => {
+  for (const path of ["/", "/pricing", "/contact", "/legal/privacy"]) {
+    await page.goto(path);
+    expect(await page.evaluate(() => document.documentElement.hasAttribute("data-theme")), path).toBe(false);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), path).toBe("dark");
+    await expect(page.locator("form[action*='/preferences/']"), path).toHaveCount(0);
   }
+  const stored = await request.post("/preferences/theme", { form: { theme: "light" }, maxRedirects: 0 });
+  expect(stored.status()).toBe(404);
+  expect(stored.headers()["set-cookie"]).toBeUndefined();
 });
 
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
@@ -505,8 +471,8 @@ test("pricing: a service the publication does not list says it cannot be bought,
 
 // UI49 as B12 built it (L-ACT, "UI49 form" and "UI49 submit"): one explicit button posts the RFC 8058 one-click body to the api's opt-out
 // route. The unit tests hold the markup and the request contract; this case holds what only a browser shows: opening the link changes
-// nothing, the press sends once, each answer is said, and the essential notices stay apart, in both themes.
-test("unsubscribe (UI49): opening the link sends nothing and never shows the value; one explicit press sends the one-click body once; failure, limit and success are said; essential notices stay apart; accessible in both themes", async ({ page }) => {
+// nothing, the press sends once, each answer is said, and the essential notices stay apart, and the page is accessible.
+test("unsubscribe (UI49): opening the link sends nothing and never shows the value; one explicit press sends the one-click body once; failure, limit and success are said; essential notices stay apart; accessible", async ({ page }) => {
   const token = "abc123-not-a-real-token";
   const optOut = `/api/v1/public/outreach/opt-out/${token}`;
   const posts: Array<{ readonly method: string; readonly body: string; readonly type: string | undefined; readonly cookie: string | undefined }> = [];
@@ -518,15 +484,6 @@ test("unsubscribe (UI49): opening the link sends nothing and never shows the val
     await held;
     await route.fulfill({ status, contentType: "application/json", body: "{}" });
   });
-  const theme = async (name: "light" | "dark"): Promise<void> => {
-    await page.evaluate((value) => {
-      const root = document.documentElement;
-      root.setAttribute("data-theme-switching", "");
-      root.setAttribute("data-theme", value);
-      void getComputedStyle(root).color;
-      root.removeAttribute("data-theme-switching");
-    }, name);
-  };
 
   // opening the page (a GET, as a mail client's prefetch would) changes nothing
   const seen = watch(page);
@@ -547,9 +504,6 @@ test("unsubscribe (UI49): opening the link sends nothing and never shows the val
   await expect(essential).toContainText("this page never turns them off");
   await expect(essential.locator("form, button, input")).toHaveCount(0);
   await assertAccessible(page);
-  await theme("dark");
-  await assertAccessible(page);
-  await theme("light");
 
   // a failure is said and the press can be repeated; a limit says to wait
   await stop.click();
@@ -581,8 +535,6 @@ test("unsubscribe (UI49): opening the link sends nothing and never shows the val
   }
   await expect(page.locator("main form[method='post']")).toHaveCount(0);
   await expect(essential).toBeVisible();
-  await assertAccessible(page);
-  await theme("dark");
   await assertAccessible(page);
 });
 

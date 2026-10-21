@@ -12,7 +12,6 @@
 import { type ComponentType, createContext, type ReactElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { message } from "../copy/en.ts";
 import { Main, SkipLink } from "./landmarks.tsx";
-import { ThemeChoice } from "./theme-control.tsx";
 import type { NavigationItem, ProjectInView, RefusedAction, ShellView } from "./view.ts";
 
 export interface AnchorProps {
@@ -106,7 +105,7 @@ function initials(name: string): string {
 
 /**
  * The person's own controls at the foot of the menu (Order 11 round 2): one button that opens a short menu upward, next to it, with the
- * person's settings, the theme by name, and Sign out last. It replaces a link, a lone icon and a bordered button that sat side by side.
+ * person's settings and Sign out last. It replaces a link, a lone icon and a bordered button that sat side by side.
  * The menu closes on Escape (focus returns to its button) and on a click anywhere outside it; a click, never a pointerdown, so the press
  * that lands outside is finished before anything closes.
  */
@@ -144,10 +143,6 @@ function AccountMenu({ accountHref, role, Link, onSignOut }: { readonly accountH
               </Link>
             </li>
           )}
-          <li className="kauro-account-theme">
-            <span aria-hidden="true">{message("shell.theme.label")}</span>
-            <ThemeChoice className="kauro-theme-choice" labels={{ group: message("shell.theme.label"), light: message("shell.theme.option.light.label"), dark: message("shell.theme.option.dark.label") }} />
-          </li>
           <li className="kauro-account-leave">
             <button type="button" className="kauro-account-item" onClick={onSignOut}>
               {message("shell.sign-out.label")}

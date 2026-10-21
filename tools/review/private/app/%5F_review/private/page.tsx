@@ -21,7 +21,7 @@ export default function Index() {
       <h1>Kauro review — private screens</h1>
       <p className="rx-lead">
         Every private screen of the registry ({INVENTORY_GAPS.registryPrivate} of {INVENTORY_GAPS.registryTotal}), drawn on your machine with synthetic data. Nothing is sent or saved; no
-        account, provider or CRM is touched. Open a screen, change the person, its state, the width and the theme, and move to the next one.
+        account, provider or CRM is touched. Open a screen, change the person, its state and the width, and move to the next one.
       </p>
       <section className="rx-experiences" aria-labelledby="rx-walk">
         <h2 id="rx-walk">Walk it as a person</h2>

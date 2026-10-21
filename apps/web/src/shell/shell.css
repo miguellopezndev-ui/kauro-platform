@@ -388,50 +388,9 @@ body {
 }
 
 .kauro-account-panel a:focus-visible,
-.kauro-account-item:focus-visible,
-.kauro-theme-choice button:focus-visible {
+.kauro-account-item:focus-visible {
   outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
   outline-offset: -2px;
-}
-
-.kauro-account-theme {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kauro-space-3);
-  min-block-size: 2.75rem;
-  padding: 0 0.25rem 0 var(--kauro-space-3);
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
-}
-
-.kauro-theme-choice {
-  display: inline-flex;
-  gap: 0.125rem;
-  padding: 0.125rem;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: 0.5rem;
-  background: var(--kauro-color-surface);
-}
-
-.kauro-theme-choice button {
-  min-block-size: 2rem;
-  padding: 0 var(--kauro-space-3);
-  border: 1px solid transparent;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: var(--kauro-color-text-muted);
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.kauro-theme-choice button[aria-pressed="true"] {
-  border-color: var(--kauro-color-border);
-  background: var(--kauro-color-raised);
-  color: var(--kauro-color-text);
-  font-weight: 600;
 }
 
 /* Sign out last, after a rule, as in every account menu */
@@ -439,17 +398,6 @@ body {
   margin-block-start: 0.25rem;
   padding-block-start: 0.25rem;
   border-block-start: 1px solid var(--kauro-color-border);
-}
-
-/* A circle half filled: the sign for contrast, drawn in the text colour (the public frame draws the same sign). */
-.kauro-theme-glyph {
-  display: block;
-  box-sizing: border-box;
-  inline-size: 1.125rem;
-  block-size: 1.125rem;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
 }
 
 @media (max-width: 61.99rem) {

@@ -85,7 +85,7 @@ function index() {
   const rows = PAGES.map(([name, path, cat, note]) => `<tr><td><a href="${path}">${esc(name)}</a><br><code>${esc(path)}</code></td><td><span class="cat cat-${cat}">${LABEL[cat]}</span></td><td>${esc(note)}</td></tr>`).join("");
   const switches = Object.keys(READINGS).map((k) => `<a class="${k === readingName ? "on" : ""}" href="/__review/publication/${k}">${k}</a>`).join(" ");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kauro review</title>
-<style>:root{color-scheme:light dark;--bg:#f8f6f3;--ink:#242426;--mut:#5e5853;--rule:#ddd5cc;--wine:#653a46}@media (prefers-color-scheme:dark){:root{--bg:#1d1d1f;--ink:#f1ede8;--mut:#b8b0a8;--rule:#3a3a3d;--wine:#c4a693}}
+<style>:root{color-scheme:dark;--bg:#1d1d1f;--ink:#f1ede8;--mut:#b8b0a8;--rule:#3a3a3d;--wine:#c4a693}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}main{max-width:1100px;margin:0 auto;padding:24px 16px 48px}h1{margin:0 0 4px;font-size:24px}p{color:var(--mut);max-width:820px}
 table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--rule);padding:8px;text-align:left;vertical-align:top}a{color:var(--wine)}code{font-size:12px;color:var(--mut)}
 .cat{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;border:1px solid}.cat-IMPLEMENTED{color:#1d6b43;border-color:#1d6b43}.cat-SYNTHETIC{color:#7a4d0c;border-color:#7a4d0c}.cat-PROTOTYPE{color:#8a1c2b;border-color:#8a1c2b}

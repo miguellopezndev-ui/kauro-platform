@@ -1,36 +1,36 @@
 /* Generated from packages/ui/src/tokens.ts (renderTokenCss); packages/ui/test/tokens.test.ts checks it. Do not edit by hand. */
 :root {
-  color-scheme: light;
-  --kauro-color-text: #242426;
-  --kauro-color-text-muted: #5F5955;
-  --kauro-color-background: #F8F6F3;
-  --kauro-color-surface: #F1EDE8;
-  --kauro-color-raised: #FAF8F5;
-  --kauro-color-border: #E3DCD4;
-  --kauro-color-control-border: #8C837D;
-  --kauro-color-primary: #653A46;
-  --kauro-color-primary-hover: #4F2C37;
-  --kauro-color-on-primary: #F8F6F3;
-  --kauro-color-focus: #653A46;
+  color-scheme: dark;
+  --kauro-color-text: #F1ECE6;
+  --kauro-color-text-muted: #ADA59E;
+  --kauro-color-background: #242426;
+  --kauro-color-surface: #1D1D1F;
+  --kauro-color-raised: #2D2C2F;
+  --kauro-color-border: #3A393D;
+  --kauro-color-control-border: #857D77;
+  --kauro-color-primary: #C4A693;
+  --kauro-color-primary-hover: #D6BFAE;
+  --kauro-color-on-primary: #242426;
+  --kauro-color-focus: #C4A693;
   --kauro-color-accent: #C4A693;
-  --kauro-color-accent-text: #7A5A45;
-  --kauro-color-accent-surface: #ECE2D9;
-  --kauro-color-ink: #242426;
-  --kauro-color-on-ink: #F8F6F3;
-  --kauro-color-ink-muted: #B5ADA6;
-  --kauro-color-ink-border: #3D3B3F;
+  --kauro-color-accent-text: #C4A693;
+  --kauro-color-accent-surface: #352E2A;
+  --kauro-color-ink: #19191B;
+  --kauro-color-on-ink: #F1ECE6;
+  --kauro-color-ink-muted: #ADA59E;
+  --kauro-color-ink-border: #333236;
   --kauro-color-ink-accent: #C4A693;
   --kauro-color-wine: #653A46;
   --kauro-color-on-wine: #F8F6F3;
   --kauro-color-wine-muted: #E3D3D2;
-  --kauro-color-danger-text: #9E2F26;
-  --kauro-color-danger-surface: #F7E3DF;
-  --kauro-color-warning-text: #7A4D0C;
-  --kauro-color-warning-surface: #F5E8D2;
-  --kauro-color-success-text: #2E5B38;
-  --kauro-color-success-surface: #E3EDE2;
-  --kauro-color-info-text: #344E6B;
-  --kauro-color-info-surface: #E4E9EF;
+  --kauro-color-danger-text: #F0A49A;
+  --kauro-color-danger-surface: #3A2422;
+  --kauro-color-warning-text: #E3BC74;
+  --kauro-color-warning-surface: #352A1B;
+  --kauro-color-success-text: #A3CDA9;
+  --kauro-color-success-surface: #213026;
+  --kauro-color-info-text: #AFC3DA;
+  --kauro-color-info-surface: #242D38;
   --kauro-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --kauro-display-family: "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --kauro-mono-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
@@ -57,144 +57,8 @@
   --kauro-target-size: 44px;
   --kauro-border-width: 1px;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --kauro-color-text: #F1ECE6;
-    --kauro-color-text-muted: #ADA59E;
-    --kauro-color-background: #242426;
-    --kauro-color-surface: #1D1D1F;
-    --kauro-color-raised: #2D2C2F;
-    --kauro-color-border: #3A393D;
-    --kauro-color-control-border: #857D77;
-    --kauro-color-primary: #C4A693;
-    --kauro-color-primary-hover: #D6BFAE;
-    --kauro-color-on-primary: #242426;
-    --kauro-color-focus: #C4A693;
-    --kauro-color-accent: #C4A693;
-    --kauro-color-accent-text: #C4A693;
-    --kauro-color-accent-surface: #352E2A;
-    --kauro-color-ink: #19191B;
-    --kauro-color-on-ink: #F1ECE6;
-    --kauro-color-ink-muted: #ADA59E;
-    --kauro-color-ink-border: #333236;
-    --kauro-color-ink-accent: #C4A693;
-    --kauro-color-wine: #653A46;
-    --kauro-color-on-wine: #F8F6F3;
-    --kauro-color-wine-muted: #E3D3D2;
-    --kauro-color-danger-text: #F0A49A;
-    --kauro-color-danger-surface: #3A2422;
-    --kauro-color-warning-text: #E3BC74;
-    --kauro-color-warning-surface: #352A1B;
-    --kauro-color-success-text: #A3CDA9;
-    --kauro-color-success-surface: #213026;
-    --kauro-color-info-text: #AFC3DA;
-    --kauro-color-info-surface: #242D38;
-  }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --kauro-color-text: #F1ECE6;
-  --kauro-color-text-muted: #ADA59E;
-  --kauro-color-background: #242426;
-  --kauro-color-surface: #1D1D1F;
-  --kauro-color-raised: #2D2C2F;
-  --kauro-color-border: #3A393D;
-  --kauro-color-control-border: #857D77;
-  --kauro-color-primary: #C4A693;
-  --kauro-color-primary-hover: #D6BFAE;
-  --kauro-color-on-primary: #242426;
-  --kauro-color-focus: #C4A693;
-  --kauro-color-accent: #C4A693;
-  --kauro-color-accent-text: #C4A693;
-  --kauro-color-accent-surface: #352E2A;
-  --kauro-color-ink: #19191B;
-  --kauro-color-on-ink: #F1ECE6;
-  --kauro-color-ink-muted: #ADA59E;
-  --kauro-color-ink-border: #333236;
-  --kauro-color-ink-accent: #C4A693;
-  --kauro-color-wine: #653A46;
-  --kauro-color-on-wine: #F8F6F3;
-  --kauro-color-wine-muted: #E3D3D2;
-  --kauro-color-danger-text: #F0A49A;
-  --kauro-color-danger-surface: #3A2422;
-  --kauro-color-warning-text: #E3BC74;
-  --kauro-color-warning-surface: #352A1B;
-  --kauro-color-success-text: #A3CDA9;
-  --kauro-color-success-surface: #213026;
-  --kauro-color-info-text: #AFC3DA;
-  --kauro-color-info-surface: #242D38;
-}
 .kauro-inverse {
   color-scheme: dark;
-  --kauro-color-text: #F1ECE6;
-  --kauro-color-text-muted: #ADA59E;
-  --kauro-color-background: #242426;
-  --kauro-color-surface: #1D1D1F;
-  --kauro-color-raised: #2D2C2F;
-  --kauro-color-border: #3A393D;
-  --kauro-color-control-border: #857D77;
-  --kauro-color-primary: #C4A693;
-  --kauro-color-primary-hover: #D6BFAE;
-  --kauro-color-on-primary: #242426;
-  --kauro-color-focus: #C4A693;
-  --kauro-color-accent: #C4A693;
-  --kauro-color-accent-text: #C4A693;
-  --kauro-color-accent-surface: #352E2A;
-  --kauro-color-ink: #19191B;
-  --kauro-color-on-ink: #F1ECE6;
-  --kauro-color-ink-muted: #ADA59E;
-  --kauro-color-ink-border: #333236;
-  --kauro-color-ink-accent: #C4A693;
-  --kauro-color-wine: #653A46;
-  --kauro-color-on-wine: #F8F6F3;
-  --kauro-color-wine-muted: #E3D3D2;
-  --kauro-color-danger-text: #F0A49A;
-  --kauro-color-danger-surface: #3A2422;
-  --kauro-color-warning-text: #E3BC74;
-  --kauro-color-warning-surface: #352A1B;
-  --kauro-color-success-text: #A3CDA9;
-  --kauro-color-success-surface: #213026;
-  --kauro-color-info-text: #AFC3DA;
-  --kauro-color-info-surface: #242D38;
-  color: var(--kauro-color-text);
-  background: var(--kauro-color-background);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .kauro-inverse {
-    --kauro-color-text: #F1ECE6;
-    --kauro-color-text-muted: #ADA59E;
-    --kauro-color-background: #19191B;
-    --kauro-color-surface: #141416;
-    --kauro-color-raised: #262528;
-    --kauro-color-border: #323135;
-    --kauro-color-control-border: #857D77;
-    --kauro-color-primary: #C4A693;
-    --kauro-color-primary-hover: #D6BFAE;
-    --kauro-color-on-primary: #242426;
-    --kauro-color-focus: #C4A693;
-    --kauro-color-accent: #C4A693;
-    --kauro-color-accent-text: #C4A693;
-    --kauro-color-accent-surface: #2B2623;
-    --kauro-color-ink: #19191B;
-    --kauro-color-on-ink: #F1ECE6;
-    --kauro-color-ink-muted: #ADA59E;
-    --kauro-color-ink-border: #333236;
-    --kauro-color-ink-accent: #C4A693;
-    --kauro-color-wine: #653A46;
-    --kauro-color-on-wine: #F8F6F3;
-    --kauro-color-wine-muted: #E3D3D2;
-    --kauro-color-danger-text: #F0A49A;
-    --kauro-color-danger-surface: #3A2422;
-    --kauro-color-warning-text: #E3BC74;
-    --kauro-color-warning-surface: #352A1B;
-    --kauro-color-success-text: #A3CDA9;
-    --kauro-color-success-surface: #213026;
-    --kauro-color-info-text: #AFC3DA;
-    --kauro-color-info-surface: #242D38;
-  }
-}
-:root[data-theme="dark"] .kauro-inverse {
   --kauro-color-text: #F1ECE6;
   --kauro-color-text-muted: #ADA59E;
   --kauro-color-background: #19191B;
@@ -225,6 +89,8 @@
   --kauro-color-success-surface: #213026;
   --kauro-color-info-text: #AFC3DA;
   --kauro-color-info-surface: #242D38;
+  color: var(--kauro-color-text);
+  background: var(--kauro-color-background);
 }
 .kauro-wine {
   color-scheme: dark;
@@ -282,7 +148,6 @@ html {
   outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
   outline-offset: var(--kauro-focus-offset);
 }
-:root[data-theme-switching] *, :root[data-theme-switching] *::before, :root[data-theme-switching] *::after { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

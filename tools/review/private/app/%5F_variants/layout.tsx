@@ -5,21 +5,13 @@
 import "@web/app/(public)/public.css";
 import "../../variants/variants.css";
 import type { ReactNode } from "react";
-import { PUBLIC_COPY } from "@web/copy/public.ts";
 import { SiteFrame } from "@web/public/frame.tsx";
-import { SiteThemeControl } from "@web/app/(public)/theme-control.tsx";
 import { FooterColumns } from "../../variants/footer-nav.tsx";
 import { HeaderNav } from "../../variants/header-nav.tsx";
 
-const THEME_LABELS = {
-  group: PUBLIC_COPY["site.theme.label"],
-  light: PUBLIC_COPY["site.theme.option.light.label"],
-  dark: PUBLIC_COPY["site.theme.option.dark.label"],
-};
-
 export default function VariantsLayout({ children }: { readonly children: ReactNode }) {
   return (
-    <SiteFrame signInHref="/login" nav={<HeaderNav />} themeControl={<SiteThemeControl labels={THEME_LABELS} />} footerNav={<FooterColumns />}>
+    <SiteFrame signInHref="/login" nav={<HeaderNav />} footerNav={<FooterColumns />}>
       {children}
     </SiteFrame>
   );

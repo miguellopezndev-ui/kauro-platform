@@ -1,9 +1,9 @@
 "use client";
 // P-01 Your account (proposed; Order 11 round 2, research app-shell-settings.md §9.10 A). The personal scope, the same in every workspace,
-// opened from the account menu (route /account). Five pages, in order of use: Profile · Sign-in and security · Notifications · Appearance ·
+// opened from the account menu (route /account). Four pages, in order of use: Profile · Sign-in and security · Notifications ·
 // Your workspaces. Each states its scope under its heading: "These settings only apply to you."
 //
-// Built only from what exists where it can be: the theme is the application's own control (POST /preferences/theme); two-step verification
+// Built only from what exists where it can be (the product has one theme, dark, so there is no Appearance page): two-step verification
 // and the session's limits come from the session (getCurrentSession) and the session policy (idle 30 minutes, 12 hours at most, a fresh
 // confirmation after 15 minutes: packages/application/src/sessions/protocol.ts, ports/assurance-and-admission.ts); the memberships are the
 // switcher's read (ListAgencies). The profile read, sign-in methods, recovery codes, other sessions, security activity and notification
@@ -26,7 +26,6 @@ export const P01_STATES: readonly StateDef[] = [
   { key: "security-signed-out", label: "Other sessions ended", note: "After signing out of every other session: only this one is left." },
   { key: "notifications", label: "Notifications", note: "The emails you choose, per workspace, and the ones that are always sent." },
   { key: "notifications-saved", label: "Notifications saved", note: "After saving the choices." },
-  { key: "appearance", label: "Appearance", note: "Light, dark or match your device; motion follows your device's setting." },
   { key: "workspaces", label: "Your workspaces", note: "Each membership with its type, role and when you joined; leave one, create one, open the example." },
 ];
 
@@ -34,7 +33,6 @@ const PAGES: readonly SettingsPage[] = [
   { key: "normal", label: "Profile" },
   { key: "security", label: "Sign-in and security" },
   { key: "notifications", label: "Notifications" },
-  { key: "appearance", label: "Appearance" },
   { key: "workspaces", label: "Your workspaces" },
 ];
 
@@ -48,7 +46,6 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
       {page === "normal" ? <Profile ctx={ctx} /> : null}
       {page === "security" ? <Security ctx={ctx} state={state} /> : null}
       {page === "notifications" ? <Notifications ctx={ctx} state={state} /> : null}
-      {page === "appearance" ? <Appearance /> : null}
       {page === "workspaces" ? <Workspaces ctx={ctx} /> : null}
     </SettingsFrame>
   );
@@ -245,53 +242,6 @@ function Notifications({ ctx, state }: Pick<PrototypeProps, "ctx" | "state">): R
           <li>Payment messages: a transfer matched, a payment under review, a refund.</li>
           <li>Deletion messages: files about to be deleted, and the record once they are.</li>
         </ul>
-      </section>
-    </>
-  );
-}
-
-/** Light, dark, or the device's own setting; the light and dark choices go to the web's own theme route (POST /preferences/theme). */
-function Appearance(): ReactElement {
-  const [theme, setTheme] = useState<"light" | "dark" | "system" | null>(null);
-  useEffect(() => {
-    const stored = document.documentElement.dataset["theme"];
-    setTheme(stored === "light" || stored === "dark" ? stored : "system");
-  }, []);
-  const choose = (next: "light" | "dark" | "system"): void => {
-    setTheme(next);
-    if (next === "system") {
-      delete document.documentElement.dataset["theme"];
-      return;
-    }
-    document.documentElement.dataset["theme"] = next;
-    void fetch("/preferences/theme", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-kauro-theme": "1" }, body: `theme=${next}`, credentials: "same-origin" }).catch(() => undefined);
-  };
-  return (
-    <>
-      <section aria-labelledby="me-theme-h">
-        <h2 id="me-theme-h">Theme</h2>
-        <fieldset className="kauro-a-themes">
-          <legend className="kauro-visually-hidden">Theme</legend>
-          {(["light", "dark", "system"] as const).map((option) => (
-            <label key={option} className={`kauro-a-theme kauro-a-theme--${option}`}>
-              <span className="kauro-a-theme-preview" aria-hidden="true">
-                <span className="kauro-a-theme-bar">Kauro</span>
-                <span className="kauro-a-theme-line" />
-                <span className="kauro-a-theme-line kauro-a-theme-line--short" />
-              </span>
-              <span className="kauro-a-theme-choice">
-                <input type="radio" name="theme" value={option} checked={theme === option} onChange={() => choose(option)} />
-                <span>{option === "light" ? "Light" : option === "dark" ? "Dark" : "Match your device"}</span>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-        <p className="kauro-muted">Saved for this browser as soon as you choose. The same choice is in the account menu.</p>
-        <Needs>Needs a change: the theme setting stores light or dark today; "Match your device" needs a third value</Needs>
-      </section>
-      <section aria-labelledby="me-motion-h">
-        <h2 id="me-motion-h">Motion</h2>
-        <p>Kauro follows your device&apos;s reduce-motion setting: when it is on, nothing on a page moves.</p>
       </section>
     </>
   );

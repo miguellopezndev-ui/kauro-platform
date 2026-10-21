@@ -281,7 +281,7 @@
   }
 }
 
-/* the smallest phones (under 360 px): the brand, the menu, the theme and Sign in fit on one line with tighter gaps */
+/* the smallest phones (under 360 px): the brand, the menu and Sign in fit on one line with tighter gaps */
 @media (max-width: 22.49rem) {
   .kauro-site-header-inner:has(.kauro-variant-nav) {
     column-gap: var(--kauro-space-2);

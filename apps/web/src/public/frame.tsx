@@ -1,11 +1,11 @@
 // The frame every public page shares (UI01-UI08, UI48, UI49): a skip link, the site header, the main region every page renders into, and a
-// footer with the name, the one-line limit of what Kauro does, the service links and the theme control.
+// footer with the name, the service links and the one-line limit of what Kauro does.
 //
 // Order 11 round 2, the header as the best B2B headers measured compose it: the name on the left with the main pages beside it on a wide
 // screen; on the right "Sign in" as a quiet link and the site's one call to action as the only filled button; a menu only where the pages
-// no longer fit. The theme control moved to the footer, as on the sites that offer one, so the header holds only what a buyer navigates by.
+// no longer fit, so the header holds only what a buyer navigates by. One theme, dark (owner, 2026-10-21): no theme control anywhere.
 //
-// Pure markup with no router: the navigation that marks the current page and the theme control are handed in (the client components of
+// Pure markup with no router: the navigation that marks the current page is handed in (the client components of
 // src/app/(public)/ read the path), so node:test renders this whole frame. Classes are all kauro-site-*: this frame and W3's application shell
 // never share a selector. The main region's id is the one the application shell also uses for its skip link.
 import type { ReactElement, ReactNode } from "react";
@@ -69,14 +69,12 @@ export interface SiteFrameProps {
   readonly cta?: ReactNode;
   /** The menu of a narrow screen; none in a plain render. */
   readonly menu?: ReactNode;
-  /** The colour theme control (a client component); none in a render that has no browser. */
-  readonly themeControl?: ReactNode;
   /** The footer navigation; the plain list when not given. */
   readonly footerNav?: ReactNode;
   readonly children: ReactNode;
 }
 
-export function SiteFrame({ signInHref, nav, cta, menu, themeControl, footerNav, children }: SiteFrameProps): ReactElement {
+export function SiteFrame({ signInHref, nav, cta, menu, footerNav, children }: SiteFrameProps): ReactElement {
   return (
     <>
       <a className="kauro-site-skip" href={`#${MAIN_ID}`}>
@@ -111,7 +109,6 @@ export function SiteFrame({ signInHref, nav, cta, menu, themeControl, footerNav,
           {footerNav ?? <FooterNav />}
           <div className="kauro-site-footer-row">
             <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
-            {themeControl}
           </div>
         </div>
       </footer>
