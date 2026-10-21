@@ -162,7 +162,7 @@ for (const route of ["/sample-delivery", "/legal/terms"]) {
 test("the pages give the same reading twice in a row: the publication is read on every request, never cached", async ({ page }) => {
   api.publish([["CLEAN", "AVAILABLE"]]);
   await page.goto("/status");
-  await expect(page.locator("main")).toContainText("CLEAN");
+  await expect(page.locator("main")).toContainText("Clean your data");
   await expect(page.locator("main")).not.toContainText("HubSpot");
   api.publish([["CLEAN", "AVAILABLE"], ["HUBSPOT", "AVAILABLE"]]);
   await page.goto("/status");
@@ -321,7 +321,8 @@ test("contact: an empty form sends nothing, moves focus to a summary that links 
   ] as const) {
     const control = page.locator(`#${field}`);
     await expect(control).toHaveAttribute("aria-invalid", "true");
-    await expect(control).toHaveAttribute("aria-describedby", `${field}-error`);
+    // a field with a hint keeps it, and its message is named last (the size question says why it is asked)
+    await expect(control).toHaveAttribute("aria-describedby", new RegExp(`^(?:\\S+ )?${field}-error$`));
     await expect(page.locator(`#${field}-error`)).toHaveText(message);
   }
   await expect(page.locator("#contact-buyer")).toHaveAttribute("aria-describedby", "contact-buyer-error");
@@ -450,7 +451,7 @@ test("no scripts: the fit form and the estimator each say they need scripts, in 
     await expect(page.locator("noscript > p")).toHaveText("This form needs JavaScript to send your inquiry.");
     await expect(page.locator("noscript > p")).toBeVisible();
     await page.goto("/pricing");
-    await expect(page.locator("noscript > p")).toHaveText("The estimate needs JavaScript. The table above shows every band and price.");
+    await expect(page.locator("noscript > p")).toHaveText("The estimate needs JavaScript. The table below shows every band and price.");
     await expect(page.locator("noscript > p")).toBeVisible();
   } finally {
     await context.close();
@@ -462,7 +463,7 @@ test("no scripts: the fit form and the estimator each say they need scripts, in 
 test("pricing: the estimator answers in a polite live region only when asked, in words a screen reader can read, and never as a quote", async ({ page }) => {
   await page.goto("/pricing");
   await page.waitForFunction(() => {
-    const form = document.querySelector("form.kauro-site-form");
+    const form = document.querySelector("form.kauro-r2-estimator");
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
   const result = page.locator("#estimate-result");
@@ -471,13 +472,16 @@ test("pricing: the estimator answers in a polite live region only when asked, in
   await page.getByLabel("Billable source units").fill("many");
   await expect(result, "typing announces nothing").toContainText("Enter a number to see the indicative band.");
   await page.getByRole("button", { name: "Show the indicative band" }).click();
+  await expect(result, "no service is chosen for the visitor").toContainText("Choose a service to see the indicative band.");
+  await page.getByLabel("Prepare for HubSpot").check();
+  await page.getByRole("button", { name: "Show the indicative band" }).click();
   await expect(result).toContainText("Enter a whole number of units, such as 42,000.");
   await page.getByLabel("Billable source units").fill("42,000");
   await page.getByRole("button", { name: "Show the indicative band" }).press("Enter");
-  await expect(result).toContainText(/Indicative band: .+ units, .+ for CLEAN\. This is an estimate and reserves nothing\./);
-  await page.getByLabel("Service").selectOption("HUBSPOT");
+  await expect(result).toContainText(/Indicative band for Prepare for HubSpot: .+ units, .+\. This is an estimate and reserves nothing\./);
+  await page.getByLabel("Clean your data").check();
   await page.getByRole("button", { name: "Show the indicative band" }).click();
-  await expect(result).toContainText(/for HubSpot/);
+  await expect(result).toContainText(/for Clean your data/);
   await assertAccessible(page);
 });
 
@@ -485,11 +489,11 @@ test("pricing: a service the publication does not list says it cannot be bought,
   api.publish([["CLEAN", "AVAILABLE"]]);
   await page.goto("/pricing");
   await page.waitForFunction(() => {
-    const form = document.querySelector("form.kauro-site-form");
+    const form = document.querySelector("form.kauro-r2-estimator");
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
   await page.getByLabel("Billable source units").fill("42,000");
-  await page.getByLabel("Service").selectOption("SALESFORCE");
+  await page.getByLabel("Prepare for Salesforce").check();
   await page.getByRole("button", { name: "Show the indicative band" }).click();
   await expect(page.locator("#estimate-result")).toContainText("Salesforce is not available for purchase right now.");
 });
