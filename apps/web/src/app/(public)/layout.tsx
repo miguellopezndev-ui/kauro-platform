@@ -12,9 +12,9 @@ import { SiteThemeControl } from "./theme-control.tsx";
 export const metadata: Metadata = { title: { template: "%s | Kauro", default: "Kauro" } };
 
 const THEME_LABELS = {
-  toDark: PUBLIC_COPY["site.theme.dark.label"],
-  toLight: PUBLIC_COPY["site.theme.light.label"],
-  toggle: PUBLIC_COPY["site.theme.toggle.label"],
+  group: PUBLIC_COPY["site.theme.label"],
+  light: PUBLIC_COPY["site.theme.option.light.label"],
+  dark: PUBLIC_COPY["site.theme.option.dark.label"],
 };
 
 export default function PublicLayout({ children }: { readonly children: ReactNode }) {

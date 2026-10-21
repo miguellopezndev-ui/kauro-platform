@@ -241,7 +241,8 @@ test("theme preference with JavaScript: the choice is drawn at once and is still
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
   const stored = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
-  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
+  // the footer names both themes (Order 11 round 2): choose the one not drawn now; choosing the drawn one sends nothing
+  await page.locator("form[action^='/preferences/theme'] button[type='submit'][aria-pressed='false']").click();
   expect((await stored).status(), "the background post is accepted").toBe(204);
   const chosen = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
   expect(chosen === "light" || chosen === "dark").toBe(true);

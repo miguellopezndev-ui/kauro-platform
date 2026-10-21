@@ -12,9 +12,9 @@ import { FooterColumns } from "../../variants/footer-nav.tsx";
 import { HeaderNav } from "../../variants/header-nav.tsx";
 
 const THEME_LABELS = {
-  toDark: PUBLIC_COPY["site.theme.dark.label"],
-  toLight: PUBLIC_COPY["site.theme.light.label"],
-  toggle: PUBLIC_COPY["site.theme.toggle.label"],
+  group: PUBLIC_COPY["site.theme.label"],
+  light: PUBLIC_COPY["site.theme.option.light.label"],
+  dark: PUBLIC_COPY["site.theme.option.dark.label"],
 };
 
 export default function VariantsLayout({ children }: { readonly children: ReactNode }) {

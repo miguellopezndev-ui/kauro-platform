@@ -93,6 +93,37 @@ export function ThemeChoice({ labels, className }: { readonly labels: ThemeChoic
   );
 }
 
+/**
+ * The theme as two named options in a form (Order 11 round 2, the public footer): it works before and without the script, since each option
+ * is its own submit button the server stores; with the script the page switches at once. The same words as the account menu's choice.
+ */
+export function ThemeChoiceForm({ labels, className, returnTo }: { readonly labels: ThemeChoiceLabels; readonly className: string; readonly returnTo: string | null }): ReactElement {
+  const drawn = useSyncExternalStore<Theme | null>(subscribe, drawnTheme, () => null);
+  function onSubmit(event: FormEvent<HTMLFormElement>): void {
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const value = submitter instanceof HTMLButtonElement ? submitter.value : null;
+    if (value !== "light" && value !== "dark") return;
+    event.preventDefault();
+    if (value !== drawn) choose(value);
+  }
+  const option = (theme: Theme, label: string): ReactElement => (
+    <button type="submit" name="theme" value={theme} aria-pressed={drawn === null ? undefined : drawn === theme}>
+      {label}
+    </button>
+  );
+  return (
+    <form className={className} method="post" action={`${THEME_ROUTE}?return=${encodeURIComponent(returnPath(returnTo))}`} onSubmit={onSubmit}>
+      <span className="kauro-theme-choice-label" aria-hidden="true">
+        {labels.group}
+      </span>
+      <span className="kauro-theme-choice" role="group" aria-label={labels.group}>
+        {option("light", labels.light)}
+        {option("dark", labels.dark)}
+      </span>
+    </form>
+  );
+}
+
 export function ThemeControl({ labels, className, returnTo, mode = "form" }: ThemeControlProps): ReactElement {
   const drawn = useSyncExternalStore<Theme | null>(subscribe, drawnTheme, () => null);
   const next: Theme | null = drawn === null ? null : drawn === "dark" ? "light" : "dark";
