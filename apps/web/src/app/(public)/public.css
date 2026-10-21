@@ -10152,3 +10152,7 @@ body:has(> .kauro-site-header) {
   justify-self: start;
   text-align: start;
 }
+/* the note runs on one line wherever the row is wide enough (owner, 2026-10-21); a phone still wraps it */
+.kauro-site-footer .kauro-site-footer-row .kauro-site-footer-note {
+  max-inline-size: none;
+}
