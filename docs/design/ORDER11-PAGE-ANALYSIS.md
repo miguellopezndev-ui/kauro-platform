@@ -48,7 +48,7 @@ the import's steps and results) share an entry. Every private page and proposal 
 5. **Next action.** Create the workspace.
 6. **Exceptions.** Out of scope (sensitive data, consumers): the page says Kauro is not for it; a workspace already in setup is resumed.
 7. **Connections.** From sign-up; to the workspace's projects.
-8. **Better than conventional.** About a minute; no billing form before money is involved (decision D-UI09-2, proposed).
+8. **Better than conventional.** Four short questions, no time promised; no billing form before a quote (decision D-UI09-2, proposed).
 9. **Extra / missing.** Moving billing details to the first quote needs a contract change (D-UI09-2).
 10. **Public-site quality.** Yes.
 
@@ -427,7 +427,7 @@ the import's steps and results) share an entry. Every private page and proposal 
 
 ### P-09 Billing overview (proposed) `/billing`
 
-1. **Who and why.** An owner or billing member opening Billing from the menu, to see what is due, open, paid or refunded.
+1. **Who and why.** Any member opening Billing from the menu, to see what is due, open, paid or refunded; owners and billing members act on it.
 2. **Decide or do.** Find what needs action (a transfer to send, a quote to accept) and open it.
 3. **Information.** Totals by state, each with a count; one line a quote or order: project, client, service, state, amount, the date
    that matters, the fiscal document's number.

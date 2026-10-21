@@ -94,7 +94,7 @@ export const RESOURCES: readonly Resource[] = [
   { family: "Worked example", version: 2, state: "CURRENT", since: "2026-10-05", what: "The synthetic project of the public site, step by step, for a demonstration" },
   { family: "Questions buyers ask", version: 2, state: "CURRENT", since: "2026-10-12", what: "Answers to the usual objections, each with the page of the site that backs it" },
   { family: "What a seller may promise", version: 1, state: "CURRENT", since: "2026-07-01", what: "The contract's limits: no discount, no deadline and no result you cannot show" },
-  { family: "Offer sheet", version: 2, state: "SUPERSEDED", since: "2026-07-01", what: "Named an introductory discount that no longer exists", replacedBy: "Offer sheet version 3, on Oct 12, 2026" },
+  { family: "Offer sheet", version: 2, state: "SUPERSEDED", since: "2026-07-01", what: "Its price wording was replaced by the current price bands", replacedBy: "Offer sheet version 3, on Oct 12, 2026" },
 ];
 
 /** The policy's repeat ladder, as the offer sheet quotes it (a buyer's own discount, never the seller's to give). */

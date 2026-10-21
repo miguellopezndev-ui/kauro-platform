@@ -171,7 +171,7 @@ function Welcome({ ctx }: { readonly ctx: ReviewContext }): ReactElement {
           <ol className="kauro-welcome-steps">
             <li>
               <strong>Set up your agency or company</strong>
-              <span>Who buys, its name, what your files hold, and the agreements. About a minute.</span>
+              <span>Who buys, its name, what your files hold, and the agreements.</span>
             </li>
             <li>
               <strong>Upload your exports</strong>

@@ -116,7 +116,7 @@ export function AgencySetup({ ctx, state }: PrototypeProps): ReactElement {
 
   return (
     <>
-      <PageHead title="Set up your agency or company" lead="What Kauro needs before it can receive real files. About a minute; billing details come later." />
+      <PageHead title="Set up your agency or company" lead="What Kauro needs before it can receive real files. Four short questions; billing details come later." />
       <p className="kauro-setup-done">
         <span className="kauro-setup-done-mark" aria-hidden="true" />
         <span>
@@ -229,7 +229,7 @@ export function AgencySetup({ ctx, state }: PrototypeProps): ReactElement {
           {state === "agreements-today" ? <Button type="button">Save as a draft</Button> : null}
         </div>
         <p className="kauro-muted">
-          Billing details are asked when you accept your first quote, not before. <span className="kauro-proposed">Proposed — D-UI09-2</span>
+          Billing details are asked before your first quote is issued, not now. <span className="kauro-proposed">Proposed — D-UI09-2</span>
         </p>
       </form>
       <p className="kauro-setup-join">

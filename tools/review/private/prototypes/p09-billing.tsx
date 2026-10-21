@@ -142,7 +142,7 @@ export function BillingOverview({ ctx, state }: PrototypeProps): ReactElement {
             </table>
           </div>
           <p className="kauro-muted">
-            Amounts in USD. A quote is not a charge and an order is not an invoice: a fiscal document exists only where this list shows its number. {agencyId === "" ? "" : "Only owners and billing members see this page."}
+            Amounts in USD. A quote is not a charge and an order is not an invoice: a fiscal document exists only where this list shows its number. {agencyId === "" ? "" : "Every member sees this page; only owners and billing members request quotes, pay or ask for refunds."}
           </p>
         </>
       )}

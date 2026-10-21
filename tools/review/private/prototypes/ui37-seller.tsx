@@ -52,7 +52,7 @@ export function SellerLifecycle({ state }: PrototypeProps): ReactElement {
             </div>
             <div>
               <dt>Notice</dt>
-              <dd>As the agreement sets: 15 days, in writing, with the reason.</dd>
+              <dd>As the signed seller agreement sets, in writing, with the reason.</dd>
             </div>
           </dl>
           <div className="kauro-actions">

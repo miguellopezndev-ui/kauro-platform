@@ -87,7 +87,7 @@ export const PROPOSALS: readonly Proposal[] = [
     primaryCopy: "Track quotes, payments, fiscal documents and refunds.",
     information: "A summary (waiting for a transfer, quotes to accept, paid this year, refunded: each an amount and a count); one line a quote or order: project, client and service, state, amount, the date that matters (send by, valid until, paid, refunded), the fiscal document's number.",
     actions: "Open the quote (UI23), the payment (UI24) or the order's billing (UI30).",
-    exceptions: "A quote is never shown as a charge, nor an order as an invoice; the free check never appears; only owners and billing members see it.",
+    exceptions: "A quote is never shown as a charge, nor an order as an invoice; the free check never appears; every member sees it, and only owners and billing members act on it.",
   },
   {
     key: "P-07",

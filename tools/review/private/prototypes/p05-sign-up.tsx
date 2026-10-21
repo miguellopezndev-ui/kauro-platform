@@ -139,7 +139,7 @@ export function SignUp({ state }: PrototypeProps): ReactElement {
       title = "Set up two‑step verification";
       lead = google
         ? "Google has confirmed who you are. Kauro also asks for a code from an authenticator app every time you sign in, before anyone can see client data."
-        : "Kauro asks for a code from an authenticator app every time you sign in, before anyone can see client data. This takes a minute, once.";
+        : "Kauro asks for a code from an authenticator app every time you sign in, before anyone can see client data. You do this once.";
       body = (
         <form className="kauro-form" noValidate onSubmit={(event) => checkCode(event, "signup-enrol", "The code must be the 6 digits your app shows now; it changes every 30 seconds", () => go("codes"))}>
           <EnrolSteps />

@@ -47,7 +47,7 @@ export function ForAgenciesPage(): ReactElement {
         <ul className="kauro-site-specs kauro-site-specs--plate">
           <li>The free data health check works on a prospect&apos;s files too, with that business&apos;s documented authorisation and the data processing terms in place.</li>
           <li>It is never anonymous and never unlimited: it runs in your workspace, under your account.</li>
-          <li>Kauro never contacts your client or your prospect.</li>
+          <li>Kauro never uses what you share to contact your client or your prospect, and never contacts your client to sell around you.</li>
         </ul>
       </Section>
       <Section id="agencies-branding" heading="Reports with your name" layout="split" tone="sunken">

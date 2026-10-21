@@ -202,7 +202,7 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
             <ol>
               <li>Kauro checks who you are with evidence independent of this account, and your authority over the workspace.</li>
               <li>A person at Kauro reviews the checks. Nothing is automatic.</li>
-              <li>A waiting period, set by the risk, starts. Every owner and admin of the workspace is told, and can stop it.</li>
+              <li>A waiting period, set by the risk, starts. Every owner and admin of the workspace is told.</li>
               <li>Then you set up two-step verification again, and every other session of the account ends.</li>
             </ol>
           </div>
@@ -221,7 +221,7 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
       body = (
         <div className="kauro-form">
           <Banner tone="info" title="Requested on Oct 20, 2026 at 4:05 PM UTC" announce="status">
-            <p>Kauro is checking who you are. Every owner and admin of Northwind Data has been told by email, and can stop the recovery from that email.</p>
+            <p>Kauro is checking who you are. Every owner and admin of Northwind Data has been told by email, and is told what to do if it was not you.</p>
           </Banner>
           <dl className="kauro-recover-facts">
             <div>
@@ -297,7 +297,7 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
       break;
     case "enrol":
       title = "Set up two‑step verification";
-      lead = "Kauro asks for a code from an authenticator app every time you sign in, also with Google, before anyone can see client data. This takes a minute, once.";
+      lead = "Kauro asks for a code from an authenticator app every time you sign in, also with Google, before anyone can see client data. You do this once.";
       bar = "Two-step verification";
       stepLabel = undefined;
       body = (

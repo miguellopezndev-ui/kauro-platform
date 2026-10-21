@@ -58,7 +58,7 @@ function nextOf(state: string, actions: readonly string[], clean: boolean): Next
         : { title: "Download the package and import it", body: "The files, the report, the manifest and the import steps. Import in stages and return each stage's result.", who: "Your team", when: "Available until Oct 27, 2026, 4:20 PM UTC", cta: { label: "Open the delivery", screen: "UI26" } };
     default:
       return actions.includes("MANAGE_BILLING")
-        ? { title: "Pay the quote", body: `${EXAMPLE.price} for ${EXAMPLE.unitsText} billable source units, by bank transfer. The preparation starts once the exact amount is matched.`, who: "The billing person or an owner", when: "The quote is valid until Nov 3, 2026, 1:00 PM UTC", cta: { label: "Review the quote", screen: "UI23" } }
+        ? { title: "Pay the quote", body: `${EXAMPLE.price} for ${EXAMPLE.unitsText} billable source units, by bank transfer. Your team can start the preparation once the exact amount is matched.`, who: "The billing person or an owner", when: "The quote is valid until Nov 3, 2026, 1:00 PM UTC", cta: { label: "Review the quote", screen: "UI23" } }
         : { title: "Waiting for payment", body: `The quote is issued: ${EXAMPLE.price}. Ines Duarte (billing) or Lena Ortiz (owner) pays it by bank transfer.`, who: "The billing person or an owner", when: "The quote is valid until Nov 3, 2026, 1:00 PM UTC", link: { label: "See the quote", screen: "UI23" } };
   }
 }

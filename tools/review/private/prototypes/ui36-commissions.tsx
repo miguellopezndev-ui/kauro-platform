@@ -168,7 +168,7 @@ export function Commissions({ ctx, state }: PrototypeProps): ReactElement {
       ) : null}
       <aside className="kauro-statement-rules" aria-label="How commissions are counted">
         <p>
-          <strong>{FIRST_RATE}%</strong> of an agency&apos;s first project, <strong>{REPEAT_RATE}%</strong> of its repeats for {WINDOW_MONTHS} months after its first payment, counted on the service collected after discount, net of refunds and without tax. A line is payable {ELIGIBLE_DAYS} days after its project is complete. Each month&apos;s statement is issued on the {STATEMENT_BUSINESS_DAY}th business day of the next month and paid on the {PAYOUT_BUSINESS_DAY}th, on the Bogotá calendar.
+          <strong>{FIRST_RATE}%</strong> of a customer&apos;s first project, <strong>{REPEAT_RATE}%</strong> of its repeats for {WINDOW_MONTHS} months after its first payment, counted on the service collected after discount, net of refunds and without tax. A line is payable {ELIGIBLE_DAYS} days after its project is complete. Each month&apos;s statement is issued on the {STATEMENT_BUSINESS_DAY}th business day of the next month and paid on the {PAYOUT_BUSINESS_DAY}th, on the Bogotá calendar.
         </p>
       </aside>
       {STATEMENTS.map((statement) => (

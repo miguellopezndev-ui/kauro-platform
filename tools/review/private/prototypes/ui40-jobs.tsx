@@ -81,7 +81,7 @@ export function Jobs({ state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Resources</dt>
-            <dd>4 vCPU, 16 GB, at most 2 hours</dd>
+            <dd>Up to 8 GiB of memory, at most 8 hours (the policy's capacity)</dd>
           </div>
           <div>
             <dt>Lease</dt>

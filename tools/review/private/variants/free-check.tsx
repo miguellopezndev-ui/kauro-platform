@@ -16,7 +16,7 @@ import { ROUTE } from "@web/public/site.ts";
 
 const STEPS: readonly { readonly title: string; readonly body: string }[] = [
   { title: "Create an account", body: "With Google, or with your email and a password. Kauro verifies the email and sets up its own two-step verification before any file." },
-  { title: "Say who you are", body: "About a minute: an agency or a company, its name, what your files hold, and the agreements, accepted by someone who may accept them." },
+  { title: "Say who you are", body: "Four short questions: an agency or a company, its name, what your files hold, and the agreements, accepted by someone who may accept them." },
   { title: "Upload and seal the files", body: "CSV or XLSX exports of customer records. Sealing fixes the set the check measures; nothing is changed in it." },
   { title: "Read what the check found", body: "Each finding with its count, what it is counted out of, examples and how a plan would fix it; then an estimate from the price list." },
 ];

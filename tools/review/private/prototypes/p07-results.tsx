@@ -172,7 +172,7 @@ export function HealthResults({ ctx, state, project }: PrototypeProps): ReactEle
         <dl className="kauro-offer-facts">
           <div>
             <dt>What sets the price</dt>
-            <dd>The service, the number of source rows counted (duplicates included: they are part of the work), and the price list.</dd>
+            <dd>The service, the number of billable source units counted (contacts, organisations or deals, counted before duplicates are unified), and the price list.</dd>
           </div>
           <div>
             <dt>What can change before the quote</dt>
@@ -190,7 +190,7 @@ export function HealthResults({ ctx, state, project }: PrototypeProps): ReactEle
           </li>
           <li>
             <strong>Payment</strong>
-            <span>By bank transfer. The preparation starts once the exact amount is matched.</span>
+            <span>By bank transfer. Your team can start the preparation once the exact amount is matched.</span>
           </li>
         </ol>
         <div className="kauro-actions">

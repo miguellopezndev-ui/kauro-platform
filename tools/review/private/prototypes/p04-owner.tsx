@@ -103,7 +103,7 @@ export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
 
       <section id="owner-parameters" aria-labelledby="owner-parameters-h">
         <h2 id="owner-parameters-h">Operating parameters</h2>
-        <p>The values in force, from the policy registry. They change only through a reviewed policy version, never here.</p>
+        <p>The values in force, from the policy registry and the security settings in the code. They change only through a reviewed version, never here.</p>
         <Facts
           rows={[
             ["A quote stays valid", `${POLICY_SNAPSHOT.quoteDays} days`],

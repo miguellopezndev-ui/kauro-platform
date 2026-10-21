@@ -309,7 +309,7 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         summary={<p>Use this only when {who(subject)} has lost both their authenticator app and their recovery codes. You start the recovery; you cannot turn two-step verification off or let anyone in.</p>}
         effects={[
           { id: "check", description: <p>Kauro checks who they are with evidence independent of this account before anything changes.</p>, acknowledgeLabel: "I understand Kauro checks their identity" },
-          { id: "wait", description: <p>A waiting period, set by the risk, follows. {who(subject)} and every owner are told, and any of them can stop it.</p>, acknowledgeLabel: "I understand a waiting period applies" },
+          { id: "wait", description: <p>A waiting period, set by the risk, follows. {who(subject)} and every owner are told.</p>, acknowledgeLabel: "I understand a waiting period applies" },
           { id: "sessions", description: <p>When it completes, {who(subject)} sets up two-step verification again and every session of their account ends.</p>, acknowledgeLabel: "I understand their sessions end" },
         ]}
         copy={{ approve: "Confirm identity and start", cancel: "Do not start", errorSummaryTitle: "Check before starting" }}

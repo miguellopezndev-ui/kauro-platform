@@ -93,3 +93,16 @@ and the terms, and all nine were fixed.
 | N-46 | Refund form: an invalid field takes focus; the opened form's heading takes focus; the toggle drops an aria-expanded it could never update; another order closes the form. | The design system's field errors are not live regions, and the button that opened the form disappeared under the keyboard. | — |
 | N-47 | Finance's refusal follows the read both ways and starts again with another route; a second copy press is announced and keeps its message. | Both states stuck after their first value. The copy counter numbers presses, since the project keeps the browser clock in one place (K0). | — |
 | N-48 | Support hours say "except holidays" (ToS §12.1); the project header maps a step a service does not have (import, for "Clean your data") to its last step. | The hours omitted the holiday exclusion; the header could claim "step 1 of 5" for a delivered CLEAN project. | — |
+
+## Fact-check of the prototypes and variants (02:40)
+
+A second reviewer checked every rule, period, price, limit and promise in the prototypes and the variants against the terms, the policy
+and the code; fifteen were unsupported or contradicted, and all fifteen were corrected.
+
+| # | Decision | Why | To reverse |
+| --- | --- | --- | --- |
+| N-49 | No time is promised for setup or enrolment ("About a minute", "This takes a minute" removed). | No source; A3 §3.6 forbids promising fixed short times. | — |
+| N-50 | Payment lets the team start the preparation; it does not start it. | CMD036 is started by the team on a paid order. | — |
+| N-51 | Every member sees Billing; only owners and billing members act on it. | The reads need only a reader role (response-schemas.ts); P-09 said otherwise. | — |
+| N-52 | Removed: a 15-day seller notice period, "Kauro never contacts your prospect", "checks run every minute", "anyone can stop a recovery", a one-approval code, "4 vCPU, 2 hours", an "introductory discount" in the history. | None has a source; some contradict one (D-33 §1.1 and §4.2; CMD056; the 900-second step-up; policy capacity 8 GiB and 8 hours; ToS §7.3). Each now says what the sources support. | — |
+| N-53 | Billing details are asked "before your first quote is issued"; commission is on "a customer's" first project; support cases are due inside support hours; Owner settings says its values come from the registry and the security settings. | The quote requires a billing profile (CMD027); companies earn commission too (D-33 §3.1); ToS §12.1; the session and confirmation times are not in the registry. | — |

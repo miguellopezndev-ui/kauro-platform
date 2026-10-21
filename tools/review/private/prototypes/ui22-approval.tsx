@@ -22,7 +22,7 @@ import { SERVICE } from "./service.ts";
 
 export const UI22_STATES: readonly StateDef[] = [
   { key: "normal", label: "Ready to approve", note: "Every part reviewed and validated: the whole plan, part by part, with what it does not include." },
-  { key: "stepup", label: "Confirm it's you", note: "Approving revision 6 asks for Kauro's code, and says why; the code is valid for this one approval." },
+  { key: "stepup", label: "Confirm it's you", note: "Approving revision 6 asks for Kauro's code, and says why." },
   { key: "approved", label: "Approved", note: "Approved: the approval names revision 6, the set and the destination. The next step is the quote." },
   { key: "changes", label: "Request changes", note: "The approver writes what should change and why: the plan stays open, no quote is issued, the operator is told." },
   { key: "sent", label: "Changes requested", note: "Sent back: the plan stays open and no quote exists until a revision is approved." },
@@ -162,7 +162,7 @@ export function Approval({ ctx, state, project }: PrototypeProps): ReactElement 
           </label>
           {step === "stepup" ? (
             <div className="kauro-approve-code">
-              <CodeField id="approve-code" label="Your Kauro code" hint="Approving decides what is prepared from these records, so Kauro asks who you are again. The code works for this approval only." />
+              <CodeField id="approve-code" label="Your Kauro code" hint="Approving decides what is prepared from these records, so Kauro asks who you are again." />
               <Button variant="primary" onClick={() => setStep("approved")}>
                 Approve revision 6
               </Button>

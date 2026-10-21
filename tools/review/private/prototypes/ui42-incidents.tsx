@@ -22,7 +22,7 @@ export function Incidents({ ctx, state }: PrototypeProps): ReactElement {
       <PageHead title="Incidents" lead="Contain the affected scope and prove recovery." />
       {open ? null : (
         <Banner tone="success" title="No incident is open" announce="status">
-          <p>The last one closed on Oct 9, 2026. Checks run every minute; a new incident opens here by itself.</p>
+          <p>The last one closed on Oct 9, 2026. A new incident appears here when it is recorded.</p>
         </Banner>
       )}
       <section className="kauro-prospect" aria-labelledby="inc-h">
