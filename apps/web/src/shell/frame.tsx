@@ -12,7 +12,7 @@
 import { type ComponentType, createContext, type ReactElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { message } from "../copy/en.ts";
 import { Main, SkipLink } from "./landmarks.tsx";
-import { ThemeControl } from "./theme-control.tsx";
+import { ThemeChoice } from "./theme-control.tsx";
 import type { NavigationItem, ProjectInView, RefusedAction, ShellView } from "./view.ts";
 
 export interface AnchorProps {
@@ -104,6 +104,82 @@ function initials(name: string): string {
     .join("");
 }
 
+/**
+ * The person's own controls at the foot of the menu (Order 11 round 2): one button that opens a short menu upward, next to it, with the
+ * person's settings, the theme by name, and Sign out last. It replaces a link, a lone icon and a bordered button that sat side by side.
+ * The menu closes on Escape (focus returns to its button) and on a click anywhere outside it; a click, never a pointerdown, so the press
+ * that lands outside is finished before anything closes.
+ */
+function AccountMenu({ accountHref, Link, onSignOut }: { readonly accountHref: string | null; readonly Link: AnchorComponent; readonly onSignOut: () => void }): ReactElement {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onClick = (event: MouseEvent): void => {
+      if (event.target instanceof Node && root.current?.contains(event.target) === true) return;
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      button.current?.focus();
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div className="kauro-account" ref={root}>
+      <div className="kauro-account-panel" id={panelId} hidden={!open}>
+        <ul>
+          {accountHref === null ? null : (
+            <li>
+              <Link href={accountHref} prefetch={false}>
+                {message("shell.account.settings.label")}
+              </Link>
+            </li>
+          )}
+          <li className="kauro-account-theme">
+            <span aria-hidden="true">{message("shell.theme.label")}</span>
+            <ThemeChoice className="kauro-theme-choice" labels={{ group: message("shell.theme.label"), light: message("shell.theme.option.light.label"), dark: message("shell.theme.option.dark.label") }} />
+          </li>
+          <li className="kauro-account-leave">
+            <button type="button" className="kauro-account-item" onClick={onSignOut}>
+              {message("shell.sign-out.label")}
+            </button>
+          </li>
+        </ul>
+      </div>
+      <button type="button" ref={button} className="kauro-account-button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
+        <span className="kauro-account-mark" aria-hidden="true" />
+        <span className="kauro-account-name">{message("shell.account.label")}</span>
+        <span className="kauro-chevron" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/** A workspace as the menu names it: the mark, the name, and its state only when that state asks for attention. */
+function AgencyFace({ agency }: { readonly agency: NonNullable<ShellView["agency"]> }): ReactElement {
+  return (
+    <>
+      <span className="kauro-agency-mark" aria-hidden="true">
+        {initials(agency.name)}
+      </span>
+      <span className="kauro-agency-text">
+        <span className="kauro-agency-label">{message("shell.agency.label")}</span>
+        <bdi className="kauro-agency-name">{agency.name}</bdi>
+        {agency.state === "shell.agency.state.ACTIVE.label" ? null : <span className="kauro-agency-state">{message(agency.state)}</span>}
+      </span>
+    </>
+  );
+}
+
 /** The menu's entries in their groups, each group under its heading; Help is left for the foot of the menu. */
 function Groups({ items, Link, project }: { readonly items: readonly NavigationItem[]; readonly Link: AnchorComponent; readonly project?: ProjectInView | null | undefined }): ReactElement {
   const groups: { readonly heading: NavigationItem["group"]; readonly items: NavigationItem[] }[] = [];
@@ -189,22 +265,25 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
             </span>
           </p>
         ) : view.agency === null ? null : (
-          <div className="kauro-agency">
-            <span className="kauro-agency-mark" aria-hidden="true">
-              {initials(view.agency.name)}
-            </span>
-            <span className="kauro-agency-text">
-              <span className="kauro-agency-label">{message("shell.agency.label")}</span>
-              <bdi className="kauro-agency-name">{view.agency.name}</bdi>
-              <span className="kauro-agency-state">{message(view.agency.state)}</span>
-            </span>
+          // the workspace is its own switch (Order 11 round 2): its mark, its name and, only when it is not simply active, its state; the
+          // whole block goes to the workspaces when there is somewhere to switch to
+          <div className={view.switchHref === null ? "kauro-agency" : "kauro-agency kauro-agency--switch"}>
+            {view.switchHref === null ? (
+              <AgencyFace agency={view.agency} />
+            ) : (
+              <Link href={view.switchHref} prefetch={false}>
+                <AgencyFace agency={view.agency} />
+                <span className="kauro-shell-hidden">{message("shell.agency.switch.label")}</span>
+                <span className="kauro-chevron" aria-hidden="true" />
+              </Link>
+            )}
           </div>
         )}
         <div className="kauro-shell-panel" id={menuId}>
-          {view.switchHref === null ? null : (
+          {view.switchHref === null || view.agency !== null ? null : (
             <p className="kauro-shell-switch">
               <Link href={view.switchHref} prefetch={false}>
-                {message(view.agency === null && !view.ops ? "shell.workspaces.label" : "shell.agency.switch.label")}
+                {message("shell.workspaces.label")}
               </Link>
             </p>
           )}
@@ -226,26 +305,7 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
               )}
             </nav>
           )}
-          {view.signOut ? (
-            <div className="kauro-shell-actions">
-            {view.accountHref === null ? null : (
-              <Link href={view.accountHref} prefetch={false}>
-                {message("shell.account.label")}
-              </Link>
-            )}
-            <span className="kauro-shell-controls">
-              <ThemeControl
-                mode="button"
-                className="kauro-shell-theme"
-                returnTo={null}
-                labels={{ toDark: message("shell.theme.dark.label"), toLight: message("shell.theme.light.label"), toggle: message("shell.theme.toggle.label") }}
-              />
-              <button type="button" className="kauro-button" onClick={actions.signOut}>
-                {message("shell.sign-out.label")}
-              </button>
-            </span>
-            </div>
-          ) : null}
+          {view.signOut ? <AccountMenu accountHref={view.accountHref} Link={Link} onSignOut={actions.signOut} /> : null}
         </div>
       </header>
       {main}

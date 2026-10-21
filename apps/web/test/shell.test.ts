@@ -215,7 +215,7 @@ test("D-STATE-1, D-A11Y-1: while the session is unknown the page says so in the 
   const noAgency = render(viewOf(input({ agency: { kind: "UNAVAILABLE" } })));
   assert.ok(noAgency.includes("This workspace is not available"));
   assert.ok(noAgency.includes('<button type="button" class="kauro-button">Check again</button>'));
-  assert.ok(noAgency.includes('<button type="button" class="kauro-button">Sign out</button>'), "and the person can still leave");
+  assert.ok(noAgency.includes('<button type="button" class="kauro-account-item">Sign out</button>'), "and the person can still leave, from the account menu");
 });
 
 test("D-A11Y-1: a public screen's frame is the skip link and the one main landmark, and nothing of the private shell", () => {

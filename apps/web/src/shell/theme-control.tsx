@@ -67,6 +67,32 @@ function choose(next: Theme): void {
   }).catch(() => undefined);
 }
 
+export interface ThemeChoiceLabels {
+  /** The name of the group, and of its two options. */
+  readonly group: string;
+  readonly light: string;
+  readonly dark: string;
+}
+
+/**
+ * The theme as two named options side by side, the drawn one pressed (Order 11 round 2: the account menu names the choice instead of a
+ * lone icon). It needs its script, like the menu it sits in.
+ */
+export function ThemeChoice({ labels, className }: { readonly labels: ThemeChoiceLabels; readonly className: string }): ReactElement {
+  const drawn = useSyncExternalStore<Theme | null>(subscribe, drawnTheme, () => null);
+  const option = (theme: Theme, label: string): ReactElement => (
+    <button type="button" aria-pressed={drawn === theme} onClick={() => (drawn === theme ? undefined : choose(theme))}>
+      {label}
+    </button>
+  );
+  return (
+    <div className={className} role="group" aria-label={labels.group}>
+      {option("light", labels.light)}
+      {option("dark", labels.dark)}
+    </div>
+  );
+}
+
 export function ThemeControl({ labels, className, returnTo, mode = "form" }: ThemeControlProps): ReactElement {
   const drawn = useSyncExternalStore<Theme | null>(subscribe, drawnTheme, () => null);
   const next: Theme | null = drawn === null ? null : drawn === "dark" ? "light" : "dark";
