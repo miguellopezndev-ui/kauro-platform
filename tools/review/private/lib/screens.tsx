@@ -2,6 +2,7 @@
 // Every private screen as the review shows it (Order 11): where it lives in the application, which synthetic people may look at it, its
 // states, and, for a screen not built yet, the prototype that draws it. Real screens draw themselves from the state's api answers.
 import type { ComponentType } from "react";
+import type { WorldProject } from "./world-projects.ts";
 import { pathOf } from "@web/screens.ts";
 import { AGENCY_ID, COMPANY_ID, CONTEXTS, type ContextKey, CONTEXTS_FOR, type ReviewContext } from "./contexts.ts";
 import { IDS } from "./ids.ts";
@@ -17,6 +18,8 @@ import { UI30_STATES, UI39_STATES, UI52_STATES } from "./fixtures/account-states
 export interface PrototypeProps {
   readonly ctx: ReviewContext;
   readonly state: string;
+  /** The project the page is about: the one its address names, else the workspace's main project. */
+  readonly project: WorldProject;
 }
 
 export interface ScreenDef {
@@ -37,6 +40,7 @@ export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.
   if (proposal !== undefined) {
     if (proposal.key === "P-02") return pathOf("UI32", { agencyId });
     if (proposal.key === "P-07") return pathOf("UI18", { agencyId, id: project });
+    if (proposal.key === "P-08") return `${pathOf("UI13", { agencyId, id: project })}/activity`;
     if (proposal.key === "P-05") return "/signup";
     if (proposal.key === "P-06") return "/login/reset";
     return proposal.origin === "OPS" ? "/ops/settings" : "/account";

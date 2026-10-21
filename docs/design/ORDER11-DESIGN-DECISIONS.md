@@ -23,6 +23,11 @@ Kinds of statement: **[O]** the owner decided it; **[A]** an authority document 
 4. **True promises only [A].** "No card" only for the free check; never "ACH" on public pages until the route is proven; deletion
    periods only as the policy states them (free check: 7 days after the results, at most 14 days after sealing; purchased: 7 days after
    the first package, at most 14 days after payment; staged: 21 days after the first stage, at most 30 days after payment).
+5. **One date format in the application [A].** Every private screen writes dates as the design system does (`packages/ui` `formatDeadline`):
+   "Oct 20, 2026" for a day, "Oct 20, 2026, 1:00 PM UTC" for a moment, always with the time zone. The prototypes used "20 Oct 2026,
+   13:00 UTC" and the real screens the design system's form, so the same quote read differently from one page to the next; the
+   prototypes now follow the product. The approved public site keeps its own ISO form ("2026-10-20 12:02 UTC"), which is not changed
+   without approval; aligning it is listed among the public proposals.
 
 ## 2. Page structure
 

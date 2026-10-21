@@ -15,9 +15,9 @@ export const UI40_STATES: readonly StateDef[] = [
 ];
 
 const JOBS = [
-  { id: "job-7c41", workspace: "Halden Outdoor", project: "Spring contacts", state: "RUNNING", attempt: 1, version: 3, queued: "20 Oct, 13:52 UTC", deadline: "22 Oct, 13:52 UTC" },
-  { id: "job-5a10", workspace: "Northwind Data", project: "Larch Studio contacts", state: "READY", attempt: 1, version: 6, queued: "20 Oct, 14:00 UTC", deadline: "22 Oct, 14:00 UTC" },
-  { id: "job-31e9", workspace: "Juniper Digital", project: "Second import", state: "CANCELLED", attempt: 1, version: 2, queued: "17 Oct, 09:10 UTC", deadline: "19 Oct, 09:10 UTC" },
+  { id: "job-7c41", workspace: "Halden Outdoor", project: "Spring contacts", state: "RUNNING", attempt: 1, version: 3, queued: "Oct 20, 1:52 PM UTC", deadline: "Oct 22, 1:52 PM UTC" },
+  { id: "job-5a10", workspace: "Northwind Data", project: "Larch Studio contacts", state: "READY", attempt: 1, version: 6, queued: "Oct 20, 2:00 PM UTC", deadline: "Oct 22, 2:00 PM UTC" },
+  { id: "job-31e9", workspace: "Juniper Digital", project: "Second import", state: "CANCELLED", attempt: 1, version: 2, queued: "Oct 17, 9:10 AM UTC", deadline: "Oct 19, 9:10 AM UTC" },
 ] as const;
 const WORD: Readonly<Record<string, string>> = { RUNNING: "Running", READY: "Ready", CANCELLED: "Cancelled" };
 
@@ -85,7 +85,7 @@ export function Jobs({ state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Lease</dt>
-            <dd>{!running ? "Released" : stalled ? "Last renewed 14:41 UTC; expired 14:43 UTC" : "Renewed 12 seconds ago; expires 14:44 UTC"}</dd>
+            <dd>{!running ? "Released" : stalled ? "Last renewed 2:41 PM UTC; expired 2:43 PM UTC" : "Renewed 12 seconds ago; expires 2:44 PM UTC"}</dd>
           </div>
           <div>
             <dt>Incident</dt>

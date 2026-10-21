@@ -77,8 +77,8 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
         <Facts
           rows={[
             ["Google", ctx.key === "operator" ? "Not connected" : <span key="g">Connected as <bdi>{person.email}</bdi></span>],
-            ["Password", "Set on 2 Sep 2026"],
-            ["Two-step verification", <Badge key="m" tone="success">Authenticator app, since 2 Sep 2026</Badge>],
+            ["Password", "Set on Sep 2, 2026"],
+            ["Two-step verification", <Badge key="m" tone="success">Authenticator app, since Sep 2, 2026</Badge>],
             ["Recovery codes", "8 of 10 unused"],
             ["Identity confirmed for sensitive actions", "Not in the last 15 minutes. Kauro asks again before a sensitive action."],
           ]}
@@ -108,7 +108,7 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
           <li>
             <span className="kauro-sessions-what">
               <strong>This device</strong>
-              <span>Chrome on Windows · signed in today at 14:02 UTC</span>
+              <span>Chrome on Windows · signed in today at 2:02 PM UTC</span>
             </span>
             <Badge tone="success">Active now</Badge>
           </li>
@@ -117,14 +117,14 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
               <li>
                 <span className="kauro-sessions-what">
                   <strong>Safari on iPhone</strong>
-                  <span>Signed in on 18 Oct 2026 · last active yesterday · near Bogotá, CO</span>
+                  <span>Signed in on Oct 18, 2026 · last active yesterday · near Bogotá, CO</span>
                 </span>
                 <Button>Sign out</Button>
               </li>
               <li>
                 <span className="kauro-sessions-what">
                   <strong>Firefox on macOS</strong>
-                  <span>Signed in on 12 Oct 2026 · last active 14 Oct 2026 · near Medellín, CO</span>
+                  <span>Signed in on Oct 12, 2026 · last active Oct 14, 2026 · near Medellín, CO</span>
                 </span>
                 <Button>Sign out</Button>
               </li>

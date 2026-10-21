@@ -220,7 +220,7 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
       stepLabel = undefined;
       body = (
         <div className="kauro-form">
-          <Banner tone="info" title="Requested on 20 Oct 2026 at 16:05 UTC" announce="status">
+          <Banner tone="info" title="Requested on Oct 20, 2026 at 4:05 PM UTC" announce="status">
             <p>Kauro is checking who you are. Every owner and admin of Northwind Data has been told by email, and can stop the recovery from that email.</p>
           </Banner>
           <dl className="kauro-recover-facts">
@@ -350,7 +350,7 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
       body = (
         <div className="kauro-form">
           <Banner tone="warning" title="Too many attempts" announce="alert">
-            <p>To protect the account, sign-in is paused until 16:20 UTC. You can try again then.</p>
+            <p>To protect the account, sign-in is paused until 4:20 PM UTC. You can try again then.</p>
           </Banner>
           <p>
             Forgotten your password? <a href={RESET}>Reset it</a>. A reset keeps your two-step verification.

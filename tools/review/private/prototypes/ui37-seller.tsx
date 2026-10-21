@@ -17,12 +17,12 @@ export const UI37_STATES: readonly StateDef[] = [
 ];
 
 const STEPS = [
-  { name: "Assessment", fact: "Interviewed and assessed on 12 Jun 2026", done: true },
-  { name: "Legal review", fact: "Independent contractor in Colombia, reviewed by counsel on 24 Jun 2026", done: true },
-  { name: "Agreement", fact: `${SELLER.agreement}, signed by both on 1 Jul 2026`, done: true },
-  { name: "Training", fact: "Offer, data handling and outreach rules, completed 4 Jul 2026", done: true },
+  { name: "Assessment", fact: "Interviewed and assessed on Jun 12, 2026", done: true },
+  { name: "Legal review", fact: "Independent contractor in Colombia, reviewed by counsel on Jun 24, 2026", done: true },
+  { name: "Agreement", fact: `${SELLER.agreement}, signed by both on Jul 1, 2026`, done: true },
+  { name: "Training", fact: "Offer, data handling and outreach rules, completed Jul 4, 2026", done: true },
   { name: "Access", fact: "Sales screens only, with two-step verification; no customer data", done: true },
-  { name: "Pilot", fact: "1 Jul to 31 Dec 2026; review due 15 Dec 2026", done: false },
+  { name: "Pilot", fact: "Jul 1 to Dec 31, 2026; review due Dec 15, 2026", done: false },
 ] as const;
 
 export function SellerLifecycle({ state }: PrototypeProps): ReactElement {

@@ -31,7 +31,7 @@ export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
       name: "Bank route",
       what: "USD receipts by bank transfer",
       state: alerts ? { tone: "danger", label: "Details expired" } : { tone: "success", label: "Verified · sandbox" },
-      detail: alerts ? "Payments stop being offered until the route's details are confirmed again." : "Rollout: controlled. Account shown as ··US01 only. Last verified 18 Oct 2026.",
+      detail: alerts ? "Payments stop being offered until the route's details are confirmed again." : "Rollout: controlled. Account shown as ··US01 only. Last verified Oct 18, 2026.",
       to: "UI39",
     },
     {

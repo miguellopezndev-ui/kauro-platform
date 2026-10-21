@@ -62,7 +62,7 @@ function Detail({ prospect, ctx, claimed }: { readonly prospect: Prospect; reado
       </dl>
       {suppressed ? (
         <Banner tone="danger" title="Suppressed on every channel" announce="status">
-          <p>Kestrel &amp; Lowe asked not to be contacted, on 1 Oct 2026. No message, call or social contact may be prepared or sent, by anyone, from any route.</p>
+          <p>Kestrel &amp; Lowe asked not to be contacted, on Oct 1, 2026. No message, call or social contact may be prepared or sent, by anyone, from any route.</p>
         </Banner>
       ) : (
         <div className="kauro-next">

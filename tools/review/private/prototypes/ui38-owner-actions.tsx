@@ -20,7 +20,7 @@ function Prepared({ state }: { readonly state: string }): ReactElement {
   const [copied, setCopied] = useState<string | null>(null);
   const fields = [
     ["Domain", "kauro.example"],
-    ["Period", "1 year, to 2 Nov 2027"],
+    ["Period", "1 year, to Nov 2, 2027"],
     ["Automatic renewal", "Leave off"],
     ["Privacy protection", "Keep on (included)"],
   ] as const;
@@ -28,15 +28,15 @@ function Prepared({ state }: { readonly state: string }): ReactElement {
     <section className="kauro-owner-action" aria-labelledby="renew-h">
       <div className="kauro-owner-action-head">
         <h2 id="renew-h">Renew the kauro.example domain</h2>
-        {state === "recorded" ? <Badge tone="success">Done</Badge> : <Badge tone="warning">Due 2 Nov 2026</Badge>}
+        {state === "recorded" ? <Badge tone="success">Done</Badge> : <Badge tone="warning">Due Nov 2, 2026</Badge>}
       </div>
-      <p>If it lapses, the site and every email address on it stop working. The registrar holds it until 2 Nov 2026.</p>
+      <p>If it lapses, the site and every email address on it stop working. The registrar holds it until Nov 2, 2026.</p>
       <dl className="kauro-owner-action-facts">
         <div>
           <dt>Where</dt>
           <dd>
             <code>https://account.registrar.example/domains/kauro.example/renew</code>
-            <span className="kauro-muted-text">Checked on 20 Oct 2026: the registrar&apos;s own address, as on its invoices</span>
+            <span className="kauro-muted-text">Checked on Oct 20, 2026: the registrar&apos;s own address, as on its invoices</span>
           </dd>
         </div>
         <div>
@@ -67,7 +67,7 @@ function Prepared({ state }: { readonly state: string }): ReactElement {
         </tbody>
       </table>
       {state === "recorded" ? (
-        <p className="kauro-owner-action-done">Recorded on 20 Oct 2026 at 15:12 UTC: renewed to 2 Nov 2027, receipt kept with this action.</p>
+        <p className="kauro-owner-action-done">Recorded on Oct 20, 2026 at 3:12 PM UTC: renewed to Nov 2, 2027, receipt kept with this action.</p>
       ) : state === "changed" ? (
         <Banner tone="warning" title="Reported: the page did not match" announce="alert">
           <p>You said the registrar asked for a transfer code this preparation does not mention. Nothing was paid. Kauro prepares the action again from the registrar&apos;s current page before it comes back to you.</p>
@@ -93,16 +93,16 @@ export function OwnerActions({ state }: PrototypeProps): ReactElement {
           <h2 id="tax-h">File the quarterly sales tax return</h2>
           <Badge tone="neutral">Not ready</Badge>
         </div>
-        <p>Due 15 Jan 2027. Its steps are not prepared yet, so this action does not ask anything of you: Kauro does not guess a government&apos;s screens. It will come back prepared, like the one above, by 5 Jan 2027.</p>
+        <p>Due Jan 15, 2027. Its steps are not prepared yet, so this action does not ask anything of you: Kauro does not guess a government&apos;s screens. It will come back prepared, like the one above, by Jan 5, 2027.</p>
       </section>
       <section className="kauro-screen-section" aria-labelledby="done-h">
         <h2 id="done-h">Done</h2>
         <ol className="kauro-history">
           <li>
-            <span>14 Oct 2026</span> Verified the company bank account at the payment provider · confirmation kept
+            <span>Oct 14, 2026</span> Verified the company bank account at the payment provider · confirmation kept
           </li>
           <li>
-            <span>1 Jul 2026</span> Signed the seller agreement with Daniel Kim · signed copy kept
+            <span>Jul 1, 2026</span> Signed the seller agreement with Daniel Kim · signed copy kept
           </li>
         </ol>
       </section>

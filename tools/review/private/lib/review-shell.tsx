@@ -22,7 +22,7 @@ const CHECKING: SessionPhase = { kind: "CHECKING" };
 const LOADING: AgencyContext = { kind: "LOADING" };
 const IDLE = (): void => undefined;
 /** The review draws the finished application: every private screen counts as present, so the navigation shows them all. */
-const ALL_PRIVATE: ReadonlySet<string> = new Set(PRIVATE_IDS);
+const ALL_PRIVATE: ReadonlySet<string> = new Set([...PRIVATE_IDS, "P-08"]);
 
 interface Store<T> {
   snapshot(): T;

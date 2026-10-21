@@ -22,16 +22,18 @@ const TASKS: readonly { readonly key: PlanTask; readonly screen: string; readonl
   { key: "relationships", screen: "UI21", name: "Links between records" },
   { key: "approval", screen: "UI22", name: "Approval" },
 ];
-const STATE_WORD: Readonly<Record<TaskState, string>> = { done: "Reviewed", review: "To review", blocked: "Blocked", waiting: "After the three parts" };
+const STATE_WORD: Readonly<Record<TaskState, string>> = { done: "Reviewed", review: "To review", blocked: "Blocked", waiting: "After the other parts" };
 
-/** The plan's parts and where each stands; the page's own part is marked as current. */
-export function PlanTasks({ ctx, current, states }: { readonly ctx: PrototypeProps["ctx"]; readonly current: PlanTask; readonly states: Readonly<Record<PlanTask, TaskState>> }): ReactElement {
+/** The plan's parts and where each stands; the page's own part is marked as current. "Clean your data" has no links between records: its
+ * Company column stays a column, and no association is prepared. */
+export function PlanTasks({ ctx, project, current, states }: { readonly ctx: PrototypeProps["ctx"]; readonly project: PrototypeProps["project"]; readonly current: PlanTask; readonly states: Readonly<Record<PlanTask, TaskState>> }): ReactElement {
+  const tasks = project.mode === "CLEAN" ? TASKS.filter((task) => task.key !== "relationships") : TASKS;
   return (
     <nav className="kauro-plan-tasks" aria-label="The parts of the plan">
       <ol>
-        {TASKS.map((task) => (
+        {tasks.map((task) => (
           <li key={task.key} className={`kauro-plan-task kauro-plan-task--${states[task.key]}${task.key === current ? " is-current" : ""}`}>
-            <Link href={appPathOf(task.screen, ctx)} prefetch={false} aria-current={task.key === current ? "page" : undefined}>
+            <Link href={appPathOf(task.screen, ctx, project.projectId)} prefetch={false} aria-current={task.key === current ? "page" : undefined}>
               <span className="kauro-plan-task-name">{task.name}</span>
               <span className="kauro-plan-task-state">{task.key === "approval" && states[task.key] === "done" ? "Approved" : STATE_WORD[states[task.key]]}</span>
             </Link>

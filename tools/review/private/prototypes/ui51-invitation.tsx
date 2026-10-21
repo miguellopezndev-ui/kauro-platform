@@ -82,7 +82,7 @@ export function Invitation({ ctx, state }: PrototypeProps): ReactElement {
         <Facts
           rows={[
             ["Your role", "Operator: clients and projects, from upload to the run"],
-            ["Joined", "20 Oct 2026, 14:02 UTC"],
+            ["Joined", "Oct 20, 2026, 2:02 PM UTC"],
           ]}
         />
         <p className="kauro-auth-small">A change of role is decided by the agency&apos;s owner.</p>

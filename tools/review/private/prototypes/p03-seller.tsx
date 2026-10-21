@@ -35,7 +35,7 @@ export function SellerSettings({ ctx, state }: PrototypeProps): ReactElement {
         <Facts
           rows={[
             ["State", suspended ? <Badge key="s" tone="danger">Suspended</Badge> : <Badge key="s" tone="success">Active</Badge>],
-            ["Seller agreement", "Signed on 1 Jul 2026"],
+            ["Seller agreement", "Signed on Jul 1, 2026"],
             ["Name", "Daniel Kim"],
             ["Email address", "daniel.kim@sellers.example"],
           ]}
@@ -59,7 +59,7 @@ export function SellerSettings({ ctx, state }: PrototypeProps): ReactElement {
           rows={[
             ["Paid to", "Bank account ending ··4821"],
             ["Currency", "USD"],
-            ["Destination", <Badge key="v" tone="success">Verified on 5 Sep 2026</Badge>],
+            ["Destination", <Badge key="v" tone="success">Verified on Sep 5, 2026</Badge>],
           ]}
         />
         <p className="kauro-muted">Kauro keeps a masked label and a fingerprint of the account, never the full number.</p>

@@ -1593,6 +1593,62 @@ fieldset.kauro-notice-form {
   box-shadow: inset 3px 0 0 var(--kauro-color-warning-text);
 }
 
+/* on a phone, each field of the comparison is a card: the field, then each row's value and the unified record, labelled, so nothing is
+   cropped and no region needs scrolling sideways */
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-group .kauro-table-region:has(.kauro-compare) {
+    overflow: visible;
+  }
+  .kauro-main .kauro-compare,
+  .kauro-compare tbody,
+  .kauro-compare tr,
+  .kauro-compare :is(th, td) {
+    display: block;
+  }
+  .kauro-compare thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-compare tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-compare tbody tr:last-child {
+    border-block-end: 0;
+  }
+  /* a field whose values disagree marks its whole card, not the heading's text */
+  .kauro-main .kauro-compare tr.is-conflict {
+    box-shadow: inset 3px 0 0 var(--kauro-color-warning-text);
+  }
+  .kauro-main .kauro-compare tr.is-conflict th {
+    box-shadow: none;
+  }
+  .kauro-main .kauro-compare :is(th, td) {
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow-wrap: anywhere;
+  }
+  .kauro-main .kauro-compare th[scope="row"] {
+    margin-block-end: var(--kauro-space-2);
+  }
+  .kauro-main .kauro-compare td + td {
+    margin-block-start: var(--kauro-space-2);
+  }
+  .kauro-compare td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-style: normal;
+  }
+}
+
 /* UI21: companies and contacts joined by their links */
 .kauro-main .kauro-links > h2 {
   margin-block-end: var(--kauro-space-4);
@@ -1841,14 +1897,6 @@ fieldset.kauro-notice-form {
   }
   .kauro-main .kauro-mapping tr.is-left-out {
     background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
-  }
-  /* the records of a group stay side by side: the table scrolls inside its frame */
-  .kauro-main .kauro-compare {
-    min-inline-size: 34rem;
-  }
-  .kauro-main .kauro-compare :is(th, td) {
-    overflow-wrap: normal;
-    word-break: normal;
   }
 }
 
@@ -2980,4 +3028,205 @@ fieldset.kauro-notice-form {
 }
 .kauro-main .kauro-setup-part .kauro-choice--row label {
   margin: 0;
+}
+
+/* P-07: the estimate on the dark sheet, what sets it, and the three moments to a purchase */
+.kauro-main .kauro-offer-figure {
+  display: grid;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-offer-facts {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+}
+.kauro-main .kauro-offer-facts > div {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-offer-facts dt {
+  color: var(--kauro-color-ink-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-offer-facts dd {
+  margin: 0;
+  color: var(--kauro-color-on-ink);
+}
+.kauro-main .kauro-moments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: moment;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-moments {
+    grid-column: 1 / -1;
+  }
+}
+.kauro-main .kauro-moments li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: none;
+  padding: var(--kauro-space-3) var(--kauro-space-3) var(--kauro-space-3) 2.75rem;
+  border: 1px solid var(--kauro-color-ink-border);
+  border-radius: var(--kauro-radius);
+  counter-increment: moment;
+}
+.kauro-moments li::before {
+  content: counter(moment);
+  position: absolute;
+  inset-block-start: var(--kauro-space-3);
+  inset-inline-start: var(--kauro-space-3);
+  display: grid;
+  place-items: center;
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  border: 1.5px solid var(--kauro-color-ink-accent);
+  border-radius: 50%;
+  color: var(--kauro-color-ink-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-moments li.is-current {
+  border-color: var(--kauro-color-ink-accent);
+}
+.kauro-moments li.is-current::before {
+  background: var(--kauro-color-ink-accent);
+  color: var(--kauro-color-ink);
+}
+.kauro-moments strong {
+  color: var(--kauro-color-on-ink);
+}
+.kauro-moments span {
+  color: var(--kauro-color-ink-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* UI19 for "Clean your data": optional output preferences */
+.kauro-main .kauro-output-prefs {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: var(--kauro-space-6) 0 var(--kauro-space-4);
+  padding: var(--kauro-space-5);
+  border: 1px dashed var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+}
+.kauro-main .kauro-output-prefs > * {
+  margin: 0;
+}
+.kauro-main .kauro-output-prefs h2 {
+  font-size: 1.125rem;
+}
+.kauro-output-prefs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--kauro-space-4);
+}
+.kauro-main .kauro-output-prefs-grid .kauro-choice {
+  margin: 0;
+}
+
+/* UI13: what is in the way */
+.kauro-main .kauro-blockers {
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-blockers h2 {
+  margin: 0 0 var(--kauro-space-2);
+  color: var(--kauro-color-warning-text);
+  font-size: 1rem;
+}
+.kauro-main .kauro-blockers ul {
+  margin: 0;
+  padding-inline-start: 1.125rem;
+  color: var(--kauro-color-text);
+}
+
+/* P-08: the project's record, newest first */
+.kauro-main .kauro-activity-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin: 0 0 var(--kauro-space-5);
+}
+.kauro-main .kauro-activity-filters label {
+  display: grid;
+  gap: var(--kauro-space-1);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-activity-filters select {
+  min-block-size: 2.5rem;
+  min-inline-size: 12rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-weight: 400;
+}
+.kauro-timeline {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-timeline li {
+  display: grid;
+  grid-template-columns: 11rem 7.5rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-timeline-when,
+.kauro-timeline-who {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-timeline-area {
+  justify-self: start;
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-timeline-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-2);
+  justify-content: flex-end;
+  text-align: end;
+}
+.kauro-timeline-who code {
+  font-size: 0.75rem;
+}
+@media (max-width: 61.99rem) {
+  .kauro-main .kauro-timeline li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .kauro-timeline-what {
+    grid-column: 1 / -1;
+  }
+  .kauro-timeline-who {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    text-align: start;
+  }
 }

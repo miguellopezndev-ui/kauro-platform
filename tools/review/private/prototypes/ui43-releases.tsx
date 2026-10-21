@@ -28,7 +28,7 @@ export function Releases({ state }: PrototypeProps): ReactElement {
       <PageHead title="Releases" lead="Promote only the accepted exact candidate." />
       {rebuilt ? (
         <Banner tone="danger" title="This image is not the one that was tested" announce="alert">
-          <p>The image was rebuilt at 15:02 UTC from the same commit. Its digest is new, so the gates that passed at 14:10 UTC do not apply to it. Promotion is held until the gates run on this exact image.</p>
+          <p>The image was rebuilt at 3:02 PM UTC from the same commit. Its digest is new, so the gates that passed at 2:10 PM UTC do not apply to it. Promotion is held until the gates run on this exact image.</p>
         </Banner>
       ) : null}
       <section className="kauro-prospect" aria-labelledby="cand-h">
@@ -88,7 +88,7 @@ export function Releases({ state }: PrototypeProps): ReactElement {
         <ul>
           <li>Legal texts: unchanged; no new version to publish.</li>
           <li>Prices and policy: R2-INITIAL, unchanged.</li>
-          <li>Support: the help pages that change are ready, reviewed on 19 Oct 2026.</li>
+          <li>Support: the help pages that change are ready, reviewed on Oct 19, 2026.</li>
         </ul>
       </section>
       {rebuilt ? (

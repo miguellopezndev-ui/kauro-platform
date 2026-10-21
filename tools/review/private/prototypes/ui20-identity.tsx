@@ -22,7 +22,7 @@ export const UI20_STATES: readonly StateDef[] = [
 
 const STATES = { mapping: "done", identity: "review", relationships: "review", approval: "waiting" } as const;
 
-export function Identity({ ctx, state }: PrototypeProps): ReactElement {
+export function Identity({ ctx, state, project }: PrototypeProps): ReactElement {
   const agencyId = ctx.agency?.agencyId ?? "";
   const decided = state === "decided";
   const [choice, setChoice] = useState<"unify" | "apart" | null>(null);
@@ -31,7 +31,7 @@ export function Identity({ ctx, state }: PrototypeProps): ReactElement {
     <>
       <ProjectHeader current="plan" />
       <PageHead title="Duplicates" lead="Similarity is a signal; merging needs a decision." />
-      <PlanTasks ctx={ctx} current="identity" states={decided ? { ...STATES, identity: "done" } : STATES} />
+      <PlanTasks ctx={ctx} project={project} current="identity" states={decided ? { ...STATES, identity: "done" } : STATES} />
       <dl className="kauro-identity-counts">
         <div>
           <dt>Candidate groups</dt>
@@ -87,27 +87,27 @@ export function Identity({ ctx, state }: PrototypeProps): ReactElement {
               <tbody>
                 <tr>
                   <th scope="row">Name</th>
-                  <td>Maria Lopez</td>
-                  <td>M. Lopez</td>
-                  <td>Maria Lopez</td>
+                  <td data-label="Row 3,118, kept">Maria Lopez</td>
+                  <td data-label="Row 9,402">M. Lopez</td>
+                  <td data-label="The unified record">Maria Lopez</td>
                 </tr>
                 <tr>
                   <th scope="row">Email</th>
-                  <td>m.lopez@example.com</td>
-                  <td>m.lopez@example.com</td>
-                  <td>m.lopez@example.com</td>
+                  <td data-label="Row 3,118, kept">m.lopez@example.com</td>
+                  <td data-label="Row 9,402">m.lopez@example.com</td>
+                  <td data-label="The unified record">m.lopez@example.com</td>
                 </tr>
                 <tr className="is-conflict">
                   <th scope="row">Company</th>
-                  <td>Tidewell</td>
-                  <td className="kauro-compare-empty">Empty</td>
-                  <td>Tidewell, the only value given</td>
+                  <td data-label="Row 3,118, kept">Tidewell</td>
+                  <td data-label="Row 9,402" className="kauro-compare-empty">Empty</td>
+                  <td data-label="The unified record">Tidewell, the only value given</td>
                 </tr>
                 <tr className={state === "conflict" ? "is-conflict" : undefined}>
                   <th scope="row">Marketing consent</th>
-                  <td>{state === "conflict" ? "Subscribed" : "Not subscribed"}</td>
-                  <td>Not subscribed</td>
-                  <td>Not subscribed{state === "conflict" ? ", the most restrictive choice" : ""}</td>
+                  <td data-label="Row 3,118, kept">{state === "conflict" ? "Subscribed" : "Not subscribed"}</td>
+                  <td data-label="Row 9,402">Not subscribed</td>
+                  <td data-label="The unified record">Not subscribed{state === "conflict" ? ", the most restrictive choice" : ""}</td>
                 </tr>
               </tbody>
             </table>
@@ -143,11 +143,11 @@ export function Identity({ ctx, state }: PrototypeProps): ReactElement {
       )}
       <div className="kauro-actions">
         {decided ? (
-          <ScreenButton to="UI21" ctx={ctx} variant="primary">
+          <ScreenButton to="UI21" ctx={ctx} project={project.projectId} variant="primary">
             <span className="kauro-go">Continue to links between records</span>
           </ScreenButton>
         ) : (
-          <ScreenButton to="UI21" ctx={ctx}>
+          <ScreenButton to="UI21" ctx={ctx} project={project.projectId}>
             Review links between records
           </ScreenButton>
         )}

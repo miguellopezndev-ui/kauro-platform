@@ -118,8 +118,8 @@ export function OrganisationSettings({ ctx, state }: PrototypeProps): ReactEleme
         <h2 id="org-legal-h">Legal and billing identity</h2>
         <Facts
           rows={[
-            ["Service terms accepted", "Version 2026-10, on 2 Sep 2026"],
-            ["Data processing terms accepted", "Version 2026-10, on 2 Sep 2026"],
+            ["Service terms accepted", "Version 2026-10, on Sep 2, 2026"],
+            ["Data processing terms accepted", "Version 2026-10, on Sep 2, 2026"],
             ["Billing profile", <Badge key="b" tone="success">Prepared by Kauro</Badge>],
           ]}
         />
@@ -143,7 +143,7 @@ export function OrganisationSettings({ ctx, state }: PrototypeProps): ReactEleme
       <section id="org-closure" aria-labelledby="org-closure-h">
         <h2 id="org-closure-h">Close {company ? "this company workspace" : "this agency"}</h2>
         {state === "closing" ? (
-          <Banner tone="info" title="Closure requested on 20 Oct 2026" announce="status">
+          <Banner tone="info" title="Closure requested on Oct 20, 2026" announce="status">
             <p>Open quotes were withdrawn. Paid work in progress, refunds and reconciliation finish with Kauro; then your data is scheduled for deletion. It cannot be requested again.</p>
           </Banner>
         ) : owner ? (

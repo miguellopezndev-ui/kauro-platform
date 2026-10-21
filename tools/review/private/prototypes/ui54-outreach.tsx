@@ -35,7 +35,7 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
       <PageHead title="Reviewed correspondence" lead="Review exactly what will be sent." />
       {state === "accepted" ? (
         <Banner tone="success" title="The provider accepted the message" announce="status">
-          <p>At 10:42 UTC. That means it left Kauro&apos;s provider; it does not mean it reached the inbox, or that anyone read it. A reply, if one comes, appears here.</p>
+          <p>At 10:42 AM UTC. That means it left Kauro&apos;s provider; it does not mean it reached the inbox, or that anyone read it. A reply, if one comes, appears here.</p>
         </Banner>
       ) : null}
       {state === "uncertain" ? (
@@ -45,7 +45,7 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
       ) : null}
       {blocked ? (
         <Banner tone="danger" title="This address asked not to be contacted" announce="alert">
-          <p>Kestrel &amp; Lowe is suppressed since 1 Oct 2026, on every channel. This draft cannot be authorised or sent, from this page or any other.</p>
+          <p>Kestrel &amp; Lowe is suppressed since Oct 1, 2026, on every channel. This draft cannot be authorised or sent, from this page or any other.</p>
         </Banner>
       ) : null}
       <section className="kauro-letter" aria-labelledby="letter-h">
@@ -64,11 +64,11 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Why it may be sent</dt>
-            <dd>{blocked ? "It may not: the address is suppressed." : "They asked for the worked example on 16 Oct 2026, in writing: a reply they requested, under the rule in force for the Netherlands."}</dd>
+            <dd>{blocked ? "It may not: the address is suppressed." : "They asked for the worked example on Oct 16, 2026, in writing: a reply they requested, under the rule in force for the Netherlands."}</dd>
           </div>
           <div>
             <dt>Suppression</dt>
-            <dd>{blocked ? "Suppressed since 1 Oct 2026" : "Checked at 10:31 UTC: not suppressed"}</dd>
+            <dd>{blocked ? "Suppressed since Oct 1, 2026" : "Checked at 10:31 AM UTC: not suppressed"}</dd>
           </div>
           <div>
             <dt>Content</dt>
@@ -90,19 +90,19 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
         owner ? (
           <section className="kauro-approve" aria-labelledby="auth-h">
             <h2 id="auth-h">Authorise this message</h2>
-            <p>The authorisation covers this exact content, from Daniel Kim&apos;s identity, once, until 23 Oct 2026. Any change to the text needs a new review.</p>
+            <p>The authorisation covers this exact content, from Daniel Kim&apos;s identity, once, until Oct 23, 2026. Any change to the text needs a new review.</p>
             <div className="kauro-actions">
               <Button variant="primary">Authorise once</Button>
               <Button>Send back with a note</Button>
             </div>
           </section>
         ) : (
-          <p className="kauro-muted">Waiting for the owner&apos;s review, sent on 20 Oct 2026 at 10:31 UTC. You will see the answer here; until then, nothing is sent.</p>
+          <p className="kauro-muted">Waiting for the owner&apos;s review, sent on Oct 20, 2026 at 10:31 AM UTC. You will see the answer here; until then, nothing is sent.</p>
         )
       ) : state === "authorised" ? (
         <section className="kauro-approve" aria-labelledby="send-h">
           <h2 id="send-h">Send</h2>
-          <p>Authorised by the owner for this exact content, once, until 23 Oct 2026.</p>
+          <p>Authorised by the owner for this exact content, once, until Oct 23, 2026.</p>
           <Button variant="primary">Send the message</Button>
         </section>
       ) : null}

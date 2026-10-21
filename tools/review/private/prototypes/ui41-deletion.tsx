@@ -11,7 +11,7 @@ import type { StateDef } from "../lib/scenario.ts";
 import { Badge, PageHead } from "./kit.tsx";
 
 export const UI41_STATES: readonly StateDef[] = [
-  { key: "normal", label: "A retry pending", note: "A retention deletion: every class removed but one storage object, retried at 14:00 UTC." },
+  { key: "normal", label: "A retry pending", note: "A retention deletion: every class removed but one storage object, retried at 2:00 PM UTC." },
   { key: "verified", label: "Verified", note: "Every class removed at the provider too: the deletion is verified, with its receipt." },
 ];
 
@@ -39,7 +39,7 @@ export function Deletion({ state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Due</dt>
-            <dd>20 Oct 2026, 11:05 UTC; started on time</dd>
+            <dd>Oct 20, 2026, 11:05 AM UTC; started on time</dd>
           </div>
           <div>
             <dt>Covers</dt>
@@ -74,12 +74,12 @@ export function Deletion({ state }: PrototypeProps): ReactElement {
       </div>
       {verified ? (
         <Banner tone="success" title="Removed everywhere, and verified" announce="status">
-          <p>Every object was confirmed gone at the provider on 20 Oct 2026 at 14:02 UTC. The receipt lists each class and each object; the restore journal holds nothing of this project.</p>
+          <p>Every object was confirmed gone at the provider on Oct 20, 2026 at 2:02 PM UTC. The receipt lists each class and each object; the restore journal holds nothing of this project.</p>
         </Banner>
       ) : (
         <section className="kauro-approve" aria-labelledby="retry-h">
           <h2 id="retry-h">One object is still held</h2>
-          <p>The provider refused to remove manifest.json at 11:06 UTC (a temporary error) and was asked again at 14:00 UTC. Until it confirms, this deletion is not verified, whatever the database says.</p>
+          <p>The provider refused to remove manifest.json at 11:06 AM UTC (a temporary error) and was asked again at 2:00 PM UTC. Until it confirms, this deletion is not verified, whatever the database says.</p>
           <div className="kauro-actions">
             <Button variant="primary">Retry the removal now</Button>
             <Button>Inspect the provider&apos;s answer</Button>

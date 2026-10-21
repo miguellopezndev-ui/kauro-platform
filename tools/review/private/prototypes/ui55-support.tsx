@@ -16,9 +16,9 @@ export const UI55_STATES: readonly StateDef[] = [
 ];
 
 const CASES = [
-  { id: "case-118", workspace: "Northwind Data", topic: "Import steps", summary: "How should we set the marketing contacts option in stage 2?", severity: "S3", due: "Today, 16:00 UTC", state: "Waiting for Kauro" },
-  { id: "case-117", workspace: "Halden Outdoor", topic: "Billing", summary: "Our transfer was sent on Friday; the quote still shows unpaid.", severity: "S3", due: "Tomorrow, 10:00 UTC", state: "Waiting for Kauro" },
-  { id: "case-115", workspace: "Coastline Analytics", topic: "Product defect", summary: "12 rows in exceptions.csv seem to have a valid email address.", severity: "S2", due: "Tomorrow, 12:00 UTC", state: "Triaged" },
+  { id: "case-118", workspace: "Northwind Data", topic: "Import steps", summary: "How should we set the marketing contacts option in stage 2?", severity: "S3", due: "Today, 4:00 PM UTC", state: "Waiting for Kauro" },
+  { id: "case-117", workspace: "Halden Outdoor", topic: "Billing", summary: "Our transfer was sent on Friday; the quote still shows unpaid.", severity: "S3", due: "Tomorrow, 10:00 AM UTC", state: "Waiting for Kauro" },
+  { id: "case-115", workspace: "Coastline Analytics", topic: "Product defect", summary: "12 rows in exceptions.csv seem to have a valid email address.", severity: "S2", due: "Tomorrow, 12:00 PM UTC", state: "Triaged" },
 ] as const;
 
 export function SupportOperations({ state }: PrototypeProps): ReactElement {

@@ -28,7 +28,23 @@ if (NOT_FOUND.reduce((sum, row) => sum + row.rows, 0) !== PLAN.notFound) throw n
 
 const STATES = { mapping: "done", identity: "done", relationships: "review", approval: "waiting" } as const;
 
-export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
+export function Relationships({ ctx, state, project }: PrototypeProps): ReactElement {
+  // "Clean your data" prepares no links: the Company column stays a column of the cleaned file
+  if (project.mode === "CLEAN")
+    return (
+      <>
+        <ProjectHeader current="plan" />
+        <PageHead title="Links between records" lead="Not part of this project." />
+        <Banner tone="info" title="Clean your data keeps the Company column as a column" announce="status">
+          <p>No link between contacts and companies is prepared: the cleaned files keep the company name beside each contact, made consistent where the plan says so.</p>
+        </Banner>
+        <div className="kauro-actions">
+          <ScreenButton to="UI22" ctx={ctx} project={project.projectId} variant="primary">
+            <span className="kauro-go">Go to approval</span>
+          </ScreenButton>
+        </div>
+      </>
+    );
   const agencyId = ctx.agency?.agencyId ?? "";
   const confirmed = state === "confirmed";
   const output = PLAN.output;
@@ -36,7 +52,7 @@ export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
     <>
       <ProjectHeader current="plan" />
       <PageHead title="Links between records" lead="Confirm how records stay connected." />
-      <PlanTasks ctx={ctx} current="relationships" states={confirmed ? { ...STATES, relationships: "done" } : STATES} />
+      <PlanTasks ctx={ctx} project={project} current="relationships" states={confirmed ? { ...STATES, relationships: "done" } : STATES} />
       <section className="kauro-links" aria-labelledby="links-h">
         <h2 id="links-h">Contacts and their companies</h2>
         <div className="kauro-links-map" aria-hidden="true">
@@ -140,7 +156,7 @@ export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
       )}
       <div className="kauro-actions">
         {confirmed ? (
-          <ScreenButton to="UI22" ctx={ctx} variant="primary">
+          <ScreenButton to="UI22" ctx={ctx} project={project.projectId} variant="primary">
             <span className="kauro-go">Continue to approval</span>
           </ScreenButton>
         ) : (

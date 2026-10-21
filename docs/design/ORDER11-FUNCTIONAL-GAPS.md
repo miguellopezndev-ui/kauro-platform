@@ -97,3 +97,10 @@ the Privacy notice (UI46) and the Data processing terms (UI47), but no page for 
 linking the Policy at a proposed `/legal/data-processing-policy`. **Needs.** A registry addition for the Policy's page (legal text
 published by its own procedure), and the consent record at registration (F-07). The approved contact form should be checked against the
 same rule when the public site is next changed.
+
+## F-09. Output preferences for "Clean your data" (proposal)
+
+**Design.** The owner asked whether optional output choices add value. Proposed in Fields, for "Clean your data" only and never required:
+the file type (as uploaded, or all CSV in UTF-8) and phone numbers (as in the file, or international format where the country is known).
+**Code.** The plan's body has no place for such preferences. **Needs.** Fields in the plan's contract and the core's CLEAN output, decided
+with the cores' owner; no change to their algorithms is implied by the design. **Status.** Proposal.

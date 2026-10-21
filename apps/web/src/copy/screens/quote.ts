@@ -12,7 +12,7 @@ export const QUOTE_COPY = {
   "screen.quote.total.label": "Total due",
   "screen.quote.units.label": "Billable source units",
   "screen.quote.mode.label": "Service",
-  "screen.quote.mode.CLEAN": "Clean and verify",
+  "screen.quote.mode.CLEAN": "Clean your data",
   "screen.quote.mode.HUBSPOT": "Prepare for HubSpot",
   "screen.quote.mode.SALESFORCE": "Prepare for Salesforce",
   "screen.quote.price-expires.label": "Price valid until",

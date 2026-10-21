@@ -40,12 +40,12 @@ function StatementCard({ statement, submitted, contest }: { readonly statement: 
         </div>
         <div>
           <dt>{shown === "PAID" ? "Paid" : shown === "DRAFT" ? "Issued on" : "To be paid by"}</dt>
-          <dd>{shown === "PAID" ? statement.paid : shown === "DRAFT" ? "9 Nov 2026" : statement.payDue}</dd>
+          <dd>{shown === "PAID" ? statement.paid : shown === "DRAFT" ? "Nov 9, 2026" : statement.payDue}</dd>
         </div>
       </dl>
       {shown === "DRAFT" ? <p className="kauro-muted">A draft changes until it is issued: a refund or a correction this month changes it.</p> : null}
       {submitted && statement.state === "PAID" ? (
-        <p className="kauro-statement-proof">Transfer sent on 15 Oct 2026. It shows as paid once the bank confirms it reached your account; until then, it is not.</p>
+        <p className="kauro-statement-proof">Transfer sent on Oct 15, 2026. It shows as paid once the bank confirms it reached your account; until then, it is not.</p>
       ) : statement.state === "PAID" ? (
         <p className="kauro-statement-proof">Paid on {statement.paid}, to the account ending ··4821; the bank&apos;s confirmation is kept with the statement.</p>
       ) : null}
@@ -120,7 +120,7 @@ export function Commissions({ state }: PrototypeProps): ReactElement {
       <PageHead title="Commissions" lead="Understand what was earned, held and paid." />
       {state === "submitted" ? (
         <Banner tone="info" title="September's transfer is on its way" announce="status">
-          <p>Sent on 15 Oct 2026. A transfer that has been sent is not yet money received: this page says paid when the bank confirms it.</p>
+          <p>Sent on Oct 15, 2026. A transfer that has been sent is not yet money received: this page says paid when the bank confirms it.</p>
         </Banner>
       ) : null}
       <aside className="kauro-statement-rules" aria-label="How commissions are counted">

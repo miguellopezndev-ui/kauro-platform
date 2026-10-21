@@ -28,7 +28,7 @@ interface Row {
   readonly state: "kept" | "deleting" | "deleted";
 }
 
-export function Lifecycle({ ctx, state }: PrototypeProps): ReactElement {
+export function Lifecycle({ ctx, state, project }: PrototypeProps): ReactElement {
   const agencyId = ctx.agency?.agencyId ?? "";
   const extended = state === "extended";
   const gone = state === "deleted";
@@ -40,7 +40,7 @@ export function Lifecycle({ ctx, state }: PrototypeProps): ReactElement {
     {
       what: "Files and delivery package",
       holds: "The sealed files, the plan, the package and its report",
-      until: gone ? "Deleted 27 Oct 2026" : moment(extended ? EXTENDED_DEADLINE : SOFT_DEADLINE),
+      until: gone ? "Deleted Oct 27, 2026" : moment(extended ? EXTENDED_DEADLINE : SOFT_DEADLINE),
       rule: `7 days after the first package was ready; never later than ${moment(HARD_DEADLINE)}, 14 days after the payment`,
       state: files,
     },
@@ -52,7 +52,7 @@ export function Lifecycle({ ctx, state }: PrototypeProps): ReactElement {
       state: files,
     },
     {
-      what: "HubSpot settings you confirmed",
+      what: "Destination settings you confirmed",
       holds: "What Kauro read and you confirmed; never a password or a key",
       until: `Up to ${TARGET_DAYS} days after their last use`,
       rule: "Used for a new delivery for 30 days at most",
@@ -71,13 +71,13 @@ export function Lifecycle({ ctx, state }: PrototypeProps): ReactElement {
       <ProjectHeader current="import" />
       <PageHead title="Data lifecycle" lead="See what remains and what will be deleted." />
       {deleting ? (
-        <Banner tone="info" title="Deletion requested on 22 Oct 2026 at 10:30 UTC" announce="status">
+        <Banner tone="info" title="Deletion requested on Oct 22, 2026 at 10:30 AM UTC" announce="status">
           <p>The project&apos;s files, package and import results are being deleted from Kauro&apos;s storage, staging and derived files. This page says when it is done.</p>
         </Banner>
       ) : null}
       {gone ? (
         <Banner tone="neutral" title="The project's files are deleted" announce="status">
-          <p>Deleted on 27 Oct 2026, at the end of their keeping period. No extension can bring them back; to work on the same data again, start a new project with the files.</p>
+          <p>Deleted on Oct 27, 2026, at the end of their keeping period. No extension can bring them back; to work on the same data again, start a new project with the files.</p>
         </Banner>
       ) : null}
       <div className="kauro-table-region">
@@ -154,7 +154,7 @@ export function Lifecycle({ ctx, state }: PrototypeProps): ReactElement {
         <ul>
           <li>Copies your team downloaded stay with your team.</li>
           <li>Financial and legal records stay for as long as the rules require, apart from CRM content.</li>
-          <li>Nothing in your HubSpot account: Kauro never had access to it.</li>
+          <li>Nothing in your CRM: Kauro never had access to it.</li>
         </ul>
       </section>
     </>

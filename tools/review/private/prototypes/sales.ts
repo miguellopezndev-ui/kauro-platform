@@ -28,10 +28,10 @@ export interface Prospect {
 }
 export const PROSPECTS: readonly Prospect[] = [
   { id: "p-01", name: "Fernhill Growth Partners", segment: "Agency", jurisdiction: "United Kingdom", source: "Its own site, the HubSpot partner directory", observed: "2026-10-14", state: "QUALIFIED", fit: "HubSpot partner; runs migrations for clients", next: "Write the first message" },
-  { id: "p-02", name: "Saltmarsh Digital", segment: "Agency", jurisdiction: "Ireland", source: "Its own site", observed: "2026-10-09", state: "CONTACTED", fit: "Builds CRM setups for small firms", next: "No reply yet: follow up from 23 Oct", claim: "Claim accepted, until 7 Jan 2027" },
-  { id: "p-03", name: "Ostra Revenue Ops", segment: "Agency", jurisdiction: "Netherlands", source: "A conference speaker list, published", observed: "2026-10-02", state: "ENGAGED", fit: "Salesforce consultancy; asked for the worked example", next: "Send the worked example they asked for", claim: "Claim accepted, until 31 Dec 2026" },
+  { id: "p-02", name: "Saltmarsh Digital", segment: "Agency", jurisdiction: "Ireland", source: "Its own site", observed: "2026-10-09", state: "CONTACTED", fit: "Builds CRM setups for small firms", next: "No reply yet: follow up from Oct 23", claim: "Claim accepted, until Jan 7, 2027" },
+  { id: "p-03", name: "Ostra Revenue Ops", segment: "Agency", jurisdiction: "Netherlands", source: "A conference speaker list, published", observed: "2026-10-02", state: "ENGAGED", fit: "Salesforce consultancy; asked for the worked example", next: "Send the worked example they asked for", claim: "Claim accepted, until Dec 31, 2026" },
   { id: "p-04", name: "Bellweather Outdoor", segment: "Company", jurisdiction: "United States", source: "Its own careers page (CRM admin role)", observed: "2026-10-16", state: "RESEARCHED", fit: "Not checked yet: is there a migration?", next: "Check the fit before any message" },
-  { id: "p-05", name: "Kestrel & Lowe", segment: "Agency", jurisdiction: "United Kingdom", source: "Its own site", observed: "2026-09-28", state: "SUPPRESSED", fit: "Asked not to be contacted on 1 Oct 2026", next: "None: suppressed on every channel" },
+  { id: "p-05", name: "Kestrel & Lowe", segment: "Agency", jurisdiction: "United Kingdom", source: "Its own site", observed: "2026-09-28", state: "SUPPRESSED", fit: "Asked not to be contacted on Oct 1, 2026", next: "None: suppressed on every channel" },
 ];
 
 export interface StatementLine {
@@ -62,17 +62,17 @@ export const STATEMENTS: readonly Statement[] = [
     period: "October 2026",
     state: "DRAFT",
     issued: null,
-    payDue: "17 Nov 2026",
+    payDue: "Nov 17, 2026",
     paid: null,
     lines: [line("Juniper Digital", "Contacts clean-up", "FIRST", 129_500), line("Coastline Analytics", "Q4 contacts", "REPEAT", 129_500, "Eligible 30 days after the project is complete; it is not complete yet")],
   },
   {
     period: "September 2026",
     state: "PAID",
-    issued: "7 Oct 2026",
-    payDue: "15 Oct 2026",
-    paid: "15 Oct 2026",
-    lines: [line("Coastline Analytics", "Contacts and companies", "FIRST", 245_000), line("Juniper Digital", "Contacts clean-up", "FIRST", 129_500, "Eligible on 15 Oct 2026, 30 days after the project was complete")],
+    issued: "Oct 7, 2026",
+    payDue: "Oct 15, 2026",
+    paid: "Oct 15, 2026",
+    lines: [line("Coastline Analytics", "Contacts and companies", "FIRST", 245_000), line("Juniper Digital", "Contacts clean-up", "FIRST", 129_500, "Eligible on Oct 15, 2026, 30 days after the project was complete")],
   },
 ];
 export const sumOf = (lines: readonly StatementLine[], key: "payableCents" | "heldCents" | "basisCents"): number => lines.reduce((sum, one) => sum + one[key], 0);
@@ -91,7 +91,7 @@ export const RESOURCES: readonly Resource[] = [
   { family: "Worked example", version: 2, state: "CURRENT", since: "2026-10-05", what: "The synthetic project of the public site, step by step, for a demonstration" },
   { family: "Questions buyers ask", version: 2, state: "CURRENT", since: "2026-10-12", what: "Answers to the usual objections, each with the page of the site that backs it" },
   { family: "What a seller may promise", version: 1, state: "CURRENT", since: "2026-07-01", what: "The contract's limits: no discount, no deadline and no result you cannot show" },
-  { family: "Offer sheet", version: 2, state: "SUPERSEDED", since: "2026-07-01", what: "Named an introductory discount that no longer exists", replacedBy: "Offer sheet version 3, on 12 Oct 2026" },
+  { family: "Offer sheet", version: 2, state: "SUPERSEDED", since: "2026-07-01", what: "Named an introductory discount that no longer exists", replacedBy: "Offer sheet version 3, on Oct 12, 2026" },
 ];
 
 /** The policy's repeat ladder, as the offer sheet quotes it (a buyer's own discount, never the seller's to give). */

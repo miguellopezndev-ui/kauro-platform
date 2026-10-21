@@ -32,16 +32,18 @@ export const ROLE_SCOPE: Readonly<Record<Role, string>> = {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** 2026-09-14T10:00:00Z → "14 Sep 2026" (UTC, so the review reads the same everywhere). */
+/** 2026-09-14T10:00:00Z → "Sep 14, 2026" (UTC, so the review reads the same everywhere; the design system's format). */
 export function day(iso: string): string {
   const date = new Date(iso);
-  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
-/** 2026-09-14T10:05:00Z → "14 Sep 2026, 10:05 UTC". */
+/** 2026-09-14T10:05:00Z → "Sep 14, 2026, 10:05 AM UTC", the design system's format (formatDeadline). */
 export function moment(iso: string): string {
   const date = new Date(iso);
-  return `${day(iso)}, ${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")} UTC`;
+  const hour = date.getUTCHours();
+  const twelve = hour % 12 === 0 ? 12 : hour % 12;
+  return `${day(iso)}, ${twelve}:${String(date.getUTCMinutes()).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"} UTC`;
 }
 
 export function Facts({ rows }: { readonly rows: ReadonlyArray<readonly [label: ReactNode, value: ReactNode]> }): ReactElement {

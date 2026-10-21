@@ -38,3 +38,11 @@ export const WORLD_PROJECTS: Readonly<Record<string, readonly WorldProject[]>> =
 export function worldProject(agencyId: string, projectId: string): WorldProject | null {
   return WORLD_PROJECTS[agencyId]?.find((one) => one.projectId === projectId) ?? null;
 }
+
+/** The project a page draws: the one its address names, else the workspace's main project, else the review's main HubSpot project. */
+export function projectOf(agencyId: string | null, projectId: string | null): WorldProject {
+  const named = agencyId !== null && projectId !== null ? worldProject(agencyId, projectId) : null;
+  if (named !== null) return named;
+  const main = agencyId === null ? undefined : WORLD_PROJECTS[agencyId]?.[0];
+  return main ?? (WORLD_PROJECTS[AGENCY_ID]?.[0] as WorldProject);
+}

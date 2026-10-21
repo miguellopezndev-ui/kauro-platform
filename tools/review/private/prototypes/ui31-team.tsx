@@ -132,7 +132,7 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
 
       {panel === "invited" ? (
         <Banner tone="success" title="Invitation sent" announce="status">
-          <p>It can be accepted until 27 Oct 2026, once, by the person invited. The link is sent to them and never shown again; if it is lost, withdraw it and invite again.</p>
+          <p>It can be accepted until Oct 27, 2026, once, by the person invited. The link is sent to them and never shown again; if it is lost, withdraw it and invite again.</p>
         </Banner>
       ) : null}
       {panel === "last-owner" ? (

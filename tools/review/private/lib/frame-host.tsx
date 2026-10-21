@@ -6,7 +6,8 @@ import { type ReactElement, type ReactNode, useMemo } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
 import { proposalOf } from "./proposals.ts";
 import { agencyFor } from "./world.ts";
-import { agencyOfPathname } from "@web/screens.ts";
+import { agencyOfPathname, projectOfPathname } from "@web/screens.ts";
+import { projectOf } from "./world-projects.ts";
 import { asHref, REVIEW } from "./links.ts";
 import { ReviewShell } from "./review-shell.tsx";
 import { scriptOf } from "./scenario.ts";
@@ -21,10 +22,13 @@ export function FrameHost({ id, context, state, pathname, children }: { readonly
   const base = CONTEXTS[context];
   const pathAgency = agencyOfPathname(pathname);
   const ctx = pathAgency === null ? base : { ...base, agency: agencyFor(context, pathAgency) ?? base.agency };
+  // the project a prototype draws is the one its address names (its name, client and service), else the workspace's main project
+  const inside = projectOfPathname(pathname);
+  const project = projectOf(ctx.agency?.agencyId ?? null, inside?.projectId ?? null);
   const script = useMemo(() => {
-    const fixed = stateDef === undefined ? {} : scriptOf(stateDef, context);
+    const fixed = stateDef === undefined ? {} : scriptOf(stateDef, context, project);
     return () => fixed;
-  }, [stateDef, context]);
+  }, [stateDef, context, project]);
   const Prototype = def.Prototype;
   return (
     <>
@@ -57,7 +61,7 @@ export function FrameHost({ id, context, state, pathname, children }: { readonly
         </a>
       </div>
       <ReviewShell appPath={proposalOf(id)?.anonymous === true ? "/login" : pathname} context={context} script={script}>
-        {children ?? (Prototype === undefined ? <NotDesigned id={id} /> : <Prototype ctx={ctx} state={stateDef?.key ?? "normal"} />)}
+        {children ?? (Prototype === undefined ? <NotDesigned id={id} /> : <Prototype ctx={ctx} state={stateDef?.key ?? "normal"} project={project} />)}
       </ReviewShell>
     </>
   );

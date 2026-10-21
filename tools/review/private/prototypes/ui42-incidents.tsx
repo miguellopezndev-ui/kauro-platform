@@ -22,7 +22,7 @@ export function Incidents({ state }: PrototypeProps): ReactElement {
       <PageHead title="Incidents" lead="Contain the affected scope and prove recovery." />
       {open ? null : (
         <Banner tone="success" title="No incident is open" announce="status">
-          <p>The last one closed on 9 Oct 2026. Checks run every minute; a new incident opens here by itself.</p>
+          <p>The last one closed on Oct 9, 2026. Checks run every minute; a new incident opens here by itself.</p>
         </Banner>
       )}
       <section className="kauro-prospect" aria-labelledby="inc-h">
@@ -33,7 +33,7 @@ export function Incidents({ state }: PrototypeProps): ReactElement {
         <dl className="kauro-prospect-facts">
           <div>
             <dt>Started</dt>
-            <dd>{open ? "20 Oct 2026, 15:20 UTC" : "9 Oct 2026, 08:12 UTC; closed 08:53 UTC"}</dd>
+            <dd>{open ? "Oct 20, 2026, 3:20 PM UTC" : "Oct 9, 2026, 8:12 AM UTC; closed 8:53 AM UTC"}</dd>
           </div>
           <div>
             <dt>Known to be affected</dt>
@@ -41,18 +41,18 @@ export function Incidents({ state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Next review</dt>
-            <dd>{open ? "16:20 UTC, in 40 minutes" : "Review held on 10 Oct 2026"}</dd>
+            <dd>{open ? "4:20 PM UTC, in 40 minutes" : "Review held on Oct 10, 2026"}</dd>
           </div>
         </dl>
       </section>
       <ol className="kauro-incident-duties">
         <li className={open ? "is-done" : "is-done"}>
           <strong>Containment</strong>
-          <span>{open ? "Done at 15:31 UTC: new links for the 3 packages are paused; nothing else is affected." : "Done at 08:20 UTC: the queue was drained."}</span>
+          <span>{open ? "Done at 3:31 PM UTC: new links for the 3 packages are paused; nothing else is affected." : "Done at 8:20 AM UTC: the queue was drained."}</span>
         </li>
         <li className={open ? "is-current" : "is-done"}>
           <strong>Recovery</strong>
-          <span>{open ? "Under way: the signing key is being rotated. Proof of recovery: a test link for each package, downloaded and checked." : "Proved at 08:53 UTC: the 6 checks completed and were compared with a second run."}</span>
+          <span>{open ? "Under way: the signing key is being rotated. Proof of recovery: a test link for each package, downloaded and checked." : "Proved at 8:53 AM UTC: the 6 checks completed and were compared with a second run."}</span>
         </li>
         <li className={open ? "is-current" : "is-done"}>
           <strong>Communication</strong>

@@ -2,6 +2,7 @@
 // screen draws it with its own code; a prototype reads the same state key to draw its matching variant. The states every private screen
 // shares (the session and the agency the shell reads first) are built here once.
 import type { OperationId } from "@web/api/generated.ts";
+import type { WorldProject } from "./world-projects.ts";
 import { type ContextKey, CONTEXTS, type ReviewContext, sessionFor } from "./contexts.ts";
 import type { Reply, Script } from "./fixture-fetch.ts";
 import { agencyFor, workspaceOf } from "./world.ts";
@@ -12,7 +13,8 @@ export interface StateDef {
   /** One line for the owner: what this state is and when a person meets it. */
   readonly note: string;
   /** The api's answers in this state, beyond the session and the agency (real screens only). */
-  readonly script?: (ctx: ReviewContext) => Script;
+  /** The replies of this state, for this person and the project the page names (a real screen read by id cannot tell). */
+  readonly script?: (ctx: ReviewContext, project?: WorldProject) => Script;
   /** The session and agency answers are replaced (sign-in states, refusals). */
   readonly base?: "SIGNED_IN" | "SIGNED_OUT" | "SESSION_UNAVAILABLE" | "AGENCY_REFUSED";
 }
@@ -52,9 +54,9 @@ export function withShared(states: readonly StateDef[]): readonly StateDef[] {
 }
 
 /** The script of one state, as the fixture fetch asks for it. */
-export function scriptOf(state: StateDef, contextKey: ContextKey): Script {
+export function scriptOf(state: StateDef, contextKey: ContextKey, project?: WorldProject): Script {
   const ctx = CONTEXTS[contextKey];
-  return { ...baseScript(ctx, state.base), ...(state.script?.(ctx) ?? {}) };
+  return { ...baseScript(ctx, state.base), ...(state.script?.(ctx, project) ?? {}) };
 }
 
 /** A helper for a real screen whose reads are `ops`: normal, loading, recoverable error. */

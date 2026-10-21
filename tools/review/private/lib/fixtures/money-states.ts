@@ -2,6 +2,8 @@
 // review's one project: the public site's worked example, 15,684 billable source units, HubSpot, priced by the policy's band. Built with
 // the web's own test fixtures, so the schema guard checks every answer; every figure is synthetic.
 import type { AuditView, PaymentOrderDetailView, PaymentOrderView, QuoteView } from "@web/api/generated.ts";
+import { bandIndexOf, priceOf } from "@web/public/pricing-bands.ts";
+import type { WorldProject } from "../world-projects.ts";
 import { audit, order, quote } from "@web-test/fixtures.ts";
 import { authorization, job } from "@web-test/fixtures-processing.ts";
 import { EXAMPLE } from "../../prototypes/example.ts";
@@ -35,22 +37,29 @@ export const UI18_STATES: readonly StateDef[] = [
 
 // ---------------------------------------------------------------- UI23 the quote
 
+// a review value with a real hash's shape (the SHA-256 of a review label), never the hash of a real terms document
+const TERMS_HASH = "61bd222c8dee08741f6215b10aa467fb03fba3781b6033466593e3f24094df4a";
 const cents = (value: number): string => String(value);
 const units = EXAMPLE.units;
 const base = EXAMPLE.priceCents;
 
 function quoteOf(agency: string, overrides: Partial<QuoteView> = {}): QuoteView {
-  return quote({ agencyId: agency, billableUnits: units, baseServiceCents: cents(base), serviceCents: cents(base), totalCents: cents(base), issuedAt: "2026-10-20T13:00:00Z", expiresAt: "2026-11-03T13:00:00Z", sourceAvailableUntil: "2026-11-03T09:00:00Z", ...overrides });
+  return quote({ agencyId: agency, billableUnits: units, baseServiceCents: cents(base), serviceCents: cents(base), totalCents: cents(base), issuedAt: "2026-10-20T13:00:00Z", expiresAt: "2026-11-03T13:00:00Z", sourceAvailableUntil: "2026-11-03T09:00:00Z", termsHash: TERMS_HASH, ...overrides });
 }
 
-const quoteState = (overrides: Partial<QuoteView>) => (ctx: ReviewContext): Script => ({ GetQuote: () => READ(quoteOf(agencyOf(ctx), overrides)) });
-const repeat = Math.round(base * 0.05);
+// the quote of the project the page names: its service and that service's price for the same units (a quote is read by its own id)
+const priceFor = (mode: QuoteView["mode"]): number => { const band = bandIndexOf(units); return band === null ? base : priceOf(band, mode); };
+const quoteState = (overrides: (price: number) => Partial<QuoteView>) => (ctx: ReviewContext, project?: WorldProject): Script => {
+  const mode = project?.mode ?? "HUBSPOT";
+  const price = priceFor(mode);
+  return { GetQuote: () => READ(quoteOf(agencyOf(ctx), { mode, baseServiceCents: cents(price), serviceCents: cents(price), totalCents: cents(price), ...overrides(price) })) };
+};
 
 export const UI23_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Ready to pay", note: "The first project's quote: the base price for 15,684 units in the HubSpot band, no discount, the tax treatment, the total and when it expires.", script: quoteState({}) },
-  { key: "repeat", label: "With the repeat discount", note: "A later project: the repeat discount on its own line, one discount only.", script: quoteState({ discountCents: cents(repeat), serviceCents: cents(base - repeat), totalCents: cents(base - repeat), discount: { bps: 500, basis: "REPEAT" } }) },
-  { key: "expired", label: "Expired", note: "The quote's time has passed: no Pay now, a new quote instead.", script: quoteState({ state: "EXPIRED", checkoutReady: false, checkoutBlockers: ["QUOTE_EXPIRED"], permittedActions: [] }) },
-  { key: "source-expired", label: "Files no longer kept", note: "The sealed files are past their date: the page offers to upload and check again, never to pay.", script: quoteState({ checkoutReady: false, checkoutBlockers: ["SOURCE_EXPIRED"], permittedActions: [] }) },
+  { key: "normal", label: "Ready to pay", note: "The first project's quote: the base price for 15,684 units in the HubSpot band, no discount, the tax treatment, the total and when it expires.", script: quoteState(() => ({})) },
+  { key: "repeat", label: "With the repeat discount", note: "A later project: the repeat discount on its own line, one discount only.", script: quoteState((price) => ({ discountCents: cents(Math.round(price * 0.05)), serviceCents: cents(price - Math.round(price * 0.05)), totalCents: cents(price - Math.round(price * 0.05)), discount: { bps: 500, basis: "REPEAT" } })) },
+  { key: "expired", label: "Expired", note: "The quote's time has passed: no Pay now, a new quote instead.", script: quoteState(() => ({ state: "EXPIRED", checkoutReady: false, checkoutBlockers: ["QUOTE_EXPIRED"], permittedActions: [] })) },
+  { key: "source-expired", label: "Files no longer kept", note: "The sealed files are past their date: the page offers to upload and check again, never to pay.", script: quoteState(() => ({ checkoutReady: false, checkoutBlockers: ["SOURCE_EXPIRED"], permittedActions: [] })) },
   ...ending("GetQuote", "quote"),
 ];
 

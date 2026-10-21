@@ -9,6 +9,11 @@
 // synthetic example, labelled as one (registry: "Empty state uses synthetic examples"). A restricted agency keeps its support, refund and
 // deletion routes (registry exceptions).
 //
+// Revision of 2026-10-20: a row names the project, its client and its service ("Clean your data", "Prepare for HubSpot", "Prepare for
+// Salesforce"), and says the step in the words of the project's header; a step waiting on someone else names who (research:
+// app-operations-ux.md §1.3 proposal 1.1). Starting a CRM project asks for the destination's account or org identifier, because creating
+// the project needs it (packages/domain/src/model/project.ts:73-79); "Clean your data" needs none.
+//
 // PROPOSED (D-UI11-1): the repeat-discount line. The policy's ladder is public (Pricing), but no read tells a workspace how many paid
 // projects it has; shown as reachable progress, never as the far tier (research: onboarding-vs-discounts.md 6).
 import type { ProjectDashboardItem } from "@web/api/generated.ts";
@@ -21,6 +26,8 @@ import { appPathOf, type PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { EXAMPLE_ID } from "../lib/world.ts";
 import { day, PageHead, ScreenButton, ScreenLink } from "./kit.tsx";
+import { SERVICE } from "./service.ts";
+import { worldProject } from "../lib/world-projects.ts";
 import { AGENCY_PROJECTS, COMPANY_PROJECTS, PAID_PROJECTS } from "./projects-data.ts";
 
 export const UI11_STATES: readonly StateDef[] = [
@@ -40,8 +47,7 @@ const GROUPS: readonly { readonly key: Group; readonly title: string; readonly n
 ];
 
 const STAGE_OF: Readonly<Record<ProjectDashboardItem["phase"], number>> = { SOURCES: 0, HEALTH_CHECK: 1, PLAN: 2, PURCHASE: 3, PROCESSING: 4, DELIVERED: 5, FAILED: -1, ARCHIVED: -1 };
-const STAGE_NAME = ["Upload and seal", "Free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and import"] as const;
-const MODE: Readonly<Record<ProjectDashboardItem["mode"], string>> = { CLEAN: "CLEAN", HUBSPOT: "HubSpot", SALESFORCE: "Salesforce" };
+const STAGE_NAME = ["Files", "Health check", "Plan", "Purchase", "Delivery", "Import"] as const;
 
 const ACTION: Readonly<Record<Exclude<ProjectDashboardItem["requiredAction"], "NONE">, { readonly label: string; readonly screen: string; readonly needs?: "APPROVE_PLANS" | "MANAGE_BILLING" }>> = {
   UPLOAD_SOURCES: { label: "Upload the files", screen: "UI14" },
@@ -52,7 +58,7 @@ const ACTION: Readonly<Record<Exclude<ProjectDashboardItem["requiredAction"], "N
   PAY_QUOTE: { label: "Pay the quote", screen: "UI23", needs: "MANAGE_BILLING" },
   START_PROCESSING: { label: "Start the preparation", screen: "UI25" },
 };
-const WAITING: Readonly<Record<"APPROVE_PLANS" | "MANAGE_BILLING", string>> = { APPROVE_PLANS: "Waiting for an approver", MANAGE_BILLING: "Waiting for payment" };
+const WAITING: Readonly<Record<"APPROVE_PLANS" | "MANAGE_BILLING", string>> = { APPROVE_PLANS: "Waiting for Samuel Osei (approver)", MANAGE_BILLING: "Waiting for Ines Duarte (billing)" };
 const AT_KAURO: Readonly<Partial<Record<ProjectDashboardItem["phase"], { readonly label: string; readonly screen: string }>>> = {
   HEALTH_CHECK: { label: "Kauro is checking the files", screen: "UI18" },
   PROCESSING: { label: "Kauro is preparing the package", screen: "UI25" },
@@ -93,16 +99,19 @@ function ProjectRow({ row, ctx }: { readonly row: Row; readonly ctx: PrototypePr
   const { item } = row;
   const stage = STAGE_OF[item.phase];
   const href = appPathOf(row.screen, ctx, item.projectId);
+  const name = worldProject(ctx.agency?.agencyId ?? "", item.projectId)?.name ?? item.clientLabel;
   return (
     <li className={`kauro-board-row kauro-board-row--${row.group}`}>
       <Link className="kauro-board-link" href={href} prefetch={false}>
         <span className="kauro-board-client">
-          <bdi>{item.clientLabel}</bdi>
-          <span className="kauro-board-mode">{MODE[item.mode]}</span>
+          <bdi className="kauro-board-name">{name}</bdi>
+          <span className="kauro-board-mode">
+            <bdi>{item.clientLabel}</bdi> · {SERVICE[item.mode].name}
+          </span>
         </span>
         <span className="kauro-board-stage">
           {stage < 0 ? <span className="kauro-board-stopped">Stopped</span> : <StageMarks stage={stage} />}
-          <span className="kauro-board-stage-name">{stage < 0 ? "The run ended" : `${stage + 1}. ${STAGE_NAME[stage]}`}</span>
+          <span className="kauro-board-stage-name">{stage < 0 ? "The run ended" : STAGE_NAME[stage]}</span>
         </span>
         <span className="kauro-board-when">
           {item.deadline === null ? <>Updated {day(item.lastActivityAt)}</> : row.group === "yours" ? <>Due {day(item.deadline)}</> : <>Deadline {day(item.deadline)}</>}
@@ -177,7 +186,7 @@ export function Projects({ ctx, state }: PrototypeProps): ReactElement {
         <section className="kauro-board-first" aria-labelledby="board-first-h">
           <div className="kauro-board-first-start">
             <h2 id="board-first-h">Your first project</h2>
-            <p>Upload the exports you want prepared. The free data health check shows what Kauro finds in them, and the exact price, before you pay anything.</p>
+            <p>Upload the exports you want prepared. The free data health check shows what Kauro finds in every row, then an estimate; you pay only after approving a plan and its quote.</p>
             {canStart && !starting ? (
               <Button variant="primary" onClick={() => setStarting(true)}>
                 <span className="kauro-go">Start your first project</span>
@@ -188,13 +197,13 @@ export function Projects({ ctx, state }: PrototypeProps): ReactElement {
             <li className="kauro-board-row kauro-board-row--example">
               <Link className="kauro-board-link" href={`/agencies/${EXAMPLE_ID}/projects/${AGENCY_PROJECTS[0]?.projectId ?? ""}`} prefetch={false}>
                 <span className="kauro-board-client">
-                  <bdi>Larch Studio</bdi>
-                  <span className="kauro-board-mode">HubSpot</span>
+                  <bdi className="kauro-board-name">Example project</bdi>
+                  <span className="kauro-board-mode">Larch Studio (synthetic) · Prepare for HubSpot</span>
                   <span className="kauro-board-example">Example · synthetic</span>
                 </span>
                 <span className="kauro-board-stage">
                   <StageMarks stage={6} />
-                  <span className="kauro-board-stage-name">Delivered, from upload to import</span>
+                  <span className="kauro-board-stage-name">Every step, from the files to the import</span>
                 </span>
                 <span className="kauro-board-when">Synthetic data</span>
                 <span className="kauro-board-next">
@@ -252,22 +261,20 @@ export function Projects({ ctx, state }: PrototypeProps): ReactElement {
   );
 }
 
-const SERVICES = [
-  { mode: "HUBSPOT", name: "HubSpot", body: "Import files and the steps for HubSpot's own importer." },
-  { mode: "SALESFORCE", name: "Salesforce", body: "Import files and the steps for Salesforce Data Loader." },
-  { mode: "CLEAN", name: "CLEAN", body: "Cleaned, explained standard files for another CRM or for spreadsheets." },
-] as const;
+const SERVICES = (["HUBSPOT", "SALESFORCE", "CLEAN"] as const).map((mode) => ({ mode, name: SERVICE[mode].name, body: SERVICE[mode].line }));
 
 /** The start of a project (CreateProject: the service and a purpose; an agency names the client first). The destination is set later. */
 function StartProject({ ctx, clients, onCancel }: { readonly ctx: PrototypeProps["ctx"]; readonly clients: readonly string[]; readonly onCancel: () => void }): ReactElement {
   const router = useRouter();
+  const [mode, setMode] = useState<"HUBSPOT" | "SALESFORCE" | "CLEAN">("HUBSPOT");
   const [errors, setErrors] = useState<readonly { fieldId: string; message: string }[]>([]);
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const found: { fieldId: string; message: string }[] = [];
-    if (clients.length > 0 && String(data.get("client") ?? "") === "") found.push({ fieldId: "start-client", message: "Choose the client this project is for." });
-    if (String(data.get("purpose") ?? "").trim() === "") found.push({ fieldId: "start-purpose", message: "Say in a few words what this project is for." });
+    if (clients.length > 0 && String(data.get("client") ?? "") === "") found.push({ fieldId: "start-client", message: "Choose the client this project is for" });
+    if (String(data.get("purpose") ?? "").trim() === "") found.push({ fieldId: "start-purpose", message: "Enter what this project is for" });
+    if (mode !== "CLEAN" && String(data.get("instance") ?? "").trim() === "") found.push({ fieldId: "start-instance", message: mode === "SALESFORCE" ? "Enter your Salesforce organization ID" : "Enter your HubSpot account ID" });
     setErrors(found);
     if (found.length === 0) router.push(appPathOf("UI14", ctx));
   };
@@ -275,7 +282,7 @@ function StartProject({ ctx, clients, onCancel }: { readonly ctx: PrototypeProps
     <section className="kauro-board-start" aria-labelledby="board-start-h">
       <form className="kauro-form" noValidate onSubmit={submit}>
         <h2 id="board-start-h">Start a project</h2>
-        <ErrorSummary title="Check these details" errors={errors} />
+        <ErrorSummary title="There is a problem" errors={errors} />
         {clients.length === 0 ? null : (
           <Field id="start-client" label="Client" hint="Each client keeps its own projects and files." error={errors.find((entry) => entry.fieldId === "start-client")?.message}>
             {(control) => (
@@ -294,7 +301,7 @@ function StartProject({ ctx, clients, onCancel }: { readonly ctx: PrototypeProps
           <legend>Service</legend>
           {SERVICES.map((service, index) => (
             <label key={service.mode}>
-              <input type="radio" name="mode" value={service.mode} defaultChecked={index === 0} />
+              <input type="radio" name="mode" value={service.mode} checked={mode === service.mode} onChange={() => setMode(service.mode)} />
               <span>
                 <strong>{service.name}</strong>
                 <small>{service.body}</small>
@@ -302,10 +309,20 @@ function StartProject({ ctx, clients, onCancel }: { readonly ctx: PrototypeProps
             </label>
           ))}
         </fieldset>
-        <Field id="start-purpose" label="What this project is for" hint="A few words your team will recognise, such as: spring cleanup before the HubSpot move." error={errors.find((entry) => entry.fieldId === "start-purpose")?.message}>
+        {mode === "CLEAN" ? null : (
+          <Field
+            id="start-instance"
+            label={mode === "SALESFORCE" ? "Salesforce organization ID" : "HubSpot account ID"}
+            hint={mode === "SALESFORCE" ? "In Salesforce Setup, under Company Information. Kauro uses it only to name the destination; it never connects to it." : "In HubSpot, in your account menu. Kauro uses it only to name the destination; it never connects to it."}
+            error={errors.find((entry) => entry.fieldId === "start-instance")?.message}
+          >
+            {(control) => <input {...control} name="instance" spellCheck={false} autoComplete="off" />}
+          </Field>
+        )}
+        <Field id="start-purpose" label="What this project is for" hint="A few words your team will recognise, such as: spring clean-up before the move." error={errors.find((entry) => entry.fieldId === "start-purpose")?.message}>
           {(control) => <input {...control} name="purpose" maxLength={200} />}
         </Field>
-        <p className="kauro-muted">The destination&apos;s settings come later, before the free check. Nothing is charged to start a project.</p>
+        <p className="kauro-muted">{mode === "CLEAN" ? "No destination is needed. Nothing is charged to start a project." : "The destination's settings are confirmed later, before the free check. Nothing is charged to start a project."}</p>
         <div className="kauro-actions">
           <Button type="submit" variant="primary">
             <span className="kauro-go">Create the project</span>

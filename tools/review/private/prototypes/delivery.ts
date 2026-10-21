@@ -5,6 +5,7 @@
 // of at most 3 days never crosses that limit, and a download link works for 15 minutes. The api shapes are ImportStageView, DownloadView
 // and RetentionView; these pages have no read in the web yet (VISUAL PROTOTYPE).
 import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
+import type { ServiceMode } from "@web/screens.ts";
 import { MANIFEST_FILES, SAMPLE } from "@web/public/sample-data.ts";
 import { PLAN } from "./plan.tsx";
 
@@ -12,9 +13,13 @@ const r = POLICY_SNAPSHOT.retention;
 const DAY = 86_400_000;
 const at = (iso: string, days: number): string => new Date(Date.parse(iso) + days * DAY).toISOString();
 
-const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
-const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
-if (contacts === undefined || companies === undefined) throw new Error("the public sample data lost a file");
+function fileOf(contactsFile: boolean): (typeof MANIFEST_FILES)[number] {
+  const found = MANIFEST_FILES.find((file) => (file.name === SAMPLE.contactsFile) === contactsFile);
+  if (found === undefined) throw new Error("the public sample data lost a file");
+  return found;
+}
+const contacts = fileOf(true);
+const companies = fileOf(false);
 
 export const PAID_AT = "2026-10-20T13:40:00Z";
 export const READY_AT = "2026-10-20T16:20:00Z";
@@ -33,15 +38,40 @@ export interface PackageFile {
   readonly bytes: number;
   readonly sha: string;
 }
-export const PACKAGE_FILES: readonly PackageFile[] = [
-  { name: companies.name, role: "Companies to import, stage 1", rows: companies.rows, bytes: 412_806, sha: "4f1c9a2e" },
-  { name: contacts.name, role: "Contacts to import, stage 2", rows: contacts.rows, bytes: 2_184_330, sha: "b72e05d1" },
-  { name: "associations.csv", role: "Contact to company links, stage 3", rows: PLAN.links, bytes: 690_548, sha: "0d93be47" },
-  { name: "exceptions.csv", role: "Values left out or left empty, each with its row", rows: PLAN.noCompany + PLAN.emailsInvalid + 12, bytes: 38_914, sha: "e6a4f210" },
-  { name: "manifest.json", role: "Every output row and the source rows it came from", rows: null, bytes: 1_906_221, sha: "9c0b7d3a" },
-  { name: "report.pdf", role: "What was found, decided and changed, with exact counts", rows: null, bytes: 486_112, sha: "71f2c8e9" },
-  { name: "import-steps.pdf", role: "The steps for HubSpot, with the settings you confirmed", rows: null, bytes: 204_770, sha: "a35d6b02" },
-];
+/**
+ * The package's files for the project's service. "Prepare for HubSpot" imports in three stages (companies, contacts, then the links);
+ * "Prepare for Salesforce" in two with Data Loader (accounts, then contacts carrying their account's Salesforce ID from the first stage's
+ * success file); "Clean your data" has cleaned files and their evidence, and no import steps.
+ */
+export function packageFilesFor(mode: ServiceMode): readonly PackageFile[] {
+  const evidence: PackageFile[] = [
+    { name: "exceptions.csv", role: "Values left out or left empty, each with its row", rows: PLAN.noCompany + PLAN.emailsInvalid + 12, bytes: 38_914, sha: "e6a4f210" },
+    { name: "manifest.json", role: "Every output row and the source rows it came from", rows: null, bytes: 1_906_221, sha: "9c0b7d3a" },
+    { name: "report.pdf", role: "What was found, decided and changed, with exact counts", rows: null, bytes: 486_112, sha: "71f2c8e9" },
+  ];
+  if (mode === "CLEAN")
+    return [
+      { name: companies.name, role: "Companies, cleaned", rows: companies.rows, bytes: 398_240, sha: "5d2a8c41" },
+      { name: contacts.name, role: "Contacts, cleaned", rows: contacts.rows, bytes: 2_101_884, sha: "c81e47b0" },
+      ...evidence,
+    ];
+  if (mode === "SALESFORCE")
+    return [
+      { name: "accounts-clean.csv", role: "Accounts to import, stage 1", rows: companies.rows, bytes: 405_118, sha: "3b7f0e92" },
+      { name: contacts.name, role: "Contacts to import, stage 2, each with its account", rows: contacts.rows, bytes: 2_240_512, sha: "a90c3d15" },
+      ...evidence,
+      { name: "import-steps.pdf", role: "The steps for Data Loader, with the settings you confirmed", rows: null, bytes: 198_406, sha: "e2b45c7d" },
+    ];
+  return [
+    { name: companies.name, role: "Companies to import, stage 1", rows: companies.rows, bytes: 412_806, sha: "4f1c9a2e" },
+    { name: contacts.name, role: "Contacts to import, stage 2", rows: contacts.rows, bytes: 2_184_330, sha: "b72e05d1" },
+    { name: "associations.csv", role: "Contact to company links, stage 3", rows: PLAN.links, bytes: 690_548, sha: "0d93be47" },
+    ...evidence,
+    { name: "import-steps.pdf", role: "The steps for HubSpot, with the settings you confirmed", rows: null, bytes: 204_770, sha: "a35d6b02" },
+  ];
+}
+/** The HubSpot package, kept for pages that show it as the example. */
+export const PACKAGE_FILES: readonly PackageFile[] = packageFilesFor("HUBSPOT");
 
 export const OUTPUT = Object.freeze({
   contacts: contacts.rows,
@@ -60,34 +90,61 @@ export interface Stage {
   readonly after: string | null;
   readonly settings: readonly string[];
 }
-export const STAGES: readonly Stage[] = [
-  {
-    sequence: 1,
-    name: "Companies",
-    file: companies.name,
-    rows: companies.rows,
-    operation: "Create new companies only",
-    after: null,
-    settings: ["HubSpot importer: one file, one object, Companies", "Create new companies only; do not update existing ones", "Company domain name identifies each company"],
-  },
-  {
-    sequence: 2,
-    name: "Contacts",
-    file: contacts.name,
-    rows: contacts.rows,
-    operation: "Create new contacts only",
-    after: "Companies",
-    settings: ["HubSpot importer: one file, one object, Contacts", "Create new contacts only; do not update existing ones", "Email identifies each contact; marketing consent is imported as given"],
-  },
-  {
-    sequence: 3,
-    name: "Links between records",
-    file: "associations.csv",
-    rows: PLAN.links,
-    operation: "Associate only",
-    after: "Companies and Contacts",
-    settings: ["HubSpot importer: one file, two objects, Contacts and Companies, associate only", "Each row pairs a contact's email with its company's domain", "No record is created or changed by this stage"],
-  },
-];
+/** The import stages of a CRM service, in order; "Clean your data" has none. */
+export function stagesFor(mode: ServiceMode): readonly Stage[] {
+  if (mode === "CLEAN") return [];
+  if (mode === "SALESFORCE")
+    return [
+      {
+        sequence: 1,
+        name: "Accounts",
+        file: "accounts-clean.csv",
+        rows: companies.rows,
+        operation: "Insert",
+        after: null,
+        settings: ["Data Loader: Insert, object Account", "Map the columns with the mapping file in the package", "Keep the success file: it gives each account its Salesforce ID"],
+      },
+      {
+        sequence: 2,
+        name: "Contacts",
+        file: contacts.name,
+        rows: contacts.rows,
+        operation: "Insert",
+        after: "Accounts",
+        settings: ["Data Loader: Insert, object Contact", "Add each account's Salesforce ID from stage 1's success file, as the steps show", "Email identifies each contact; marketing consent is imported as given"],
+      },
+    ];
+  return [
+    {
+      sequence: 1,
+      name: "Companies",
+      file: companies.name,
+      rows: companies.rows,
+      operation: "Create new companies only",
+      after: null,
+      settings: ["HubSpot importer: one file, one object, Companies", "Create new companies only; do not update existing ones", "Company domain name identifies each company"],
+    },
+    {
+      sequence: 2,
+      name: "Contacts",
+      file: contacts.name,
+      rows: contacts.rows,
+      operation: "Create new contacts only",
+      after: "Companies",
+      settings: ["HubSpot importer: one file, one object, Contacts", "Create new contacts only; do not update existing ones", "Email identifies each contact; marketing consent is imported as given"],
+    },
+    {
+      sequence: 3,
+      name: "Links between records",
+      file: "associations.csv",
+      rows: PLAN.links,
+      operation: "Associate only",
+      after: "Companies and Contacts",
+      settings: ["HubSpot importer: one file, two objects, Contacts and Companies, associate only", "Each row pairs a contact's email with its company's domain", "No record is created or changed by this stage"],
+    },
+  ];
+}
+/** The HubSpot stages, kept for pages that show them as the example. */
+export const STAGES: readonly Stage[] = stagesFor("HUBSPOT");
 
 export const bytes = (value: number): string => (value >= 1_000_000 ? `${(value / 1_000_000).toFixed(1)} MB` : `${Math.round(value / 1000)} KB`);

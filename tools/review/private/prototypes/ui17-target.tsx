@@ -19,17 +19,42 @@ export const UI17_STATES: readonly StateDef[] = [
   { key: "provide", label: "Settings to give", note: "No settings yet: how to export them from HubSpot, and where to put the file." },
   { key: "confirmed", label: "Confirmed", note: "The team confirmed the exact settings: the free data health check can start." },
   { key: "stale", label: "Settings out of date", note: "The settings were read too long ago for a new delivery: export them again." },
-  { key: "clean", label: "CLEAN: no destination", note: "A CLEAN project has no destination to set up: it goes straight to the free check." },
 ];
 
-const OBJECTS = [
-  { name: "Contacts", fields: 94, required: "Email", identity: "Email is unique: a row with an address already in HubSpot updates that contact." },
-  { name: "Companies", fields: 61, required: "Company domain name", identity: "Domain names are not unique in HubSpot: two companies may share one." },
-  { name: "Deals", fields: 48, required: "Deal name, Pipeline, Deal stage", identity: "Sales pipeline, 7 stages; a deal's stage must belong to its pipeline." },
-] as const;
+const OBJECTS = {
+  HUBSPOT: [
+    { name: "Contacts", fields: 94, required: "Email", identity: "Email is unique: a row with an address already in HubSpot updates that contact." },
+    { name: "Companies", fields: 61, required: "Company domain name", identity: "Domain names are not unique in HubSpot: two companies may share one." },
+    { name: "Deals", fields: 48, required: "Deal name, Pipeline, Deal stage", identity: "Sales pipeline, 7 stages; a deal's stage must belong to its pipeline." },
+  ],
+  SALESFORCE: [
+    { name: "Contact", fields: 72, required: "Last Name", identity: "Email is not unique in Salesforce: the org's duplicate rules decide what happens to a second contact with the same address." },
+    { name: "Account", fields: 58, required: "Account Name", identity: "Account names need not be unique: two accounts may share one." },
+    { name: "Opportunity", fields: 44, required: "Name, Stage, Close Date", identity: "A stage must be one of the org's stages for its sales process." },
+  ],
+} as const;
 
-export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
+export function TargetSetup({ ctx, state, project }: PrototypeProps): ReactElement {
   const [confirmed, setConfirmed] = useState(state === "confirmed");
+  const salesforce = project.mode === "SALESFORCE";
+  const crm = salesforce ? "Salesforce" : "HubSpot";
+  const fieldWord = salesforce ? "fields" : "properties";
+  // "Clean your data" has no destination (the owner's decision of 2026-10-20; the backend's contrary requirement is F-01)
+  if (project.mode === "CLEAN")
+    return (
+      <>
+        <ProjectHeader current="files" />
+        <PageHead title="Destination" lead="This project has no destination." />
+        <Banner tone="info" title="Clean your data prepares files for any tool" announce="status">
+          <p>There is no CRM to describe and nothing to confirm here. After the files are sealed, the free check starts on them.</p>
+        </Banner>
+        <div className="kauro-actions">
+          <ScreenButton to="UI18" ctx={ctx} project={project.projectId} variant="primary">
+            <span className="kauro-go">Go to the health check</span>
+          </ScreenButton>
+        </div>
+      </>
+    );
   const agencyId = ctx.agency?.agencyId ?? "";
   const days = POLICY_SNAPSHOT.retention.targetExecutionFreshnessDays;
   return (
@@ -42,7 +67,7 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
           <h2 id="target-clean-h">CLEAN prepares standard files</h2>
           <p>There is no destination to set up: the files Kauro prepares are cleaned, explained standard files your team imports with its own tools, into another CRM or a spreadsheet.</p>
           <div className="kauro-actions">
-            <ScreenButton to="UI18" ctx={ctx} variant="primary">
+            <ScreenButton to="UI18" ctx={ctx} project={project.projectId} variant="primary">
               <span className="kauro-go">Start the free data health check</span>
             </ScreenButton>
           </div>
@@ -50,15 +75,15 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
       ) : state === "provide" ? (
         <>
           <section className="kauro-target-steps" aria-labelledby="target-provide-h">
-            <h2 id="target-provide-h">Give Kauro your HubSpot settings</h2>
+            <h2 id="target-provide-h">Give Kauro your {crm} settings</h2>
             <ol>
               <li>
-                <strong>Export the properties</strong>
-                <span>In HubSpot, open Settings, then Data Management, then Properties, and choose Export all properties.</span>
+                <strong>Export the {fieldWord}</strong>
+                <span>{salesforce ? "Export the field definitions of Account, Contact and Opportunity from your org; the help page lists the ways to do it." : "In HubSpot, open Settings, then Data Management, then Properties, and choose Export all properties."}</span>
               </li>
               <li>
                 <strong>Upload the exported file here</strong>
-                <span>Kauro reads only the settings: no record leaves your HubSpot account, and Kauro never connects to it.</span>
+                <span>Kauro reads only the settings: no record leaves your {crm} {salesforce ? "org" : "account"}, and Kauro never connects to it.</span>
               </li>
               <li>
                 <strong>Confirm what Kauro read</strong>
@@ -68,7 +93,7 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
           </section>
           <label className="kauro-dropzone">
             <span className="kauro-dropzone-title">Choose the exported settings, or drop them here</span>
-            <span className="kauro-dropzone-label">HubSpot properties export (CSV or XLSX)</span>
+            <span className="kauro-dropzone-label">{crm} {fieldWord} export (CSV or XLSX)</span>
             <span className="kauro-dropzone-limits">The settings are kept for up to {POLICY_SNAPSHOT.retention.targetMetadataDaysFromLastUse} days after their last use, and used for a new delivery for {days} days at most.</span>
             <input type="file" accept=".csv,.xlsx" />
           </label>
@@ -77,7 +102,7 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
         <>
           {state === "stale" ? (
             <Banner tone="warning" title="These settings are too old for a new delivery" announce="status">
-              <p>They were read on 12 Sep 2026. Settings are used to prepare a delivery for {days} days at most, so export them again before the free check.</p>
+              <p>They were read on Sep 12, 2026. Settings are used to prepare a delivery for {days} days at most, so export them again before the free check.</p>
             </Banner>
           ) : null}
           <section className="kauro-set-status" aria-labelledby="target-status-h">
@@ -88,24 +113,24 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
           </section>
           <Facts
             rows={[
-              ["Destination", "HubSpot"],
-              ["Account", "HubSpot account 24816309"],
-              ["Import method", "HubSpot importer, as of October 2026"],
-              ["Settings read", state === "stale" ? "12 Sep 2026, 10:15 UTC" : "20 Oct 2026, 09:40 UTC"],
+              ["Destination", crm],
+              [salesforce ? "Org" : "Account", `${crm} ${salesforce ? "org" : "account"} 24816309`],
+              ["Import method", salesforce ? "Data Loader, as of October 2026" : "HubSpot importer, as of October 2026"],
+              ["Settings read", state === "stale" ? "Sep 12, 2026, 10:15 AM UTC" : "Oct 20, 2026, 9:40 AM UTC"],
             ]}
           />
           <section className="kauro-screen-section" aria-labelledby="target-objects-h">
             <h2 id="target-objects-h">What Kauro read</h2>
             <ul className="kauro-ledger-list">
-              {OBJECTS.map((object) => (
+              {OBJECTS[salesforce ? "SALESFORCE" : "HUBSPOT"].map((object) => (
                 <li key={object.name} className="kauro-ledger-item">
                   <div className="kauro-ledger-item-head">
                     <h3>{object.name}</h3>
-                    <span className="kauro-muted-text">{object.fields} properties</span>
+                    <span className="kauro-muted-text">{object.fields} {fieldWord}</span>
                   </div>
                   <dl className="kauro-ledger-facts">
                     <div>
-                      <dt>Required by HubSpot</dt>
+                      <dt>Required by {crm}</dt>
                       <dd>{object.required}</dd>
                     </div>
                     <div className="kauro-ledger-wide">
@@ -121,18 +146,22 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
             <h2 id="target-unknown-h">Not known yet</h2>
             <div className="kauro-unknown">
               <p className="kauro-unknown-what">
-                <span className="kauro-unknown-tag">Unknown</span> Whether <strong>Deal owner</strong> can be set by an import in this account
+                <span className="kauro-unknown-tag">Unknown</span> {salesforce ? <>Whether the org&apos;s <strong>duplicate rules</strong> block or allow a second contact with the same email</> : <>Whether <strong>Deal owner</strong> can be set by an import in this account</>}
               </p>
-              <p>Until it is known, the plan leaves deal owners out. Everything else can be prepared. Ask your HubSpot administrator, then export the settings again, or go on without deal owners.</p>
+              <p>
+                {salesforce
+                  ? "Until it is known, the plan keeps such contacts apart in the files and lists them. Ask your Salesforce administrator, then export the settings again."
+                  : "Until it is known, the plan leaves deal owners out. Everything else can be prepared. Ask your HubSpot administrator, then export the settings again, or go on without deal owners."}
+              </p>
             </div>
           </section>
           <div className="kauro-actions">
             {confirmed ? (
-              <ScreenButton to="UI18" ctx={ctx} variant="primary">
+              <ScreenButton to="UI18" ctx={ctx} project={project.projectId} variant="primary">
                 <span className="kauro-go">Start the free data health check</span>
               </ScreenButton>
             ) : state === "stale" ? (
-              <ScreenButton to="UI17" ctx={ctx} variant="primary">
+              <ScreenButton to="UI17" ctx={ctx} project={project.projectId} variant="primary">
                 Export and upload the settings again
               </ScreenButton>
             ) : (
@@ -141,7 +170,7 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
               </Button>
             )}
           </div>
-          {confirmed ? <p className="kauro-muted">Confirmed on 20 Oct 2026. If HubSpot&apos;s settings change in a material way, Kauro stops using these and asks again.</p> : null}
+          {confirmed ? <p className="kauro-muted">Confirmed on Oct 20, 2026. If {crm}&apos;s settings change in a material way, Kauro stops using these and asks again.</p> : null}
         </>
       )}
     </>

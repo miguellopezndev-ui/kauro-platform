@@ -40,7 +40,7 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
             </li>
           ))}
         </ol>
-        <p className="kauro-muted">Observed, from 1 to 20 Oct 2026. The largest drop is between a finished check and an approved plan: 14 to 6.</p>
+        <p className="kauro-muted">Observed, from 1 to Oct 20, 2026. The largest drop is between a finished check and an approved plan: 14 to 6.</p>
       </section>
       <dl className="kauro-identity-counts">
         <div>
@@ -67,7 +67,7 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
       <section className="kauro-screen-section" aria-labelledby="owed-h">
         <h2 id="owed-h">What is owed</h2>
         <ul>
-          <li>Seller commissions: USD 129.50 payable on 17 Nov 2026; USD 51.80 held until a project is complete.</li>
+          <li>Seller commissions: USD 129.50 payable on Nov 17, 2026; USD 51.80 held until a project is complete.</li>
           <li>Refunds: none requested.</li>
           <li>Tax on October&apos;s sales: filed in January; its amount is known when the quarter closes, and is not zero.</li>
         </ul>
@@ -92,7 +92,7 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Stop when</dt>
-            <dd>After 20 checks, or on 30 Nov 2026: stop if fewer than 3 more plans are approved than the 6 in October.</dd>
+            <dd>After 20 checks, or on Nov 30, 2026: stop if fewer than 3 more plans are approved than the 6 in October.</dd>
           </div>
         </dl>
         <p className="kauro-muted">If every team that opened its results only once approved a plan, October would have 11. That is arithmetic, not demand.</p>

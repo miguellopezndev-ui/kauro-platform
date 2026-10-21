@@ -28,7 +28,7 @@ export const AGENCY_PROJECTS: readonly ProjectDashboardItem[] = [
 
 /** Halden Outdoor's projects: a company buying for its own data, so the client is the company itself. */
 export const COMPANY_PROJECTS: readonly ProjectDashboardItem[] = [
-  item({ projectId: IDS.project, clientId: id(110), clientLabel: "Halden Outdoor", mode: "SALESFORCE", phase: "PLAN", requiredAction: "APPROVE_PLAN", lastActivityAt: "2026-10-20T12:15:00Z" }),
+  item({ projectId: IDS.project, clientId: id(110), clientLabel: "Halden Outdoor", mode: "HUBSPOT", phase: "PLAN", requiredAction: "APPROVE_PLAN", lastActivityAt: "2026-10-20T12:15:00Z" }),
   item({ projectId: id(212), clientId: id(110), clientLabel: "Halden Outdoor", mode: "CLEAN", phase: "DELIVERED", requiredAction: "NONE", lastActivityAt: "2026-09-28T10:00:00Z" }),
 ];
 

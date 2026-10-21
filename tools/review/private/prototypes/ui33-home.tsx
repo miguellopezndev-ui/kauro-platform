@@ -56,7 +56,7 @@ function SellerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; reado
         <section className="kauro-next" aria-labelledby="next-h">
           <p className="kauro-next-label">Next</p>
           <h2 id="next-h">Ostra Revenue Ops asked for the worked example</h2>
-          <p>Send it from the current resources, through a reviewed message. Your claim on them is accepted until 31 Dec 2026.</p>
+          <p>Send it from the current resources, through a reviewed message. Your claim on them is accepted until Dec 31, 2026.</p>
           <div className="kauro-actions">
             <ScreenButton to="UI54" ctx={ctx} variant="primary">
               <span className="kauro-go">Prepare the message</span>
@@ -68,7 +68,7 @@ function SellerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; reado
         ctx={ctx}
         tiles={[
           { label: "Prospects you work", figure: String(open.length), fact: "1 to check before any message, 1 suppressed", screen: "UI34" },
-          { label: "This month so far", figure: draft === undefined ? "Not issued" : usd(sumOf(draft.lines, "payableCents")), fact: draft === undefined ? "" : `A draft until it is issued on 9 Nov; ${usd(sumOf(draft.lines, "heldCents"))} held`, screen: "UI36" },
+          { label: "This month so far", figure: draft === undefined ? "Not issued" : usd(sumOf(draft.lines, "payableCents")), fact: draft === undefined ? "" : `A draft until it is issued on Nov 9; ${usd(sumOf(draft.lines, "heldCents"))} held`, screen: "UI36" },
           { label: "Last paid", figure: last === undefined ? "None yet" : usd(sumOf(last.lines, "payableCents")), fact: last === undefined ? "" : `${last.period}, paid on ${last.paid ?? ""}`, screen: "UI36" },
         ]}
       />
@@ -90,7 +90,7 @@ function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readon
       ) : (
         <section className="kauro-next" aria-labelledby="next-h">
           <p className="kauro-next-label">Waiting for you · 2</p>
-          <h2 id="next-h">Renew the kauro.example domain before 2 Nov 2026</h2>
+          <h2 id="next-h">Renew the kauro.example domain before Nov 2, 2026</h2>
           <p>Prepared: the registrar&apos;s own page, the fields filled in, the cost (USD 18.00) and what to keep as proof. One more action waits: approve a seller&apos;s claim.</p>
           <div className="kauro-actions">
             <ScreenButton to="UI38" ctx={ctx} variant="primary">
@@ -105,7 +105,7 @@ function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readon
           ctx={ctx}
           tiles={[
             { label: "Credits to attribute", figure: quiet ? "0" : "2", fact: quiet ? "Every credit is matched to its order" : "USD 2,275.00 received, not matched yet", screen: "UI39", tone: quiet ? undefined : "attention" },
-            { label: "Seller payouts", figure: "Not issued", fact: "October's statements are issued on 9 Nov", screen: "UI36" },
+            { label: "Seller payouts", figure: "Not issued", fact: "October's statements are issued on Nov 9", screen: "UI36" },
           ]}
         />
       </section>
@@ -115,9 +115,9 @@ function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readon
           ctx={ctx}
           tiles={[
             { label: "Jobs", figure: "1 running", fact: "No job failed in the last 7 days", screen: "UI40" },
-            { label: "Deletion", figure: quiet ? "0" : "1 retry", fact: quiet ? "Every scheduled deletion verified" : "A provider object was not removed: retried at 14:00", screen: "UI41", tone: quiet ? undefined : "attention" },
-            { label: "Incidents", figure: "None open", fact: "The last one closed on 9 Oct 2026", screen: "UI42" },
-            { label: "Support cases", figure: "3 open", fact: "Next answer due today at 16:00 UTC", screen: "UI55" },
+            { label: "Deletion", figure: quiet ? "0" : "1 retry", fact: quiet ? "Every scheduled deletion verified" : "A provider object was not removed: retried at 2:00 PM UTC", screen: "UI41", tone: quiet ? undefined : "attention" },
+            { label: "Incidents", figure: "None open", fact: "The last one closed on Oct 9, 2026", screen: "UI42" },
+            { label: "Support cases", figure: "3 open", fact: "Next answer due today at 4:00 PM UTC", screen: "UI55" },
           ]}
         />
       </section>
@@ -127,7 +127,7 @@ function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readon
           ctx={ctx}
           tiles={[
             { label: "Releases", figure: "1 candidate", fact: "Every gate passed; waiting for your promotion", screen: "UI43" },
-            { label: "Operating review", figure: "Due 3 Nov", fact: "October's evidence is being gathered", screen: "UI44" },
+            { label: "Operating review", figure: "Due Nov 3", fact: "October's evidence is being gathered", screen: "UI44" },
             { label: "Sales", figure: "1 claim", fact: "Saltmarsh Digital, claimed by Daniel Kim", screen: "UI34" },
           ]}
         />
