@@ -13,6 +13,7 @@ import "../prototypes/r2-board.css";
 import "../prototypes/r2-plan.css";
 import "../prototypes/r2-delivery.css";
 import "../prototypes/r2-access.css";
+import "../prototypes/r2-decisions.css";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";

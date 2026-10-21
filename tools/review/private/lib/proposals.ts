@@ -201,6 +201,33 @@ export const PROPOSALS: readonly Proposal[] = [
     exceptions: "No key, token, password or full account number is ever shown; sections that need backend work say so and change nothing.",
   },
   ...PROPOSALS_ROUND2,
+  // the owner's decisions of 2026-10-21 (Orders 11-12, design only), drawn beside the real screens they would change
+  {
+    key: "P-30",
+    group: "C",
+    anchor: "UI23",
+    origin: "APP",
+    title: "Quote: the five dates that end something",
+    why: "Owner decision of 2026-10-21: the quote's expiry, the free check's retention, the one extension (now also for the free check, to 17 days from sealing at most), the hold for a pending transfer and the paid project's retention, kept apart everywhere they appear.",
+    route: "/agencies/{agencyId}/projects/{id}/purchase (proposed)",
+    primaryCopy: "Review price, scope and availability.",
+    information: "The next step for the moment the project is in; the five dates as one table with the rule and the state of each; how Kauro keeps the files before and after payment.",
+    actions: "Accept the quote (owner, billing); ask for the one extension (owner, admin); open the payment and its hold.",
+    exceptions: "A hold is not payment, starts only with proof of a sent transfer, is given once per quote and per set of files, is never renewed and never added to the extension; preparation never starts on it.",
+  },
+  {
+    key: "P-31",
+    group: "C",
+    anchor: "UI24",
+    origin: "APP",
+    title: "Payment: the hold while a sent transfer arrives",
+    why: "Owner decision of 2026-10-21: a separate, limited retention for an order whose bank transfer was legitimately sent and waits for confirmation (proposed: five business days, to be checked against the payment method and its evidence).",
+    route: "/agencies/{agencyId}/payments/{orderId} (proposed)",
+    primaryCopy: "Your status comes from verified payment information.",
+    information: "The order's status; how to give the proof of a sent transfer and what it does; the hold's end and its limits; the five dates.",
+    actions: "Give the proof of a sent transfer (owner, billing) once per quote; check the status again.",
+    exceptions: "The proof is not payment; a second proof, another order on the same quote or a new quote for the same files starts no new hold; a hold that ends without the money deletes the files.",
+  },
 ];
 
 export function proposalOf(key: string): Proposal | undefined {

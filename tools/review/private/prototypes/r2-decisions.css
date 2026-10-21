@@ -1,0 +1,173 @@
+/* The owner's decisions of 2026-10-21 (Orders 11–12, design only): the five dates, the extension of the free check, the hold for a
+   pending transfer. Tokens only, no inline style, reflow at 320 px, both themes, 13 px floor. */
+
+/* the proposed marker: a word in a quiet box, never a pill that breaks over two lines */
+.kauro-main .kauro-d-proposed {
+  display: inline-block;
+  padding: 0 var(--kauro-space-2);
+  border: 1px dashed var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kauro-main .kauro-d-proposed--page {
+  display: block;
+  margin: 0 0 var(--kauro-space-5);
+  padding: var(--kauro-space-2) var(--kauro-space-3);
+  font-weight: 400;
+  white-space: normal;
+}
+
+.kauro-main .kauro-d-section {
+  margin-block: 0 var(--kauro-space-7);
+}
+.kauro-main .kauro-d-section > h2 {
+  margin: 0 0 var(--kauro-space-3);
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-d-section + .kauro-d-section {
+  padding-block-start: var(--kauro-space-5);
+}
+
+/* the five dates: the name of what ends leads each row; the rule is quieter; the state is a word */
+.kauro-main .kauro-d-dates th[scope="row"] {
+  padding: var(--kauro-space-3) var(--kauro-space-3) var(--kauro-space-3) 0;
+  border-block-end: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-body);
+  font-weight: 600;
+  vertical-align: top;
+}
+.kauro-main .kauro-d-dates td:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-d-dates .kauro-d-rule {
+  max-inline-size: 26rem;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-d-dates .kauro-d-rule .kauro-d-proposed {
+  margin-inline-start: var(--kauro-space-1);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-d-dates th[scope="row"] {
+    inline-size: 22%;
+  }
+  .kauro-main .kauro-d-dates td:nth-child(2) {
+    inline-size: 20%;
+  }
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-d-dates caption {
+    display: block;
+    inline-size: auto;
+  }
+  .kauro-main .kauro-d-dates th[scope="row"] {
+    display: block;
+    padding: 0 0 var(--kauro-space-1);
+    border: 0;
+  }
+  .kauro-main .kauro-d-dates .kauro-d-rule {
+    max-inline-size: none;
+  }
+}
+
+/* the payment's status with its amount */
+.kauro-main .kauro-d-status {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-d-status > * {
+  margin: 0;
+}
+.kauro-main .kauro-d-status h2 {
+  font-size: 1rem;
+}
+.kauro-main .kauro-d-amount {
+  font-family: var(--kauro-display-family);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-d-for,
+.kauro-main .kauro-d-note {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* the proof Kauro holds the files on: label above value */
+.kauro-main .kauro-d-facts {
+  max-inline-size: 44rem;
+}
+.kauro-main .kauro-d-mono {
+  font-family: var(--kauro-mono-family);
+  font-size: 0.9375rem;
+}
+.kauro-main .kauro-d-limits {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 44rem;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+/* the proof form: one column, its one action at the foot */
+.kauro-main .kauro-d-form {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 36rem;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-d-form input[type="file"] {
+  max-inline-size: 100%;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-d-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--kauro-space-3);
+  align-items: start;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-d-check input {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--kauro-color-primary);
+}
+.kauro-main .kauro-d-form .kauro-actions {
+  margin: 0;
+}
+
+/* how Kauro keeps the files: a disclosure that reads as one */
+.kauro-main .kauro-d-help {
+  max-inline-size: 44rem;
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-d-help > summary {
+  inline-size: fit-content;
+  min-block-size: 1.5rem;
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.kauro-main .kauro-d-help ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: var(--kauro-space-3) 0 0;
+  padding-inline-start: 1.25rem;
+  font-size: var(--kauro-font-size-dense);
+}

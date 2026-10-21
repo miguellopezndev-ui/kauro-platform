@@ -3,7 +3,7 @@
    The one date that matters (download by) is the only larger line on the Delivery page. */
 
 /* ---- one heading size a page ---- */
-.kauro-main :is(.kauro-dl-package, .kauro-dl-files, .kauro-dl-next, .kauro-im-before, .kauro-im-stages-wrap) > h2,
+.kauro-main :is(.kauro-dl-package, .kauro-dl-files, .kauro-dl-next, .kauro-im-before, .kauro-im-stages-wrap, .kauro-im-routes, .kauro-im-hubspot) > h2,
 .kauro-main .kauro-dl-title h2 {
   font-size: 1.25rem;
   letter-spacing: -0.01em;
@@ -463,4 +463,117 @@
   margin-block-start: var(--kauro-space-6);
   color: var(--kauro-color-text-muted);
   font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- Order 12: how each Salesforce record finds its parent, the blocked rows of a reconciled stage, the generated files ---- */
+.kauro-main .kauro-im-routes > p {
+  max-inline-size: 72ch;
+}
+.kauro-main .kauro-im-routes-table {
+  max-inline-size: 60rem;
+}
+.kauro-main .kauro-im-routes-table code,
+.kauro-main .kauro-im-blocked code {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-im-route-link {
+  display: block;
+}
+.kauro-main .kauro-im-route-link + .kauro-im-route-link {
+  margin-block-start: var(--kauro-space-1);
+}
+.kauro-main .kauro-im-order-note {
+  margin-block: var(--kauro-space-4) 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-body h4 + .kauro-im-blocked {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-im-blocked td {
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-blocked td:first-child strong {
+  font-size: var(--kauro-font-size-body);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-im-blocked th:nth-child(3),
+  .kauro-main .kauro-im-blocked th:nth-child(4) {
+    inline-size: 32%;
+  }
+}
+.kauro-main .kauro-im-generated {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+}
+.kauro-main .kauro-im-generated > * {
+  margin: 0;
+}
+.kauro-main .kauro-im-generated ul {
+  display: grid;
+  gap: var(--kauro-space-1);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-im-generated li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-1) var(--kauro-space-3);
+  max-inline-size: none;
+  margin: 0;
+}
+.kauro-main .kauro-im-generated li code {
+  font-weight: 600;
+  word-break: normal;
+}
+.kauro-main .kauro-im-generated li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-im-later summary {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--kauro-target-size);
+  color: var(--kauro-color-primary);
+  font-size: var(--kauro-font-size-dense);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.kauro-main .kauro-im-later summary:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-main .kauro-im-later[open] {
+  display: grid;
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-im-later > p {
+  margin: 0;
+}
+.kauro-main .kauro-im-hubspot > p {
+  max-inline-size: 72ch;
+}
+
+/* an API name or status code breaks only at its parts (the <wbr> after an underscore or before a capital), never inside a word */
+.kauro-main code.kauro-im-api {
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+.kauro-main code.kauro-im-api--small {
+  display: block;
+  margin-block-start: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+/* the links of a record stay one block in their cell, so a phone's label column keeps its place */
+.kauro-main .kauro-im-route-links {
+  display: grid;
+  gap: var(--kauro-space-1);
 }

@@ -1000,3 +1000,271 @@
     padding: var(--kauro-space-5) var(--kauro-space-4);
   }
 }
+
+/* ---- batch unification (Orders 11–12): demonstrated identities, probable duplicates many at once, blocking conflicts, the record ---- */
+.kauro-main .kauro-pl-crm {
+  margin: 0 0 var(--kauro-space-2);
+}
+.kauro-main .kauro-pl-preview {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 52rem;
+  margin-block-start: var(--kauro-space-4);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-pl-preview > * {
+  margin: 0;
+}
+.kauro-main .kauro-pl-preview h3 {
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-pl-preview dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.kauro-main .kauro-pl-preview dl > div {
+  display: grid;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-pl-preview dl > div {
+    grid-template-columns: 9rem minmax(0, 1fr);
+  }
+}
+.kauro-main .kauro-pl-preview dt {
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-pl-preview dd {
+  max-inline-size: none;
+}
+.kauro-main .kauro-pl-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3) var(--kauro-space-4);
+}
+.kauro-main .kauro-pl-preview-actions .kauro-pl-samples {
+  margin: 0;
+}
+.kauro-main .kauro-pl-applied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  max-inline-size: 52rem;
+  margin-block-start: var(--kauro-space-4);
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-success-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-pl-applied p {
+  flex: 1 1 24rem;
+  margin: 0;
+}
+.kauro-main .kauro-pl-changed {
+  border-inline-start-color: var(--kauro-color-warning-text);
+}
+.kauro-main .kauro-pl-applied-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-pl-batch-done {
+  max-inline-size: 52rem;
+  margin: var(--kauro-space-3) 0;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-inline-start: 4px solid var(--kauro-color-success-text);
+  background: var(--kauro-color-success-surface);
+  color: var(--kauro-color-success-text);
+}
+.kauro-main .kauro-pl-classlist {
+  display: grid;
+  max-inline-size: 52rem;
+  margin: var(--kauro-space-4) 0;
+  padding: 0;
+  list-style: none;
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-pl-classlist li {
+  display: grid;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-3) 0;
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-pl-classlist li {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.5fr);
+    align-items: baseline;
+  }
+}
+.kauro-main .kauro-pl-classlist-name {
+  font-weight: 600;
+}
+.kauro-main .kauro-pl-classlist-count {
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-pl-classlist-state {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-pl-picker {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin-block-start: var(--kauro-space-4);
+}
+.kauro-main .kauro-pl-picker-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+}
+.kauro-main .kauro-pl-picker-class {
+  display: grid;
+  gap: var(--kauro-space-1);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+.kauro-main .kauro-pl-picker-class span {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-pl-picker-class select {
+  inline-size: 100%;
+  max-inline-size: 26rem;
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+}
+.kauro-main .kauro-pl-picker-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-pl-groups td:first-child {
+  inline-size: 2.75rem;
+}
+.kauro-main .kauro-pl-groups th[scope="row"] {
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-pl-groups tr.is-selected :is(th, td) {
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-pl-check {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--kauro-color-primary);
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-pl-groups tr {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    column-gap: var(--kauro-space-2);
+  }
+  .kauro-main .kauro-pl-groups td:first-child {
+    grid-row: 1 / span 3;
+    inline-size: auto;
+  }
+  .kauro-main .kauro-pl-groups tr > :not(:first-child) {
+    grid-column: 2;
+  }
+}
+.kauro-main .kauro-pl-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--kauro-space-4);
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-pl-blocked th[scope="row"],
+.kauro-main .kauro-pl-trace th[scope="row"] {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kauro-main .kauro-pl-blockgroup {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 52rem;
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-pl-blockgroup > * {
+  margin: 0;
+}
+.kauro-main .kauro-pl-blockgroup h3 {
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-pl-blockgroup .kauro-pl-decide {
+  margin: 0;
+}
+.kauro-main .kauro-pl-trace td {
+  font-size: var(--kauro-font-size-dense);
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-pl-blocked th[scope="row"],
+  .kauro-main .kauro-pl-trace th[scope="row"] {
+    white-space: normal;
+  }
+}
+.kauro-main .kauro-pl-revised {
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-pl-revised > * {
+  margin: 0;
+}
+.kauro-main .kauro-pl-revised h2 {
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-pl-revised + section {
+  margin-block-start: var(--kauro-space-6);
+}
+.kauro-main .kauro-pl-diff th[scope="row"] {
+  font-weight: 600;
+}
+/* fixes after the design shots: a short number column keeps its heading whole; the blocked pair has no unified column to stress; on a
+   phone each listed group reads as one card, its labels above its values */
+.kauro-main .kauro-pl-rtable th[scope="col"] {
+  white-space: nowrap;
+}
+.kauro-main .kauro-pl-blocked td:last-child {
+  min-inline-size: 7rem;
+}
+.kauro-main .kauro-pl-blockgroup .kauro-pl-compare td:last-child {
+  font-weight: 400;
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-pl-groups td:not(:first-child),
+  .kauro-main .kauro-pl-blocked td,
+  .kauro-main .kauro-pl-trace td {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .kauro-main .kauro-pl-rtable th[scope="col"] {
+    white-space: normal;
+  }
+}

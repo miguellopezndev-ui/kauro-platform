@@ -122,3 +122,90 @@ Detailed per-page notes are in the code comments at the top of each prototype. I
 2. **Bulk duplicate decisions:** may "Unify all" ship for the strong evidence classes only, with a sample and undo until approval?
 3. **Salesforce staged import:** release the stage-2 contacts file only after stage 1 is verified, with each contact's AccountId filled
    from the stage-1 success file (rather than the customer filling them)?
+
+## Design decisions of 2026-10-21 (owner's answers; Orders 11–12, design only)
+
+The owner answered the three questions above deliberately without treating existing policy or implementation as fixed. Everything below is
+drawn in the review only: prototypes, review fixtures, and proposals beside the real screens, each marked "Proposed". No product code fakes
+an api behaviour, no core or backend was changed. Every functional change is an entry of `ORDER11-FUNCTIONAL-GAPS.md` (F-19 onwards),
+naming the component it opens and its dependencies.
+
+### 1. Extensions and pending payments
+
+**Decision.** The one voluntary extension (up to 72 hours) is also offered for the free data health check; with it, and only with it, the
+free check's files may stay past the ordinary 14 days from sealing, to an exceptional maximum of 17 days. A separate, transitional and
+limited hold covers an order whose bank transfer was legitimately initiated and waits for confirmation: proposed five business days from the
+proof, pending the check against the enabled payment method and its evidence. Five things are told apart everywhere: the quote's expiry,
+the free check's retention, the extension, the pending-payment hold and the paid project's retention. A fictitious or repeated order never
+keeps files indefinitely, and preparation never starts before the payment is confirmed.
+
+**Designed limits of the hold (all on screen).** Only with proof of a transfer already sent (the bank's confirmation or its trace number),
+for the exact amount and the order's reference; given only by an owner or a billing member; once per quote and per sealed set (another order
+on the same quote, a new quote for the same files or a second proof starts none); never renewed; never added to the extension (the files go
+on the later of the two dates, never their sum); never past 24 days from sealing (proposed ceiling); not payment; when it ends without the
+money, the files are deleted and a late transfer is reviewed and returned.
+
+**What changed, where.**
+
+| Screen | Change | Review states |
+|---|---|---|
+| Shared | `prototypes/retention.ts` computes the five dates from the timeline and the policy; `retention-dates.tsx` draws them as one table (what ends, date, rule, state in words), with "Proposed" on the proposed values | — |
+| P-30, beside UI23 Quote | The quote's dates: the next step for the moment (pay before the files go; the extension used; waiting for the transfer; the files gone; paid), the five-date table, and a Help disclosure "How Kauro keeps your files before and after payment" | normal (free check, files end first), extended, held, hold-expired, paid |
+| P-31, beside UI24 Payment | "Already sent the transfer?": the proof form (trace number, optional bank confirmation, the declaration), what a hold can and cannot do, the five dates | normal, held, second (a second proof refused), hold-expired, confirmed |
+| UI13 Overview | Three proposed cards: the free check extended; the transfer pending within its hold (nothing confirmed, preparation cannot start); the hold ended (upload again) | extended, held, hold-expired |
+| UI29 Data and deletion | Before a purchase: the five dates, More time for the free check (to 17 days from sealing at most), early deletion; the hold and the extension never add up | check, check-extended, held, hold-expired |
+| Review links | The strip of UI23 and UI24 links their proposals; kit links reach a proposal drawn on a real path (P-02, P-07, P-09, P-30, P-31) | — |
+
+**Open points.** The five business days and the 24-day ceiling are proposals until the payment route's evidence is known (PV1); the coverage
+calendar's holidays; whether the proof needs the authenticator code (step-up); the threshold of unpaid holds above which the owner reviews a
+workspace; the public Data handling and Help words (the lead's pages) and the ToS/DPA text.
+
+### 2. Batch unification
+
+**Decision.** Demonstrated identities without a blocking conflict may be applied together; probable duplicates may be reviewed, selected and
+decided many at once, but are never treated as demonstrated. A precise preview of effects, exclusions and conflicts always comes first;
+decisions change freely before execution, and a change after approval needs a new plan revision, its validation and its approval. Every
+decision is traced; nothing is promised about reverting changes in a CRM, because Kauro writes to none.
+
+**What changed, where (UI20 Duplicates, UI22 Approval, `plan.tsx`).**
+
+| State | What it shows |
+|---|---|
+| UI20 `demonstrated` | Nothing decided yet: the 138 groups with the same email and the same name and no blocking conflict can be applied together; the exact preview (effects, 3 groups kept out, conflicts) comes before the button. |
+| UI20 `normal` | The 138 demonstrated groups applied; the probable groups listed with checkboxes (by class, by page or one by one); one action decides the selection, recorded as decided by that person, never as demonstrated. |
+| UI20 `blocked` | Group 7 is kept out of every batch (both rows are already separate records in HubSpot), with the reason and the actions; the other blocked groups listed with theirs. |
+| UI20 `changed` | Before approval, group 171 is taken out of a 36-group batch and kept apart; the trace keeps the batch, the change, who and when; the batch can still be undone as a whole. |
+| UI20 `decided` | 200 unified and 7 kept apart, with the full record of who decided what, when and on which evidence. |
+| UI22 `revised` | A change after approval: revision 7 needs validation and approval; revision 6's approval stays in the record; its quote (USD 1,230.25) no longer applies. "Who decided the duplicates" appears on every approval state. |
+
+Counts add up on every page: 207 groups, 428 contacts.
+
+### 3. Salesforce and dependent relationships
+
+**Decision.** The customer never fills in AccountIds by hand. Safe external identifiers are used when they already suit the org; where
+Salesforce-generated IDs are needed, the import is staged: the team imports the parent records, returns Data Loader's success and error
+files, Kauro reconciles them and generates the dependent package with IDs proved by that evidence. Ambiguous, rejected or unmatched rows are
+blocked, each with the action it needs. No new Salesforce field is a universal condition, and Kauro never has CRM access.
+
+**What changed, where (UI27 Import, UI28 the same page, UI26 Delivery, `prototypes/delivery.ts`).**
+
+| State | What it shows |
+|---|---|
+| `sf-external-id` | The route per object. The org metadata the team confirmed shows an existing External ID field on Account (`Osprey_Account_Key__c`) holding the source key: accounts are upserted on it, and contacts and opportunities name their account by that key, in the package at once, with no wait for Kauro. Contact roles still need the generated IDs and stay a later stage. Kauro never asks to create a field. |
+| `sf-reconciled` (also UI28) | Stage 1 reconciled from the returned files: 2,930 accounts with a proved ID; 21 blocked in five groups, each with what the files show and the action (Salesforce `DUPLICATES_DETECTED`; `FIELD_CUSTOM_VALIDATION_EXCEPTION`; no success or error row; the same source key imported twice; an ambiguous match). Stages 2 and 3 are generated only for rows whose account is proved; 87 contacts and 23 opportunities are held back and named. The approver releases the generated stages. |
+| `sf-chain` | The order: 1 Accounts; 2 Contacts and 3 Opportunities (either order), each after its parent is proved; 4 Contact roles, generated from the proved IDs of stages 2 and 3. |
+| `hs-links` | HubSpot answered: its importer links records across files by a shared unique value (email for contacts, domain for companies), so Kauro generates no ID file for HubSpot; it still checks the returned error file of the linking stage (14 links not made, each with its action). Points not confirmed from HubSpot's documentation are marked "to verify". |
+
+A Salesforce state opened on a HubSpot project (or the reverse) shows a banner linking to the right project. The Osprey Freight project
+appears in these states at a later moment than on the board (where it waits for plan approval): the review shows each case on the same
+project.
+
+**To verify** (before building): that Data Loader's success and error files echo the unmapped source-key column; the Upsert related-object
+(external-ID) path for lookups; whether a HubSpot export includes the associated company's record ID.
+
+### Open points for the owner
+
+1. The proposed values: five business days for the hold, 24 days from sealing as the unpaid ceiling, and the threshold of unpaid holds above which the owner reviews a workspace.
+2. Whether giving the proof of a sent transfer needs the authenticator code.
+3. The batch cap for one bulk decision, and whether a demonstrated identity may ever include a name that differs only by accents.
+4. The points to verify on real tools before building (Data Loader result files, the Upsert related-object step, HubSpot exports).

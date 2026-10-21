@@ -31,6 +31,8 @@ import { P06_STATES, ResetPassword } from "../prototypes/p06-reset.tsx";
 import { HealthResults, P07_STATES } from "../prototypes/p07-results.tsx";
 import { Activity, P08_STATES } from "../prototypes/p08-activity.tsx";
 import { BillingOverview, P09_STATES } from "../prototypes/p09-billing.tsx";
+import { P30_STATES, QuoteDates } from "../prototypes/p30-quote-dates.tsx";
+import { P31_STATES, TransferHold } from "../prototypes/p31-transfer-hold.tsx";
 import { PrivateHome, UI33_STATES } from "../prototypes/ui33-home.tsx";
 import { Prospects, UI34_STATES } from "../prototypes/ui34-prospects.tsx";
 import { AgencyRelationship, UI35_STATES } from "../prototypes/ui35-relationship.tsx";
@@ -98,6 +100,8 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   "P-07": { Component: HealthResults, states: P07_STATES, contexts: ["agency", "company", "admin", "operator", "approver", "billing", "viewer"] },
   "P-08": { Component: Activity, states: P08_STATES, contexts: ["agency", "company", "operator"] },
   "P-09": { Component: BillingOverview, states: P09_STATES, contexts: ["agency", "company", "billing", "viewer"] },
+  "P-30": { Component: QuoteDates, states: P30_STATES, contexts: ["agency", "company", "billing", "admin", "approver", "viewer"] },
+  "P-31": { Component: TransferHold, states: P31_STATES, contexts: ["agency", "company", "billing", "admin", "operator", "viewer"] },
   "P-21": { Component: SellersList, states: P21_STATES, contexts: ["owner"] },
   "P-22": { Component: Payouts, states: P22_STATES, contexts: ["owner"] },
   "P-23": { Component: CustomersList, states: P23_STATES, contexts: ["owner"] },
