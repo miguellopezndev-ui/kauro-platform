@@ -9,9 +9,9 @@ import { INPUT_LIMITS } from "./limits.ts";
 import { POLICY_SNAPSHOT } from "./policy-snapshot.ts";
 import { formatDays } from "./retention.ts";
 
-export const GUIDES_VERSION = "1.3";
+export const GUIDES_VERSION = "1.4";
 /** The date the guides last changed, in UTC. */
-export const GUIDES_CHANGED = "2026-10-20";
+export const GUIDES_CHANGED = "2026-10-21";
 
 export interface GuideParagraph {
   readonly id: PublicCopyId;
@@ -59,6 +59,7 @@ const FIGURES: Readonly<Record<string, string | number>> = Object.freeze({
   package: formatDays(r.paidDaysFromFirstPackage),
   hard: formatDays(r.paidDaysHardFromCapture),
   check: formatDays(r.unpaidDaysFromReady),
+  checkHard: formatDays(r.unpaidDaysHardFromSeal),
 });
 
 function paragraph(id: PublicCopyId): GuideParagraph {

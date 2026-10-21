@@ -1,21 +1,24 @@
-// UI02 How it works: the buyer's operational guide to a project (Order 10, the owner's final decision). Home shows the process as a film;
-// this page is the reference behind it, so it plays nothing. The head is wine and carries the card of who acts at each stage (A10 §8: the
-// decisions and the import stay with the customer, the preparation is Kauro's). Then six stages in one ordered list, each with the same five
-// fields (who acts, what it needs, what happens, what you get, what stops it), an index beside them on a wide screen as in Help, and a worked
-// example on the synthetic sample that keeps apart the three counts a reader confuses (candidate groups, approved unifications, unified
-// rows, all three in the contacts file) and shows the price from the billable source units. The destinations are named only by the
-// capability publication (Supported services), so a stage says "a destination Kauro qualifies"; the example names its invented service. Every figure comes from the policy snapshot, the input limits or the sample.
+// UI02 How it works: the buyer's guide to a project. Home shows the process as a film; this page is the reference behind it, so it plays
+// nothing. A3 3.2: the check is free, bounded and never promised as immediate, and the call to action leads to the fit form. A3 3.6: no fixed
+// duration. UI02's exceptions: nothing here implies that software approves or that Kauro writes to a production CRM. The destinations are
+// named only by the capability publication (Supported services), so a stage says "a destination Kauro qualifies"; the example names its
+// invented service. Every figure comes from the policy snapshot, the input limits or the sample.
 //
-// A3 3.2: the check is free, bounded and never promised as immediate, and the call to action leads to the fit form. A3 3.6: no fixed
-// duration. UI02's exceptions: nothing here implies that software approves or that Kauro writes to a production CRM.
+// Order 11 round 2: a process page is understood before it reassures (eight of ten process pages in the round-2 sample use short numbered
+// steps), so the six stages open the page at a glance, each with who acts and what it leaves you with, and the call to action follows them.
+// Each stage then says in a few lines what happens, what you get and what stops it, all in view; the rest of its detail (who acts, what it
+// needs, what happens step by step) is folded under one control on the stage itself, so the page halves without moving anything out of
+// reach. The duplicate counts moved to Sample delivery, beside the report they belong to; the example keeps the price, with its counting
+// rule and the line saying it is invented directly under it.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../../copy/public.ts";
 import { INPUT_LIMITS } from "../limits.ts";
 import { modeName } from "../estimate-text.ts";
-import { DataTable, LinkButton, PageHead, Section } from "../parts.tsx";
+import { DataTable } from "../parts.tsx";
 import { bandIndexOf, bandLabel, formatCount, formatUsd, priceOf } from "../pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
-import { MANIFEST_FILES, SAMPLE, SAMPLE_GROUPS, SAMPLE_MODE } from "../sample-data.ts";
+import { Block, CHECK_CTA, Closing, Head } from "../r2.tsx";
+import { MANIFEST_FILES, SAMPLE, SAMPLE_MODE } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
 
 type Actor = "team" | "kauro";
@@ -45,7 +48,6 @@ const FIELD_LABEL: Readonly<Record<Field, PublicCopyId>> = {
   gets: "how.field.gets",
   stops: "how.field.stops",
 };
-const LIST_FIELDS = ["needs", "happens", "gets", "stops"] as const;
 
 const LIMITS: CopyValues = { files: INPUT_LIMITS.files, fileSize: INPUT_LIMITS.fileSize, setSize: INPUT_LIMITS.setSize, columns: INPUT_LIMITS.columns, units: INPUT_LIMITS.units };
 
@@ -133,116 +135,127 @@ const textOf = (line: Line): string => (typeof line === "string" ? PUBLIC_COPY[l
 const keyOf = (line: Line): string => (typeof line === "string" ? line : line.id);
 const numberOf = (index: number): string => String(index + 1).padStart(2, "0");
 
-/** Who acts at each stage, as one card beside the heading: the team on one side, Kauro on the other. */
-function WhoActs(): ReactElement {
-  const column = (actor: Actor): ReactElement => (
-    <div className={`kauro-acts-column kauro-acts-column--${actor}`}>
-      <p className="kauro-acts-actor">{PUBLIC_COPY[ACTOR_LABEL[actor]]}</p>
-      <ul>
-        {STAGES.map((stage, index) =>
-          stage.actor === actor ? (
-            <li key={stage.key}>
-              <span className="kauro-acts-number">{numberOf(index)}</span>
-              {PUBLIC_COPY[stage.heading]}
-            </li>
-          ) : null,
-        )}
-      </ul>
-    </div>
-  );
+/** What each stage leaves your team with, in a few words: the overview's line under each stage. */
+const OUTCOME: Readonly<Record<StageKey, PublicCopyId>> = {
+  files: "how.stage.files.outcome",
+  check: "how.stage.check.outcome",
+  decide: "how.stage.decide.outcome",
+  quote: "how.stage.quote.outcome",
+  prepare: "how.stage.prepare.outcome",
+  import: "how.stage.import.outcome",
+};
+
+function ActorTag({ actor }: { readonly actor: Actor }): ReactElement {
+  return <span className={`kauro-r2-actor kauro-r2-actor--${actor}`}>{PUBLIC_COPY[ACTOR_LABEL[actor]]}</span>;
+}
+
+/** The six stages at a glance: number, name, who acts and what it leaves you with; each item leads to its stage below. */
+function Overview(): ReactElement {
   return (
-    <div className="kauro-acts kauro-paper" aria-hidden="true">
-      <p className="kauro-acts-bar">
-        <span className="kauro-acts-brand">{PUBLIC_COPY["site.name"]}</span>
-        <span className="kauro-acts-title">{PUBLIC_COPY["how.acts.label"]}</span>
-      </p>
-      <div className="kauro-acts-columns">
-        {column("team")}
-        {column("kauro")}
-      </div>
-    </div>
+    <nav className="kauro-r2-overview" aria-label={PUBLIC_COPY["how.index.label"]}>
+      <ul>
+        {STAGES.map((stage, index) => (
+          <li key={stage.key}>
+            <a href={`#stage-${stage.key}`}>
+              <span className="kauro-r2-overview-number" aria-hidden="true">
+                {numberOf(index)}
+              </span>
+              <span className="kauro-r2-overview-name">{PUBLIC_COPY[stage.heading]}</span>
+              <ActorTag actor={stage.actor} />
+              <span className="kauro-r2-overview-outcome">{PUBLIC_COPY[OUTCOME[stage.key]]}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
-/** One stage: its number, heading and actor, a summary, then the five fields in the same order on every stage. */
+function Lines({ lines }: { readonly lines: readonly Line[] }): ReactElement {
+  return (
+    <ul>
+      {lines.map((line) => (
+        <li key={keyOf(line)}>{textOf(line)}</li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One stage: its number, heading and actor, the summary, then what you get and what stops it, always in view (a stop is a disclosure a
+ * buyer must not have to open). Who acts, what it needs and what happens, the detail a buyer reads once, are folded under one control.
+ */
 function StageSheet({ stage, index }: { readonly stage: Stage; readonly index: number }): ReactElement {
   const headingId = `stage-${stage.key}-heading`;
   return (
     <li id={`stage-${stage.key}`} className={`kauro-stage kauro-stage--${stage.actor}`}>
       <article className="kauro-stage-sheet" aria-labelledby={headingId}>
-        <header className="kauro-stage-head">
-          <span className="kauro-stage-number" aria-hidden="true">
+        <div className="kauro-r2-stage-head">
+          <span className="kauro-r2-stage-number" aria-hidden="true">
             {numberOf(index)}
           </span>
           <h3 id={headingId}>{PUBLIC_COPY[stage.heading]}</h3>
-          <p className="kauro-stage-actor">{PUBLIC_COPY[ACTOR_LABEL[stage.actor]]}</p>
-        </header>
-        <p className="kauro-stage-summary">{PUBLIC_COPY[stage.summary]}</p>
-        <dl className="kauro-stage-fields">
-          <div className="kauro-stage-field kauro-stage-field--who">
-            <dt>{PUBLIC_COPY[FIELD_LABEL.who]}</dt>
+          <ActorTag actor={stage.actor} />
+        </div>
+        <p className="kauro-r2-stage-summary">{PUBLIC_COPY[stage.summary]}</p>
+        <dl className="kauro-r2-stage-keys">
+          <div>
+            <dt>{PUBLIC_COPY[FIELD_LABEL.gets]}</dt>
             <dd>
-              <p>{PUBLIC_COPY[stage.who]}</p>
+              <Lines lines={stage.gets} />
             </dd>
           </div>
-          {LIST_FIELDS.map((field) => (
-            <div key={field} className={`kauro-stage-field kauro-stage-field--${field}`}>
-              <dt>{PUBLIC_COPY[FIELD_LABEL[field]]}</dt>
+          <div>
+            <dt>{PUBLIC_COPY[FIELD_LABEL.stops]}</dt>
+            <dd>
+              <Lines lines={stage.stops} />
+            </dd>
+          </div>
+        </dl>
+        <details className="kauro-r2-stage-more">
+          <summary>{PUBLIC_COPY["how.stage.more"]}</summary>
+          <dl className="kauro-r2-stage-detail">
+            <div>
+              <dt>{PUBLIC_COPY[FIELD_LABEL.who]}</dt>
               <dd>
-                <ul>
-                  {stage[field].map((line) => (
-                    <li key={keyOf(line)}>{textOf(line)}</li>
-                  ))}
-                </ul>
+                <p>{PUBLIC_COPY[stage.who]}</p>
               </dd>
             </div>
-          ))}
-        </dl>
+            <div>
+              <dt>{PUBLIC_COPY[FIELD_LABEL.needs]}</dt>
+              <dd>
+                <Lines lines={stage.needs} />
+              </dd>
+            </div>
+            <div>
+              <dt>{PUBLIC_COPY[FIELD_LABEL.happens]}</dt>
+              <dd>
+                <Lines lines={stage.happens} />
+              </dd>
+            </div>
+          </dl>
+        </details>
       </article>
     </li>
   );
 }
 
-/** The worked example: the three duplicate counts kept apart, then the price from the billable source units. */
+/** The worked example: from the billable source units of the invented project to its price, with the counting rule right under it. */
 function Example(): ReactElement | null {
   const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
   const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
   if (contacts === undefined || companies === undefined) return null;
-  const { pairs, triples, pairsKeptApart } = SAMPLE_GROUPS;
-  const groups = pairs + triples;
   const units = contacts.source + companies.source;
   const band = bandIndexOf(units);
   if (band === null) return null;
   const n = formatCount;
   return (
-    <div className="kauro-how-example">
-      <DataTable
-        caption={PUBLIC_COPY["how.example.counts.caption"]}
-        columns={[PUBLIC_COPY["how.example.counts.what"], PUBLIC_COPY["how.example.counts.figure"], PUBLIC_COPY["how.example.counts.meaning"]]}
-        stack
-        variant="kauro-how-ledger"
-        rows={[
-          {
-            key: "groups",
-            head: PUBLIC_COPY["how.example.groups.label"],
-            cells: [copy("how.example.groups.value", { count: n(groups), contacts: n(pairs * 2 + triples * 3) }), PUBLIC_COPY["how.example.groups.meaning"]],
-          },
-          {
-            key: "approved",
-            head: PUBLIC_COPY["how.example.approved.label"],
-            cells: [copy("how.example.approved.value", { count: n(groups - pairsKeptApart), max: n(groups) }), copy("how.example.approved.meaning", { kept: n(pairsKeptApart) })],
-          },
-          {
-            key: "unified",
-            head: PUBLIC_COPY["how.example.unified.label"],
-            cells: [n(contacts.unified), copy("how.example.unified.meaning", { source: n(contacts.source), output: n(contacts.rows) })],
-          },
-        ]}
-      />
+    <div className="kauro-r2-example">
       <DataTable
         caption={PUBLIC_COPY["how.example.price.caption"]}
         columns={[PUBLIC_COPY["how.example.price.line"], PUBLIC_COPY["how.example.counts.figure"]]}
-        variant="kauro-how-ledger kauro-how-ledger--price"
+        variant="kauro-r2-compact-table kauro-r2-ledger"
+        stack={false}
         rows={[
           { key: "contacts", head: PUBLIC_COPY["how.example.price.contacts"], cells: [n(contacts.source)] },
           { key: "companies", head: PUBLIC_COPY["how.example.price.companies"], cells: [n(companies.source)] },
@@ -252,62 +265,66 @@ function Example(): ReactElement | null {
           { key: "total", head: PUBLIC_COPY["how.example.price.total"], cells: [formatUsd(priceOf(band, SAMPLE_MODE))] },
         ]}
       />
-      <p className="kauro-how-example-note">{copy("how.example.price.note", { units: n(units), output: n(contacts.rows + companies.rows) })}</p>
-      <p className="kauro-site-meta">{PUBLIC_COPY["how.example.synthetic"]}</p>
+      <div className="kauro-r2-example-notes">
+        <p>{copy("how.example.price.note", { units: n(units), output: n(contacts.rows + companies.rows) })}</p>
+        <p className="kauro-r2-example-synthetic">{PUBLIC_COPY["how.example.synthetic"]}</p>
+        <a className="kauro-site-arrow" href={ROUTE.sample}>
+          {PUBLIC_COPY["how.example.duplicates.cta"]}
+        </a>
+      </div>
     </div>
   );
 }
 
+const NEVER = [
+  { key: "live", name: "home.limits.live.name", body: "home.limits.live" },
+  { key: "import", name: "home.limits.import.name", body: "home.limits.import" },
+  { key: "decide", name: "home.limits.decide.name", body: "home.limits.decide" },
+] as const satisfies ReadonlyArray<{ readonly key: string; readonly name: PublicCopyId; readonly body: PublicCopyId }>;
+
 export function HowItWorksPage(): ReactElement {
   return (
     <>
-      <PageHead eyebrow={PUBLIC_COPY["nav.how.label"]} title={PUBLIC_COPY["how.title"]} accent={3} lead={PUBLIC_COPY["how.lead"]} tone="wine" size="compact" variant="kauro-site-head-how" aside={<WhoActs />} />
-      <section id="how-steps" className="kauro-site-docs kauro-how-guide" aria-labelledby="how-steps-heading">
-        <div className="kauro-site-wrap kauro-site-docs-inner">
-          <nav className="kauro-site-toc kauro-how-toc" aria-label={PUBLIC_COPY["how.index.label"]}>
-            <p className="kauro-site-toc-title" aria-hidden="true">
-              {PUBLIC_COPY["how.index.label"]}
-            </p>
-            <ul>
-              {STAGES.map((stage, index) => (
-                <li key={stage.key} className={`kauro-how-toc-item--${stage.actor}`}>
-                  <a href={`#stage-${stage.key}`}>
-                    <span className="kauro-how-toc-number" aria-hidden="true">
-                      {numberOf(index)}
-                    </span>
-                    {PUBLIC_COPY[stage.heading]}
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <ul className="kauro-site-legend" aria-hidden="true">
-              <li className="kauro-site-legend-item kauro-site-legend-item--team">{PUBLIC_COPY["how.actor.team.label"]}</li>
-              <li className="kauro-site-legend-item kauro-site-legend-item--kauro">{PUBLIC_COPY["how.actor.kauro.label"]}</li>
-            </ul>
-          </nav>
-          <div className="kauro-how-stages">
-            <h2 id="how-steps-heading">{PUBLIC_COPY["how.steps.heading"]}</h2>
-            <p className="kauro-site-guide-summary">{PUBLIC_COPY["how.steps.lead"]}</p>
-            <ol className="kauro-stage-list">
-              {STAGES.map((stage, index) => (
-                <StageSheet key={stage.key} stage={stage} index={index} />
-              ))}
-            </ol>
-          </div>
-        </div>
-      </section>
-      <Section id="how-example" heading={PUBLIC_COPY["how.example.heading"]} lead={copy("how.example.lead", { mode: modeName(SAMPLE_MODE) })} tone="sunken" variant="kauro-how-example-band">
-        <Example />
-      </Section>
-      <Section id="how-responsibility" heading={PUBLIC_COPY["how.responsibility.heading"]} layout="split" tone="inverse" variant="kauro-site-band-grain">
-        <p className="kauro-site-statement">{PUBLIC_COPY["how.responsibility.body"]}</p>
-        <div className="kauro-site-actions">
-          <LinkButton href={ROUTE.contact} primary>
+      <Head kind="path" accent={3} eyebrow={PUBLIC_COPY["nav.how.label"]} title={PUBLIC_COPY["how.title"]} lead={PUBLIC_COPY["how.lead"]} />
+      <Block id="how-overview" heading={PUBLIC_COPY["how.overview.heading"]} variant="kauro-r2-block--first">
+        <Overview />
+        <div className="kauro-r2-inline-cta">
+          <a className="kauro-site-button kauro-site-button--primary" href={ROUTE.contact}>
             {PUBLIC_COPY["public.cta.request-health-check.cta"]}
-          </LinkButton>
-          <LinkButton href={ROUTE.services}>{PUBLIC_COPY["how.next.services.cta"]}</LinkButton>
+          </a>
+          <p className="kauro-r2-hint">{PUBLIC_COPY["pricing.answer.free"]}</p>
         </div>
-      </Section>
+      </Block>
+      <Block id="how-steps" heading={PUBLIC_COPY["how.steps.heading"]} lead={PUBLIC_COPY["how.steps.lead"]} tone="sunken">
+        <ol className="kauro-r2-stages">
+          {STAGES.map((stage, index) => (
+            <StageSheet key={stage.key} stage={stage} index={index} />
+          ))}
+        </ol>
+      </Block>
+      <Block id="how-example" heading={PUBLIC_COPY["how.example.heading"]} lead={copy("how.example.lead", { mode: modeName(SAMPLE_MODE) })} layout="split">
+        <Example />
+      </Block>
+      <Block id="how-never" heading={PUBLIC_COPY["home.limits.heading"]} lead={PUBLIC_COPY["home.limits.lead"]} tone="sunken">
+        <ul className="kauro-r2-never">
+          {NEVER.map((item) => (
+            <li key={item.key}>
+              <h3>{PUBLIC_COPY[item.name]}</h3>
+              <p>{PUBLIC_COPY[item.body]}</p>
+            </li>
+          ))}
+        </ul>
+      </Block>
+      <Closing
+        id="how-responsibility"
+        heading={PUBLIC_COPY["how.responsibility.heading"]}
+        body={PUBLIC_COPY["how.responsibility.body"]}
+        primary={CHECK_CTA}
+        links={[
+          { href: ROUTE.services, label: PUBLIC_COPY["how.next.services.cta"] },
+          { href: ROUTE.sample, label: PUBLIC_COPY["services.sample.cta"] },
+        ]}
+      />
     </>
   );
 }

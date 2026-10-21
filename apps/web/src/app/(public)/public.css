@@ -8741,3 +8741,1147 @@ body:has(> .kauro-site-header) {
     text-align: start;
   }
 }
+
+/* ==== Order 11 round 2: the rebuilt pages (r2.tsx) ======================================================================================
+   One type scale for every page but Home: a page that opens a path has a heading of 36 to 52 px, a reference page 32 to 40 px; every section
+   heading on every page is 24 to 30 px, a card or stage title 20 to 22 px, body 16 px, meta 14 px. One large figure per page at most (the
+   Pricing estimate). Peers are equal vertical cards in a grid; facts and limits are tables and lists at reading size; every decision page
+   ends in the same closing band with the one call to action. The rules are scoped under .kauro-site-main so they win over the earlier
+   layers of this sheet without !important. */
+
+.kauro-site-main .kauro-r2-head {
+  padding-block: clamp(2.5rem, 1.5rem + 3.5vw, 4.5rem) clamp(2rem, 1rem + 2.5vw, 3rem);
+}
+.kauro-site-main .kauro-r2-head h1 {
+  max-inline-size: 20ch;
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+}
+.kauro-site-main .kauro-r2-head--path h1 {
+  font-size: clamp(2.25rem, 1.65rem + 2.1vw, 3.25rem);
+}
+.kauro-site-main .kauro-r2-head--reference h1 {
+  max-inline-size: 26ch;
+  font-size: clamp(2rem, 1.7rem + 1vw, 2.5rem);
+  letter-spacing: -0.026em;
+}
+.kauro-site-main .kauro-r2-head .kauro-site-eyebrow {
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-site-main .kauro-r2-lead {
+  max-inline-size: 62ch;
+  margin-block-start: var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+.kauro-site-main .kauro-r2-head-line,
+.kauro-site-main .kauro-r2-meta {
+  margin-block-start: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+}
+.kauro-site-main .kauro-r2-head-line {
+  color: var(--kauro-color-text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-head .kauro-site-stamp-line {
+  margin-block-start: var(--kauro-space-5);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-head--aside .kauro-r2-head-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    align-items: center;
+    column-gap: clamp(2.5rem, 5vw, 5rem);
+  }
+}
+.kauro-site-main .kauro-r2-head-aside {
+  margin-block-start: var(--kauro-space-6);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-head-aside {
+    margin-block-start: 0;
+  }
+}
+
+/* ---- sections ---- */
+.kauro-site-main .kauro-r2-block {
+  padding-block: clamp(3rem, 2rem + 4vw, 5rem);
+}
+.kauro-site-main .kauro-r2-block--first {
+  padding-block-start: clamp(0.5rem, 1.5vw, 1.5rem);
+}
+.kauro-site-main .kauro-r2-block--sunken {
+  background: var(--kauro-color-surface);
+}
+.kauro-site-main .kauro-r2-block--plain + .kauro-r2-block--plain {
+  padding-block-start: 0;
+}
+.kauro-site-main .kauro-r2-block--plain + .kauro-r2-block--plain > .kauro-r2-block-inner {
+  padding-block-start: clamp(3rem, 2rem + 4vw, 5rem);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-block-inner {
+  display: grid;
+  gap: var(--kauro-space-6);
+}
+.kauro-site-main :is(.kauro-r2-block, .kauro-r2-closing, .kauro-r2-docs, .kauro-r2-contact) h2 {
+  max-inline-size: 28ch;
+  font-size: clamp(1.5rem, 1.3rem + 0.7vw, 1.875rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.022em;
+}
+.kauro-site-main .kauro-r2-block-lead {
+  max-inline-size: 60ch;
+  margin-block-start: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+.kauro-site-main .kauro-r2-block-body {
+  min-inline-size: 0;
+}
+.kauro-site-main .kauro-r2-block-body > * + * {
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-site-main .kauro-r2-block-body > p + p {
+  margin-block-start: var(--kauro-space-3);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-block--split .kauro-r2-block-inner {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+    align-items: start;
+  }
+}
+.kauro-site-main :is(.kauro-r2-block, .kauro-r2-docs) h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+}
+.kauro-site-main .kauro-r2-after {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-hint {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.kauro-site-main .kauro-r2-callout {
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-inline-start: 3px solid var(--kauro-color-primary);
+  border-radius: 0 var(--kauro-radius) var(--kauro-radius) 0;
+  background: var(--kauro-color-raised);
+}
+.kauro-site-main .kauro-r2-callout--warning {
+  border-inline-start-color: var(--kauro-color-warning-text);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-site-main .kauro-r2-notes {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* ---- the closing band: the same on every decision page ---- */
+.kauro-site-main .kauro-r2-closing {
+  padding-block: clamp(3rem, 2rem + 4vw, 4.5rem);
+  border-block-start: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-accent-surface);
+}
+.kauro-site-main .kauro-r2-closing-inner {
+  display: grid;
+  gap: var(--kauro-space-5);
+  align-items: center;
+}
+.kauro-site-main .kauro-r2-closing p {
+  max-inline-size: 56ch;
+  margin-block-start: var(--kauro-space-3);
+  color: var(--kauro-color-text);
+  font-size: 1.0625rem;
+}
+.kauro-site-main .kauro-r2-closing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-closing-inner {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+  }
+  .kauro-site-main .kauro-r2-closing-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ---- state tags: the words always, a dot of colour beside them ---- */
+.kauro-site-main .kauro-r2-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  color: var(--kauro-color-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.kauro-site-main .kauro-r2-state::before {
+  content: "";
+  flex: none;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  background: var(--kauro-color-text-muted);
+}
+.kauro-site-main .kauro-r2-state--available::before {
+  background: var(--kauro-color-success-text);
+}
+.kauro-site-main .kauro-r2-state--limited::before {
+  background: var(--kauro-color-warning-text);
+}
+.kauro-site-main .kauro-r2-state--closed::before {
+  background: var(--kauro-color-danger-text);
+}
+
+/* ---- Supported services: three equal cards, the same rows in the same order ---- */
+.kauro-site-main .kauro-r2-services {
+  display: grid;
+  gap: var(--kauro-space-4);
+}
+.kauro-site-main .kauro-r2-service {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kauro-space-4);
+  box-sizing: border-box;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-site-main .kauro-r2-service h3 {
+  font-size: 1.375rem;
+  letter-spacing: -0.018em;
+}
+.kauro-site-main .kauro-r2-service-row {
+  margin: 0;
+}
+.kauro-site-main .kauro-r2-service-row dt,
+.kauro-site-main .kauro-r2-answer-label {
+  margin-block-end: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-r2-service-row dd {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.kauro-site-main .kauro-r2-service-particular {
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-card-note,
+.kauro-site-main .kauro-r2-service-closed {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.kauro-site-main .kauro-r2-service-foot {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin-block-start: auto;
+}
+.kauro-site-main .kauro-r2-card-meta {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+.kauro-site-main .kauro-r2-service-foot .kauro-site-arrow {
+  min-block-size: 2.25rem;
+}
+@media (min-width: 62rem) {
+  /* the rows of the three cards line up across the grid: a card is a subgrid of the row's tracks */
+  .kauro-site-main .kauro-r2-services {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(6, auto);
+    column-gap: var(--kauro-space-5);
+    row-gap: 0;
+  }
+  .kauro-site-main .kauro-r2-service {
+    display: grid;
+    grid-row: span 6;
+    grid-template-rows: subgrid;
+    row-gap: var(--kauro-space-4);
+  }
+  .kauro-site-main .kauro-r2-service-closed {
+    grid-row: span 3;
+  }
+}
+.kauro-site-main .kauro-r2-facts--settings {
+  margin: 0;
+}
+
+/* ---- facts: label and value ---- */
+.kauro-site-main .kauro-r2-facts {
+  display: grid;
+  margin: 0;
+}
+.kauro-site-main .kauro-r2-fact {
+  display: grid;
+  gap: var(--kauro-space-1) var(--kauro-space-5);
+  padding-block: var(--kauro-space-3);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-fact:last-child {
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-fact dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-fact dd {
+  margin: 0;
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-facts--settings .kauro-r2-fact {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-block: var(--kauro-space-2);
+}
+.kauro-site-main .kauro-r2-facts--head {
+  max-inline-size: 60rem;
+  margin-block-start: var(--kauro-space-6);
+}
+@media (min-width: 48rem) {
+  .kauro-site-main .kauro-r2-facts--head .kauro-r2-fact {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+}
+.kauro-site-main .kauro-r2-facts--head .kauro-r2-fact dd {
+  font-weight: 500;
+}
+
+/* ---- two short lists side by side: included and not included ---- */
+.kauro-site-main .kauro-r2-pair {
+  display: grid;
+  gap: var(--kauro-space-4);
+}
+@media (min-width: 48rem) {
+  .kauro-site-main .kauro-r2-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-site-main .kauro-r2-pair-item {
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-site-main .kauro-r2-pair-item h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin-block-end: var(--kauro-space-3);
+  font-size: 1.0625rem;
+}
+.kauro-site-main .kauro-r2-pair-item h3::before {
+  content: "";
+  flex: none;
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  border-radius: 50%;
+  background: var(--kauro-color-success-text);
+}
+.kauro-site-main .kauro-r2-pair-item--out h3::before {
+  background: var(--kauro-color-text-muted);
+}
+.kauro-site-main .kauro-r2-pair-item ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+/* ---- the limits: one table, values at reading size, aligned on the right ---- */
+.kauro-site-main .kauro-r2-table-region {
+  max-inline-size: 44rem;
+}
+.kauro-site-main .kauro-r2-grouped,
+.kauro-site-main .kauro-r2-status {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+}
+.kauro-site-main :is(.kauro-r2-grouped, .kauro-r2-status) caption {
+  padding-block-end: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+  text-align: start;
+}
+.kauro-site-main .kauro-r2-grouped :is(th, td),
+.kauro-site-main .kauro-r2-status :is(th, td) {
+  padding: var(--kauro-space-3) 0;
+  border-block-end: 1px solid var(--kauro-color-border);
+  text-align: start;
+  vertical-align: baseline;
+}
+.kauro-site-main .kauro-r2-grouped tbody th[scope="row"] {
+  padding-inline-end: var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+}
+.kauro-site-main .kauro-r2-grouped td {
+  color: var(--kauro-color-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: end;
+}
+.kauro-site-main .kauro-r2-grouped-group th {
+  padding-block: var(--kauro-space-5) var(--kauro-space-2);
+  color: var(--kauro-color-text);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-r2-grouped tbody:first-of-type .kauro-r2-grouped-group th {
+  padding-block-start: var(--kauro-space-2);
+}
+.kauro-site-main .kauro-r2-status thead th {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-r2-status tbody th {
+  font-weight: 600;
+}
+
+/* ---- tables made with DataTable: figures on the right, tabular ---- */
+.kauro-site-main :is(.kauro-r2-prices, .kauro-r2-compact-table, .kauro-r2-files) td,
+.kauro-site-main :is(.kauro-r2-prices, .kauro-r2-files) thead th:not(:first-child),
+.kauro-site-main .kauro-r2-compact-table thead th:last-child,
+.kauro-site-main .kauro-r2-report :is(td, thead th):is(:nth-child(2), :nth-child(4)) {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.kauro-site-main .kauro-r2-prices {
+  max-inline-size: 52rem;
+}
+.kauro-site-main .kauro-r2-prices tbody tr:last-child :is(th, td) {
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+}
+.kauro-site-main .kauro-r2-prices td {
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-compact-table {
+  max-inline-size: 36rem;
+}
+.kauro-site-main .kauro-r2-files tbody th {
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.kauro-site-main .kauro-r2-retention tbody th {
+  inline-size: 38%;
+}
+
+/* ---- Pricing: the estimator, the page's one large figure ---- */
+.kauro-site-main .kauro-r2-estimator {
+  display: grid;
+  box-sizing: border-box;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  overflow: hidden;
+}
+.kauro-site-main .kauro-r2-estimator-ask,
+.kauro-site-main .kauro-r2-estimator-answer {
+  display: grid;
+  align-content: start;
+  gap: var(--kauro-space-4);
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.kauro-site-main .kauro-r2-estimator-answer {
+  border-block-start: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-estimator {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+  .kauro-site-main .kauro-r2-estimator-answer {
+    border-block-start: 0;
+    border-inline-start: 1px solid var(--kauro-color-border);
+  }
+}
+.kauro-site-main .kauro-r2-estimator .kauro-site-field {
+  display: grid;
+  gap: var(--kauro-space-2);
+}
+.kauro-site-main .kauro-r2-estimator .kauro-site-field label,
+.kauro-site-main .kauro-r2-segments legend {
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-estimator input[type="text"] {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 20rem;
+  min-block-size: 3rem;
+  padding: 0 var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-site-main .kauro-r2-estimator .kauro-site-button {
+  justify-self: start;
+}
+.kauro-site-main .kauro-r2-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-site-main .kauro-r2-segments legend {
+  margin-block-end: var(--kauro-space-2);
+  padding: 0;
+}
+.kauro-site-main .kauro-r2-segments label {
+  position: relative;
+  display: inline-flex;
+}
+.kauro-site-main .kauro-r2-segments input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.kauro-site-main .kauro-r2-segments span {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: 999px;
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+.kauro-site-main .kauro-r2-segments input:checked + span {
+  border-color: var(--kauro-color-text);
+  background: var(--kauro-color-text);
+  color: var(--kauro-color-background);
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-segments input:focus-visible + span {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-site-main .kauro-r2-answer-label {
+  margin: 0;
+}
+.kauro-site-main .kauro-r2-answer-figure {
+  margin: 0;
+  color: var(--kauro-color-text);
+  font-family: var(--kauro-display-family);
+  font-size: clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.kauro-site-main .kauro-r2-answer-figure--empty {
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+}
+.kauro-site-main .kauro-r2-answer-band {
+  margin-block-start: var(--kauro-space-2);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-answer-text p {
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-answer-text p + p {
+  margin-block-start: var(--kauro-space-2);
+}
+.kauro-site-main .kauro-r2-answer-next {
+  display: grid;
+  gap: var(--kauro-space-2);
+  justify-items: start;
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+
+/* ---- Pricing: questions, opened one at a time ---- */
+.kauro-site-main .kauro-r2-questions {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-questions details {
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-questions summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-4);
+  min-block-size: 3.5rem;
+  color: var(--kauro-color-text);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+.kauro-site-main .kauro-r2-questions summary::-webkit-details-marker {
+  display: none;
+}
+.kauro-site-main .kauro-r2-questions summary::after,
+.kauro-site-main .kauro-r2-stage-more summary::after {
+  content: "+" / "";
+  flex: none;
+  color: var(--kauro-color-primary);
+  font-size: 1.25rem;
+  font-weight: 400;
+}
+.kauro-site-main .kauro-r2-questions details[open] summary::after,
+.kauro-site-main .kauro-r2-stage-more[open] summary::after {
+  content: "\2212" / "";
+}
+.kauro-site-main .kauro-r2-questions details p {
+  padding-block-end: var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-site-main :is(.kauro-r2-questions, .kauro-r2-stage-more) summary:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+
+/* ---- How it works: the six stages at a glance, then each stage ---- */
+.kauro-site-main .kauro-r2-overview ul {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 40rem) {
+  .kauro-site-main .kauro-r2-overview ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-overview ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 80rem) {
+  .kauro-site-main .kauro-r2-overview ul {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.kauro-site-main .kauro-r2-overview a {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  gap: var(--kauro-space-2);
+  block-size: 100%;
+  box-sizing: border-box;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-site-main .kauro-r2-overview a:hover {
+  border-color: var(--kauro-color-control-border);
+}
+.kauro-site-main .kauro-r2-overview a:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-site-main .kauro-r2-overview-number,
+.kauro-site-main .kauro-r2-stage-number {
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-overview-name {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.kauro-site-main .kauro-r2-overview-outcome {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+.kauro-site-main .kauro-r2-actor {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-actor::before {
+  content: "";
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  background: var(--kauro-color-accent);
+}
+.kauro-site-main .kauro-r2-actor--kauro::before {
+  border-radius: 2px;
+  background: var(--kauro-color-primary);
+}
+.kauro-site-main .kauro-r2-inline-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+}
+.kauro-site-main .kauro-r2-stages {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-main .kauro-r2-stages .kauro-stage-sheet {
+  display: grid;
+  gap: var(--kauro-space-4);
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  scroll-margin-block-start: 6rem;
+}
+.kauro-site-main .kauro-r2-stages > li {
+  scroll-margin-block-start: 6rem;
+}
+.kauro-site-main .kauro-r2-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+}
+.kauro-site-main .kauro-r2-stage-head h3 {
+  font-size: 1.375rem;
+}
+.kauro-site-main .kauro-r2-stage-summary {
+  max-inline-size: 70ch;
+  font-size: 1.0625rem;
+}
+.kauro-site-main .kauro-r2-stage-keys,
+.kauro-site-main .kauro-r2-stage-detail {
+  display: grid;
+  gap: var(--kauro-space-4) var(--kauro-space-6);
+  margin: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-site-main .kauro-r2-stage-keys {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-site-main :is(.kauro-r2-stage-keys, .kauro-r2-stage-detail) dt {
+  margin-block-end: var(--kauro-space-2);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main :is(.kauro-r2-stage-keys, .kauro-r2-stage-detail) dd {
+  margin: 0;
+}
+.kauro-site-main :is(.kauro-r2-stage-keys, .kauro-r2-stage-detail) ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-stage-more {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-stage-more summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: 2.75rem;
+  padding-block-start: var(--kauro-space-3);
+  color: var(--kauro-color-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+.kauro-site-main .kauro-r2-stage-more summary::-webkit-details-marker {
+  display: none;
+}
+.kauro-site-main .kauro-r2-stage-detail {
+  padding-block: var(--kauro-space-3) var(--kauro-space-2);
+}
+.kauro-site-main .kauro-r2-stage-detail p {
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-example {
+  display: grid;
+  gap: var(--kauro-space-4);
+}
+/* the counting rule and the line that says the figures are invented sit directly under the table they explain */
+.kauro-site-main .kauro-r2-example-notes {
+  display: grid;
+  gap: var(--kauro-space-1);
+  max-inline-size: 36rem;
+}
+.kauro-site-main .kauro-r2-example-notes p {
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-example-notes p + p {
+  margin-block-start: 0;
+}
+.kauro-site-main .kauro-r2-example-synthetic {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+}
+.kauro-site-main .kauro-r2-never {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 48rem) {
+  .kauro-site-main .kauro-r2-never {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.kauro-site-main .kauro-r2-never li {
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-site-main .kauro-r2-never h3 {
+  margin-block-end: var(--kauro-space-2);
+  font-size: 1.125rem;
+}
+.kauro-site-main .kauro-r2-never p {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* ---- numbered steps (the importer guide, the contact page, the path of a file) ---- */
+.kauro-site-main .kauro-r2-steps,
+.kauro-site-main .kauro-r2-path {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: kauro-r2-step;
+}
+.kauro-site-main .kauro-r2-steps li,
+.kauro-site-main .kauro-r2-path li {
+  position: relative;
+  padding-inline-start: 2.75rem;
+  counter-increment: kauro-r2-step;
+}
+.kauro-site-main .kauro-r2-steps li::before,
+.kauro-site-main .kauro-r2-path li::before {
+  content: counter(kauro-r2-step) / "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: -0.125rem;
+  display: grid;
+  place-items: center;
+  inline-size: 1.875rem;
+  block-size: 1.875rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 50%;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-path {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--kauro-space-5);
+  }
+  .kauro-site-main .kauro-r2-path li {
+    padding-inline-start: 0;
+    padding-block-start: 2.75rem;
+  }
+}
+.kauro-site-main .kauro-r2-path h3 {
+  margin-block-end: var(--kauro-space-2);
+  font-size: 1.125rem;
+}
+.kauro-site-main .kauro-r2-path p {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* ---- Sample delivery: the crop of the report in the head, and the package named document by document ---- */
+.kauro-site-main .kauro-r2-crop {
+  box-sizing: border-box;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--kauro-color-ink) 10%, transparent);
+}
+.kauro-site-main .kauro-r2-crop-title {
+  margin-block-end: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-r2-crop-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 4rem;
+  gap: var(--kauro-space-3);
+  align-items: baseline;
+  padding-block: var(--kauro-space-2);
+  border-block-start: 1px solid var(--kauro-color-border);
+  font-size: 0.875rem;
+}
+.kauro-site-main .kauro-r2-crop-row + .kauro-r2-crop-row {
+  margin-block-start: 0;
+}
+.kauro-site-main .kauro-r2-crop-figure,
+.kauro-site-main .kauro-r2-crop-share {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.kauro-site-main .kauro-r2-crop-figure {
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-crop-share {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-site-main .kauro-r2-package {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 48rem) {
+  .kauro-site-main .kauro-r2-package {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 72rem) {
+  .kauro-site-main .kauro-r2-package {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.kauro-site-main .kauro-r2-package a {
+  display: grid;
+  gap: var(--kauro-space-2);
+  block-size: 100%;
+  box-sizing: border-box;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-site-main .kauro-r2-package a:hover {
+  border-color: var(--kauro-color-control-border);
+}
+.kauro-site-main .kauro-r2-package-name {
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-package-body {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+/* ---- Help: the index beside the guides ---- */
+.kauro-site-main .kauro-r2-docs {
+  padding-block: var(--kauro-space-5) clamp(3rem, 2rem + 4vw, 5rem);
+}
+.kauro-site-main .kauro-r2-docs-inner {
+  display: grid;
+  gap: var(--kauro-space-6);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-docs-inner {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+    align-items: start;
+  }
+}
+.kauro-site-main .kauro-r2-toc-title {
+  margin-block-end: var(--kauro-space-2);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-r2-toc ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-inline-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-toc a {
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  padding-inline-start: var(--kauro-space-4);
+  color: var(--kauro-color-text);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+.kauro-site-main .kauro-r2-toc a:hover {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-main .kauro-r2-guides {
+  display: grid;
+  gap: var(--kauro-space-7);
+  max-inline-size: 46rem;
+}
+.kauro-site-main .kauro-r2-guide {
+  display: grid;
+  gap: var(--kauro-space-3);
+  justify-items: start;
+  scroll-margin-block-start: 6rem;
+}
+.kauro-site-main .kauro-r2-guide + .kauro-r2-guide {
+  padding-block-start: var(--kauro-space-7);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-r2-guide-summary {
+  color: var(--kauro-color-text-muted);
+  font-size: 1.0625rem;
+}
+
+/* ---- Contact: the steps beside one column of fields ---- */
+.kauro-site-main .kauro-r2-contact {
+  padding-block: var(--kauro-space-4) clamp(3rem, 2rem + 4vw, 5rem);
+}
+.kauro-site-main .kauro-r2-contact-inner {
+  display: grid;
+  gap: var(--kauro-space-6);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-contact-inner {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+    align-items: start;
+  }
+}
+.kauro-site-main .kauro-r2-contact-aside {
+  display: grid;
+  gap: var(--kauro-space-4);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-surface);
+}
+.kauro-site-main .kauro-r2-contact-aside h2 {
+  font-size: 1.25rem;
+}
+.kauro-site-main .kauro-r2-contact-form .kauro-site-section {
+  padding-block: 0;
+  background: none;
+}
+.kauro-site-main .kauro-r2-contact-form .kauro-site-wrap {
+  padding-inline: 0;
+}
+.kauro-site-main .kauro-r2-contact-form .kauro-site-section-inner {
+  display: grid;
+  gap: var(--kauro-space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+.kauro-site-main .kauro-r2-contact-form h2 {
+  font-size: 1.25rem;
+}
+.kauro-site-main .kauro-r2-contact-form .kauro-site-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-5);
+  max-inline-size: 36rem;
+}
+.kauro-site-main .kauro-r2-contact-form .kauro-site-form > * {
+  grid-column: 1 / -1;
+}
+.kauro-site-main .kauro-r2-contact-form .kauro-site-form .kauro-site-button--primary {
+  justify-self: start;
+}
+
+/* ---- round 2, after the first inspection ---- */
+/* the estimate's sentence is for a screen reader and a careful reader: quiet, under the figure it repeats */
+.kauro-site-main .kauro-r2-answer-text .kauro-site-estimate {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.kauro-site-main .kauro-r2-answer-text .kauro-site-estimate--invalid {
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+.kauro-site-main .kauro-r2-crop-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.kauro-site-main .kauro-r2-crop-share {
+  min-inline-size: 3rem;
+  white-space: nowrap;
+}
+/* a reference page reads as one document: sections that sit side by side on the page follow each other closely */
+.kauro-site-main .kauro-r2-block--plain.kauro-r2-block--split:has(+ .kauro-r2-block--plain.kauro-r2-block--split) {
+  padding-block-end: clamp(2rem, 1.5rem + 2vw, 3rem);
+}
+.kauro-site-main .kauro-r2-block--plain.kauro-r2-block--split + .kauro-r2-block--plain.kauro-r2-block--split > .kauro-r2-block-inner {
+  padding-block-start: clamp(2rem, 1.5rem + 2vw, 3rem);
+}
+.kauro-site-main .kauro-r2-status .kauro-r2-state {
+  font-size: 0.9375rem;
+}
+.kauro-site-main .kauro-r2-guide p + p {
+  margin-block-start: 0;
+}

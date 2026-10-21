@@ -188,7 +188,6 @@ export function InquiryFormConsent(): ReactElement {
           ) : null}
           {shown !== null ? <Panel kind={shown.kind} headingId="contact-outcome-heading" heading={shown.heading} body={shown.body} panelRef={panelRef} /> : null}
           <form className="kauro-site-form" method="post" noValidate onSubmit={(event) => void submit(event)}>
-            <p className="kauro-site-note">{PUBLIC_COPY["contact.required.hint"]}</p>
             <fieldset className="kauro-site-fieldset" id="contact-buyer" aria-describedby={describedBy("buyerType")}>
               <legend>{PUBLIC_COPY["contact.buyer.legend"]}</legend>
               <Message name="buyerType" errors={errors} />

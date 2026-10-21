@@ -55,14 +55,8 @@ export default function Index() {
       </section>
       <section className="rx-experiences" aria-labelledby="rx-variants">
         <h2 id="rx-variants">Public-site proposals</h2>
-        <p>Variants of the approved Order 10 site, drawn apart from it: the approved pages stay as they are until you choose.</p>
+        <p>Proposals that need a decision before they can join the site (a new page or a change to a contract). Supported services and Pricing were rebuilt on the site itself in round 2.</p>
         <ul>
-          <li>
-            <a href="/__variants/supported-services">Supported services: three cards, the new service names, and a footer listing every page</a>
-            <span>
-              Beside <a href="/supported-services">the approved page</a>. Both read the same publication; switch it in the public review.
-            </span>
-          </li>
           <li>
             <a href="/__variants/free-check">Check a file free: the page the main call to action would open</a>
             <span>Then Create an account and the self-serve start (P-05, UI09). Changes A3 §3.2: your decision (F-03).</span>
@@ -70,12 +64,6 @@ export default function Index() {
           <li>
             <a href="/__variants/for-agencies">For agencies: a page for the main channel</a>
             <span>Only the statements and limits you set; branded reports shown as not available yet.</span>
-          </li>
-          <li>
-            <a href="/__variants/pricing">Pricing: what the price includes, and questions about it</a>
-            <span>
-              Beside <a href="/pricing">the approved page</a>; every answer from an existing rule.
-            </span>
           </li>
           <li>
             <a href="/__variants/contact">Contact: the required authorisation and &quot;Email address&quot;</a>

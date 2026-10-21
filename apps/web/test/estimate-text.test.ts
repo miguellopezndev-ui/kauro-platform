@@ -27,12 +27,12 @@ test("zero units is no project, and a count beyond the ladder is told the launch
 test("an offered band shows its indicative price for the mode, with the words estimate and reserves nothing", () => {
   assert.deepEqual(describeEstimate("42,000", "CLEAN", "AVAILABLE"), {
     kind: "RESULT",
-    text: "Indicative band: Up to 50,000 units, USD 695 for CLEAN. This is an estimate and reserves nothing.",
+    text: "Indicative band for Clean your data: Up to 50,000 units, USD 695. This is an estimate and reserves nothing.",
     notes: [],
   });
-  assert.equal(describeEstimate("50000", "HUBSPOT", "AVAILABLE").text, "Indicative band: Up to 50,000 units, USD 1,295 for HubSpot. This is an estimate and reserves nothing.");
-  assert.equal(describeEstimate("50001", "SALESFORCE", "LIMITED").text, "Indicative band: 50,001 to 150,000 units, USD 2,295 for Salesforce. This is an estimate and reserves nothing.");
-  assert.equal(describeEstimate(" 150 001 ", "CLEAN", "AVAILABLE").text, "Indicative band: 150,001 to 500,000 units, USD 1,795 for CLEAN. This is an estimate and reserves nothing.");
+  assert.equal(describeEstimate("50000", "HUBSPOT", "AVAILABLE").text, "Indicative band for Prepare for HubSpot: Up to 50,000 units, USD 1,295. This is an estimate and reserves nothing.");
+  assert.equal(describeEstimate("50001", "SALESFORCE", "LIMITED").text, "Indicative band for Prepare for Salesforce: 50,001 to 150,000 units, USD 2,295. This is an estimate and reserves nothing.");
+  assert.equal(describeEstimate(" 150 001 ", "CLEAN", "AVAILABLE").text, "Indicative band for Clean your data: 150,001 to 500,000 units, USD 1,795. This is an estimate and reserves nothing.");
   assert.equal(describeEstimate("500,000", "CLEAN", "AVAILABLE").kind, "RESULT");
   for (const units of ["1", "42000", "500000"]) assert.doesNotMatch(describeEstimate(units, "CLEAN", "AVAILABLE").text, /\bquote\b/i, "an estimate never calls itself a quote");
 });
@@ -49,11 +49,11 @@ test("the band that is not offered at launch has no price at all, and says the l
 test("a mode that is not available, or whose availability cannot be read, is said so beside the estimate, never instead of it", () => {
   const closed = describeEstimate("42,000", "SALESFORCE", "CLOSED");
   assert.equal(closed.kind, "RESULT");
-  assert.match(closed.text, /USD 1,495 for Salesforce/);
-  assert.deepEqual(closed.notes, ["Salesforce is not available for purchase right now."]);
+  assert.match(closed.text, /Prepare for Salesforce: Up to 50,000 units, USD 1,495./);
+  assert.deepEqual(closed.notes, ["Prepare for Salesforce is not available for purchase right now."]);
   const unread = describeEstimate("42,000", "HUBSPOT", "UNREAD");
-  assert.deepEqual(unread.notes, ["Whether HubSpot is available cannot be read right now."]);
-  assert.deepEqual(describeEstimate("500,001", "CLEAN", "CLOSED").notes, ["CLEAN is not available for purchase right now."], "a closed mode is said so for an unoffered band as well");
+  assert.deepEqual(unread.notes, ["Whether Prepare for HubSpot is available cannot be read right now."]);
+  assert.deepEqual(describeEstimate("500,001", "CLEAN", "CLOSED").notes, ["Clean your data is not available for purchase right now."], "a closed mode is said so for an unoffered band as well");
   assert.deepEqual(describeEstimate("42,000", "CLEAN", "AVAILABLE").notes, []);
   assert.deepEqual(describeEstimate("42,000", "CLEAN", "LIMITED").notes, []);
   assert.deepEqual(describeEstimate("", "CLEAN", "CLOSED").notes, [], "nothing to add to a prompt");

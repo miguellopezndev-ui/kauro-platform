@@ -170,7 +170,6 @@ export function InquiryForm(): ReactElement {
           ) : null}
           {shown !== null ? <Panel kind={shown.kind} headingId="contact-outcome-heading" heading={shown.heading} body={shown.body} panelRef={panelRef} /> : null}
           <form className="kauro-site-form" method="post" noValidate onSubmit={(event) => void submit(event)}>
-            <p className="kauro-site-note">{PUBLIC_COPY["contact.required.hint"]}</p>
             <fieldset className="kauro-site-fieldset" id="contact-buyer" aria-describedby={describedBy("buyerType")}>
               <legend>{PUBLIC_COPY["contact.buyer.legend"]}</legend>
               <Message name="buyerType" errors={errors} />
@@ -210,8 +209,11 @@ export function InquiryForm(): ReactElement {
             </div>
             <div className="kauro-site-field">
               <label htmlFor="contact-band">{PUBLIC_COPY["contact.band.label"]}</label>
+              <p id="contact-band-hint" className="kauro-site-note">
+                {PUBLIC_COPY["contact.band.hint"]}
+              </p>
               <Message name="recordBand" errors={errors} />
-              <select id="contact-band" name="recordBand" required aria-invalid={invalid("recordBand")} aria-describedby={describedBy("recordBand")} value={values.recordBand} onChange={(event) => set("recordBand", event.target.value)}>
+              <select id="contact-band" name="recordBand" required aria-invalid={invalid("recordBand")} aria-describedby={describedBy("recordBand", "contact-band-hint")} value={values.recordBand} onChange={(event) => set("recordBand", event.target.value)}>
                 <option value="">{PUBLIC_COPY["contact.choose.option"]}</option>
                 {RECORD_BANDS.map((band) => (
                   <option key={band.value} value={band.value}>

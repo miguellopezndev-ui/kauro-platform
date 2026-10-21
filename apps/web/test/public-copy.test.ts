@@ -80,7 +80,7 @@ test("copy() fills every placeholder, refuses a message asked for with a value m
 test("every placeholder of the catalogue is one the pages know how to fill, and a value that is a figure is never typed into a message", () => {
   const known = new Set([
     "band", "check", "columns", "contacts", "count", "date", "days", "fileSize", "files", "fresh", "hard", "high", "id", "kept", "low", "max", "mid", "minutes", "mode", "name", "output", "package", "price", "range",
-    "reference", "repair", "setSize", "source", "time", "unified", "units", "version", "wait",
+    "reference", "repair", "setSize", "source", "time", "unified", "units", "version", "wait", "next", "nextPrice", "checkHard",
   ]);
   const unknown = ids.flatMap((id) => placeholdersOf(entries[id] ?? "").filter((name) => !known.has(name)).map((name) => `${id} {${name}}`));
   assert.deepEqual(unknown, []);
@@ -145,7 +145,7 @@ test("the sources say what a page shows only through the catalogue: no sentence 
 });
 
 test("D-33: the lines that state who may buy, who gets a repeat discount, who holds an account and whose data is kept apart name any customer, never an agency alone", () => {
-  for (const id of ["pricing.ladder.repeat.body", "pricing.repeat.body", "pricing.account.body", "security.processed.body", "security.isolation.heading", "security.isolation.body"] as const) {
+  for (const id of ["pricing.estimate.repeat", "pricing.repeat.body", "pricing.account.body", "security.processed.body", "security.isolation.heading", "security.isolation.body"] as const) {
     assert.doesNotMatch(PUBLIC_COPY[id], /\bagenc(y|ies)\b/i, id);
   }
   assert.equal(PUBLIC_COPY["contact.buyer.in-house"], "A company working on its own data");
