@@ -78,9 +78,23 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
           </div>
         </dl>
         <div className="kauro-letter-body">
-          <p className="kauro-letter-subject">Subject: The worked example you asked for</p>
-          <p>Hello,</p>
-          <p>Thank you for your note on 16 October. Here is the worked example: two synthetic files, 12,480 contacts and 3,204 companies, taken through the free health check, the plan your team approves, and the import package for HubSpot. Every count in it adds up, and nothing in it is anyone&apos;s real data.</p>
+          {blocked ? (
+            <>
+              <p className="kauro-letter-subject">Subject: Client data, checked before it reaches HubSpot</p>
+              <p>Hello,</p>
+              <p>Your site says you set up HubSpot for clients. Kauro checks the files a client exports, prepares them for the import your team runs, and shows every change in a report. The first check is free.</p>
+              <p className="kauro-muted-text">Drafted on Sep 29, 2026, before the request of Oct 1.</p>
+            </>
+          ) : (
+            <>
+              <p className="kauro-letter-subject">Subject: The worked example you asked for</p>
+              <p>Hello,</p>
+              <p>
+                Thank you for your note on October 16. Here is the worked example: two synthetic files, 12,480 contacts and 3,204 companies, taken through the free health check, the plan your team approves, and the import
+                package, prepared for HubSpot in this example; for Salesforce, the package is the files Data Loader takes. Every count in it adds up, and nothing in it is anyone&apos;s real data.
+              </p>
+            </>
+          )}
           <p>Kauro never connects to a CRM: your team imports the files with its own account. If a check of one of your own exports would help, the health check is free.</p>
           <p>Daniel Kim, for Kauro</p>
           <p className="kauro-letter-foot">To stop receiving messages from Kauro, reply with &quot;stop&quot;; it takes effect at once, on every channel.</p>
@@ -97,12 +111,12 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
             </div>
           </section>
         ) : (
-          <p className="kauro-muted">Waiting for the owner&apos;s review, sent on Oct 20, 2026 at 10:31 AM UTC. You will see the answer here; until then, nothing is sent.</p>
+          <p className="kauro-muted">Submitted for the owner&apos;s review on Oct 20, 2026 at 10:31 AM UTC. You will see the answer here; until then, nothing is sent.</p>
         )
       ) : state === "authorised" ? (
         <section className="kauro-approve" aria-labelledby="send-h">
           <h2 id="send-h">Send</h2>
-          <p>Authorised by the owner for this exact content, once, until Oct 23, 2026.</p>
+          <p>Authorised by the owner for this exact content, once, until Oct 23, 2026. Editing it sends it back for review.</p>
           <Button variant="primary">Send the message</Button>
         </section>
       ) : null}

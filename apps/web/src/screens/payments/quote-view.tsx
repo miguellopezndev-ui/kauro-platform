@@ -1,6 +1,11 @@
 // UI23 Quote as markup (registry: "Review price, scope and availability."): base, one discount, service, tax, total, units, terms, price and
 // data expiry, and the blockers. Pay is a control only for an open quote; an expired price or expired data offers a new quote or
 // re-upload instead (D-COPY-1, A3). Pure markup: the container owns the checkbox, the run and the clock.
+//
+// Order 11: the quote also says what it covers (the approved plan, the sealed files, the delivery) and what it does not (the import, and
+// for "Clean your data" any outside data), from ToS §3.5 and §9.2. Every discount the server sends is shown: a non-repeat discount used to
+// read "No discount"; it reads "Discount", since D-COPY-1 keeps the founding line hidden until B10. The tax line carries its treatment,
+// three steps say how payment works, and the hint under the button gives the reason it is disabled, not both.
 import { Banner, Button, Count, Deadline, Money } from "@kauro/ui";
 import type { ReactElement } from "react";
 import type { QuoteView as Quote } from "../../api/generated.ts";
@@ -16,6 +21,8 @@ export interface QuoteViewProps {
   readonly creating: boolean;
   readonly termsHref: string;
   readonly reuploadHref: string;
+  /** The approval of the plan this quote was issued from. */
+  readonly planHref: string;
 }
 
 const row = (label: MessageId, value: ReactElement | string, key: string, extra = ""): ReactElement => (
@@ -25,7 +32,17 @@ const row = (label: MessageId, value: ReactElement | string, key: string, extra 
   </div>
 );
 
-export function QuoteDetails({ quote, nowMs, termsAccepted, onTermsChange, onCreate, creating, termsHref, reuploadHref }: QuoteViewProps): ReactElement {
+function DiscountRow({ quote, money }: { readonly quote: Quote; readonly money: (minor: string) => ReactElement }): ReactElement {
+  if (quote.discount.basis === "NONE") return row("screen.quote.discount.label", message("screen.quote.discount.none.body"), "discount", " kauro-row--quiet");
+  return (
+    <div key="discount" className="kauro-row kauro-row--sub">
+      <dt>{message(quote.discount.basis === "REPEAT" ? "screen.quote.discount.repeat.body" : "screen.quote.discount.other.body", { percent: quote.discount.bps / 100 })}</dt>
+      <dd>−{money(quote.discountCents)}</dd>
+    </div>
+  );
+}
+
+export function QuoteDetails({ quote, nowMs, termsAccepted, onTermsChange, onCreate, creating, termsHref, reuploadHref, planHref }: QuoteViewProps): ReactElement {
   const gate = quoteGate(quote, nowMs);
   const money = (minor: string): ReactElement => <Money minor={minor} currency={quote.currency} />;
   const enabled = canCreateOrder(quote, nowMs, termsAccepted) && !creating;
@@ -37,20 +54,21 @@ export function QuoteDetails({ quote, nowMs, termsAccepted, onTermsChange, onCre
           <h2 id="quote-service">{message(`screen.quote.mode.${quote.mode}`)}</h2>
           <dl className="kauro-quote-scope">
             {row("screen.quote.units.label", <Count value={quote.billableUnits} />, "units")}
+            {row("screen.quote.issued.label", <Deadline at={quote.issuedAt} timeZone="UTC" />, "issued")}
+            {row("screen.quote.policy.label", <code>{quote.pricePolicyVersion}</code>, "policy")}
           </dl>
         </header>
         <dl className="kauro-quote-lines">
           {row("screen.quote.base.label", money(quote.baseServiceCents), "base")}
-          {quote.discount.basis === "REPEAT" ? (
-            <div key="discount" className="kauro-row kauro-row--sub">
-              <dt>{message("screen.quote.discount.repeat.body", { percent: quote.discount.bps / 100 })}</dt>
-              <dd>−{money(quote.discountCents)}</dd>
-            </div>
-          ) : (
-            row("screen.quote.discount.label", message("screen.quote.discount.none.body"), "discount", " kauro-row--quiet")
-          )}
+          <DiscountRow quote={quote} money={money} />
           {row("screen.quote.service.label", money(quote.serviceCents), "service")}
-          {row("screen.quote.tax.label", money(quote.taxCents), "tax")}
+          <div key="tax" className="kauro-row">
+            <dt>
+              {message("screen.quote.tax.label")}
+              {quote.taxTreatment === "DOMESTIC_TAXABLE" ? null : <small className="kauro-quote-note">{message(`screen.quote.tax.${quote.taxTreatment}`)}</small>}
+            </dt>
+            <dd>{money(quote.taxCents)}</dd>
+          </div>
           {row("screen.quote.total.label", money(quote.totalCents), "total", " kauro-row--total")}
         </dl>
         <dl className="kauro-quote-dates">
@@ -58,6 +76,25 @@ export function QuoteDetails({ quote, nowMs, termsAccepted, onTermsChange, onCre
           {row("screen.quote.data-expires.label", <Deadline at={quote.sourceAvailableUntil} timeZone="UTC" />, "data")}
         </dl>
       </article>
+      <section className="kauro-quote-covers" aria-label={message("screen.quote.covers.heading")}>
+        <div>
+          <h2>{message("screen.quote.covers.heading")}</h2>
+          <ul>
+            <li>
+              {message("screen.quote.covers.plan")} <a href={planHref}>{message("screen.quote.covers.plan.link")}</a>
+            </li>
+            <li>{message("screen.quote.covers.files", { units: quote.billableUnits.toLocaleString("en-US") })}</li>
+            <li>{message("screen.quote.covers.delivery")}</li>
+          </ul>
+        </div>
+        <div>
+          <h2>{message("screen.quote.excludes.heading")}</h2>
+          <ul>
+            <li>{message(`screen.quote.excludes.${quote.mode}.1`)}</li>
+            <li>{message(`screen.quote.excludes.${quote.mode}.2`)}</li>
+          </ul>
+        </div>
+      </section>
       {gate.kind === "EXPIRED" || gate.kind === "NOT_CURRENT" ? (
         <Banner tone="warning" title={gate.kind === "EXPIRED" ? message("screen.quote.expired.title") : message(`screen.quote.state.${gate.state}.label`)} announce="alert">
           <p>{message("screen.quote.expired.body")}</p>
@@ -90,10 +127,15 @@ export function QuoteDetails({ quote, nowMs, termsAccepted, onTermsChange, onCre
             {message("screen.quote.terms.accept.label")}
           </label>
           <p className="kauro-quote-bank">{message("screen.quote.pay.bank.body")}</p>
+          <ol className="kauro-quote-steps" aria-label={message("screen.quote.steps.label")}>
+            <li>{message("screen.quote.steps.1")}</li>
+            <li>{message("screen.quote.steps.2")}</li>
+            <li>{message("screen.quote.steps.3")}</li>
+          </ol>
           <Button variant="primary" disabled={!enabled} aria-busy={creating ? true : undefined} onClick={() => (enabled ? onCreate() : undefined)}>
             {message("screen.quote.pay.cta")}
           </Button>
-          <p className="kauro-quote-hint">{creating ? message("screen.quote.pay.working.body") : enabled ? "" : message("screen.quote.pay.disabled.hint")}</p>
+          <p className="kauro-quote-hint">{creating ? message("screen.quote.pay.working.body") : enabled ? "" : gate.kind === "BLOCKED" && gate.blockers.length > 0 ? message("screen.quote.pay.blocked.hint") : message("screen.quote.pay.disabled.hint")}</p>
         </section>
       ) : null}
     </div>

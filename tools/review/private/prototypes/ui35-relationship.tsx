@@ -24,12 +24,28 @@ export function AgencyRelationship({ ctx, state }: PrototypeProps): ReactElement
       <div className="kauro-lifecycle-actions">
         <section className="kauro-lifecycle-card" aria-labelledby="service-h">
           <h2 id="service-h">Who serves them</h2>
-          <p className="kauro-relationship-who">{reassign ? "Kauro owner, from Nov 1, 2026" : "Daniel Kim, seller"}</p>
+          <p className="kauro-relationship-who">
+            {reassign ? (
+              "Kauro owner, from Nov 1, 2026"
+            ) : (
+              <>
+                <ScreenLink to="UI37" ctx={ctx}>
+                  Daniel Kim
+                </ScreenLink>
+                , seller
+              </>
+            )}
+          </p>
           <p className="kauro-muted-text">Answers their questions and prepares their next project. It can change; changing it moves no money.</p>
         </section>
         <section className="kauro-lifecycle-card" aria-labelledby="acq-h">
           <h2 id="acq-h">Who acquired them</h2>
-          <p className="kauro-relationship-who">Daniel Kim, seller</p>
+          <p className="kauro-relationship-who">
+            <ScreenLink to="UI37" ctx={ctx}>
+              Daniel Kim
+            </ScreenLink>
+            , seller
+          </p>
           <ul className="kauro-relationship-terms">
             <li>Claim accepted on Jul 18, 2026, valid {CLAIM_DAYS} days</li>
             <li>
@@ -72,10 +88,10 @@ export function AgencyRelationship({ ctx, state }: PrototypeProps): ReactElement
             <span>Aug 11, 2026</span> Agency created its workspace
           </li>
           <li>
-            <span>Aug 26, 2026</span> First project paid: USD 2,450.00 of service
+            <span>Aug 26, 2026</span> First project paid: USD 2,295.00 of service
           </li>
           <li>
-            <span>Oct 14, 2026</span> Second project quoted, a repeat
+            <span>Oct 14, 2026</span> Second project paid, a repeat: USD 1,230.25 of service, after its 5% discount
           </li>
         </ol>
       </section>

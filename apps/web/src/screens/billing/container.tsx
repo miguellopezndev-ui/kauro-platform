@@ -3,6 +3,7 @@
 // refund request (CMD044 then CMD031) through the page's runner, and reads the refund back from the server. The form's two keys are minted
 // when the form opens and are renewed only after a completed answer, so a double activation and a lost answer replay the same keys.
 import { useRef, useState } from "react";
+import { pathOf } from "../../screens.ts";
 import type { ReactElement } from "react";
 import { useShell } from "../../shell/shell-context.ts";
 import { pageRunner, useCommand } from "../shared/run-command.ts";
@@ -21,6 +22,7 @@ export function BillingScreen({ agencyId, orderId }: { readonly agencyId: string
   const [details, setDetails] = useState("");
   const [problems, setProblems] = useState<readonly RefundInputProblem[]>([]);
   const [refundId, setRefundId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const forms = useRef<RefundForms | null>(null);
   const agency = agencyRead.state.kind === "ANSWERED" && agencyRead.state.answer.kind === "REPLY" ? agencyRead.state.answer.body.data : null;
   const detail = orderRead.state.kind === "ANSWERED" && orderRead.state.answer.kind === "REPLY" ? orderRead.state.answer.body.data : null;
@@ -37,7 +39,7 @@ export function BillingScreen({ agencyId, orderId }: { readonly agencyId: string
     }
     return outcome;
   });
-  if (orderId === null) return <NoOrder />;
+  if (orderId === null) return <NoOrder projectsHref={pathOf("UI11", { agencyId })} />;
   if (agencyRead.state.kind === "LOADING" || orderRead.state.kind === "LOADING") return <StatePanel decision={agencyRead.state.kind === "LOADING" ? agencyRead.state.decision : orderRead.state.decision} />;
   if (agency === null) return <StatePanel decision={agencyRead.state.decision} onNext={agencyRead.refresh} />;
   if (detail === null) return <StatePanel decision={orderRead.state.decision} onNext={orderRead.refresh} />;
@@ -54,7 +56,8 @@ export function BillingScreen({ agencyId, orderId }: { readonly agencyId: string
         agency={agency}
         detail={detail}
         refund={refund ?? created}
-        form={{ reason, details, problems, submitting: command.state.kind === "RUNNING", onReasonChange: setReason, onDetailsChange: setDetails, onSubmit }}
+        form={{ reason, details, problems, submitting: command.state.kind === "RUNNING", onReasonChange: setReason, onDetailsChange: setDetails, onSubmit, open: formOpen, onOpen: () => setFormOpen(true) }}
+        projectHref={pathOf("UI13", { agencyId, id: detail.order.projectId })}
       />
       {done === null || created !== null ? null : <StatePanel decision={done.decision} onNext={done.decision.next === "RELOAD" || done.decision.next === "REQUERY" ? orderRead.refresh : undefined} />}
     </>

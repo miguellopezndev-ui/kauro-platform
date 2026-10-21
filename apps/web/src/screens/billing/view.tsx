@@ -1,6 +1,10 @@
 // UI30 Billing as markup. Orders, captures, fiscal documents and refunds are exactly what the api reports; money is the server's integer
 // cents through <Money>; the word "invoice" appears only for an issued document with its legal number. Customer strings are text nodes.
-import { Banner, Button, Deadline, Money, StatusBadge } from "@kauro/ui";
+//
+// Order 11: the order links to its project; the refund request is a button that opens the form (a refund is a rare, deliberate act, so
+// its form is not laid open on every visit), beside the refund terms of ToS §10 and the defect route of ToS §11; the fields are the
+// design system's.
+import { Banner, Button, Deadline, Field, Money, StatusBadge } from "@kauro/ui";
 import type { ReactElement } from "react";
 import type { AgencyView, PaymentOrderDetailView, RefundView, TaxDocumentView } from "../../api/generated.ts";
 import { message } from "../../copy/en.ts";
@@ -14,6 +18,9 @@ export interface RefundFormProps {
   readonly onReasonChange: (value: string) => void;
   readonly onDetailsChange: (value: string) => void;
   readonly onSubmit: () => void;
+  /** Whether the person opened the form; closed on arrival. */
+  readonly open: boolean;
+  readonly onOpen: () => void;
 }
 
 export interface BillingViewProps {
@@ -22,6 +29,8 @@ export interface BillingViewProps {
   /** The refund as read back from the server, when one was requested; null before. */
   readonly refund: RefundView | null;
   readonly form: RefundFormProps;
+  /** The project the order pays for. */
+  readonly projectHref: string;
 }
 
 function Document({ document }: { readonly document: TaxDocumentView }): ReactElement {
@@ -73,21 +82,17 @@ function RefundForm({ form }: { readonly form: RefundFormProps }): ReactElement 
     >
       <h3 id="billing-refund-form">{message("screen.billing.refund.form.heading")}</h3>
       <p>{message("screen.billing.refund.case.body")}</p>
-      <p>
-        <label>
-          {message("screen.billing.refund.reason.field")}
-          <input type="text" name="reason" maxLength={200} value={form.reason} onChange={(event) => form.onReasonChange(event.target.value)} aria-invalid={form.problems.includes("REASON") ? true : undefined} />
-        </label>
-        {form.problems.includes("REASON") ? <span role="alert">{message("screen.billing.refund.reason.error")}</span> : null}
-      </p>
-      <p>
-        <label>
-          {message("screen.billing.refund.details.field")}
-          <textarea name="details" maxLength={4000} value={form.details} onChange={(event) => form.onDetailsChange(event.target.value)} aria-invalid={form.problems.includes("DETAILS") ? true : undefined} />
-        </label>
-        <span>{message("screen.billing.refund.details.hint")}</span>
-        {form.problems.includes("DETAILS") ? <span role="alert">{message("screen.billing.refund.details.error")}</span> : null}
-      </p>
+      <Field id="billing-refund-reason" label={message("screen.billing.refund.reason.field")} error={form.problems.includes("REASON") ? message("screen.billing.refund.reason.error") : undefined}>
+        {(control) => <input {...control} type="text" name="reason" maxLength={200} value={form.reason} onChange={(event) => form.onReasonChange(event.target.value)} />}
+      </Field>
+      <Field
+        id="billing-refund-details"
+        label={message("screen.billing.refund.details.field")}
+        hint={message("screen.billing.refund.details.hint")}
+        error={form.problems.includes("DETAILS") ? message("screen.billing.refund.details.error") : undefined}
+      >
+        {(control) => <textarea {...control} name="details" rows={5} maxLength={4000} value={form.details} onChange={(event) => form.onDetailsChange(event.target.value)} />}
+      </Field>
       <Button type="submit" disabled={form.submitting} aria-busy={form.submitting ? true : undefined}>
         {message("screen.billing.refund.cta")}
       </Button>
@@ -96,7 +101,20 @@ function RefundForm({ form }: { readonly form: RefundFormProps }): ReactElement 
   );
 }
 
-export function BillingDetails({ agency, detail, refund, form }: BillingViewProps): ReactElement {
+function RefundTerms(): ReactElement {
+  return (
+    <div className="kauro-refund-terms">
+      <ul>
+        <li>{message("screen.billing.refund.terms.1")}</li>
+        <li>{message("screen.billing.refund.terms.2")}</li>
+        <li>{message("screen.billing.refund.terms.3")}</li>
+      </ul>
+      <p>{message("screen.billing.refund.defect.body")}</p>
+    </div>
+  );
+}
+
+export function BillingDetails({ agency, detail, refund, form, projectHref }: BillingViewProps): ReactElement {
   const model = billingModel(agency, detail);
   const { order } = detail;
   return (
@@ -107,6 +125,7 @@ export function BillingDetails({ agency, detail, refund, form }: BillingViewProp
         <dl>
           <div className="kauro-ledger-amount"><dt>{message("screen.billing.order.amount.label")}</dt><dd><Money minor={order.expectedAmountCents} currency={order.currency} /></dd></div>
           <div><dt>{message("screen.billing.order.state.label")}</dt><dd><StatusBadge tone={order.paymentStatus === "CONFIRMED" ? "success" : order.paymentStatus === "FAILED" ? "danger" : "info"}>{message(`screen.payment.status.${order.paymentStatus}.label`)}</StatusBadge></dd></div>
+          <div><dt>{message("screen.billing.order.project.label")}</dt><dd><a href={projectHref}>{message("screen.billing.order.project.link")}</a></dd></div>
           <div><dt>{message("screen.billing.order.reference.label")}</dt><dd><code>{order.orderId}</code></dd></div>
         </dl>
         <p className="kauro-ledger-note">{message("screen.billing.order.amount.hint")}</p>
@@ -160,7 +179,16 @@ export function BillingDetails({ agency, detail, refund, form }: BillingViewProp
             <p>{message("screen.billing.refund.owner.body")}</p>
           </Banner>
         ) : model.canRequestRefund && refund === null ? (
-          <RefundForm form={form} />
+          <>
+            <RefundTerms />
+            {form.open ? (
+              <RefundForm form={form} />
+            ) : (
+              <Button aria-expanded={false} onClick={form.onOpen}>
+                {message("screen.billing.refund.open.cta")}
+              </Button>
+            )}
+          </>
         ) : refund === null ? (
           <p>{message("screen.billing.refund.unavailable.body")}</p>
         ) : null}
@@ -169,12 +197,15 @@ export function BillingDetails({ agency, detail, refund, form }: BillingViewProp
   );
 }
 
-/** No order in the address: nothing is read. */
-export function NoOrder(): ReactElement {
+/** No order in the address: nothing is read, and the way to an order is the projects (a list of orders needs a read the api lacks: P-09). */
+export function NoOrder({ projectsHref }: { readonly projectsHref: string }): ReactElement {
   return (
     <section>
       <h2>{message("screen.billing.none.title")}</h2>
       <p>{message("screen.billing.none.body")}</p>
+      <p>
+        <a href={projectsHref}>{message("screen.billing.none.link")}</a>
+      </p>
     </section>
   );
 }

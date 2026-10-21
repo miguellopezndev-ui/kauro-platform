@@ -30,8 +30,8 @@ const credential = (): IdentityCredential => new IdentityCredential("CONTRACT_FA
 const bodyOf = (init: { body?: string }): Record<string, unknown> => JSON.parse(init.body ?? "{}") as Record<string, unknown>;
 const keyOf = (init: { headers: Readonly<Record<string, string>> }): string | undefined => init.headers["Idempotency-Key"];
 
-const form = (overrides: Partial<BillingViewProps["form"]> = {}): BillingViewProps["form"] => ({ reason: "", details: "", problems: [], submitting: false, onReasonChange: noop, onDetailsChange: noop, onSubmit: noop, ...overrides });
-const billing = (overrides: Partial<BillingViewProps> = {}): string => renderToStaticMarkup(createElement(BillingDetails, { agency: agency(), detail: orderDetail(), refund: null, form: form(), ...overrides }));
+const form = (overrides: Partial<BillingViewProps["form"]> = {}): BillingViewProps["form"] => ({ reason: "", details: "", problems: [], submitting: false, onReasonChange: noop, onDetailsChange: noop, onSubmit: noop, open: true, onOpen: noop, ...overrides });
+const billing = (overrides: Partial<BillingViewProps> = {}): string => renderToStaticMarkup(createElement(BillingDetails, { agency: agency(), detail: orderDetail(), refund: null, form: form(), projectHref: "/agencies/a/projects/p", ...overrides }));
 const settings = (overrides: Partial<Parameters<typeof SettingsDetails>[0]> = {}): string => renderToStaticMarkup(createElement(SettingsDetails, { agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_AGENCY"] }), onClose: noop, closing: false, closure: null, ...overrides }));
 
 test("fixtures: the billing and settings DTOs are valid against the generated schemas (a drifted fixture cannot prove anything)", () => {
@@ -74,7 +74,10 @@ test("UI30: the order shows captures, tax documents and refunds from the server 
   const refunded = billing({ refund: refund() });
   assert.ok(refunded.includes("Refund requested") && refunded.includes("USD 1,400.00") && refunded.includes("These amounts are proposed and may change when the refund is approved."));
   assert.ok(!refunded.includes('name="reason"'), "no second refund form beside a refund");
-  assert.ok(billing().includes("No refund has been requested from this page."));
+  assert.ok(billing().includes("No refund has been requested for this order."));
+  // the form opens on request: closed, a button names the act and the refund terms are read first
+  const closed = billing({ form: form({ open: false }) });
+  assert.ok(!closed.includes('name="reason"') && closed.includes("Request a refund") && closed.includes("Before the preparation starts, a refund is full."));
 
   // MANAGE_BILLING decides the control; without it the owner text replaces the form, and nothing to send is offered
   const manager = billing();
@@ -234,7 +237,7 @@ test("UI30/UI32: both containers draw LOADING with no private value before the f
     assert.ok(!text.includes("Acme Growth Partners") && !text.includes(order().orderId.slice(0, 8)));
   }
   const none = within(createElement(BillingScreen, { agencyId: AGENCY, orderId: null }));
-  assert.ok(none.includes("Choose an order"));
+  assert.ok(none.includes("Billing shows one order at a time") && none.includes("Go to projects"), "no order: the way to one, not a dead end");
   assert.equal(sent.length, 0, "rendering sends nothing; the reads start in effects");
 });
 

@@ -25,6 +25,7 @@ const props = (overrides: Partial<Parameters<typeof QuoteDetails>[0]> = {}) => (
   onCreate: noop,
   creating: false,
   termsHref: "/legal/terms",
+  planHref: "/agencies/a/projects/p/plan/approval",
   reuploadHref: "/agencies/a/projects/p/sources",
   ...overrides,
 });
@@ -41,7 +42,7 @@ test("fixtures: the quote and the order are valid against the generated schemas 
 test("UI23: the quote shows base, one discount, service, tax, total, units, terms and both expiries, with money from minor units and the exact registry sentence", () => {
   const html = render({ quote: quote({ discount: { bps: 1000, basis: "REPEAT" }, discountCents: "15000", serviceCents: "135000", taxCents: "0", totalCents: "135000" }) });
   assert.ok(html.includes("Review price, scope and availability."));
-  for (const text of ["USD 1,500.00", "USD 1,350.00", "1,200", "Repeat-project discount, 10 percent.", "Prepare for HubSpot", "Price valid until", "Source files kept until", "Read the service terms"]) assert.ok(html.includes(text), text);
+  for (const text of ["USD 1,500.00", "USD 1,350.00", "1,200", "Repeat-project discount (10%)", "Prepare for HubSpot", "Price valid until", "Source files kept until", "Read the service terms"]) assert.ok(html.includes(text), text);
   assert.match(html, /dateTime="2026-10-20T12:00:00.000Z"/);
   assert.match(html, /dateTime="2026-10-27T12:00:00.000Z"/);
 });
@@ -149,6 +150,8 @@ const detailsProps = (over: Partial<Parameters<typeof PaymentDetails>[0]> = {}) 
   onRefresh: noop,
   refreshing: false,
   hrefs: { CONTACT_SUPPORT: "/agencies/a/support", REQUEST_NEW_QUOTE: "/agencies/a/projects/p/purchase", REQUEST_NEW_REVIEW: "/agencies/a/projects/p/audit" },
+  projectHref: "/agencies/a/projects/p",
+  preparationHref: "/agencies/a/projects/p/processing",
   ...over,
 });
 const renderPayment = (over: Partial<Parameters<typeof PaymentDetails>[0]> = {}): string => renderToStaticMarkup(createElement(PaymentDetails, detailsProps(over)));

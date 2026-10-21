@@ -104,3 +104,12 @@ same rule when the public site is next changed.
 the file type (as uploaded, or all CSV in UTF-8) and phone numbers (as in the file, or international format where the country is known).
 **Code.** The plan's body has no place for such preferences. **Needs.** Fields in the plan's contract and the core's CLEAN output, decided
 with the cores' owner; no change to their algorithms is implied by the design. **Status.** Proposal.
+
+## F-10. A list of the workspace's quotes and orders (P-09)
+
+**Design.** The menu's Billing should open an overview of every quote and order of the workspace's projects: what is waiting for a
+transfer and by when, which quotes are open, what is paid with its fiscal document, and any refund; each line opens the existing quote
+(UI23), payment (UI24) or order billing (UI30). **Code.** The api reads one quote (GetQuote) or one order (GetPaymentOrder) by id and lists
+neither; UI30 without an order can only point to the projects. **Needs.** A read listing the workspace's quotes and payment orders with
+their state, amount, key date and fiscal document number, limited to members who may see billing. **Status.** Proposal; UI30's empty
+state now leads to the projects instead of ending there.

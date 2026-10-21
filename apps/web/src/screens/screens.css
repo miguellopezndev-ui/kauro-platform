@@ -689,6 +689,15 @@
   color: var(--kauro-color-text-muted);
 }
 
+/* the quote facts in the header: labels in one column, values aligned in the next */
+.kauro-main .kauro-quote-head .kauro-quote-scope {
+  grid-template-columns: auto auto;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+}
+.kauro-main .kauro-quote-head .kauro-quote-scope > div {
+  display: contents;
+}
+
 .kauro-main :is(.kauro-quote-scope, .kauro-quote-lines, .kauro-quote-dates) dt {
   color: var(--kauro-color-text-muted);
   font-size: var(--kauro-font-size-dense);
@@ -789,6 +798,39 @@
 
 .kauro-quote-terms > .kauro-button {
   justify-self: start;
+}
+
+/* what the quote covers and what it does not, side by side where there is room */
+.kauro-main .kauro-quote-covers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--kauro-space-4) var(--kauro-space-6);
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-quote-covers h2 {
+  margin: 0 0 var(--kauro-space-2);
+  font-size: 1rem;
+}
+.kauro-main .kauro-quote-covers ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.125rem;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-quote-note {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-main .kauro-quote-steps {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
 }
 
 /* ---- UI24 the payment: the amount first, the state once, the bank details as a transfer slip with the reference to copy ----------- */
@@ -894,15 +936,23 @@
 }
 
 .kauro-main .kauro-transfer-key dd {
-  display: grid;
-  gap: var(--kauro-space-1);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-1) 0;
+}
+
+/* the value and its copy button share a line; the warning takes the next */
+.kauro-main .kauro-transfer-key dd > span:not(.kauro-copy) {
+  flex-basis: 100%;
 }
 
 .kauro-main .kauro-transfer-key strong {
   font-size: 1.25rem;
 }
 
-.kauro-main .kauro-transfer-key span {
+/* the warning under a key value; the value itself (the amount renders inside its own span) keeps the strong size */
+.kauro-main .kauro-transfer-key dd > span:not(.kauro-copy) {
   color: var(--kauro-color-text-muted);
   font-size: var(--kauro-font-size-dense);
 }
@@ -911,6 +961,108 @@
   font-family: var(--kauro-mono-family);
   letter-spacing: 0.06em;
   user-select: all;
+}
+
+/* a copy button sits after the value it copies; its result is announced, then fades */
+.kauro-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin-inline-start: var(--kauro-space-2);
+  vertical-align: middle;
+}
+.kauro-main .kauro-copy-button {
+  min-block-size: var(--kauro-target-size);
+  min-inline-size: var(--kauro-target-size);
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-copy-button:hover {
+  border-color: var(--kauro-color-primary);
+}
+.kauro-main .kauro-copy-button:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-main .kauro-copy-result {
+  color: var(--kauro-color-success-text);
+  font-size: 0.8125rem;
+}
+.kauro-main .kauro-transfer-key .kauro-copy {
+  margin-block: 0;
+}
+.kauro-main .kauro-transfer-hint {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+.kauro-main .kauro-transfer-rules-heading {
+  margin: var(--kauro-space-5) 0 var(--kauro-space-2);
+  font-size: 1rem;
+}
+.kauro-main .kauro-transfer-rules {
+  display: grid;
+  gap: var(--kauro-space-1);
+  max-inline-size: 40rem;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-payment-next {
+  max-inline-size: 40rem;
+  margin-block: var(--kauro-space-5);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-inline-start: 3px solid var(--kauro-color-success-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-payment-next > * {
+  margin: 0 0 var(--kauro-space-2);
+}
+.kauro-main .kauro-payment-next > :last-child {
+  margin-block-end: 0;
+}
+.kauro-main .kauro-payment-next-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-payment-next h2 {
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-payment-order {
+  margin-block-start: var(--kauro-space-6);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-main .kauro-payment-order code {
+  overflow-wrap: anywhere;
+}
+
+/* UI30: the refund terms read before the request opens */
+.kauro-main .kauro-refund-terms {
+  max-inline-size: 40rem;
+  margin-block: var(--kauro-space-3) var(--kauro-space-4);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-refund-terms ul {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0 0 var(--kauro-space-3);
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-refund-terms p {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
 }
 
 .kauro-main .kauro-payment-hint {

@@ -30,6 +30,7 @@ import { P05_STATES, SignUp } from "../prototypes/p05-sign-up.tsx";
 import { P06_STATES, ResetPassword } from "../prototypes/p06-reset.tsx";
 import { HealthResults, P07_STATES } from "../prototypes/p07-results.tsx";
 import { Activity, P08_STATES } from "../prototypes/p08-activity.tsx";
+import { BillingOverview, P09_STATES } from "../prototypes/p09-billing.tsx";
 import { PrivateHome, UI33_STATES } from "../prototypes/ui33-home.tsx";
 import { Prospects, UI34_STATES } from "../prototypes/ui34-prospects.tsx";
 import { AgencyRelationship, UI35_STATES } from "../prototypes/ui35-relationship.tsx";
@@ -92,4 +93,5 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   "P-06": { Component: ResetPassword, states: P06_STATES, contexts: ["agency"] },
   "P-07": { Component: HealthResults, states: P07_STATES, contexts: ["agency", "company", "operator"] },
   "P-08": { Component: Activity, states: P08_STATES, contexts: ["agency", "company", "operator"] },
+  "P-09": { Component: BillingOverview, states: P09_STATES, contexts: ["agency", "company"] },
 };

@@ -1649,6 +1649,121 @@ fieldset.kauro-notice-form {
   }
 }
 
+/* P-09: the billing overview, its figures then one line a quote or order; on a phone each line is a card */
+.kauro-main .kauro-billing-figures {
+  margin-block-end: var(--kauro-space-5);
+}
+.kauro-main .kauro-billing-figures dd:first-of-type {
+  white-space: nowrap;
+}
+@media (max-width: 29.99rem) {
+  .kauro-main .kauro-billing-figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.kauro-orders-sub,
+.kauro-orders-when {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.kauro-main .kauro-orders th[scope="row"] a {
+  font-weight: 600;
+}
+.kauro-main .kauro-orders td.kauro-table-end {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-orders,
+  .kauro-orders tbody,
+  .kauro-orders tr,
+  .kauro-orders :is(th, td) {
+    display: block;
+  }
+  .kauro-orders thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-orders tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-orders tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main .kauro-orders :is(th, td) {
+    min-inline-size: 0;
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+    background: none;
+    text-align: start;
+    white-space: normal;
+  }
+  .kauro-main .kauro-orders td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--kauro-space-3);
+  }
+  .kauro-orders td[data-label]::before {
+    content: attr(data-label);
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-orders .kauro-orders-when {
+    display: none;
+  }
+}
+@media (min-width: 48rem) {
+  .kauro-orders .kauro-orders-when {
+    display: inline;
+  }
+}
+
+/* UI36: a line is asked about from its own row */
+.kauro-main .kauro-statement-ask {
+  text-align: end;
+  white-space: nowrap;
+}
+.kauro-main .kauro-text-button {
+  min-block-size: var(--kauro-target-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-link, var(--kauro-color-primary));
+  font: inherit;
+  font-size: var(--kauro-font-size-dense);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.kauro-main .kauro-text-button:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-main .kauro-statement-lines tr.is-asked :is(th, td) {
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-statement-asked {
+  margin: 0 0 var(--kauro-space-3);
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-statement-ask {
+    text-align: start;
+  }
+}
+
+/* UI36 seen by the owner: whose statements these are */
+.kauro-main .kauro-statement-of {
+  margin: 0 0 var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+}
+
 /* UI21: companies and contacts joined by their links */
 .kauro-main .kauro-links > h2 {
   margin-block-end: var(--kauro-space-4);

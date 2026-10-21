@@ -166,9 +166,9 @@ The project is the path's core. Its six stages are the same as on How it works:
 
 | Page | Who comes | Why | What they do | Next | Must not |
 | --- | --- | --- | --- | --- | --- |
-| **Quote (UI23, real)** | The owner, admin or billing member, after approval | To see the exact price before paying | Read base, one discount, service, tax and total; accept the terms; create the payment order | Payment | Offer "Pay now" on expired data |
+| **Quote (UI23, real)** | The owner, admin or billing member, after approval | To see the exact price before paying | Read what the quote covers and excludes, base, discount, service, tax and its treatment, total; accept the terms; read how payment works; create the payment order | Payment | Offer "Pay now" on expired data |
 | **Payment (UI24, real)** | The same person | To pay and know it counted | Follow the order's state; refresh the same order; contact support | Processing | Encourage a second payment while the first is uncertain; trust a redirect as payment |
-| **Billing (UI30, real)** | The billing member, the owner | To keep the company's papers | Download issued invoices; request a refund; settle the billing profile | — | Present a summary as an invoice |
+| **Billing (UI30, real)** | The billing member, the owner | To keep the company's papers | See one order: payments received, fiscal documents, refunds; read the refund terms, then request a refund; open the project | The overview (P-09, proposed) | Present a summary as an invoice |
 
 ### 3.5 Sellers (group D, OPS)
 
@@ -222,3 +222,5 @@ None of these replaces a registered screen. Each is drawn in the review as "PROP
 | P-06 | Reset password | Email and password need a safe recovery | `/login/reset` (APP and OPS) |
 | P-01 (extended) | Personal settings: sign-in methods, two-step verification, recovery codes, sessions | Ending other sessions and safe recovery (owner, 2026-10-20) | `/account` |
 | P-07 | Health check results | The check is where Kauro shows its value before a price; the api has no findings read | Beside UI18, `/projects/{id}/audit` |
+| P-08 | Activity | A project area, reachable and never a step (owner, 2026-10-20); the api has no activity read | `/projects/{id}/activity` |
+| P-09 | Billing overview | The menu's Billing ended at "choose an order"; a workspace needs every quote and order first; the api lists neither (F-10) | `/billing` without an order |

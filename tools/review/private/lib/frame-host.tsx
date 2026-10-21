@@ -56,6 +56,8 @@ export function FrameHost({ id, context, state, pathname, children }: { readonly
         {id === "P-02" ? <a href={pathname}>Back to the page as built (UI32)</a> : null}
         {id === "UI18" ? <a href={`${pathname}?review-proposal=P-07`}>See the proposed results page (P-07)</a> : null}
         {id === "P-07" ? <a href={pathname}>Back to the check as built (UI18)</a> : null}
+        {id === "UI30" ? <a href={`${pathname}?review-proposal=P-09`}>See the proposed billing overview (P-09)</a> : null}
+        {id === "P-09" ? <a href={pathname}>Back to the order as built (UI30)</a> : null}
         <a className="kauro-review-strip-index" href={REVIEW}>
           All screens and states
         </a>

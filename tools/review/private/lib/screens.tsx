@@ -40,6 +40,7 @@ export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.
   if (proposal !== undefined) {
     if (proposal.key === "P-02") return pathOf("UI32", { agencyId });
     if (proposal.key === "P-07") return pathOf("UI18", { agencyId, id: project });
+    if (proposal.key === "P-09") return pathOf("UI30", { agencyId });
     if (proposal.key === "P-08") return `${pathOf("UI13", { agencyId, id: project })}/activity`;
     if (proposal.key === "P-05") return "/signup";
     if (proposal.key === "P-06") return "/login/reset";

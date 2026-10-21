@@ -12,6 +12,9 @@ export const REPEAT_RATE = 4;
 export const CLAIM_DAYS = 90;
 export const ELIGIBLE_DAYS = 30;
 export const WINDOW_MONTHS = 12;
+/** A month's statement is issued on its next month's 5th business day and paid on the 10th, on the Bogotá calendar. */
+export const STATEMENT_BUSINESS_DAY = 5;
+export const PAYOUT_BUSINESS_DAY = 10;
 
 export type ProspectState = "RESEARCHED" | "QUALIFIED" | "CONTACTED" | "ENGAGED" | "OPPORTUNITY" | "WON" | "LOST" | "SUPPRESSED";
 export interface Prospect {
@@ -31,7 +34,7 @@ export const PROSPECTS: readonly Prospect[] = [
   { id: "p-02", name: "Saltmarsh Digital", segment: "Agency", jurisdiction: "Ireland", source: "Its own site", observed: "2026-10-09", state: "CONTACTED", fit: "Builds CRM setups for small firms", next: "No reply yet: follow up from Oct 23", claim: "Claim accepted, until Jan 7, 2027" },
   { id: "p-03", name: "Ostra Revenue Ops", segment: "Agency", jurisdiction: "Netherlands", source: "A conference speaker list, published", observed: "2026-10-02", state: "ENGAGED", fit: "Salesforce consultancy; asked for the worked example", next: "Send the worked example they asked for", claim: "Claim accepted, until Dec 31, 2026" },
   { id: "p-04", name: "Bellweather Outdoor", segment: "Company", jurisdiction: "United States", source: "Its own careers page (CRM admin role)", observed: "2026-10-16", state: "RESEARCHED", fit: "Not checked yet: is there a migration?", next: "Check the fit before any message" },
-  { id: "p-05", name: "Kestrel & Lowe", segment: "Agency", jurisdiction: "United Kingdom", source: "Its own site", observed: "2026-09-28", state: "SUPPRESSED", fit: "Asked not to be contacted on Oct 1, 2026", next: "None: suppressed on every channel" },
+  { id: "p-05", name: "Kestrel & Lowe", segment: "Agency", jurisdiction: "United Kingdom", source: "Its own site", observed: "2026-09-28", state: "SUPPRESSED", fit: "Sets up HubSpot for clients", next: "None: suppressed on every channel" },
 ];
 
 export interface StatementLine {
@@ -64,7 +67,7 @@ export const STATEMENTS: readonly Statement[] = [
     issued: null,
     payDue: "Nov 17, 2026",
     paid: null,
-    lines: [line("Juniper Digital", "Contacts clean-up", "FIRST", 129_500), line("Coastline Analytics", "Q4 contacts", "REPEAT", 129_500, "Eligible 30 days after the project is complete; it is not complete yet")],
+    lines: [line("Juniper Digital", "HubSpot contacts", "FIRST", 129_500), line("Coastline Analytics", "Q4 contacts", "REPEAT", 123_025, "Eligible 30 days after the project is complete; it is not complete yet")],
   },
   {
     period: "September 2026",
@@ -72,7 +75,7 @@ export const STATEMENTS: readonly Statement[] = [
     issued: "Oct 7, 2026",
     payDue: "Oct 15, 2026",
     paid: "Oct 15, 2026",
-    lines: [line("Coastline Analytics", "Contacts and companies", "FIRST", 245_000), line("Juniper Digital", "Contacts clean-up", "FIRST", 129_500, "Eligible on Oct 15, 2026, 30 days after the project was complete")],
+    lines: [line("Coastline Analytics", "Accounts and contacts", "FIRST", 229_500), line("Juniper Digital", "HubSpot contacts", "FIRST", 129_500, "Eligible on Oct 15, 2026, 30 days after the project was complete")],
   },
 ];
 export const sumOf = (lines: readonly StatementLine[], key: "payableCents" | "heldCents" | "basisCents"): number => lines.reduce((sum, one) => sum + one[key], 0);
