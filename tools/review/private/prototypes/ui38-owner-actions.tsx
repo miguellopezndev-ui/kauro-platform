@@ -10,6 +10,9 @@ import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { Badge, PageHead } from "./kit.tsx";
 
+/** The registrar's fields a person types; the rest are only checked. */
+const TYPED: ReadonlySet<string> = new Set(["Domain"]);
+
 export const UI38_STATES: readonly StateDef[] = [
   { key: "normal", label: "Actions", note: "One action prepared and due, one not ready, one done with its proof." },
   { key: "recorded", label: "Result recorded", note: "The renewal done: the receipt kept, and the action closed." },
@@ -60,7 +63,8 @@ function Prepared({ state }: { readonly state: string }): ReactElement {
               <th scope="row">{label}</th>
               <td>{value}</td>
               <td className="kauro-table-actions">
-                <Button onClick={() => setCopied(label)}>{copied === label ? "Copied" : "Copy"}</Button>
+                {/* only a value typed on the registrar's page is copied; the others are checked, not typed */}
+                {TYPED.has(label) ? <Button onClick={() => setCopied(label)}>{copied === label ? "Copied" : "Copy"}</Button> : null}
               </td>
             </tr>
           ))}
@@ -90,10 +94,10 @@ export function OwnerActions({ state }: PrototypeProps): ReactElement {
       <Prepared state={state} />
       <section className="kauro-owner-action is-not-ready" aria-labelledby="tax-h">
         <div className="kauro-owner-action-head">
-          <h2 id="tax-h">File the quarterly sales tax return</h2>
+          <h2 id="tax-h">File the next tax return</h2>
           <Badge tone="neutral">Not ready</Badge>
         </div>
-        <p>Due Jan 15, 2027. Its steps are not prepared yet, so this action does not ask anything of you: Kauro does not guess a government&apos;s screens. It will come back prepared, like the one above, by Jan 5, 2027.</p>
+        <p>Its date and its steps come from the company&apos;s accountant and are not recorded yet, so this action asks nothing of you: Kauro does not guess a government&apos;s screens. Once they are recorded, it comes back prepared, like the one above.</p>
       </section>
       <section className="kauro-screen-section" aria-labelledby="done-h">
         <h2 id="done-h">Done</h2>

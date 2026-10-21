@@ -26,19 +26,19 @@ interface ProviderRow {
 export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
   const alerts = state === "alerts";
   const providers: readonly ProviderRow[] = [
-    { name: "Identity provider", what: "Sign-in, two-step verification, identity confirmation", state: { tone: "warning", label: "Not connected" }, detail: "Sign-in is not available until it is connected (W-IDP-LIVE)." },
+    { name: "Identity provider", what: "Sign-in, two-step verification, identity confirmation", state: { tone: "warning", label: "Not connected" }, detail: "Sign-in is not available until it is connected (W-IDP-LIVE); this review simulates it." },
     {
       name: "Bank route",
       what: "USD receipts by bank transfer",
       state: alerts ? { tone: "danger", label: "Details expired" } : { tone: "success", label: "Verified · sandbox" },
-      detail: alerts ? "Payments stop being offered until the route's details are confirmed again." : "Rollout: controlled. Account shown as ··US01 only. Last verified Oct 18, 2026.",
+      detail: alerts ? "Payments stop being offered until the route's details are confirmed again." : "Rollout: controlled. Account shown as ··US01 only. Last verified Oct 14, 2026.",
       to: "UI39",
     },
     {
       name: "Email sending",
       what: "Transactional email and reviewed outreach",
-      state: alerts ? { tone: "danger", label: "1 identity revoked" } : { tone: "neutral", label: "Not configured" },
-      detail: alerts ? "Outreach from the revoked identity has stopped; nothing more is sent from it." : "No sending route is configured; outreach cannot be sent.",
+      state: alerts ? { tone: "danger", label: "1 identity revoked" } : { tone: "success", label: "1 identity verified" },
+      detail: alerts ? "Outreach from the revoked identity has stopped; nothing more is sent from it." : "Daniel Kim's sending identity, verified. Outreach goes out only after review, from a verified identity.",
       to: "UI54",
     },
     { name: "Card payments", what: "Hosted checkout", state: { tone: "neutral", label: "Deferred" }, detail: "Not offered at launch; payments are bank transfers (Payments V1)." },

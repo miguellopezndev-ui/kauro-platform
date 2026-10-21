@@ -66,7 +66,7 @@ export const UI52_STATES: readonly StateDef[] = [
 
 export const ROUTE_ID = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6501";
 const route = (state: "PENDING_VERIFICATION" | "VERIFIED" | "ENABLED" | "DISABLED") => ({
-  route: { routeId: ROUTE_ID, routeVersion: 1, version: 3, state, rollout: state === "ENABLED" ? "CONTROLLED" : null, environment: "SANDBOX", accountRef: "acct-review-0001", detailsEvidenceHash: "e".repeat(64), verified: state !== "PENDING_VERIFICATION" },
+  route: { routeId: ROUTE_ID, routeVersion: 1, version: 3, state, rollout: state === "ENABLED" ? "CONTROLLED" : null, environment: "SANDBOX", accountRef: "acct-review-0001", detailsEvidenceHash: "136ccde705cf3f9b32d009ac025596158c52ca0be7686c98124a5d07825139da", verified: state !== "PENDING_VERIFICATION" },
 });
 const credits = {
   data: {
@@ -77,10 +77,11 @@ const credits = {
     nextCursor: null,
   },
 };
-const finance = (state: "PENDING_VERIFICATION" | "VERIFIED" | "ENABLED" | "DISABLED") => (): Script => ({
-  getBankRoute: { status: 200, body: route(state) },
-  listBankCredits: { status: 200, body: credits },
-});
+// only the company's owner reads its finance: anyone else gets the server's refusal, as in production (a seller once saw the bank route
+// and its controls here, because the review answered every person alike)
+const REFUSED = { status: 403, problem: "NOT_AUTHORIZED", reason: "ROLE_INSUFFICIENT" } as const;
+const finance = (state: "PENDING_VERIFICATION" | "VERIFIED" | "ENABLED" | "DISABLED") => (ctx: ReviewContext): Script =>
+  ctx.key === "owner" ? { getBankRoute: { status: 200, body: route(state) }, listBankCredits: { status: 200, body: credits } } : { getBankRoute: REFUSED, listBankCredits: REFUSED };
 
 export const UI39_STATES: readonly StateDef[] = [
   { key: "normal", label: "Route enabled, credits to match", note: "The bank route is enabled for a controlled rollout; two credits wait: one carries a reference, one does not.", script: finance("ENABLED") },

@@ -67,9 +67,9 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
       <section className="kauro-screen-section" aria-labelledby="owed-h">
         <h2 id="owed-h">What is owed</h2>
         <ul>
-          <li>Seller commissions: USD 129.50 payable on Nov 17, 2026; USD 51.80 held until a project is complete.</li>
+          <li>Seller commissions: USD 129.50 payable on Nov 17, 2026; USD 49.21 held until a project is complete.</li>
           <li>Refunds: none requested.</li>
-          <li>Tax on October&apos;s sales: filed in January; its amount is known when the quarter closes, and is not zero.</li>
+          <li>Taxes: October&apos;s issued invoices and credit notes are ready for the accountant; this page estimates no tax.</li>
         </ul>
       </section>
       <section className="kauro-approve" aria-labelledby="exp-h">

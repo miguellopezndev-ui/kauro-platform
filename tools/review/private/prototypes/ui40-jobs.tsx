@@ -15,8 +15,8 @@ export const UI40_STATES: readonly StateDef[] = [
 ];
 
 const JOBS = [
-  { id: "job-7c41", workspace: "Halden Outdoor", project: "Spring contacts", state: "RUNNING", attempt: 1, version: 3, queued: "Oct 20, 1:52 PM UTC", deadline: "Oct 22, 1:52 PM UTC" },
-  { id: "job-5a10", workspace: "Northwind Data", project: "Larch Studio contacts", state: "READY", attempt: 1, version: 6, queued: "Oct 20, 2:00 PM UTC", deadline: "Oct 22, 2:00 PM UTC" },
+  { id: "job-7c41", workspace: "Halden Outdoor", project: "Customer records", state: "RUNNING", attempt: 1, version: 3, queued: "Oct 20, 1:52 PM UTC", deadline: "Oct 22, 1:52 PM UTC" },
+  { id: "job-5a10", workspace: "Northwind Data", project: "Contacts and companies", state: "READY", attempt: 1, version: 6, queued: "Oct 20, 2:00 PM UTC", deadline: "Oct 22, 2:00 PM UTC" },
   { id: "job-31e9", workspace: "Juniper Digital", project: "Second import", state: "CANCELLED", attempt: 1, version: 2, queued: "Oct 17, 9:10 AM UTC", deadline: "Oct 19, 9:10 AM UTC" },
 ] as const;
 const WORD: Readonly<Record<string, string>> = { RUNNING: "Running", READY: "Ready", CANCELLED: "Cancelled" };

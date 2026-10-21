@@ -1347,3 +1347,49 @@
 .kauro-muted-text {
   color: var(--kauro-color-text-muted);
 }
+
+/* UI39 on a phone: each incoming credit is a card, its values labelled, its action last (a six-column table cannot fit 375 px) */
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-credits,
+  .kauro-credits tbody,
+  .kauro-credits tr,
+  .kauro-credits td {
+    display: block;
+  }
+  .kauro-credits thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-credits tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-credits tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main .kauro-credits td {
+    min-inline-size: 0;
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+    text-align: start;
+    overflow-wrap: anywhere;
+  }
+  .kauro-main .kauro-credits td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--kauro-space-3);
+  }
+  .kauro-credits td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-main .kauro-credits td.kauro-table-actions {
+    padding-block-start: var(--kauro-space-2);
+  }
+}

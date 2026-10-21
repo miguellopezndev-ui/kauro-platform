@@ -107,13 +107,13 @@ export function CreditQueue({ state, read, onState, onMore, onOpen }: CreditQueu
                 const row = creditRow(credit);
                 return (
                   <tr key={credit.creditId} data-credit={credit.creditId}>
-                    <td>
+                    <td data-label={message("screen.finance.credit.transaction.label")}>
                       <code>{credit.bankTransactionId}</code>
                     </td>
-                    <td className="kauro-table-end">{row.gross}</td>
-                    <td className="kauro-table-end">{row.fee}</td>
-                    <td>{message(`screen.finance.credit.rail.${credit.rail}`)}</td>
-                    <td>{credit.reference === null ? <span className="kauro-muted-text">{message("screen.finance.credit.reference.none")}</span> : <code>{credit.reference}</code>}</td>
+                    <td className="kauro-table-end" data-label={message("screen.finance.credit.gross.label")}>{row.gross}</td>
+                    <td className="kauro-table-end" data-label={message("screen.finance.credit.fee.label")}>{row.fee}</td>
+                    <td data-label={message("screen.finance.credit.rail.label")}>{message(`screen.finance.credit.rail.${credit.rail}`)}</td>
+                    <td data-label={message("screen.finance.credit.reference.label")}>{credit.reference === null ? <span className="kauro-muted-text">{message("screen.finance.credit.reference.none")}</span> : <code>{credit.reference}</code>}</td>
                     <td className="kauro-table-actions">
                       {row.commands.length === 0 ? (
                         <Button onClick={() => onOpen(credit, null)}>{message("screen.finance.credit.open.cta")}</Button>

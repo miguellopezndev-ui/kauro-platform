@@ -40,3 +40,15 @@ which cites ToS §8 to §11 and PV1 §5), and the api's own views (`apps/web/src
 | N-16 | The commission rules state when statements are issued and paid: the 5th and 10th business days of the next month, Bogotá calendar. | A verified policy fact the seller needs to plan; the dates on the page (Nov 9, Oct 15) already follow it. | Remove the sentence. |
 | N-17 | Commission figures follow the price list: a first project's basis is a list price; a repeat's basis is after its 5% discount. | The page says the basis is the service collected after discount; USD 2,450.00 is on no list, and a repeat showed the undiscounted price. | — |
 | N-18 | The draft blocked by suppression is its own first message, dated before the request not to be contacted; the reply to the Salesforce consultancy says what its package would be. | The blocked state reused another agency's reply; a reply about HubSpot only, sent to a Salesforce consultancy, misled. | — |
+
+## Group E
+
+| # | Decision | Why | To reverse |
+| --- | --- | --- | --- |
+| N-19 | Owner settings (P-04) keep stating what is true today for the identity provider and the cloud, and say that the review simulates sign-in; email sending reads the same sending identities as Outreach. | The page is about real readiness (W-IDP-LIVE, A9 not opened), but "not configured" email contradicted the verified identity and the accepted messages elsewhere in the review. | — |
+| N-20 | A copy button only beside a value the owner types (the domain), not beside values to check ("Leave off"). | Copying "Leave off" is meaningless and dilutes the buttons that matter. | Restore one per row. |
+| N-21 | The prepared-action example "quarterly sales tax return, due Jan 15" becomes "the next tax return", whose date and steps come from the company's accountant. | The obligation and its date were invented; Kauro's sellers and payouts run on the Bogotá calendar, and a US-style return is not a known fact. | When the accountant records the real obligation, name it. |
+| N-22 | Operating review states no tax amount or filing date: the period's invoices and credit notes are ready for the accountant. | "Filed in January … not zero" had no source and contradicted the quotes' export exemption. | — |
+| N-23 | Finance on a phone: each credit is a labelled card. | The six-column table squeezed words to one letter a line at 320 to 375 px. | — |
+| N-24 | The review refuses finance reads to anyone but the owner, as the server does; the page then shows one refusal and no credit queue. | A seller saw the bank route with "Disable the route" and "Replace the bank details" because the review answered every person alike; the real page then drew the refusal twice beside an unusable filter. | — |
+| N-25 | The audit now flags text squeezed letter by letter (a box under 48 px wide, more than three lines tall). | The Finance defect passed every automated check: nothing overflowed and nothing was cut. Human inspection found it; the check keeps it from coming back. | Remove the check. |

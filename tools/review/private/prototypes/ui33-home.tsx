@@ -67,7 +67,7 @@ function SellerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; reado
       <Tiles
         ctx={ctx}
         tiles={[
-          { label: "Prospects you work", figure: String(open.length), fact: "1 to check before any message, 1 suppressed", screen: "UI34" },
+          { label: "Prospects you work", figure: String(open.length), fact: "1 to check before any message; 1 more is suppressed and never contacted", screen: "UI34" },
           { label: "This month so far", figure: draft === undefined ? "Not issued" : usd(sumOf(draft.lines, "payableCents")), fact: draft === undefined ? "" : `A draft until it is issued on Nov 9; ${usd(sumOf(draft.lines, "heldCents"))} held`, screen: "UI36" },
           { label: "Last paid", figure: last === undefined ? "None yet" : usd(sumOf(last.lines, "payableCents")), fact: last === undefined ? "" : `${last.period}, paid on ${last.paid ?? ""}`, screen: "UI36" },
         ]}
@@ -91,7 +91,7 @@ function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readon
         <section className="kauro-next" aria-labelledby="next-h">
           <p className="kauro-next-label">Waiting for you · 2</p>
           <h2 id="next-h">Renew the kauro.example domain before Nov 2, 2026</h2>
-          <p>Prepared: the registrar&apos;s own page, the fields filled in, the cost (USD 18.00) and what to keep as proof. One more action waits: approve a seller&apos;s claim.</p>
+          <p>Prepared: the registrar&apos;s own page, the fields filled in, the cost (USD 18.00) and what to keep as proof. One more decision waits in Prospects: a seller&apos;s claim.</p>
           <div className="kauro-actions">
             <ScreenButton to="UI38" ctx={ctx} variant="primary">
               <span className="kauro-go">Open owner actions</span>
@@ -128,7 +128,7 @@ function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readon
           tiles={[
             { label: "Releases", figure: "1 candidate", fact: "Every gate passed; waiting for your promotion", screen: "UI43" },
             { label: "Operating review", figure: "Due Nov 3", fact: "October's evidence is being gathered", screen: "UI44" },
-            { label: "Sales", figure: "1 claim", fact: "Saltmarsh Digital, claimed by Daniel Kim", screen: "UI34" },
+            { label: "Sales", figure: "1 claim", fact: "Fernhill Growth Partners, claimed by Daniel Kim, to decide", screen: "UI34" },
           ]}
         />
       </section>
