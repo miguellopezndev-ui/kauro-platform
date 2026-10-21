@@ -45,7 +45,7 @@ export const UI30_STATES: readonly StateDef[] = [
 // ---------------------------------------------------------------- UI52 support cases
 
 const cases = (agency: string): readonly SupportCaseView[] => [
-  supportCase({ agencyId: agency, caseId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6401", category: "BILLING", severity: "S3", state: "OPEN", summary: "Please add our VAT number to the invoice for this project.", createdAt: "2026-10-21T11:00:00Z", nextReviewAt: "2026-10-22T11:00:00Z" }),
+  supportCase({ agencyId: agency, caseId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6401", category: "BILLING", severity: "S3", state: "OPEN", summary: "Please add our VAT number to the invoice for this project.", createdAt: "2026-10-21T11:00:00Z", nextReviewAt: "2026-10-22T15:00:00Z" }),
   supportCase({ agencyId: agency, caseId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6402", category: "BILLING", severity: "S3", state: "RESOLVED", summary: "Which tax treatment applies to an agency outside the United States?", createdAt: "2026-10-18T15:20:00Z", nextReviewAt: "2026-10-19T15:20:00Z" } as Partial<SupportCaseView>),
 ];
 const support = (list: (agency: string) => readonly SupportCaseView[]) => (ctx: ReviewContext): Script => ({

@@ -68,7 +68,7 @@ export function Lifecycle({ ctx, state, project }: PrototypeProps): ReactElement
   ];
   return (
     <>
-      <ProjectHeader current="import" />
+      <ProjectHeader current="import" area="nav.project.data.label" />
       <PageHead title="Data lifecycle" lead="See what remains and what will be deleted." />
       {deleting ? (
         <Banner tone="info" title="Deletion requested on Oct 22, 2026 at 10:30 AM UTC" announce="status">

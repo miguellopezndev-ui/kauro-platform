@@ -223,7 +223,7 @@ test("UI52/CMD044: the form warns against secrets and CRM rows, shows the SECURE
   assert.equal(keys[0], form.key, "the key the form minted when it opened");
   assert.equal(lost.sent[0]?.url, `/api/v1/projects/${PROJECT}/support-cases`);
   const shown = renderToStaticMarkup(createElement(CaseCreated, { item: created, listHref: SUPPORT_HREF }));
-  assert.ok(shown.includes("Your case is open") && shown.includes("Next response by") && shown.includes("Oct 14, 2026, 10:00 AM GMT-5"), "the next response time is written");
+  assert.ok(shown.includes("Your case is open") && shown.includes("Next response by") && shown.includes("Oct 14, 2026, 3:00 PM UTC"), "the next response time is written, in UTC like every deadline of the application");
   // every retry lost: the project's cases are read back; only a case that was not there before counts, so an older identical case is never claimed
   const allLost = (listed: SupportCaseView[]) =>
     harness(async (entry) => {

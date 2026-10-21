@@ -120,6 +120,9 @@
 | D-24 | tools/review/private/prototypes/ui44-review.tsx, ui38-owner-actions.tsx, p04-owner.tsx | Held commission USD 51.80 after the basis was corrected; an invented tax filing; copy buttons on checked values; email sending "not configured" against a verified identity; a verification date that disagreed with Owner actions. | USD 49.21; no tax claim; copy on the domain only; one identity verified; Oct 14. |
 | D-25 | lib/fixtures/account-states.ts | The bank route's evidence hash was "eeee…", a placeholder. | A value shaped like a real SHA-256 (of a review label). |
 | D-26 | apps/web/src/screens/finance/view.tsx, containers.tsx, screens.css; lib/fixtures/account-states.ts | Finance squeezed its table letter by letter on a phone; a seller could read the company's finance in the review; a refusal was drawn twice. | Phone cards; non-owners refused as by the server; one refusal for the page. |
+| D-27 | apps/web/src/screens/shared/project-header.tsx; prototypes/ui29-lifecycle.tsx, p08-activity.tsx | Data and deletion passed for step 6 of 6; Activity had no project header. | Both name their area and where the project stands; a test covers the header. |
+| D-28 | apps/web/src/screens/support/view.tsx, copy/screens/support.ts; lib/fixtures/account-states.ts | Support alone wrote times in Bogotá time; its hours were never stated; the review case was due outside them. | UTC; the hours in both zones; the case due at 10:00 Bogotá. |
+| D-29 | prototypes/p05-sign-up.tsx, p06-reset.tsx | The email code was promised as six digits, a property of an identity provider not yet chosen. | "A code". |
 
 ## Findings for the owner (not changed here)
 

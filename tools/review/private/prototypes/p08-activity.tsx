@@ -4,6 +4,7 @@
 // page doubles as the project's record (research: app-operations-ux.md §1.3 proposal 1.4, Basecamp's activity filters). A void, a reissue
 // or a cancellation keeps its reason. Filters narrow by area and by person; nothing here can be edited. Needs an activity read (F-06).
 import { type ReactElement, useState } from "react";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { PageHead } from "./kit.tsx";
@@ -36,6 +37,7 @@ export function Activity({ state }: PrototypeProps): ReactElement {
   const shown = state === "empty" ? [] : EVENTS.filter((event) => (area === "All" || event.area === area) && (person === "Everyone" || event.who === person));
   return (
     <>
+      <ProjectHeader current={state === "empty" ? "files" : "delivery"} area="nav.project.activity.label" />
       <PageHead title="Activity" lead="Everything that happened in this project, newest first." />
       <p className="kauro-proposed kauro-proposed--page">Proposed — the activity needs a read the API does not have yet (F-06)</p>
       {state === "empty" ? (

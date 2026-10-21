@@ -5,7 +5,8 @@
 // the project's areas are places in the side menu, and drawing them twice would make two ways to the same page. The stages before the
 // page's are done, the page's is current, the rest are later; a state is said in words for assistive technology, never by colour alone.
 // The project comes from the frame (ProjectContext), which reads it once for the menu; without it (a page outside a project's read) the
-// header draws nothing rather than guess.
+// header draws nothing rather than guess. A page apart from the stages (Activity, Data and deletion: reachable, never a step) names
+// itself and says where the project stands, instead of passing for a step.
 import { type ReactElement, useContext } from "react";
 import { message, type MessageId } from "../../copy/en.ts";
 import { ProjectContext } from "../../shell/frame.tsx";
@@ -21,7 +22,7 @@ const STEPS: readonly { readonly key: ProjectStep; readonly label: MessageId }[]
   { key: "import", label: "nav.project.import.label" },
 ];
 
-export function ProjectHeader({ current }: { readonly current: ProjectStep }): ReactElement | null {
+export function ProjectHeader({ current, area }: { readonly current: ProjectStep; readonly area?: MessageId }): ReactElement | null {
   const project = useContext(ProjectContext);
   if (project === null) return null;
   const steps = project.mode === "CLEAN" ? STEPS.filter((step) => step.key !== "import") : STEPS;
@@ -37,7 +38,11 @@ export function ProjectHeader({ current }: { readonly current: ProjectStep }): R
         <bdi>{project.name}</bdi>
       </p>
       <div className="kauro-project-progress">
-        <p className="kauro-project-progress-count">{message("project.progress.count", { number: at + 1, total: steps.length, name: message(steps[at]?.label ?? "nav.project.files.label") })}</p>
+        <p className="kauro-project-progress-count">
+          {area === undefined
+            ? message("project.progress.count", { number: at + 1, total: steps.length, name: message(steps[at]?.label ?? "nav.project.files.label") })
+            : message("project.progress.apart", { area: message(area), number: at + 1, total: steps.length, name: message(steps[at]?.label ?? "nav.project.files.label") })}
+        </p>
         <ol className="kauro-project-progress-steps" aria-label={message("project.progress.label")}>
           {steps.map((step, index) => {
             const state = index < at ? "done" : index === at ? "current" : "later";

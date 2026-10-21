@@ -346,3 +346,17 @@ test("Order 11: inside a project the menu nests its areas for its service; a des
   assert.match(markup, /Contacts and companies/);
   assert.doesNotMatch(markup, />Import</);
 });
+
+test("ProjectHeader (Order 11): a step names its place among the service's steps; a page apart names itself and where the project stands; no project, no header", async () => {
+  const { ProjectHeader } = await import("../src/screens/shared/project-header.tsx");
+  const { ProjectContext } = await import("../src/shell/frame.tsx");
+  const project = { projectId: "p", name: "Contacts and companies", clientLabel: "Larch Studio", mode: "HUBSPOT" as const };
+  const within = (child: ReactElement, value: unknown = project): string => renderToStaticMarkup(createElement(ProjectContext.Provider, { value: value as never }, child));
+  const step = within(createElement(ProjectHeader, { current: "purchase" }));
+  assert.ok(step.includes("Step 4 of 6 · Purchase"));
+  const apart = within(createElement(ProjectHeader, { current: "import", area: "nav.project.data.label" }));
+  assert.ok(apart.includes("Data and deletion · the project is at step 6 of 6, Import") && !apart.includes("Step 6 of 6"));
+  const clean = within(createElement(ProjectHeader, { current: "delivery" }), { ...project, mode: "CLEAN" });
+  assert.ok(clean.includes("Step 5 of 5 · Delivery") && !clean.includes("Import"), "Clean your data has no import step");
+  assert.equal(within(createElement(ProjectHeader, { current: "files" }), null), "");
+});

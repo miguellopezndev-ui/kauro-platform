@@ -28,8 +28,8 @@ function CaseFacts({ item }: { readonly item: SupportCaseView }): ReactElement {
         <dt>{message("screen.support.case.state.label")}</dt>
         <dd><StatusBadge tone={STATE_TONE[item.state]}>{message(`screen.support.state.${item.state}`)}</StatusBadge></dd>
       </div>
-      <div><dt>{message("screen.support.case.next.label")}</dt><dd><Deadline at={item.nextReviewAt} timeZone="America/Bogota" /></dd></div>
-      <div><dt>{message("screen.support.case.opened.label")}</dt><dd><Deadline at={item.createdAt} timeZone="America/Bogota" /></dd></div>
+      <div><dt>{message("screen.support.case.next.label")}</dt><dd><Deadline at={item.nextReviewAt} timeZone="UTC" /></dd></div>
+      <div><dt>{message("screen.support.case.opened.label")}</dt><dd><Deadline at={item.createdAt} timeZone="UTC" /></dd></div>
     </dl>
   );
 }

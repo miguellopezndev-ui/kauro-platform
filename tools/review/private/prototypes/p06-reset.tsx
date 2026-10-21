@@ -38,7 +38,7 @@ export function ResetPassword({ state }: PrototypeProps): ReactElement {
   };
 
   let title = "Reset your password";
-  let lead: string | undefined = "Enter the email address you sign in with. We will send it a six-digit code.";
+  let lead: string | undefined = "Enter the email address you sign in with. We will send it a code.";
   let body: ReactElement;
   switch (step) {
     case "sent":
@@ -48,7 +48,7 @@ export function ResetPassword({ state }: PrototypeProps): ReactElement {
       body = (
         <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (/^[0-9]{6}$/.test(codeOf(String(data.get("code") ?? ""))) ? null : { fieldId: "reset-code", message: "The code is not correct or has expired. Enter the code from the latest email, or send a new one" }), "factor")}>
           <p>
-            If <bdi className="kauro-auth-inline">{EMAIL}</bdi> has a Kauro account, a six-digit code is on its way to it.
+            If <bdi className="kauro-auth-inline">{EMAIL}</bdi> has a Kauro account, a code is on its way to it.
           </p>
           <ErrorSummary title="There is a problem" errors={errors} />
           <CodeField id="reset-code" label="Code from the email" hint="It works for a short time. Look in spam if it has not arrived." error={errorOf("reset-code")} />

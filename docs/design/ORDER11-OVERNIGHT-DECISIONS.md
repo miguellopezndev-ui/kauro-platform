@@ -52,3 +52,11 @@ which cites ToS §8 to §11 and PV1 §5), and the api's own views (`apps/web/src
 | N-23 | Finance on a phone: each credit is a labelled card. | The six-column table squeezed words to one letter a line at 320 to 375 px. | — |
 | N-24 | The review refuses finance reads to anyone but the owner, as the server does; the page then shows one refusal and no credit queue. | A seller saw the bank route with "Disable the route" and "Replace the bank details" because the review answered every person alike; the real page then drew the refusal twice beside an unusable filter. | — |
 | N-25 | The audit now flags text squeezed letter by letter (a box under 48 px wide, more than three lines tall). | The Finance defect passed every automated check: nothing overflowed and nothing was cut. Human inspection found it; the check keeps it from coming back. | Remove the check. |
+
+## Across groups
+
+| # | Decision | Why | To reverse |
+| --- | --- | --- | --- |
+| N-26 | A page apart from the stages (Activity, Data and deletion) names itself in the project header and says where the project stands ("Data and deletion · the project is at step 6 of 6, Import"). | It read "Step 6 of 6 · Import", passing for a step, against the owner's decision that these areas are reachable and never steps. | Drop the area line. |
+| N-27 | Support shows its times in UTC, like every deadline of the application, and states the hours in both zones (09:00 to 17:00 Bogotá, 14:00 to 22:00 UTC). | It was the only page in Bogotá time, and it never said what "covered support hours" were; the review's case was due at 6:00 Bogotá, outside them. | Restore America/Bogota in the view and its test. |
+| N-28 | The email code is "a code", not "a six-digit code"; the authenticator code stays six digits. | Six digits is the authenticator standard (RFC 6238); an email code's form belongs to the identity provider, not chosen yet. | — |

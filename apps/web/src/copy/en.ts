@@ -55,6 +55,7 @@ export const APPLICATION_COPY = {
   "service.SALESFORCE.name": "Prepare for Salesforce",
   "project.progress.label": "Where the project stands",
   "project.progress.count": "Step {number} of {total} · {name}",
+  "project.progress.apart": "{area} · the project is at step {number} of {total}, {name}",
   "nav.project.overview.label": "Overview",
   "nav.project.files.label": "Files",
   "nav.project.destination.label": "Destination",

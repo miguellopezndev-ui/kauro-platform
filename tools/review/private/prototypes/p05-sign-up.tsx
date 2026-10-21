@@ -4,7 +4,7 @@
 // as themself; the agency or company is set up later, when they want to upload real files (UI09). The order is fixed:
 //   1. the account: Google, or full name, email and a password of 12 characters or more, checked against passwords exposed in known
 //      breaches, with no composition rules (the owner's rule; NIST SP 800-63B-4 §3.1.1.2);
-//   2. a verified email, by a six-digit code (Google has verified it already);
+//   2. a verified email, by a code sent to it (Google has verified it already; the code's form is the identity provider's);
 //   3. Kauro's own two-step verification, then the recovery codes, shown once;
 //   4. the welcome (UI10 with no workspace): explore a synthetic example, or set up the agency or company.
 // Whether the buyer is an agency or a company is asked in the setup, not here: no reference product asks it on the sign-up form. An email
@@ -29,7 +29,7 @@ export const P05_STATES: readonly StateDef[] = [
   { key: "invalid", label: "Details not accepted", note: "Each problem beside its field and in a summary: an empty name, an address that is not an email, a short password." },
   { key: "breached", label: "Password found in a breach", note: "The password appears in a known data breach: the person chooses another, and is told why." },
   { key: "google", label: "Back from Google", note: "Google has given the name and a verified address; the person confirms and goes straight to two-step verification." },
-  { key: "verify", label: "Check your email", note: "A six-digit code was sent. The same screen appears when the address already has an account: the email then says to sign in." },
+  { key: "verify", label: "Check your email", note: "A code was sent. The same screen appears when the address already has an account: the email then says to sign in." },
   { key: "verify-wrong", label: "Code not accepted", note: "A wrong or expired code: the person may send a new one." },
   { key: "enrol", label: "Two-step verification", note: "Kauro's own second factor, required before any private data, also after Google." },
   { key: "codes", label: "Recovery codes", note: "Shown once. The person confirms they have kept them, then arrives at the welcome." },
@@ -37,7 +37,7 @@ export const P05_STATES: readonly StateDef[] = [
 
 const STEPS = [
   { key: "account", name: "Your account", fact: "Name, email and password, or Google" },
-  { key: "email", name: "Your email", fact: "A six-digit code" },
+  { key: "email", name: "Your email", fact: "A code sent to it" },
   { key: "mfa", name: "Two-step verification", fact: "Your authenticator app" },
   { key: "workspace", name: "Your agency or company", fact: "When you want to upload real files" },
   { key: "project", name: "Your first project", fact: "The free data health check" },
@@ -120,7 +120,7 @@ export function SignUp({ state }: PrototypeProps): ReactElement {
     case "verify":
     case "verify-wrong":
       title = "Check your email";
-      lead = "We sent a six-digit code to the address below. Enter it to confirm the address is yours.";
+      lead = "We sent a code to the address below. Enter it to confirm the address is yours.";
       body = (
         <form className="kauro-form" noValidate onSubmit={(event) => checkCode(event, "signup-email-code", "The code is not correct or has expired. Enter the code from the latest email, or send a new one", () => go("enrol"))}>
           <Who email="ana.silva@gmail.example" onChange={() => go("normal")} change="Change" />
