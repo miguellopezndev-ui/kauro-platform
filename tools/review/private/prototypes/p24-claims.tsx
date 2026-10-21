@@ -1,33 +1,70 @@
 "use client";
-// P-24 Claims (proposed; round 2, owner-console.md §10.2, §13 "Decide a claim"). Claims leave Prospects: sellers work prospects, the owner
-// decides claims. The claims to decide come first; one opens with its evidence, what Kauro's records say (another claim, an existing
-// customer), and what accepting it means, in dates. Accept (CMD047, the owner, step-up) or refuse with a reason from a fixed list
-// (seller-portal.md §5.6), which the seller reads. A seller is never told who else claimed: the refusal says "Not available to claim".
+// P-24 Claims (proposed; round 2, owner-console.md §10.2, §13; the owner's decisions of 2026-10-21). Sellers work prospects; the owner
+// decides claims. The claims to decide come first; one opens with its evidence, what Kauro's records say, what accepting means in dates,
+// and its history. Accept (CMD047, step-up) or refuse with a reason from a closed list. The owner sees the internal reason, its evidence
+// and every decision; the seller reads only a neutral message that never reveals a commercial relationship or another seller's claim, and
+// may ask for a review. "Other" is the one documented exception and needs a written note. The contractual claim rules are waiting for their
+// legal validation, so this page marks them "Pending legal review" wherever it states them.
 //
-// Needs a read (gap): the api decides claims by id (AcceptAttribution) but lists none across sellers; this page is drawn from the review's
-// fixture. The fixed list of refusal reasons is a proposal for the owner and counsel.
+// Needs a read and storage (gaps F-13, F-14): the api decides claims by id (AcceptAttribution) but lists none, stores no closed reason
+// list with evidence, and has no review request. This page is drawn from the review's fixture.
 import { Button, Field } from "@kauro/ui";
 import Link from "next/link";
 import { type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Filter, OPS_PATH, OpsHead, OpsPage, Word } from "./ops-kit.tsx";
-import { CLAIMS, CLAIM_DAYS, FIRST_RATE, REPEAT_RATE, WINDOW_MONTHS, sellerById, type Claim, type ClaimState } from "./sales.ts";
+import { Filter, OPS_PATH, OpsHead, OpsPage, PendingLegal, SectionHead, Word } from "./ops-kit.tsx";
+import { CLAIMS, CLAIM_DAYS, CLAIM_REASONS, FIRST_RATE, REPEAT_RATE, WINDOW_MONTHS, claimReason, sellerById, type Claim, type ClaimReasonKey, type ClaimState } from "./sales.ts";
 
 export const P24_STATES: readonly StateDef[] = [
-  { key: "normal", label: "A claim to decide", note: "Daniel Kim's claim on Fernhill Growth Partners: its evidence, the check against Kauro's records, and what accepting means." },
-  { key: "refuse", label: "Refusing a claim", note: "A reason from the fixed list, and an optional note the seller reads." },
+  { key: "normal", label: "A claim to decide", note: "Daniel Kim's claim on Fernhill Growth Partners: its evidence, the check against Kauro's records, what accepting means, its history." },
+  { key: "refuse", label: "Refusing a claim", note: "A reason from the closed list; what the seller will read, shown before it is sent; 'Other' needs a written note." },
+  { key: "refused", label: "A refused claim, reviewed", note: "Pinewood Analytics: the internal reason and its evidence for you, the neutral message the seller read, the review asked for and its outcome." },
 ];
 
 type Show = "decide" | "accepted" | "converted" | "closed";
 const SHOW_OF: Readonly<Record<ClaimState, Show>> = { SUBMITTED: "decide", DISPUTED: "decide", ACCEPTED: "accepted", CONVERTED: "converted", REJECTED: "closed", EXPIRED: "closed" };
 const WORD: Readonly<Record<ClaimState, string>> = { SUBMITTED: "To decide", DISPUTED: "In review", ACCEPTED: "Accepted", CONVERTED: "Won", REJECTED: "Refused", EXPIRED: "Expired" };
 const TONE: Readonly<Record<ClaimState, "info" | "warning" | "success" | "neutral">> = { SUBMITTED: "info", DISPUTED: "warning", ACCEPTED: "success", CONVERTED: "success", REJECTED: "neutral", EXPIRED: "neutral" };
-const REASONS = ["Not available to claim", "Not enough evidence of the seller's own work", "Outside the seller agreement", "Duplicate of the seller's own claim"] as const;
+
+function Refuse({ claim, onCancel }: { readonly claim: Claim; readonly onCancel: () => void }): ReactElement {
+  const seller = sellerById(claim.sellerId);
+  const [reason, setReason] = useState<ClaimReasonKey>("CUSTOMER_OR_DIRECT");
+  const chosen = claimReason(reason);
+  return (
+    <div className="kauro-ops-form">
+      <Field id="refuse-reason" label="Reason" hint="From the closed list; only you see it, with its evidence">
+        {(control) => (
+          <select {...control} value={reason} onChange={(event) => setReason(event.target.value as ClaimReasonKey)}>
+            {CLAIM_REASONS.map((one) => (
+              <option key={one.key} value={one.key}>
+                {one.internal}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      <Field id="refuse-evidence" label="Evidence" hint="What in Kauro's records supports the reason: a record, a date, a reference">
+        {(control) => <textarea {...control} rows={2} />}
+      </Field>
+      <Field id="refuse-note" label={chosen?.note === true ? "Note (required for Other)" : "Note (optional)"} hint="In writing, kept with the decision; the seller does not read it">
+        {(control) => <textarea {...control} rows={2} required={chosen?.note === true} />}
+      </Field>
+      <p className="kauro-ops-sentence">
+        {seller?.name} will read: <strong>&ldquo;{chosen?.seller}.&rdquo;</strong> and can ask for a review.
+      </p>
+      <div className="kauro-actions">
+        <Button variant="primary">Refuse the claim</Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
 
 function Decide({ claim, refusing, onRefuse, onCancel }: { readonly claim: Claim; readonly refusing: boolean; readonly onRefuse: () => void; readonly onCancel: () => void }): ReactElement {
   const seller = sellerById(claim.sellerId);
   const deciding = claim.state === "SUBMITTED" || claim.state === "DISPUTED";
+  const reason = claimReason(claim.reason);
   return (
     <section className="kauro-ops-decide" aria-labelledby="claim-h">
       <div className="kauro-ops-head-title">
@@ -52,41 +89,52 @@ function Decide({ claim, refusing, onRefuse, onCancel }: { readonly claim: Claim
           <>
             <div>
               <dt>Kauro&apos;s records</dt>
-              <dd>No other claim, and no customer or workspace with this name or domain.</dd>
+              <dd>No other claim, no customer or workspace with this name or domain, and no fit inquiry from it.</dd>
             </div>
             <div>
               <dt>If you accept</dt>
               <dd>
-                It is {seller?.name}&apos;s for {CLAIM_DAYS} days, until Jan 18, 2027. A first project bought in that time earns {FIRST_RATE}% of the service collected, and its repeats {REPEAT_RATE}% for {WINDOW_MONTHS} months.
+                It is {seller?.name}&apos;s for {CLAIM_DAYS} days, until Jan 18, 2027. A first project bought in that time earns {FIRST_RATE}% of the service collected, and its repeats {REPEAT_RATE}% for {WINDOW_MONTHS} months. <PendingLegal />
               </dd>
+            </div>
+          </>
+        ) : claim.state === "REJECTED" && reason !== undefined ? (
+          <>
+            <div>
+              <dt>Internal reason</dt>
+              <dd>{reason.internal}</dd>
+            </div>
+            <div>
+              <dt>Its evidence</dt>
+              <dd>{claim.reasonEvidence ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>What the seller read</dt>
+              <dd>&ldquo;{reason.seller}.&rdquo; Nothing about a customer or another seller.</dd>
             </div>
           </>
         ) : (
           <div>
-            <dt>{claim.state === "REJECTED" ? "Reason" : claim.state === "CONVERTED" ? "Won" : "Ends"}</dt>
-            <dd>{claim.state === "REJECTED" ? `${claim.reason ?? ""}, on ${claim.decided ?? ""}` : claim.state === "CONVERTED" ? `First project paid on ${claim.ends ?? ""}` : `${claim.ends ?? ""}, ${CLAIM_DAYS} days after it was accepted on ${claim.decided ?? ""}`}</dd>
+            <dt>{claim.state === "CONVERTED" ? "Won" : "Ends"}</dt>
+            <dd>{claim.state === "CONVERTED" ? `First project paid on ${claim.ends ?? ""}` : `${claim.ends ?? ""}, ${CLAIM_DAYS} days after it was accepted on ${claim.decided ?? ""}; alerts 14 and 3 days before`}</dd>
           </div>
         )}
       </dl>
+      {claim.history === undefined ? null : (
+        <>
+          <h3>Decisions</h3>
+          <ol className="kauro-ops-history">
+            {claim.history.map(([date, event]) => (
+              <li key={`${date}-${event}`}>
+                <time>{date}</time>
+                <span>{event}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
       {!deciding ? null : refusing ? (
-        <div className="kauro-ops-form">
-          <Field id="refuse-reason" label="Reason" hint={`${seller?.name ?? "The seller"} reads it; it never names another seller or a customer`}>
-            {(control) => (
-              <select {...control} defaultValue={REASONS[0]}>
-                {REASONS.map((reason) => (
-                  <option key={reason}>{reason}</option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field id="refuse-note" label="Note (optional)" hint="One or two sentences, in writing">
-            {(control) => <textarea {...control} rows={3} />}
-          </Field>
-          <div className="kauro-actions">
-            <Button variant="primary">Refuse the claim</Button>
-            <Button onClick={onCancel}>Cancel</Button>
-          </div>
-        </div>
+        <Refuse claim={claim} onCancel={onCancel} />
       ) : (
         <>
           <div className="kauro-actions">
@@ -101,15 +149,23 @@ function Decide({ claim, refusing, onRefuse, onCancel }: { readonly claim: Claim
 }
 
 export function Claims({ state }: PrototypeProps): ReactElement {
-  const [show, setShow] = useState<Show>("decide");
-  const [open, setOpen] = useState<string>("c-01");
+  const refused = state === "refused";
+  const [show, setShow] = useState<Show>(refused ? "closed" : "decide");
+  const [open, setOpen] = useState<string>(refused ? "c-12" : "c-01");
   const [refusing, setRefusing] = useState(state === "refuse");
   const counts = (key: Show): number => CLAIMS.filter((one) => SHOW_OF[one.state] === key).length;
   const rows = CLAIMS.filter((one) => SHOW_OF[one.state] === show);
   const claim = CLAIMS.find((one) => one.id === open) ?? CLAIMS[0];
   return (
     <OpsPage>
-      <OpsHead title="Claims" lead={`Decide which seller found a customer first. An accepted claim lasts ${CLAIM_DAYS} days.`} />
+      <OpsHead
+        title="Claims"
+        lead={
+          <>
+            Decide which seller found a customer first. An accepted claim lasts {CLAIM_DAYS} days. <PendingLegal />
+          </>
+        }
+      />
       <Filter<Show>
         label="Show claims"
         value={show}
@@ -169,6 +225,35 @@ export function Claims({ state }: PrototypeProps): ReactElement {
         </div>
       </div>
       {claim === undefined ? null : <Decide claim={claim} refusing={refusing} onRefuse={() => setRefusing(true)} onCancel={() => setRefusing(false)} />}
+      <section aria-labelledby="reasons-h">
+        <SectionHead id="reasons-h" title="Reasons for a refusal" meta="A closed list. The seller reads only the right-hand message and can ask for a review." aside={<PendingLegal />} />
+        <div className="kauro-ops-tablewrap">
+          <div className="kauro-table-region">
+            <table className="kauro-table kauro-ops-table kauro-ops-table--cards kauro-ops-table--compact">
+              <caption className="kauro-visually-hidden">The closed list of refusal reasons</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Internal reason (you)</th>
+                  <th scope="col">What the seller reads</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CLAIM_REASONS.map((one) => (
+                  <tr key={one.key}>
+                    <th scope="row">
+                      {one.internal}
+                      {one.note ? <span className="kauro-ops-sub">Needs a written note</span> : null}
+                    </th>
+                    <td data-label="The seller reads">
+                      <span>{one.seller}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </OpsPage>
   );
 }

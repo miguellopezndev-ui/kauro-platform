@@ -1154,3 +1154,80 @@
 .kauro-ops-decide dl.kauro-ops-facts + .kauro-ops-form {
   margin-block-start: var(--kauro-space-5);
 }
+
+/* ---- alerts: one item once, under its most urgent kind, the kind in words ---- */
+.kauro-ops-alerts {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  list-style: none;
+}
+.kauro-main .kauro-ops-alerts > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  max-inline-size: none;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-ops-alerts > li:last-child {
+  border-block-end: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops-alerts > li {
+    grid-template-columns: 11rem minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.kauro-ops-alert-kind .kauro-status-badge {
+  white-space: nowrap;
+}
+.kauro-main .kauro-ops .kauro-ops-alerts p {
+  margin: 0;
+}
+.kauro-main .kauro-ops .kauro-ops-alert-what {
+  font-weight: 600;
+}
+.kauro-ops-alert-what a {
+  color: var(--kauro-color-text);
+  text-decoration-color: var(--kauro-color-control-border);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.kauro-main .kauro-ops .kauro-ops-alert-detail {
+  margin-block-start: var(--kauro-space-1);
+}
+.kauro-main .kauro-ops .kauro-ops-alert-also {
+  margin-block-start: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- a rule waiting for its legal validation ---- */
+.kauro-ops-legal {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--kauro-space-2);
+  padding: 0 0.5rem;
+  border: 1px dashed var(--kauro-color-accent-text);
+  border-radius: 62.5rem;
+  color: var(--kauro-color-accent-text);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* ---- a statement's balance under its lines ---- */
+.kauro-main .kauro-ops .kauro-ops-balance {
+  margin: var(--kauro-space-3) 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-ops-table tr.is-offset th,
+.kauro-ops-table tr.is-retainer th {
+  font-weight: 600;
+}
+.kauro-main .kauro-ops .kauro-ops-decide > .kauro-ops-head-title {
+  margin-block-end: var(--kauro-space-3);
+}

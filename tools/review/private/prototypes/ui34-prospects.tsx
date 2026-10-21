@@ -20,7 +20,7 @@ import { CLAIM_DAYS, FIRST_RATE, PROSPECTS, REPEAT_RATE, SELLER, SELLERS, WINDOW
 export const UI34_STATES: readonly StateDef[] = [
   { key: "normal", label: "Prospects", note: "The seller's book in four views; Ostra Revenue Ops opened, with its claim as a date, its facts and its history." },
   { key: "add", label: "Adding a prospect", note: "Four fields and the lawful source; the answer comes at once: available, not available or do not contact." },
-  { key: "unavailable", label: "Not available", note: "The answer for an organisation that cannot be claimed: it never says why, and nothing is added." },
+  { key: "unavailable", label: "Not available", note: "The answer for an organisation that cannot be claimed: a neutral message, never the reason; the seller can ask for a review." },
   { key: "suppressed", label: "Do not contact", note: "Kestrel & Lowe opened: suppressed on every channel, with no way to contact it." },
 ];
 
@@ -142,8 +142,10 @@ function AddProspect({ answered }: { readonly answered: boolean }): ReactElement
           <h2 id="answer-h">Pinewood Analytics is not available to claim</h2>
           <Word tone="neutral">Not available</Word>
         </div>
-        <p>Kauro will not say why. Nothing was added, and nothing about it is kept with your name.</p>
+        <p>Kauro does not give the reason, so nothing about another party is disclosed. Nothing was added to your prospects.</p>
+        <p>If you think this answer is wrong, ask Kauro to review it. Kauro looks at the decision again and tells you the outcome.</p>
         <div className="kauro-actions">
+          <Button>Ask for a review</Button>
           <Button>Add another prospect</Button>
         </div>
       </section>

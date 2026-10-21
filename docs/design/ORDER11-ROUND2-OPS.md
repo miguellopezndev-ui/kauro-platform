@@ -118,7 +118,7 @@ Screenshots: `Kauro.archive/Deliveries/Visual/order11/shots/round2-ops/` (every 
   and completion dates for the seller; no statement PDF/CSV; no notification preferences; no seller action to ask for authorisation (the
   owner reviews drafts in their own queue); outreach send is inert in this build.
 
-## Questions for the owner (only what cannot be decided here)
+## Questions the owner answered on 2026-10-21 (decisions below)
 
 1. **Customers' revenue on the Sellers list** (research Q-2): "Collected" per seller is the commission base and names what customers paid.
    Keep it, or show commission only?
@@ -126,3 +126,49 @@ Screenshots: `Kauro.archive/Deliveries/Visual/order11/shots/round2-ops/` (every 
    counsel, together with the fixed list of refusal reasons.
 3. **Thresholds:** stalled project 14 days; seller reminders 3 and 14 days; "Needs you" window for pilot reviews 7 days. Keep?
 4. **Retainer and offset** exist in the agreement contract. If never planned, the fields stay hidden everywhere (they are today).
+
+## The owner's decisions of 2026-10-21, and what changed (branch `order11/r2-ops-decisions`)
+
+The owner answered the four questions above on 2026-10-21 and approved the following. They are applied to the review prototypes,
+fixtures and copy only; every functional change they need is recorded as F-11 to F-18 in `docs/design/ORDER11-FUNCTIONAL-GAPS.md`.
+
+1. **Sellers: both figures, four categories, nothing counted twice.** Show what was actually collected from each seller's attributed
+   customers and, beside it, the commissions: net attributable revenue (collections, not invoices; net of refunds; without tax, never
+   Kauro's revenue), commission generated, commission pending, commission paid. One collection is never attributed twice.
+   - *Sellers (P-21):* columns are now Net revenue, Commission generated (with any offset), Commission pending (now; with what is payable
+     by Nov 17, held and waiting) and Commission paid; customers, claims and the retainer moved under the seller's name; definitions under
+     the table. The period switch changes revenue, generated and paid; pending is always as of now.
+   - *Seller (UI37):* the four figures carry the same names; money by state lists the offset and the retainer.
+   - *Customers (P-23), customer (UI35), Operating review (UI44):* "Collected" became "Net revenue"; the refund is named on its project.
+   - Supersedes question 1.
+2. **"Not available to claim": approved, with a closed list.** The seller reads a neutral message and can ask for a review; the owner sees
+   the internal reason, its evidence and the history. "Other" is the one documented exception and needs a written note. The legal
+   validation of the contractual claim rules is pending.
+   - *Claims (P-24):* the refusal form uses the closed list, shows what the seller will read before it is sent, and requires a note for
+     Other; a refused claim shows its internal reason, evidence, the neutral message and the decisions (a review asked for and upheld);
+     a table lists every reason with its seller message; "Pending legal review" beside the claim rules.
+   - *Prospects (UI34), seller:* "Not available" says no reason and offers "Ask for a review".
+   - *Settings (P-04):* "Pending legal review" beside the claim length and the tail.
+   - Supersedes question 2.
+3. **Deadlines and alerts: two controls, never one for the other.** Inactivity: 14 days without relevant progress. Deadlines: 2 days
+   before, or at once when passed. Seller claims: 14 and 3 days before their end. Pilot: its review prepared 14 days before it ends (was
+   7), changing no agreement. Three labelled kinds (blocked, deadline, inactive); each item once, under its most urgent kind (blocked >
+   deadline passed > deadline within 2 days > inactivity), the rest as its second line.
+   - *Today (UI33):* a new Alerts section (a blocked project with its inactivity as the second line; a file deletion in 2 days; an inactive
+     upload); the stage table's column is "Inactive 14 days"; claim alert dates named. Seller Today names the 14 and 3 day alerts.
+   - *Seller (UI37):* pilot reviews prepared from Dec 17 and Feb 2, 2027.
+   - *Settings (P-04):* a new Alerts section, marked "Needs backend".
+   - Supersedes question 3 (the 3-day claim reminder is kept beside the 14-day one; the 7-day pilot window became 14).
+4. **Retainer and offset.** The retainer is USD 0.00 by default for new agreements; a signed agreement that sets one is respected, shown
+   wherever the rates are and included in what is owed. Offsets after a refund are shown when they happen, on the statement, with their
+   basis (refund, project, rule), amount and resulting balance, applied only under the agreement in force and the applicable rules.
+   - *Fixtures:* Amara Okafor's signed agreement 2026-08 sets USD 150.00 a month from Sep 1, 2026 (September paid; October on the draft
+     statement). Coastline Analytics received a USD 300.00 refund (RF-2026-0007, Oct 13) on "Accounts and contacts"; Daniel Kim's October
+     statement carries a −30.00 offset under the agreement's net-of-refunds rule, its balance written out (129.50 − 30.00 = 99.50).
+   - *Statements (UI36):* offset and retainer rows with their own detail; a balance line. *Payouts (P-22), Today, Sellers:* what is owed now
+     includes the retainer (USD 319.00 by Nov 17) and says so. *Settings:* a Retainer column in "Rates by seller", and rows for the
+     retainer default and offsets.
+   - Supersedes question 4.
+
+Earlier decisions changed by these: round 2's "Collected" as the seller money figure (now four named categories); round 2's "retainer
+hidden while zero" (still hidden at zero, now shown and owed where an agreement sets it); round 1's 7-day pilot window.

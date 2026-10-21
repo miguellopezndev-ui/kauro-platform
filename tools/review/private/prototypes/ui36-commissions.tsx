@@ -40,7 +40,7 @@ import {
 } from "./sales.ts";
 
 export const UI36_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Statements", note: "Oct 21: October is a draft until Nov 9; September paid with its bank reference; two lines earned and not on a statement yet." },
+  { key: "normal", label: "Statements", note: "Oct 21: October is a draft until Nov 9, with a USD 30.00 offset after a refund and its balance; September paid; two lines not on a statement yet. As the owner, ?seller= opens another seller (Amara Okafor: a retainer)." },
   { key: "issued", label: "Statement issued", note: "Nov 10: October is issued. The owner approves the payout here; the seller reads the date it is paid by." },
   { key: "submitted", label: "Transfer sent", note: "September's transfer sent and not confirmed: never shown as paid until the bank confirms it." },
   { key: "contest", label: "Asking about a line", note: "The seller asks about one line from its row: the form names the line, and the rest of the statement goes on." },
@@ -77,7 +77,39 @@ function Rules({ open }: { readonly open: boolean }): ReactElement {
   );
 }
 
+const KIND: Readonly<Record<Line["sequence"], string>> = { FIRST: "First project", REPEAT: "Repeat", ADJUSTMENT: "Offset after a refund", RETAINER: "Fixed by the agreement" };
+
 function LineDetail({ line }: { readonly line: Line }): ReactElement {
+  if (line.sequence === "RETAINER")
+    return (
+      <dl className="kauro-ops-facts">
+        <div>
+          <dt>Retainer</dt>
+          <dd>The fixed monthly payment the signed agreement sets for {line.project}: {usd(earnedOf(line))}. It is not a commission and does not depend on sales.</dd>
+        </div>
+      </dl>
+    );
+  if (line.offset !== undefined)
+    return (
+      <dl className="kauro-ops-facts">
+        <div>
+          <dt>Refund</dt>
+          <dd>
+            {line.offset.refund}: {usd(line.offset.refundCents)} paid back to {line.customer} for {line.project}, approved {line.offset.approvedOn}
+          </dd>
+        </div>
+        <div>
+          <dt>Rule</dt>
+          <dd>{line.offset.rule}. Applied only as the agreement in force and the applicable rules allow.</dd>
+        </div>
+        <div>
+          <dt>Calculation</dt>
+          <dd>
+            {line.rate}% of {usd(-line.basisCents)} refunded = {usd(-earnedOf(line))}, taken from this statement. The original line (paid in September) stays as it was.
+          </dd>
+        </div>
+      </dl>
+    );
   return (
     <dl className="kauro-ops-facts">
       <div>
@@ -102,6 +134,21 @@ function LineDetail({ line }: { readonly line: Line }): ReactElement {
         </div>
       )}
     </dl>
+  );
+}
+
+/** A statement's balance in words, when an offset or a retainer makes it more than a sum of commissions. */
+function Balance({ lines, paid }: { readonly lines: readonly Line[]; readonly paid: boolean }): ReactElement | null {
+  const commission = lines.filter((one) => one.sequence === "FIRST" || one.sequence === "REPEAT").reduce((sum, one) => sum + earnedOf(one), 0);
+  const offsets = lines.filter((one) => one.sequence === "ADJUSTMENT").reduce((sum, one) => sum + earnedOf(one), 0);
+  const retainer = lines.filter((one) => one.sequence === "RETAINER").reduce((sum, one) => sum + earnedOf(one), 0);
+  const held = heldOf(lines);
+  if ((offsets === 0 && retainer === 0) || lines.length < 2) return null;
+  const parts = [`commission earned ${amount(commission)}`, held > 0 ? `held ${amount(-held)}` : null, offsets !== 0 ? `offset ${amount(offsets)}` : null, retainer > 0 ? `retainer +${amount(retainer)}` : null].filter((part) => part !== null);
+  return (
+    <p className="kauro-ops-balance">
+      Balance (USD): {parts.join(" · ")} = <strong>{amount(payableOf(lines))} {paid ? "paid" : "payable"}</strong>
+    </p>
   );
 }
 
@@ -178,13 +225,19 @@ function StatementBlock({ statement, shown, sent, asking: initialAsk, owner, sel
             <tbody>
               {lines.map((line) => (
                 <Fragment key={line.id}>
-                  <tr className={line.id === open ? "is-open" : undefined}>
+                  <tr className={[line.id === open ? "is-open" : null, line.offset === undefined ? null : "is-offset", line.sequence === "RETAINER" ? "is-retainer" : null].filter((one) => one !== null).join(" ") || undefined}>
                     <th scope="row">
                       <button type="button" className="kauro-ops-rowbutton" aria-expanded={line.id === open} onClick={() => setOpen(line.id === open ? null : line.id)}>
-                        {line.customer}
+                        {line.sequence === "RETAINER" ? "Monthly retainer" : line.customer}
                       </button>
                       <span className="kauro-ops-sub">
-                        {line.project} · {line.sequence === "FIRST" ? "First project" : "Repeat"}
+                        {line.project} · {KIND[line.sequence]}
+                        {line.offset === undefined ? null : (
+                          <>
+                            {" · "}
+                            <span className="kauro-ops-date">{line.offset.refund}</span>
+                          </>
+                        )}
                       </span>
                       {line.state === "HELD" ? (
                         <span className="kauro-ops-cell-badge">
@@ -193,10 +246,10 @@ function StatementBlock({ statement, shown, sent, asking: initialAsk, owner, sel
                       ) : null}
                     </th>
                     <td className="kauro-table-end" data-label="Basis (USD)">
-                      <span>{amount(line.basisCents)}</span>
+                      <span>{line.sequence === "RETAINER" ? "—" : amount(line.basisCents)}</span>
                     </td>
                     <td className="kauro-table-end" data-label="Rate">
-                      <span>{line.rate}%</span>
+                      <span>{line.sequence === "RETAINER" ? "—" : `${line.rate}%`}</span>
                     </td>
                     <td className="kauro-table-end" data-label="Earned (USD)">
                       <span>{amount(earnedOf(line))}</span>
@@ -246,6 +299,7 @@ function StatementBlock({ statement, shown, sent, asking: initialAsk, owner, sel
           </table>
         </div>
       </div>
+      <Balance lines={lines} paid={shown === "PAID"} />
       {asked === undefined ? null : (
         <div className="kauro-ops-decide kauro-ops-ask">
           <h3>

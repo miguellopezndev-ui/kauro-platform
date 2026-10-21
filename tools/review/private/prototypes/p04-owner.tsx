@@ -14,7 +14,7 @@ import { type ReactElement } from "react";
 import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Kind, OPS_PATH, OpsHead, OpsPage, Word } from "./ops-kit.tsx";
+import { Kind, OPS_PATH, OpsHead, OpsPage, PendingLegal, Word } from "./ops-kit.tsx";
 import { CLAIM_DAYS, ELIGIBLE_DAYS, FIRST_RATE, REPEAT_RATE, SELLERS, SERVICE_NAME, TAIL_DAYS, WINDOW_MONTHS, amount, type Service } from "./sales.ts";
 
 export const P04_STATES: readonly StateDef[] = [
@@ -26,7 +26,7 @@ const GROUPS = [
   { title: "You", sections: [["account", "Your account and security"]] },
   { title: "Selling", sections: [["services", "Services on offer"], ["prices", "Prices and discounts"], ["commissions", "Commissions"], ["paying", "Paying sellers"], ["outreach", "Outreach rules"]] },
   { title: "Money", sections: [["bank", "Getting paid"]] },
-  { title: "Platform", sections: [["providers", "Providers"], ["limits", "Limits and retention"], ["access", "Access and break-glass"]] },
+  { title: "Platform", sections: [["providers", "Providers"], ["alerts", "Alerts"], ["limits", "Limits and retention"], ["access", "Access and break-glass"]] },
   { title: "Company", sections: [["business", "Business details"], ["team", "Team"], ["notifications", "Notifications"], ["recovery", "Recovery"]] },
 ] as const;
 
@@ -185,11 +185,13 @@ export function OwnerSettings({ state }: PrototypeProps): ReactElement {
               rows={[
                 ["Rates", `${FIRST_RATE}% of a customer's first project · ${REPEAT_RATE}% of its repeats for ${WINDOW_MONTHS} calendar months from its first confirmed payment`],
                 ["Counted on", "The service collected, after discount, net of refunds, without tax"],
-                ["A claim lasts", `${CLAIM_DAYS} days from its acceptance`],
+                ["A claim lasts", <span key="claim">{CLAIM_DAYS} days from its acceptance <PendingLegal /></span>],
                 ["A line is payable", `${ELIGIBLE_DAYS} days after the project's final completion`],
                 ["Statements", "Issued on the 5th business day of the next month, paid by the 10th, on the Bogotá calendar"],
                 ["Smallest payout", "USD 0.00; Kauro pays the transfer fees"],
-                ["After an engagement ends", `Claims already accepted keep running for up to ${TAIL_DAYS} days`],
+                ["Retainer", "USD 0.00 by default for a new agreement. A signed agreement may set a fixed monthly payment; it is then owed every month and shown wherever the rates are"],
+                ["Offset after a refund", "Shown line by line on the statement, with the refund, the project, the rule and the balance; applied only as the agreement in force and the applicable rules allow"],
+                ["After an engagement ends", <span key="tail">Claims already accepted keep running for up to {TAIL_DAYS} days <PendingLegal /></span>],
               ]}
             />
             <h3>Rates by seller</h3>
@@ -206,6 +208,9 @@ export function OwnerSettings({ state }: PrototypeProps): ReactElement {
                       </th>
                       <th scope="col" className="kauro-table-end">
                         Repeats
+                      </th>
+                      <th scope="col" className="kauro-table-end">
+                        Retainer (USD a month)
                       </th>
                     </tr>
                   </thead>
@@ -230,6 +235,9 @@ export function OwnerSettings({ state }: PrototypeProps): ReactElement {
                           <span>
                             {REPEAT_RATE}% · {WINDOW_MONTHS} months
                           </span>
+                        </td>
+                        <td className="kauro-table-end" data-label="Retainer (USD a month)">
+                          <span>{seller.retainerCents > 0 ? amount(seller.retainerCents) : <span className="kauro-ops-zero">None</span>}</span>
                         </td>
                       </tr>
                     ))}
@@ -292,6 +300,19 @@ export function OwnerSettings({ state }: PrototypeProps): ReactElement {
                 ["Email sending", alerts ? <span key="e"><Word tone="danger">1 identity revoked</Word> Outreach from it has stopped.</span> : <span key="e"><Word tone="success">2 identities verified</Word></span>],
                 ["Card payments", <span key="c"><Word tone="neutral">Not offered</Word> Payments are bank transfers.</span>],
                 ["Cloud", <span key="h"><Word tone="neutral">Not opened</Word> Nothing is deployed; this review runs on your machine.</span>],
+              ]}
+            />
+          </section>
+
+          <section id="alerts" aria-labelledby="alerts-h">
+            <Head id="alerts" title="Alerts" kind="backend" kindText="Needs backend · alerts are not computed yet" purpose="When something is flagged, from recorded dates and events only. Three kinds, said in words: blocked, deadline, inactive." />
+            <Facts
+              rows={[
+                ["Inactivity", "A project is flagged after 14 days without relevant progress, even with no deadline near"],
+                ["Deadlines", "2 days before an important date (file deletion, quote expiry, payment due, claim end), or at once when it has passed, whatever the activity"],
+                ["Seller claims", "14 days and 3 days before a claim's recorded end"],
+                ["Pilot period", "Its review is prepared 14 days before the pilot ends; no agreement changes automatically"],
+                ["Once per item", "An item appears once, under its most urgent kind (blocked, deadline passed, deadline in 2 days, inactive); its other conditions are its second line"],
               ]}
             />
           </section>

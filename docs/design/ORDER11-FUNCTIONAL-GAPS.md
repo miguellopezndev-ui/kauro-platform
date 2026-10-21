@@ -115,3 +115,85 @@ transfer and by when, which quotes are open, what is paid with its fiscal docume
 neither; UI30 without an order can only point to the projects. **Needs.** A read listing the workspace's quotes and payment orders with
 their state, amount, key date and fiscal document number, limited to members who may see billing. **Status.** Proposal; UI30's empty
 state now leads to the projects instead of ending there.
+
+## F-11. Owner reads across sellers and customers (Sellers, Payouts, Customers, Claims)
+
+**Design.** Round 2 owner pages (P-21 Sellers, P-22 Payouts, P-23 Customers, P-24 Claims; UI37 seller, UI35 customer;
+`docs/design/ORDER11-ROUND2-OPS.md`). **Code (read).** The api writes almost everything about a seller but reads one seller's home
+(`GetSellerHome`) and one statement by id (`GetCommissionStatement`); it lists no sellers, no seller record with its agreement and rates,
+no customers with buyer type and channel, no statements across sellers by period and no claims across sellers (`apps/api/openapi.json`,
+paths `/api/v1/ops/sales/*`). **Needs.** Owner-only reads: sellers with their state, agreement in force (rates, retainer) and the money
+of F-12; one seller's record, customers, lines and statements; customers with buyer type, acquiring and serving seller, paid projects and
+net revenue; statements by period across sellers; claims across sellers with their decisions. No new rule: the data is in
+`commission_lines`, `seller_agreements`, assignments and the agencies' buyer type. **Status.** Design drawn from fixtures.
+
+## F-12. Seller money in four categories, each collection counted once (owner decision, 2026-10-21)
+
+**Decision.** Show, per seller and in total: net attributable revenue (what the attributed customers actually paid for the service:
+collections, not invoices; net of refunds; without tax, never counted as Kauro's revenue), commission generated, commission pending and
+commission paid, never mixed. Never attribute one collection twice (a customer claimed by two sellers counts for the seller the
+attribution decided, or by the shares of a split; a repeat project counts in the month it was collected, a refund in the month of the
+refund). **Code (read).** Lines carry a base and a share (`packages/persistence/migrations/0030_commission_ledger.sql`); the compensation
+guard already compares retainer plus commission against "attributable net service" per period
+(`packages/persistence/migrations/0031_statements_payouts.sql:283-300`), but no read exposes these figures per seller or per period.
+**Needs.** A read computing the four figures per seller and period from captures (not invoices), refunds and lines, with split shares
+applied once, the period of a refund defined, tax excluded. **Status.** Drawn from fixtures (P-21, UI37).
+
+## F-13. A closed list of claim refusal reasons, with evidence (owner decision, 2026-10-21)
+
+**Decision.** Approved list (internal reason, then what the seller reads): already a customer or in direct contact, "Not available to
+claim"; another seller's live claim, "Not available to claim"; a recorded owner rule, "Not available to claim"; not enough evidence of the
+seller's own work; outside the seller agreement; duplicate of the seller's own claim; Other, which needs a written note, "Not available to
+claim". The owner sees the internal reason, its evidence and the history; the seller never reads anything that reveals a commercial
+relationship or a third party's claim. The legal validation of the contractual claim rules is pending, and the owner's screens say so.
+**Code (read).** The claim machine moves SUBMITTED to DISPUTED on a conflict and keeps a free-text decision reason
+(`AttributionView.decisionReason` in `apps/web/src/api/generated.ts`); there is no closed reason list, no evidence reference per refusal and
+no seller-facing message. **Needs.** A closed, versioned reason code, an evidence reference and a note (required for Other) on a
+refusal, the seller-facing message derived from the code. **Status.** Drawn (P-24; UI34 "Not available" state); list to be validated
+by counsel (F-18).
+
+## F-14. A seller's request for a review, and the decision history
+
+**Decision.** The seller can ask for a review of a refusal or of "Not available"; the owner sees every decision in order. **Code (read).**
+No command lets a seller ask for a review of a claim decision, and no read returns a claim's decision history. **Needs.** A seller command
+(review request, optional note), an owner decision on it (uphold or change, with a reason code), the history as an append-only read, and
+an email to the seller with the outcome. **Status.** Drawn (P-24 "refused" state; UI34 "Ask for a review").
+
+## F-15. Alerts computed from real data (owner decision, 2026-10-21)
+
+**Decision.** Two distinct controls, plus blocked. Inactivity: a project is flagged after 14 days without relevant progress, even with no
+deadline near. Deadlines: 2 days before an important date (file deletion, quote expiry, payment due, claim end), or at once when it has
+passed, whatever the activity. Blocked: the next step cannot happen. Seller claims alert 14 and 3 days before their recorded end. A
+pilot's review is prepared 14 days before it ends, changing no agreement. One item appears once, under its most urgent kind (blocked,
+deadline passed, deadline within 2 days, inactivity), its other conditions as a second line; no redundant notifications. **Code (read).**
+No alert computation exists; there is no definition of "relevant progress" and no activity read (F-06). **Needs.** A definition of
+relevant progress per stage, an alert read for the owner and for a seller's claims, deduplication per item with the precedence above, and
+the emails of the seller research (`research/round2/seller-portal.md` §8.4). **Status.** Drawn (UI33 Alerts; Settings, Alerts, marked
+"Needs backend").
+
+## F-16. The retainer: zero by default, accrued and paid when a signed agreement sets it (owner decision, 2026-10-21)
+
+**Decision.** A new agreement's retainer is USD 0.00. When a signed agreement sets one, it is respected, shown wherever the rates are and
+included in what is owed. **Code (read).** `seller_agreements.retainer_cents_per_month` defaults to 0 and cannot change after preparation
+(`packages/persistence/migrations/0029_sales_attribution.sql:214, 705`); the period close reads it only for the compensation guard
+(`packages/application/src/commercial/statements/close-period.ts`, step 6), and no statement item accrues or pays it. **Needs.** A monthly
+retainer item on the statement (from the agreement's start, prorated or not as the agreement says, ending with the engagement), paid with
+the statement, and the reads of F-11 exposing it. **Status.** Drawn with a synthetic agreement (Amara Okafor, USD 150.00 a month) on P-21,
+UI37, UI36, P-22 and Settings.
+
+## F-17. Offsets after a refund, shown on the statement (owner decision, 2026-10-21)
+
+**Decision.** An offset appears when it happens, on the statement, with its basis (which refund, which project, which rule or clause), its
+amount and the resulting balance; applied only under the agreement in force and the applicable legal rules, never presented as automatic
+beyond that. **Code (read).** The statement already takes "adjustments not reported before, offsets and the owner's recovery items"
+(`close-period.ts`, step 5) under each agreement's offset terms (`packages/domain/src/commercial/statements.ts:29-33`); the statement item
+view does not expose the refund reference, the adjusted line or the clause. **Needs.** Item fields for the refund reference and amount, the
+adjusted line, the rule or clause reference, and the statement's balance (earned, held, offsets, retainer, payable). **Status.** Drawn with a
+synthetic refund (RF-2026-0007, Coastline Analytics) on UI36, UI37, UI35 and P-21.
+
+## F-18. "Pending legal review" on contractual rules
+
+**Decision.** Until counsel validates them, the claim rules (the 90-day claim, the refusal reasons, the tail after an engagement ends) are
+marked "Pending legal review" on the owner's screens. **Code.** No field records the legal status of a policy rule
+(`packages/contracts/registry/policy.json` holds the values only). **Needs.** A status per rule group (validated or pending, with the
+date and reference of the validation), read by the owner's pages. **Status.** Drawn as a fixed marker (P-24; Settings, Commissions).
