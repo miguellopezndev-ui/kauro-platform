@@ -22,6 +22,14 @@ The visual authority of every Kauro web surface is [docs/design/KAURO_VISUAL_IDE
 7. The visual appearance of Kauro is implemented and maintained by Claude. It is not redesigned by Codex.
 8. Codex may carry out an independent technical review. That review gives it no authority to change the approved identity.
 
+## Earlier decisions and functional change (D-34)
+
+Earlier decisions and existing contracts are evidence and transition constraints, not automatic reasons to reject a better solution
+(`docs/authority/decisions/2026-10-21-CONTINUOUS-IMPROVEMENT.md`). Propose a material improvement with its effects on policy,
+contracts, backend, data, security, cost, experience and tests; the owner decides. During Orders 11 and 12 work is design only: record
+each functional change it needs in `docs/design/ORDER11-FUNCTIONAL-GAPS.md`, to be grouped by component in
+`docs/design/FUNCTIONAL-CHANGE-INVENTORY.md` before the functional orders.
+
 ## Before a visual change is done
 
 - `pnpm --filter @kauro/ui run test` (tokens and contrast in every palette) and `@kauro/web` tests.
