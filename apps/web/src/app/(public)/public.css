@@ -9885,3 +9885,18 @@ body:has(> .kauro-site-header) {
 .kauro-site-main .kauro-r2-guide p + p {
   margin-block-start: 0;
 }
+/* on a phone the price table keeps its four columns; words wrap whole, never split at a hyphen */
+.kauro-site-main .kauro-r2-prices :is(th, td) {
+  hyphens: manual;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+@media (max-width: 39.99rem) {
+  .kauro-site-main .kauro-r2-prices thead th {
+    font-size: 0.625rem;
+    letter-spacing: 0.02em;
+  }
+  .kauro-site-main .kauro-r2-prices tbody tr:last-child td {
+    font-size: 0.8125rem;
+  }
+}
