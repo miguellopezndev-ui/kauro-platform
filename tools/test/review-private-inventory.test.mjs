@@ -18,10 +18,11 @@ test("the review's five groups hold exactly the registry's private screens, each
   assert.deepEqual(groups.map((group) => group.key), ["A", "B", "C", "D", "E"]);
 });
 
-test("the review edge, bound to the loopback address, sends the review only the application's private paths and its own assets", () => {
+// /__variants (Order 11): the public-site variants the owner reviews beside the approved pages; review only, never in the web's bundle
+test("the review edge, bound to the loopback address, sends the review only the application's private paths, the public-site variants and its own assets", () => {
   const edge = readFileSync(join(root, "tools", "review", "serve.mjs"), "utf8");
   assert.match(edge, /const HOST = "127\.0\.0\.1";/);
-  assert.match(edge, /const PRIVATE_PREFIXES = \["\/login", "\/onboarding", "\/invitations", "\/agencies", "\/ops", "\/account", "\/signup", "\/__as", "\/__review\/private"\];/);
+  assert.match(edge, /const PRIVATE_PREFIXES = \["\/login", "\/onboarding", "\/invitations", "\/agencies", "\/ops", "\/account", "\/signup", "\/__as", "\/__review\/private", "\/__variants"\];/);
   assert.match(edge, /url\.pathname\.startsWith\("\/__review\/assets\/"\)/);
   const config = readFileSync(join(root, "tools", "review", "private", "next.config.mjs"), "utf8");
   assert.match(config, /assetPrefix: "\/__review\/assets"/);

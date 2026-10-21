@@ -102,7 +102,7 @@ table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid var(--ru
 
 // The application's private paths (sign-in, invitation, setup, agencies, operations) are served by the review with synthetic data, so the
 // whole product can be walked from the public site; the public pages stay the real build's. The person switch and the review's index too.
-const PRIVATE_PREFIXES = ["/login", "/onboarding", "/invitations", "/agencies", "/ops", "/account", "/signup", "/__as", "/__review/private"];
+const PRIVATE_PREFIXES = ["/login", "/onboarding", "/invitations", "/agencies", "/ops", "/account", "/signup", "/__as", "/__review/private", "/__variants"];
 function isPrivate(pathname) {
   return PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }

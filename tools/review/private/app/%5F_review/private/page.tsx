@@ -36,12 +36,40 @@ export default function Index() {
             <span>Starts at her agencies. Also as a company, an admin or an operator from the strip.</span>
           </li>
           <li>
+            <a href="/__as/company">Company buying direct (Halden Outdoor)</a>
+            <span>Its own projects, no clients: the direct channel.</span>
+          </li>
+          <li>
+            <a href="/signup?review-as=newcomer">Someone new, from Create an account</a>
+            <span>Sign-up, two-step verification, setting up the workspace, then the first project.</span>
+          </li>
+          <li>
             <a href="/__as/owner">Kauro owner</a>
             <span>The operations area.</span>
           </li>
           <li>
             <a href="/__as/seller">Seller (Daniel Kim)</a>
             <span>The sales area.</span>
+          </li>
+        </ul>
+      </section>
+      <section className="rx-experiences" aria-labelledby="rx-variants">
+        <h2 id="rx-variants">Public-site proposals</h2>
+        <p>Variants of the approved Order 10 site, drawn apart from it: the approved pages stay as they are until you choose.</p>
+        <ul>
+          <li>
+            <a href="/__variants/supported-services">Supported services: three cards, the new service names, and a footer listing every page</a>
+            <span>
+              Beside <a href="/supported-services">the approved page</a>. Both read the same publication; switch it in the public review.
+            </span>
+          </li>
+          <li>
+            <a href="/__variants/free-check">Check a file free: the page the main call to action would open</a>
+            <span>Then Create an account and the self-serve start (P-05, UI09). Changes A3 §3.2: your decision (F-03).</span>
+          </li>
+          <li>
+            <a href="/__variants/for-agencies">For agencies: a page for the main channel</a>
+            <span>Only the statements and limits you set; branded reports shown as not available yet.</span>
           </li>
         </ul>
       </section>

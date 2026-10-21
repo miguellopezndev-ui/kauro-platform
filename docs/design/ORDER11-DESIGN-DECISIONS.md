@@ -97,7 +97,9 @@ Kinds of statement: **[O]** the owner decided it; **[A]** an authority document 
 
 ## 6. The public site (variants)
 
-1. The approved site stays as it is. Proposals are drawn as a separate, navigable proposed site in the review, so both can be walked.
+1. The approved site stays as it is. Proposals are drawn as variants at /__variants/... in the review, in the public frame, so both can be
+   walked (overnight decision N-29). Drawn so far: Supported services with three cards and the new names, the header and footer, the
+   "Check a file free" page and the "For agencies" page.
 2. Proposals under study: menu items shown on wide screens and "Home" removed; "Check a file free" and its page; a "For agencies" page
    on the same prices and terms (facts limited as the owner set); a footer that lists every page; Pricing with what is included and not
    included, a unit explanation and an FAQ from existing rules; Supported services' "Availability now" redesigned; the new service names.

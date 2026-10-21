@@ -1,0 +1,295 @@
+/* Order 11 public-site variants (review only; never part of the application's bundle). The three-card "Availability now" of
+   Supported services, as drawn in commit 3b317427 and withdrawn from main in 6d54e10b so that the approved Order 10 page stays as it is.
+   It sits on top of the public stylesheet: only the trio is new. */
+/* Every card reads in the same order and, on a wide screen, each part sits on a row shared by the three (subgrid): the names line
+   up, the pieces of the product line up, and the limits and versions close the cards on one line. */
+.kauro-site-trio {
+  display: grid;
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+.kauro-site-trio > .kauro-site-service {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto auto;
+  align-content: start;
+  row-gap: 0;
+  padding: clamp(1.5rem, 2.5vw, 2rem);
+  border: 1px solid var(--kauro-color-border);
+  scroll-margin-block-start: 6rem;
+}
+.kauro-site-trio > .kauro-site-service--lead.kauro-wine {
+  border-color: transparent;
+}
+.kauro-site-trio > .kauro-site-service--closed {
+  border-style: dashed;
+}
+.kauro-site-trio .kauro-site-service-top {
+  grid-row: 1;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0 0 var(--kauro-space-5);
+  border: 0;
+}
+.kauro-site-main .kauro-site-trio .kauro-site-service h3 {
+  font-size: clamp(1.75rem, 1.45rem + 0.8vw, 2.125rem);
+  letter-spacing: -0.035em;
+}
+.kauro-site-trio .kauro-site-service .kauro-site-frag {
+  grid-row: 2;
+  display: grid;
+  align-content: center;
+  max-inline-size: none;
+  margin: 0 0 var(--kauro-space-5);
+  padding: 1.125rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+}
+.kauro-site-trio .kauro-site-service-part {
+  display: grid;
+  align-content: start;
+  gap: var(--kauro-space-2);
+}
+.kauro-site-trio .kauro-site-service-part--for {
+  grid-row: 3;
+  padding-block-end: var(--kauro-space-4);
+}
+.kauro-site-trio .kauro-site-service-part--receive {
+  grid-row: 4;
+}
+.kauro-site-main .kauro-site-trio .kauro-site-service-part p {
+  margin: 0;
+}
+.kauro-site-main .kauro-site-trio p.kauro-site-service-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-site-trio .kauro-site-service .kauro-site-card-limit {
+  grid-row: 5;
+  margin: var(--kauro-space-5) 0 0;
+  font-size: 0.875rem;
+}
+.kauro-site-main .kauro-site-trio .kauro-site-service p.kauro-site-meta {
+  grid-row: 6;
+  margin: 0;
+  padding-block-start: var(--kauro-space-3);
+}
+@media (min-width: 62rem) {
+  .kauro-site-trio {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(6, auto);
+  }
+  .kauro-site-trio > .kauro-site-service {
+    grid-row: span 6;
+    grid-template-rows: subgrid;
+  }
+}
+
+
+/* the ribbon that says a page is a proposal, above its content and inside the public frame's main column */
+.kauro-variant-ribbon {
+  margin: 0 auto;
+  padding: 0.625rem clamp(1rem, 4vw, 2rem);
+  border-block-end: 1px dashed var(--kauro-color-border);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+  font-size: 0.875rem;
+}
+.kauro-variant-ribbon p {
+  max-inline-size: 72rem;
+  margin: 0 auto;
+}
+.kauro-variant-ribbon a {
+  color: inherit;
+}
+/* the one line under a service's name */
+.kauro-site-main .kauro-site-service .kauro-variant-line {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+
+/* the footer variant: five short columns of every public page, wrapping on narrow screens */
+.kauro-variant-footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: var(--kauro-space-5) var(--kauro-space-6);
+  margin-block-end: var(--kauro-space-5);
+}
+.kauro-variant-footer-heading {
+  margin: 0 0 var(--kauro-space-2);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.kauro-variant-footer ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-variant-footer a {
+  color: inherit;
+}
+
+/* the free check's four steps, numbered, one under the other */
+.kauro-variant-steps {
+  display: grid;
+  gap: var(--kauro-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-variant-steps li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: var(--kauro-space-4);
+  align-items: start;
+}
+.kauro-variant-step-number {
+  display: grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 999px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-site-main .kauro-variant-steps p {
+  margin: 0;
+}
+.kauro-site-main .kauro-variant-steps .kauro-variant-step-title {
+  margin-block-end: var(--kauro-space-1);
+  font-weight: 650;
+}
+
+/* the header variant: the pages in a line from 62rem, the menu below it; one filled action */
+.kauro-variant-nav {
+  display: flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+.kauro-variant-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-variant-nav a {
+  color: inherit;
+  text-decoration: none;
+}
+.kauro-variant-nav a:hover,
+.kauro-variant-nav a[aria-current="page"] {
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+.kauro-variant-nav-line {
+  display: none;
+}
+.kauro-site-header .kauro-variant-nav-action {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary, #fff);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-site-header .kauro-variant-nav-action:hover {
+  text-decoration: none;
+  filter: brightness(1.08);
+}
+.kauro-variant-nav-menu {
+  position: relative;
+}
+.kauro-variant-nav-menu summary {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+.kauro-variant-nav-menu summary::-webkit-details-marker {
+  display: none;
+}
+.kauro-variant-nav-menu[open] > ul {
+  position: absolute;
+  inset-inline-end: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.25rem;
+  min-inline-size: 15rem;
+  margin-block-start: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.75rem;
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1rem 2rem -1.5rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent);
+}
+.kauro-variant-nav-menu[open] > ul a {
+  display: block;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+}
+.kauro-variant-nav-menu[open] > ul li:last-child {
+  margin-block-start: 0.5rem;
+}
+@media (min-width: 62rem) {
+  .kauro-variant-nav-line {
+    display: flex;
+    align-items: center;
+    gap: clamp(0.875rem, 1.4vw, 1.375rem);
+    font-size: 0.9375rem;
+  }
+  .kauro-variant-nav-utility {
+    padding-inline-start: clamp(0.5rem, 1vw, 1rem);
+    border-inline-start: 1px solid var(--kauro-color-border);
+  }
+  .kauro-variant-nav-menu {
+    display: none;
+  }
+}
+
+/* the header orders its parts (brand 1, actions 2, menu 3): the variant nav sits after the brand, the actions after it */
+.kauro-site-header .kauro-variant-nav {
+  order: 2;
+  margin-inline-start: auto;
+}
+.kauro-site-header:has(.kauro-variant-nav) .kauro-site-header-actions {
+  order: 3;
+  margin-inline-start: var(--kauro-space-4);
+}
+/* the footer's page list spans the whole footer, five columns on a wide screen */
+.kauro-site-footer-meta:has(.kauro-variant-footer) {
+  grid-column: 1 / -1;
+}
+@media (min-width: 48rem) {
+  .kauro-variant-footer {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* the smallest phones (under 360 px): the brand, the menu, the theme and Sign in fit on one line with tighter gaps */
+@media (max-width: 22.49rem) {
+  .kauro-site-header-inner:has(.kauro-variant-nav) {
+    column-gap: var(--kauro-space-2);
+  }
+  .kauro-site-header:has(.kauro-variant-nav) .kauro-site-header-actions {
+    margin-inline-start: var(--kauro-space-2);
+  }
+  .kauro-variant-nav-menu summary {
+    padding: 0 0.75rem;
+  }
+}

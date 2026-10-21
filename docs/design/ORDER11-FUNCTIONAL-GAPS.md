@@ -59,6 +59,8 @@ sends the call to action to the fit form first. **What it needs.** An amendment 
 the onboarding records the buyer type (A3 §3.7) and the agreements (CMD002); the free check's budget and capacity states shown before
 upload (A3 §3.2 pause rule; open question Q-4 on 90% versus exhausted). **Status.** Design and simulation only.
 
+**Drawn (2026-10-21).** The page the call to action would open is at /__variants/free-check in the review, beside the approved site.
+
 ## F-04. A read of the health check's findings (P-07)
 
 **Design.** The results page shows each finding with its count, its population, examples, the consequence and the fix. **Code.** The API
