@@ -181,7 +181,7 @@ export const PUBLIC_COPY = {
   "how.meta.title": "How it works",
   "how.meta.description": "A guide to a Kauro project, stage by stage: who acts, what each stage needs, what happens, what you receive and what can stop it, from upload to your own import.",
   "how.title": "From source files to a reviewed import package.",
-  "how.lead": "A guide for the team that buys. Kauro checks, prepares and verifies the files; your team chooses what is in scope, approves every change and runs the import.",
+  "how.lead": "Kauro checks, prepares and verifies your files. Your team chooses what is in scope, approves every change and runs the import.",
   "how.overview.heading": "The six stages at a glance",
   "how.steps.heading": "Each stage, in order",
   "how.steps.lead": "What happens, what you get and what stops it. The detail of each stage is one click away.",
