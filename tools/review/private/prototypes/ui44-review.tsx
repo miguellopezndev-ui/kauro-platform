@@ -1,22 +1,24 @@
 "use client";
-// UI44 Operating review (registry: "Choose the next action from actual evidence."). A month read from what happened: the funnel of the
-// month's new accounts, the support each paid project needed, what was collected and what it cost, how concentrated the money is, and what
-// is owed. From that, the owner prepares one experiment with its budget and its stop rule. A draft is not running, and a scenario's
-// arithmetic is not demand: both say so (registry exceptions). Observed figures and assumptions are never mixed in one number.
+// UI44 Operating review (registry: "Choose the next action from actual evidence."). Round 2 (owner-console.md §8, §12): the monthly,
+// analytical page. The month's funnel (length encodes the count, each bar with its number), then the month's money in three equal figures of
+// one kind (collected, direct costs, what is left), then support and concentration as facts: round 1's four plates mixed USD, cases and a
+// percentage at one size, which read as comparable numbers. "What is owed" moved to Payouts and Finance (one fact, one home). From that,
+// the owner prepares one experiment with its budget and its stop rule. A draft is not running, and a scenario's arithmetic is not demand:
+// both say so (registry exceptions). Observed figures and assumptions are never mixed in one number.
 import { Button } from "@kauro/ui";
+import Link from "next/link";
 import { type ReactElement } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, PageHead } from "./kit.tsx";
+import { Figures, OPS_PATH, OpsHead, OpsPage, SectionHead, Word } from "./ops-kit.tsx";
+import { usd } from "./sales.ts";
 
-export const UI44_STATES: readonly StateDef[] = [
-  { key: "normal", label: "October so far", note: "The month's observed funnel, support, money and concentration; one experiment drafted, not running." },
-];
+export const UI44_STATES: readonly StateDef[] = [{ key: "normal", label: "October so far", note: "The month's observed funnel, money, support and concentration; one experiment drafted, not running." }];
 
 const FUNNEL = [
   ["Accounts created", 38],
   ["Workspaces set up", 21],
-  ["Free checks finished", 14],
+  ["Free data health checks finished", 14],
   ["Plans approved", 6],
   ["Quotes paid", 4],
   ["Imports verified", 3],
@@ -25,59 +27,55 @@ const FUNNEL = [
 export function OperatingReview(_props: PrototypeProps): ReactElement {
   const top = FUNNEL[0][1];
   return (
-    <>
-      <PageHead title="Operating review" lead="Choose the next action from actual evidence." />
-      <section className="kauro-screen-section" aria-labelledby="funnel-h">
-        <h2 id="funnel-h">October&apos;s new accounts, so far</h2>
-        <ol className="kauro-funnel">
+    <OpsPage>
+      <OpsHead title="Operating review" lead="October 2026 so far, from what happened. Due on Nov 3." />
+      <section aria-labelledby="funnel-h">
+        <SectionHead id="funnel-h" title="New accounts this month" meta="Observed, Oct 1 to Oct 20, 2026" />
+        <ol className="kauro-ops-funnel">
           {FUNNEL.map(([label, count]) => (
             <li key={label}>
-              <span className="kauro-funnel-label">{label}</span>
-              <span className="kauro-funnel-bar" aria-hidden="true">
-                <span style={{ inlineSize: `${(count / top) * 100}%` }} />
-              </span>
+              <span className="kauro-ops-funnel-label">{label}</span>
+              <progress value={count} max={top} aria-hidden="true" />
               <strong>{count}</strong>
             </li>
           ))}
         </ol>
-        <p className="kauro-muted">Observed, from 1 to Oct 20, 2026. The largest drop is between a finished check and an approved plan: 14 to 6.</p>
+        <p className="kauro-muted">The largest drop is between a finished check and an approved plan: 14 to 6.</p>
       </section>
-      <dl className="kauro-identity-counts">
-        <div>
-          <dt>Collected</dt>
-          <dd>USD 6,480.00</dd>
-          <dd>Service, after discounts, without tax</dd>
-        </div>
-        <div>
-          <dt>Direct costs</dt>
-          <dd>USD 912.40</dd>
-          <dd>Computing, storage, provider and bank fees</dd>
-        </div>
-        <div>
-          <dt>Support</dt>
-          <dd>11 cases</dd>
-          <dd>2.75 a paid project; 7 about import steps</dd>
-        </div>
-        <div>
-          <dt>Concentration</dt>
-          <dd>40%</dd>
-          <dd>Of the money from one agency: Northwind Data, 2 projects</dd>
-        </div>
-      </dl>
-      <section className="kauro-screen-section" aria-labelledby="owed-h">
-        <h2 id="owed-h">What is owed</h2>
-        <ul>
-          <li>Seller commissions: USD 129.50 payable on Nov 17, 2026; USD 49.21 held until a project is complete.</li>
-          <li>Refunds: none requested.</li>
-          <li>Taxes: October&apos;s issued invoices and credit notes are ready for the accountant; this page estimates no tax.</li>
-        </ul>
+      <section aria-labelledby="money-h">
+        <SectionHead id="money-h" title="Money this month" meta="Service collected after discounts, without tax; costs as invoiced" aside={<Link href={OPS_PATH.payouts}>What is owed to sellers</Link>} />
+        <Figures
+          label="Money this month"
+          items={[
+            { label: "Collected", value: usd(400_575), note: "4 paid projects" },
+            { label: "Direct costs", value: usd(60_480), note: "Computing, storage, providers, bank fees" },
+            { label: "Left after direct costs", value: usd(340_095), note: "Before seller commission and tax" },
+          ]}
+        />
       </section>
-      <section className="kauro-approve" aria-labelledby="exp-h">
-        <div className="kauro-prospect-head">
+      <section aria-labelledby="facts-h">
+        <SectionHead id="facts-h" title="Support and concentration" />
+        <dl className="kauro-ops-facts">
+          <div>
+            <dt>Support cases</dt>
+            <dd>11 this month, 2.75 for each paid project; 7 of them about import steps</dd>
+          </div>
+          <div>
+            <dt>Largest customer</dt>
+            <dd>Northwind Data: 52% of the money collected, from 2 projects</dd>
+          </div>
+          <div>
+            <dt>Taxes</dt>
+            <dd>October&apos;s invoices and credit notes are ready for the accountant. This page estimates no tax.</dd>
+          </div>
+        </dl>
+      </section>
+      <section className="kauro-ops-decide" aria-labelledby="exp-h">
+        <div className="kauro-ops-head-title">
           <h2 id="exp-h">One experiment</h2>
-          <Badge tone="neutral">Draft · not running</Badge>
+          <Word tone="neutral">Draft · not running</Word>
         </div>
-        <dl className="kauro-prospect-facts">
+        <dl className="kauro-ops-facts">
           <div>
             <dt>Because</dt>
             <dd>8 of 14 finished checks led to no plan; 5 of those 8 teams opened the results only once.</dd>
@@ -88,7 +86,7 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Budget</dt>
-            <dd>No money; 2 hours of the owner&apos;s time to review the email</dd>
+            <dd>No money; 2 hours of your time to review the email</dd>
           </div>
           <div>
             <dt>Stop when</dt>
@@ -101,6 +99,6 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
           <Button>Edit the draft</Button>
         </div>
       </section>
-    </>
+    </OpsPage>
   );
 }

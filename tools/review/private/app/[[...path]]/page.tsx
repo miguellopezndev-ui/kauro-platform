@@ -22,6 +22,9 @@ function screenAt(pathname: string, person: ContextKey, proposal: string | undef
   if (pathname === "/signup") return { id: "P-05", params: {} };
   if (pathname === "/login/reset") return { id: "P-06", params: {} };
   if (pathname === "/ops/settings") return { id: person === "seller" ? "P-03" : "P-04", params: {} };
+  // round 2: the owner's pages the registry does not hold (Sellers, Payouts, Customers, Claims)
+  const round2: Readonly<Record<string, string>> = { "/ops/sales/sellers": "P-21", "/ops/money/payouts": "P-22", "/ops/customers": "P-23", "/ops/sales/claims": "P-24" };
+  if (round2[pathname] !== undefined) return { id: round2[pathname] as string, params: {} };
   const match = matchRoute(pathname);
   if (match === null || match.screen.origin === "PUBLIC") return null;
   if (proposal === "P-02" && match.screen.id === "UI32") return { id: "P-02", params: match.params };

@@ -7,6 +7,7 @@ import "./review.css";
 import "../prototypes/foundation.css";
 import "../prototypes/pages.css";
 import "../prototypes/auth.css";
+import "../prototypes/ops.css";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";

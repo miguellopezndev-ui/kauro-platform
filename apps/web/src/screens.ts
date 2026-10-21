@@ -99,6 +99,10 @@ export interface NavigationEntry {
   readonly label: MessageId;
   /** A heading the entry sits under; an entry without one is in the menu's first group. "nav.group.help.label" is drawn at the foot. */
   readonly group?: MessageId;
+  /** The path of a proposed page no registry route holds yet; the entry appears only where that page exists (the review draws it). */
+  readonly proposedPath?: string;
+  /** In a narrowed (seller's) menu only: the owner reaches the same page through another entry. */
+  readonly sellerOnly?: true;
 }
 
 /** The agency-level entries of the shell, in order (reference "Agency context stays visible through Projects, Clients, Team, Billing, Settings"). */
@@ -112,24 +116,37 @@ export const AGENCY_NAVIGATION: readonly NavigationEntry[] = [
 ];
 
 /**
- * The operations entries (Order 11): the owner's day first, then money, the work, the product and sales. A person sees the entries their
- * capabilities allow (the server refuses everything else in any case); a seller's are Today, Prospects, Commissions, Resources and Outreach.
+ * The operations entries (Order 11, round 2: owner-console.md §10.2). The owner's menu is grouped by what the owner counts, each a noun with
+ * one home: Today; Money (Finance, Payouts); Customers; Sellers (Sellers, Claims); Sales work (Prospects, Outreach, Resources); Operations
+ * (Support cases first, for its deadlines, then Jobs, Incidents, Deletion); Company (Operating review, Releases, Owner actions, Settings).
+ * Customers is a group of one, so it carries no heading that would repeat its only entry. A person sees the entries their capabilities
+ * allow (the server refuses everything else in any case); a seller's are Today, Prospects, Outreach, Commissions and Resources, in the
+ * order of their work (seller-portal.md §12.1). Sellers, Payouts, Customers, Claims and Settings are proposals: they appear only where
+ * their page exists.
  */
 export const OPS_NAVIGATION: readonly NavigationEntry[] = [
   { screen: "UI33", label: "nav.ops.home.label" },
-  { screen: "UI38", label: "nav.ops.owner-actions.label" },
   { screen: "UI39", label: "nav.ops.finance.label", group: "nav.group.money.label" },
-  { screen: "UI40", label: "nav.ops.jobs.label", group: "nav.group.work.label" },
-  { screen: "UI41", label: "nav.ops.deletion.label", group: "nav.group.work.label" },
-  { screen: "UI42", label: "nav.ops.incidents.label", group: "nav.group.work.label" },
-  { screen: "UI55", label: "nav.ops.support.label", group: "nav.group.work.label" },
-  { screen: "UI43", label: "nav.ops.releases.label", group: "nav.group.product.label" },
-  { screen: "UI44", label: "nav.ops.reviews.label", group: "nav.group.product.label" },
-  { screen: "UI34", label: "nav.ops.prospects.label", group: "nav.group.sales.label" },
-  { screen: "UI36", label: "nav.ops.commissions.label", group: "nav.group.sales.label" },
-  { screen: "UI53", label: "nav.ops.resources.label", group: "nav.group.sales.label" },
-  { screen: "UI54", label: "nav.ops.outreach.label", group: "nav.group.sales.label" },
+  { screen: "P-22", label: "nav.ops.payouts.label", group: "nav.group.money.label", proposedPath: "/ops/money/payouts" },
+  { screen: "P-23", label: "nav.ops.customers.label", proposedPath: "/ops/customers" },
+  { screen: "P-21", label: "nav.ops.sellers.label", group: "nav.group.sellers.label", proposedPath: "/ops/sales/sellers" },
+  { screen: "P-24", label: "nav.ops.claims.label", group: "nav.group.sellers.label", proposedPath: "/ops/sales/claims" },
+  { screen: "UI34", label: "nav.ops.prospects.label", group: "nav.group.sales-work.label" },
+  { screen: "UI54", label: "nav.ops.outreach.label", group: "nav.group.sales-work.label" },
+  { screen: "UI36", label: "nav.ops.commissions.label", group: "nav.group.sales-work.label", sellerOnly: true },
+  { screen: "UI53", label: "nav.ops.resources.label", group: "nav.group.sales-work.label" },
+  { screen: "UI55", label: "nav.ops.support.label", group: "nav.group.operations.label" },
+  { screen: "UI40", label: "nav.ops.jobs.label", group: "nav.group.operations.label" },
+  { screen: "UI42", label: "nav.ops.incidents.label", group: "nav.group.operations.label" },
+  { screen: "UI41", label: "nav.ops.deletion.label", group: "nav.group.operations.label" },
+  { screen: "UI44", label: "nav.ops.reviews.label", group: "nav.group.company.label" },
+  { screen: "UI43", label: "nav.ops.releases.label", group: "nav.group.company.label" },
+  { screen: "UI38", label: "nav.ops.owner-actions.label", group: "nav.group.company.label" },
+  { screen: "P-04", label: "nav.ops.settings.label", group: "nav.group.company.label", proposedPath: "/ops/settings" },
 ];
+
+/** A menu this short reads without headings (seller-portal.md §12.1: five items need no groups). */
+const UNGROUPED_MAXIMUM = 7;
 
 export type ServiceMode = "CLEAN" | "HUBSPOT" | "SALESFORCE";
 
@@ -274,9 +291,14 @@ export function navigationFor(agencyId: string, implemented: ReadonlySet<string>
   return AGENCY_NAVIGATION.filter((entry) => implemented.has(entry.screen)).map((entry) => ({ ...entry, href: pathOf(entry.screen, { agencyId }) }));
 }
 
-/** The operations entries whose pages exist in this build and that this person may open (all of them when the caller does not narrow it). */
+/**
+ * The operations entries whose pages exist in this build and that this person may open (all of them when the caller does not narrow it).
+ * A narrowed menu (a seller's) also holds its own entries, and loses its headings when it is short enough to read without them.
+ */
 export function opsNavigationFor(implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS, allowed?: ReadonlySet<string>): readonly { readonly screen: string; readonly label: MessageId; readonly href: string; readonly group?: MessageId }[] {
-  return OPS_NAVIGATION.filter((entry) => implemented.has(entry.screen) && (allowed === undefined || allowed.has(entry.screen))).map((entry) => ({ ...entry, href: pathOf(entry.screen) }));
+  const entries = OPS_NAVIGATION.filter((entry) => implemented.has(entry.screen) && (allowed === undefined ? entry.sellerOnly !== true : allowed.has(entry.screen)));
+  const flat = allowed !== undefined && entries.length <= UNGROUPED_MAXIMUM;
+  return entries.map(({ screen, label, group, proposedPath }) => ({ screen, label, href: proposedPath ?? pathOf(screen), ...(group === undefined || flat ? {} : { group }) }));
 }
 
 const MAX_RETURN_PATH = 512;

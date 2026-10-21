@@ -1,105 +1,168 @@
 "use client";
-// UI35 Agency relationship (registry: "Assignment and acquisition entitlement are separate."). For one agency, two different facts side by
-// side: who serves it now (the service owner, who can change) and who acquired it (the acquisition owner, whose entitlement follows the
-// signed agreement: the rate on the first project, the repeat rate and its window, counted from the first confirmed capture). Reassigning
-// service never resets the first project or erases what the acquiring seller is still owed (registry exception). The history shows events,
-// never customer data.
-import { Banner, Button } from "@kauro/ui";
+// UI35 Customer (registry: "Assignment and acquisition entitlement are separate."). Round 2 (owner-console.md §10.2): the customer page the
+// Customers list opens, for an agency or a company. Two facts side by side, as two equal cards: who serves the customer now (it can change,
+// and changing it moves no money) and who acquired it (decided once, by the accepted claim and the agreement: the first-project rate, the
+// repeat rate and its window, counted from the first confirmed payment). Then the projects it paid (service, date, amount, commission),
+// never a file, a record or an agency's own client. Reassigning service never resets the first project or erases what the acquiring seller
+// is still owed (registry exception). The permanent "Two facts, kept apart" banner is gone: the two cards already say it.
+//
+// Needs a read (gap): no read joins a customer to its buyer type, acquiring seller, serving seller and paid projects; drawn from the review's
+// fixture. The customer is the one the address names.
+import { Button } from "@kauro/ui";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { type ReactElement } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, PageHead, ScreenLink } from "./kit.tsx";
-import { CLAIM_DAYS, FIRST_RATE, REPEAT_RATE, WINDOW_MONTHS } from "./sales.ts";
+import { Back, OPS_PATH, OpsHead, OpsPage, SectionHead, Word } from "./ops-kit.tsx";
+import { CLAIMS, CLAIM_DAYS, CUSTOMERS, FIRST_RATE, LINES, PAID_PROJECTS, REPEAT_RATE, SERVICE_NAME, WINDOW_MONTHS, amount, customerById, earnedOf, sellerById, type Customer } from "./sales.ts";
 
 export const UI35_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Relationship", note: "Coastline Analytics: served and acquired by Daniel Kim, inside the 12-month window of repeats." },
-  { key: "reassign", label: "Preparing a reassignment", note: "Service moves to the owner; the acquisition entitlement stays with the seller who found them." },
+  { key: "normal", label: "Customer", note: "Coastline Analytics: acquired and served by Daniel Kim, inside the 12-month window of repeats; its two paid projects." },
+  { key: "reassign", label: "Preparing a reassignment", note: "Service moves to you; the acquisition entitlement stays with the seller who found them." },
 ];
 
-export function AgencyRelationship({ ctx, state }: PrototypeProps): ReactElement {
-  const reassign = state === "reassign";
+export function AgencyRelationship({ state }: PrototypeProps): ReactElement {
+  const pathname = usePathname();
+  const customer: Customer = customerById(pathname?.split("/").pop()) ?? (CUSTOMERS[1] as Customer);
+  const reassign = state === "reassign" && customer.servedBy !== null;
+  const acquirer = sellerById(customer.acquiredBy);
+  const server = sellerById(customer.servedBy);
+  const claim = CLAIMS.find((one) => one.organisation === customer.name && one.state === "CONVERTED");
+  const projects = PAID_PROJECTS.filter((one) => one.customerId === customer.id);
+  const lineOf = (name: string, paidOn: string) => LINES.find((one) => one.customer === customer.name && one.project === name && one.paidOn === paidOn);
+  const lead = `${customer.kind} · ${acquirer === undefined ? "came direct" : `came through ${acquirer.name}`} · first paid ${customer.firstPaid}`;
   return (
-    <>
-      <PageHead title="Coastline Analytics" lead="Assignment and acquisition entitlement are separate." />
-      <div className="kauro-lifecycle-actions">
-        <section className="kauro-lifecycle-card" aria-labelledby="service-h">
-          <h2 id="service-h">Who serves them</h2>
-          <p className="kauro-relationship-who">
+    <OpsPage>
+      <OpsHead back={<Back href={OPS_PATH.customers}>Customers</Back>} title={customer.name} lead={lead} />
+      <div className="kauro-ops-pair">
+        <section className="kauro-ops-card" aria-labelledby="serve-h">
+          <h2 id="serve-h" className="kauro-ops-card-label">
+            Who serves them
+          </h2>
+          <p className="kauro-ops-card-value">
             {reassign ? (
-              "Kauro owner, from Nov 1, 2026"
+              "You, from Nov 1, 2026"
+            ) : server === undefined ? (
+              "You"
             ) : (
-              <>
-                <ScreenLink to="UI37" ctx={ctx}>
-                  Daniel Kim
-                </ScreenLink>
-                , seller
-              </>
+              <Link href={OPS_PATH.seller(server.id)} prefetch={false}>
+                {server.name}
+              </Link>
             )}
           </p>
-          <p className="kauro-muted-text">Answers their questions and prepares their next project. It can change; changing it moves no money.</p>
+          <p className="kauro-muted">Answers their questions and prepares their next project. It can change; changing it moves no money.</p>
         </section>
-        <section className="kauro-lifecycle-card" aria-labelledby="acq-h">
-          <h2 id="acq-h">Who acquired them</h2>
-          <p className="kauro-relationship-who">
-            <ScreenLink to="UI37" ctx={ctx}>
-              Daniel Kim
-            </ScreenLink>
-            , seller
+        <section className="kauro-ops-card" aria-labelledby="acq-h">
+          <h2 id="acq-h" className="kauro-ops-card-label">
+            Who acquired them
+          </h2>
+          <p className="kauro-ops-card-value">
+            {acquirer === undefined ? (
+              "Nobody: they came direct"
+            ) : (
+              <Link href={OPS_PATH.seller(acquirer.id)} prefetch={false}>
+                {acquirer.name}
+              </Link>
+            )}
           </p>
-          <ul className="kauro-relationship-terms">
-            <li>Claim accepted on Jul 18, 2026, valid {CLAIM_DAYS} days</li>
-            <li>
-              First project: {FIRST_RATE}%, captured Aug 26, 2026 <Badge tone="success">Paid</Badge>
-            </li>
-            <li>
-              Repeats: {REPEAT_RATE}% until Aug 26, 2027, {WINDOW_MONTHS} months after the first capture
-            </li>
-          </ul>
-          <p className="kauro-muted-text">Under the seller agreement 2026-07. It does not change when service changes.</p>
+          {acquirer === undefined ? (
+            <p className="kauro-muted">No commission is owed on this customer. A seller earns on a direct customer only through an assignment you make before the closing work.</p>
+          ) : (
+            <ul>
+              <li>
+                Claim accepted on {claim?.decided ?? "—"}, valid {CLAIM_DAYS} days
+              </li>
+              <li>
+                First project: {FIRST_RATE}%, paid {customer.firstPaid}
+              </li>
+              <li>
+                Repeats: {REPEAT_RATE}% until {customer.repeatsUntil ?? "—"}, {WINDOW_MONTHS} months after the first payment
+              </li>
+            </ul>
+          )}
         </section>
       </div>
+      <section aria-labelledby="projects-h">
+        <SectionHead id="projects-h" title="Paid projects" meta={`${customer.projects} paid since ${customer.firstPaid} · Collected is the service paid, after discount and without tax`} />
+        <div className="kauro-ops-tablewrap">
+          <div className="kauro-table-region">
+            <table className="kauro-table kauro-ops-table kauro-ops-table--cards">
+              <caption className="kauro-visually-hidden">{customer.name}&apos;s paid projects, newest first</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Project</th>
+                  <th scope="col">Paid on</th>
+                  <th scope="col" className="kauro-table-end">
+                    Collected (USD)
+                  </th>
+                  {acquirer === undefined ? null : (
+                    <th scope="col" className="kauro-table-end">
+                      Commission (USD)
+                    </th>
+                  )}
+                  <th scope="col">State</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((project) => {
+                  const line = lineOf(project.name, project.paidOn);
+                  return (
+                    <tr key={`${project.name}-${project.paidOn}`}>
+                      <th scope="row">
+                        {project.name}
+                        <span className="kauro-ops-sub">
+                          {SERVICE_NAME[project.service]}
+                          {project.discount === null ? "" : ` · ${project.discount}`}
+                        </span>
+                      </th>
+                      <td data-label="Paid on">
+                        <span>{project.paidOn}</span>
+                      </td>
+                      <td className="kauro-table-end" data-label="Collected (USD)">
+                        <span>{amount(project.collectedCents)}</span>
+                      </td>
+                      {acquirer === undefined ? null : (
+                        <td className="kauro-table-end" data-label="Commission (USD)">
+                          <span>
+                            {line === undefined ? "—" : amount(earnedOf(line))}
+                            {line === undefined ? null : <span className="kauro-ops-sub">{line.rate}% · {line.sequence === "FIRST" ? "first" : "repeat"}</span>}
+                          </span>
+                        </td>
+                      )}
+                      <td data-label="State">
+                        <span>
+                          <Word tone={project.state === "Delivered" ? "success" : "info"}>{project.state}</Word>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
       {reassign ? (
-        <section className="kauro-approve" aria-labelledby="re-h">
+        <section className="kauro-ops-decide" aria-labelledby="re-h">
           <h2 id="re-h">Move their service to you</h2>
-          <p>From Nov 1, 2026, you serve Coastline Analytics. Daniel Kim keeps the repeat rate on their projects until Aug 26, 2027, and their first project stays theirs. Daniel Kim is told in writing.</p>
+          <p>
+            From Nov 1, 2026, you serve {customer.name}. {acquirer?.name} keeps the repeat rate on their projects until {customer.repeatsUntil}, and their first project stays theirs. {acquirer?.name} is told in writing.
+          </p>
           <div className="kauro-actions">
             <Button variant="primary">Confirm the reassignment</Button>
-            <Button>Cancel</Button>
+            <Button>Keep {server?.name ?? "the seller"}</Button>
           </div>
         </section>
-      ) : (
-        <div className="kauro-actions">
-          <Button>Prepare a reassignment</Button>
-          <ScreenLink to="UI36" ctx={ctx}>
-            See the statements
-          </ScreenLink>
-        </div>
+      ) : customer.servedBy === null ? null : (
+        <section aria-labelledby="service-h">
+          <SectionHead id="service-h" title="Change who serves them" />
+          <p className="kauro-muted">Moving their service to you or to another seller changes who answers them; it never changes who acquired them or what that seller is owed.</p>
+          <div className="kauro-actions">
+            <Button>Prepare a reassignment</Button>
+          </div>
+        </section>
       )}
-      <section className="kauro-screen-section" aria-labelledby="history-h">
-        <h2 id="history-h">History</h2>
-        <ol className="kauro-history">
-          <li>
-            <span>Jul 9, 2026</span> Found by Daniel Kim on their own site, and qualified
-          </li>
-          <li>
-            <span>Jul 18, 2026</span> Claim accepted by the owner
-          </li>
-          <li>
-            <span>Aug 11, 2026</span> Agency created its workspace
-          </li>
-          <li>
-            <span>Aug 26, 2026</span> First project paid: USD 2,295.00 of service
-          </li>
-          <li>
-            <span>Oct 14, 2026</span> Second project paid, a repeat: USD 1,230.25 of service, after its 5% discount
-          </li>
-        </ol>
-      </section>
-      {reassign ? null : (
-        <Banner tone="info" title="Two facts, kept apart" announce="status">
-          <p>Who serves an agency can change at any time. Who acquired it is decided once, by the accepted claim and the agreement, and only an amendment both sides sign can change it.</p>
-        </Banner>
-      )}
-    </>
+    </OpsPage>
   );
 }
