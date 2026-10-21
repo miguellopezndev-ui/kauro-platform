@@ -4,6 +4,159 @@
 
 /* ---- shared --------------------------------------------------------------------------------------------------------------------- */
 
+/* ---- the page header (round 2): one anatomy on every page of the application -------------------------------------------------------
+   A project page: the context line (client · service), the project's name as the h1 with its state in words, where the project stands
+   (six stages, progress only), a hairline, then the page's own heading, its lead and its one primary action. A page outside a project:
+   its own name as the h1, the lead, the action. The h1 is a fixed 28 px (24 px on a phone), the page's heading 20 px, the lead 16 px:
+   type no larger than its meaning (research app-shell-settings.md §9.5). */
+.kauro-main .kauro-phead {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0 0 var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-phead p {
+  margin: 0;
+}
+.kauro-main .kauro-phead-context {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-phead-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-3);
+}
+.kauro-main .kauro-phead h1,
+.kauro-main .kauro-ptitle h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.kauro-main .kauro-phead-progress {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-phead-count {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+.kauro-phead-stages {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--kauro-space-2);
+  max-inline-size: 54rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-phead-stage {
+  display: grid;
+  align-content: start;
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  margin: 0;
+}
+.kauro-phead-stage::before {
+  content: "";
+  display: block;
+  block-size: 0.25rem;
+  border-radius: 999px;
+  background: var(--kauro-color-border);
+}
+.kauro-phead-stage--done::before {
+  background: var(--kauro-color-wine-muted);
+}
+.kauro-phead-stage--current::before {
+  block-size: 0.375rem;
+  margin-block-start: -0.0625rem;
+  background: var(--kauro-color-primary);
+}
+.kauro-phead-stage-name {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+.kauro-phead-stage--current .kauro-phead-stage-name {
+  color: var(--kauro-color-text);
+  font-weight: 650;
+}
+/* on a wide screen each stage names itself under its mark; on a phone the line above names the current stage and the marks stay */
+@media (min-width: 48rem) {
+  .kauro-main .kauro-phead-count {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-phead h1,
+  .kauro-main .kauro-ptitle h1 {
+    font-size: 1.5rem;
+  }
+  .kauro-phead-stage-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (forced-colors: active) {
+  .kauro-phead-stage::before {
+    border: 1px solid CanvasText;
+  }
+  .kauro-phead-stage--done::before,
+  .kauro-phead-stage--current::before {
+    background: CanvasText;
+  }
+}
+
+/* the page's own heading, its lead and its one action: the action beside the heading from 768 px, under the lead on a phone */
+.kauro-main .kauro-ptitle {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-ptitle-text {
+  display: grid;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-ptitle h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.kauro-main .kauro-ptitle-lead {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-body);
+}
+.kauro-main .kauro-ptitle-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ptitle--action {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}
+/* a lead the screen used to draw under its own h1 is now the header's: the old rule's negative margin would pull it into the heading */
+.kauro-main .kauro-ptitle + .kauro-screen-lead {
+  margin-block-start: 0;
+}
+
 .kauro-main .kauro-screen-lead {
   margin: calc(var(--kauro-space-3) * -1) 0 var(--kauro-space-6);
   color: var(--kauro-color-text-muted);
@@ -33,7 +186,7 @@
   margin: 0;
   color: var(--kauro-color-text-muted);
   font-family: var(--kauro-font-family);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -168,7 +321,7 @@
   background: var(--kauro-color-ink);
   color: var(--kauro-color-on-ink);
   font-family: var(--kauro-mono-family);
-  font-size: 0.6875rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -194,7 +347,7 @@
 
 .kauro-main .kauro-file-facts dt {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -316,7 +469,7 @@
   margin: 0;
   color: var(--kauro-color-text-muted);
   font-family: var(--kauro-font-family);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -489,7 +642,7 @@
 }
 
 .kauro-main .kauro-fingerprints code {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 
@@ -551,7 +704,7 @@
   block-size: 1.5rem;
   border: 1.5px solid var(--kauro-color-control-border);
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
@@ -613,7 +766,7 @@
 
 .kauro-main .kauro-facts-grid dt {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -721,7 +874,6 @@
 .kauro-main .kauro-quote-lines .kauro-row--total {
   align-items: baseline;
   padding-block: var(--kauro-space-4);
-  border-block-end: 0;
   background: color-mix(in srgb, var(--kauro-color-primary) 6%, var(--kauro-color-raised));
 }
 
@@ -738,12 +890,38 @@
   letter-spacing: -0.02em;
 }
 
-.kauro-main .kauro-quote-dates {
+/* the two dates that end something, side by side at one size (round 2, C-1): the price's validity and the files' */
+.kauro-main .kauro-quote-when {
   border-block-start: 1px solid var(--kauro-color-border);
 }
-
-.kauro-main .kauro-quote-dates > div:last-child {
+.kauro-main .kauro-quote-when .kauro-quote-dates {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+.kauro-main .kauro-quote-when .kauro-quote-dates > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: start;
+  gap: var(--kauro-space-1);
   border-block-end: 0;
+}
+.kauro-main .kauro-quote-when .kauro-quote-dates dd {
+  font-size: var(--kauro-font-size-body);
+  font-weight: 600;
+  text-align: start;
+}
+.kauro-main .kauro-quote-first {
+  margin: 0;
+  padding: var(--kauro-space-3) var(--kauro-space-5) var(--kauro-space-4);
+  color: var(--kauro-color-warning-text);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-quote-only {
+  max-inline-size: 40rem;
+  margin: 0;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  font-size: var(--kauro-font-size-dense);
 }
 
 .kauro-main .kauro-quote-terms {
@@ -822,7 +1000,7 @@
 .kauro-main .kauro-quote-note {
   display: block;
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .kauro-main .kauro-quote-steps {
   display: grid;
@@ -853,7 +1031,7 @@
 
 .kauro-main .kauro-payment-head dt {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -919,7 +1097,7 @@
 
 .kauro-main .kauro-transfer-slip dt {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -961,6 +1139,77 @@
   font-family: var(--kauro-mono-family);
   letter-spacing: 0.06em;
   user-select: all;
+}
+
+/* round 2: the three things a transfer needs, enclosed in one block (Baymard: enclosing the sensitive part raises perceived security), each
+   at one size with its copy button, then the bank's own fields */
+.kauro-main .kauro-payment-for {
+  margin: 0 0 var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-payment-status .kauro-payment-amount {
+  font-family: var(--kauro-display-family);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-transfer > h2 {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-transfer-intro {
+  margin: 0 0 var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-transfer-three {
+  display: grid;
+  gap: 0;
+  max-inline-size: 44rem;
+  margin: 0 0 var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-transfer-three > div {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-transfer-three > div:last-child {
+  border-block-end: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-transfer-three > div {
+    grid-template-columns: 9rem minmax(0, 1fr);
+    align-items: baseline;
+  }
+}
+.kauro-main .kauro-transfer-three dt {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-transfer-three dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) 0;
+  margin: 0;
+}
+.kauro-main .kauro-transfer-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-transfer-three .kauro-transfer-hint {
+  flex-basis: 100%;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-transfer-bank-heading {
+  margin: 0 0 var(--kauro-space-3);
+  font-size: 1rem;
 }
 
 /* a copy button sits after the value it copies; its result is announced, then fades */
@@ -1031,7 +1280,7 @@
 }
 .kauro-main .kauro-payment-next-label {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1042,7 +1291,7 @@
 .kauro-main .kauro-payment-order {
   margin-block-start: var(--kauro-space-6);
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .kauro-main .kauro-payment-order code {
   overflow-wrap: anywhere;
@@ -1114,7 +1363,7 @@
   margin: 0;
   color: var(--kauro-color-text-muted);
   font-family: var(--kauro-font-family);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1139,7 +1388,7 @@
 
 .kauro-main :is(.kauro-ledger-head, .kauro-ledger-facts) dt {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -1266,7 +1515,7 @@
 
 .kauro-main .kauro-case h3 {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -1292,7 +1541,7 @@
 }
 
 .kauro-main .kauro-hash {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 400;
   overflow-wrap: anywhere;
   word-break: break-all;
@@ -1392,4 +1641,108 @@
   .kauro-main .kauro-credits td.kauro-table-actions {
     padding-block-start: var(--kauro-space-2);
   }
+}
+
+/* ---- UI32 (round 2): the scope of a settings page under its heading ------------------------------------------------------------- */
+.kauro-main .kauro-settings-scope {
+  margin: calc(var(--kauro-space-4) * -1) 0 var(--kauro-space-6);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- UI25 (round 2): the note under the phases, the support link beside the check, cancelling last and apart ------------------------ */
+.kauro-main .kauro-processing-work > h2 {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-processing-note {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-processing-support {
+  align-self: center;
+  margin-inline-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-processing-cancel {
+  max-inline-size: 40rem;
+  margin-block-start: var(--kauro-space-7);
+}
+
+/* ---- UI14 (round 2): a file's facts one click away, behind its name and state ------------------------------------------------------ */
+.kauro-main .kauro-file-details {
+  margin-block-start: var(--kauro-space-2);
+}
+.kauro-main .kauro-file-details > summary {
+  inline-size: fit-content;
+  min-block-size: 1.5rem;
+  color: var(--kauro-color-primary);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-file-details[open] > summary {
+  margin-block-end: var(--kauro-space-2);
+}
+
+/* ---- round 2: one section-heading size in the app (20 px), whatever the screen (research principles-craft.md V1, V3) --------------- */
+.kauro-main :where(h2) {
+  font-size: 1.25rem;
+}
+
+/* ---- UI23 (round 2): on a wide screen what the quote covers sits beside the sheet, not under an empty half ---------------------- */
+@media (min-width: 80rem) {
+  .kauro-main .kauro-quote {
+    display: grid;
+    grid-template-columns: minmax(0, 40rem) minmax(14rem, 20rem);
+    column-gap: var(--kauro-space-7);
+    align-items: start;
+  }
+  .kauro-main .kauro-quote > * {
+    grid-column: 1;
+  }
+  .kauro-main .kauro-quote > .kauro-quote-covers {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+    padding-block-start: var(--kauro-space-2);
+  }
+}
+.kauro-main .kauro-processing-support {
+  color: var(--kauro-color-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.kauro-main .kauro-processing .kauro-facts-grid {
+  max-inline-size: 40rem;
+}
+
+/* UI14 (round 2): a file is one compact card: name, size and state on the first line; its details and its removal on the second */
+@media (min-width: 40rem) {
+  .kauro-main .kauro-file {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .kauro-main .kauro-file > :not(.kauro-file-details, .kauro-file-actions) {
+    grid-column: 1 / -1;
+  }
+  .kauro-main .kauro-file > .kauro-file-details {
+    grid-column: 1;
+    margin: 0;
+  }
+  .kauro-main .kauro-file > .kauro-file-actions {
+    grid-column: 2;
+    margin: 0;
+  }
+}
+.kauro-main .kauro-file-size {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-settings {
+  max-inline-size: 48rem;
+}
+/* UI24: the reference is set in the mono face, whose wide glyphs read larger: one step down keeps the three values one size to the eye */
+.kauro-main .kauro-transfer-value.kauro-transfer-reference {
+  font-size: 1.125rem;
 }

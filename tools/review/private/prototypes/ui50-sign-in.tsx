@@ -209,7 +209,7 @@ export function SignIn({ ctx, state }: PrototypeProps): ReactElement {
           <Button type="submit" variant="primary">
             <span className="kauro-go">Request the recovery</span>
           </Button>
-          <p className="kauro-proposed">Proposed — recovery needs the identity provider and its abuse tests (F-07)</p>
+          <p className="kauro-proposed kauro-a-proposed">Proposed — recovery needs the identity provider and its abuse tests (F-07)</p>
         </form>
       );
       break;

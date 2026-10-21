@@ -56,7 +56,6 @@ export function HealthCheckDetails({ audit, onRefresh, onCancel, cancelling, pla
   const model = healthCheckModel(audit);
   return (
     <div className="kauro-health-check">
-      <p className="kauro-screen-lead">{message("screen.health.lead.body")}</p>
       <section className="kauro-set-status" aria-labelledby="health-status">
         <h2 id="health-status">{message("screen.health.state.label")}</h2>
         <p role="status">

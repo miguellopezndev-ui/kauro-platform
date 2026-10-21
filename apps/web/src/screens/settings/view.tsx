@@ -1,3 +1,7 @@
+// Round 2 (research app-shell-settings.md section 9.10): this is the General page of "Workspace settings", and its scope is said under the
+// heading ("These settings apply to everyone in {workspace}"), the question every settings page raises first. Billing identity lives in
+// Billing; the agreements are read here. Closing the workspace is last, owner only.
+//
 // UI32 Settings as markup. Four separate sections: the display label (read-only here), the legal identity (what was accepted), security and
 // branding, and the closure, which is its own form with its own button. Customer strings are text nodes.
 import { Banner, Button, Deadline, Money, StatusBadge } from "@kauro/ui";
@@ -44,7 +48,9 @@ export function SettingsDetails({ agency, onClose, closing, closure }: SettingsV
   const model = settingsModel(agency);
   return (
     <div className="kauro-settings">
-      <p>{message("screen.settings.lead.body")}</p>
+      <p className="kauro-settings-scope">
+        {message("screen.settings.scope.body", { workspace: agency.displayName })}
+      </p>
       <section aria-labelledby="settings-display">
         <h2 id="settings-display">{message("screen.settings.display.heading")}</h2>
         <dl>

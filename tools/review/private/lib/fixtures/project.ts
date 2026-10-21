@@ -113,12 +113,12 @@ export function reviewEvaluated(agencyId: string): InspectionView {
   const base = reviewInspection(agencyId);
   return {
     ...base,
-    revision: readyToSeal({ agencyId, populations: POPULATIONS, dataAvailableUntil: "2026-11-03T09:00:00Z" }),
+    revision: readyToSeal({ agencyId, populations: POPULATIONS, dataAvailableUntil: "2026-10-21T09:10:00Z" }),
     selection: { selectionManifestId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6006", selectionHash: "5".repeat(64), tables: [{ tableId: CONTACTS_TABLE, disposition: "INCLUDE" }, { tableId: COMPANIES_TABLE, disposition: "INCLUDE" }, { tableId: ARCHIVE_TABLE, disposition: "EXCLUDE", exclusionReason: "OLD_OR_ARCHIVED_DATA" }] },
     evaluation: { evaluationHash: HASH, result: "COMPLETE", populations: POPULATIONS, failures: [] },
   };
 }
 
-export const readyRevision = (agencyId: string, overrides: Partial<SourceRevisionView> = {}): SourceRevisionView => readyToSeal({ agencyId, populations: POPULATIONS, dataAvailableUntil: "2026-11-03T09:00:00Z", ...overrides });
+export const readyRevision = (agencyId: string, overrides: Partial<SourceRevisionView> = {}): SourceRevisionView => readyToSeal({ agencyId, populations: POPULATIONS, dataAvailableUntil: "2026-10-21T09:10:00Z", ...overrides });
 
 export { PROJECT, REVISION };

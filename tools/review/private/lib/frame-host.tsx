@@ -13,7 +13,7 @@ import { ReviewShell } from "./review-shell.tsx";
 import { scriptOf } from "./scenario.ts";
 import { screenDef } from "./screens.tsx";
 
-const PEOPLE: readonly ContextKey[] = ["newcomer", "agency", "company", "admin", "operator", "owner", "seller", "outsider"];
+const PEOPLE: readonly ContextKey[] = ["newcomer", "agency", "company", "admin", "operator", "approver", "billing", "viewer", "owner", "seller", "outsider"];
 
 export function FrameHost({ id, context, state, pathname, children }: { readonly id: string; readonly context: ContextKey; readonly state: string; readonly pathname: string; readonly children: ReactNode }): ReactElement {
   const def = screenDef(id);

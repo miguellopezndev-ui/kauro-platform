@@ -16,7 +16,7 @@
 .kauro-auth-step-count {
   margin-inline-start: auto;
   color: var(--kauro-color-ink-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -25,7 +25,7 @@
 }
 .kauro-main .kauro-auth-body h1 {
   margin: 0;
-  font-size: clamp(1.625rem, 1.35rem + 1vw, 2rem);
+  font-size: 1.75rem;
   letter-spacing: -0.03em;
   line-height: 1.15;
 }
@@ -255,7 +255,7 @@
 }
 .kauro-main .kauro-qr figcaption {
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.4;
 }
 .kauro-main .kauro-enrol-steps {
@@ -316,6 +316,24 @@
 }
 .kauro-signup-path .kauro-note {
   margin-block-start: var(--kauro-space-5);
+}
+/* below 62rem the path sits under the form and before the footer: the footer that closes every identity step stays last */
+@media (max-width: 61.99rem) {
+  .kauro-signup > .kauro-auth {
+    display: contents;
+  }
+  .kauro-signup > .kauro-auth > .kauro-auth-object,
+  .kauro-signup > .kauro-auth > .kauro-auth-after {
+    justify-self: center;
+    inline-size: min(100%, 27rem);
+  }
+  .kauro-signup > .kauro-auth > .kauro-auth-footer {
+    order: 2;
+    justify-self: center;
+  }
+  .kauro-main .kauro-signup-path {
+    order: 1;
+  }
 }
 @media (min-width: 62rem) {
   .kauro-signup {

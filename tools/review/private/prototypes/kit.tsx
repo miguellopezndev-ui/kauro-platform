@@ -173,3 +173,43 @@ export function Monogram({ name }: { readonly name: string }): ReactElement {
     </span>
   );
 }
+
+// ---- round 2 (2026-10-21): the shared parts of the rebuilt workspace pages (research agency-workspace.md §5, app-shell-settings.md §9) ----
+
+/** One fact of a next step: who acts, by when, what happens if not. Each is a short phrase, never a paragraph. */
+export type StepFact = readonly [label: string, value: ReactNode];
+
+/**
+ * The one requirement of a page (Stripe's "currently due", research agency-workspace.md §5.3): the next step as a verb, one sentence of
+ * what and why, then who acts, by when and what happens if not, then its one action. At most one per page, always first after the header.
+ */
+export function NextStep({ id, label = "Next step", heading, children, facts = [], action }: { readonly id: string; readonly label?: string; readonly heading: string; readonly children?: ReactNode; readonly facts?: readonly StepFact[]; readonly action?: ReactNode }): ReactElement {
+  return (
+    <section className="kauro-nextstep" aria-labelledby={id}>
+      <p className="kauro-nextstep-label">{label}</p>
+      <h2 id={id}>{heading}</h2>
+      {children === undefined ? null : <div className="kauro-nextstep-body">{children}</div>}
+      {facts.length === 0 ? null : (
+        <dl className="kauro-nextstep-facts">
+          {facts.map(([term, value]) => (
+            <div key={term}>
+              <dt>{term}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {action === undefined ? null : <div className="kauro-nextstep-action">{action}</div>}
+    </section>
+  );
+}
+
+/** The one line a limited role reads instead of a control it cannot use (research app-shell-settings.md §9.11). */
+export function Only({ children }: { readonly children: ReactNode }): ReactElement {
+  return <p className="kauro-only">{children}</p>;
+}
+
+/** The scope of a settings page, under its heading: who a change here reaches (HubSpot's "These preferences only apply to you"). */
+export function Scope({ children }: { readonly children: ReactNode }): ReactElement {
+  return <p className="kauro-scope">{children}</p>;
+}

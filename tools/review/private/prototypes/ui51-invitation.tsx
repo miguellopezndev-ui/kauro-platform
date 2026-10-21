@@ -110,7 +110,7 @@ export function Invitation({ ctx, state }: PrototypeProps): ReactElement {
       <>
         {step === "preview" ? (
           <>
-            <p className="kauro-proposed">Proposed — needs an invitation read (D-UI51-1)</p>
+            <p className="kauro-proposed kauro-a-proposed">Proposed — needs an invitation read (D-UI51-1)</p>
             <h2>
               <bdi>Northwind Data</bdi> invites you as Operator
             </h2>

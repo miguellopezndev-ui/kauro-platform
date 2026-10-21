@@ -13,8 +13,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
   if (agency === null || project === null || (order !== undefined && idOrNull(order) === null) || (job !== undefined && idOrNull(job) === null)) notFound();
   return (
     <>
-      <ProjectHeader current="delivery" />
-      <h1>{message("screen.processing.title")}</h1>
+      <ProjectHeader stage="preparation" title={message("screen.processing.title")} lead={message("screen.processing.lead.body")} />
       <ProcessingScreen agencyId={agency} projectId={project} orderId={idOrNull(order)} jobId={idOrNull(job)} />
     </>
   );

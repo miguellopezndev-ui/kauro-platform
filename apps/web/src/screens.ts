@@ -152,7 +152,7 @@ export type ServiceMode = "CLEAN" | "HUBSPOT" | "SALESFORCE";
 
 /** One area of a project in the menu: the screens it holds, the first of which it opens, and the services that have it. */
 export interface ProjectAreaEntry {
-  readonly key: "overview" | "files" | "destination" | "check" | "plan" | "purchase" | "delivery" | "import" | "activity" | "data";
+  readonly key: "overview" | "files" | "destination" | "check" | "plan" | "purchase" | "preparation" | "delivery" | "import" | "activity" | "data";
   readonly label: MessageId;
   /** The screens of this area; the first is where the area's link goes. An id that is not a built screen (a proposal) hides the area. */
   readonly screens: readonly string[];
@@ -165,9 +165,12 @@ export interface ProjectAreaEntry {
 }
 
 /**
- * The areas of a project (Order 11, the owner's decision of 2026-10-20): places for the real tasks, in the order the work meets them, adapted
- * to the service (a destination and an import exist for HubSpot and Salesforce, never for "Clean your data"); Activity and the data kept are
- * reachable and never a step. The areas nest under Projects in the menu; the project's progress is drawn once, in the project's header.
+ * The areas of a project (Order 11, the owner's decision of 2026-10-20, kept in round 2): places for the real tasks, in the order the work
+ * meets them, adapted to the service (a destination and an import exist for HubSpot and Salesforce, never for "Clean your data"); Activity
+ * and the data kept are reachable and never a step. The areas nest under Projects in the menu; the project's progress is drawn once, in the
+ * project's header, as a path that does not navigate. Round 2 (research agency-workspace.md §1.2: the menu and the progress said the same
+ * thing "in different words, with different counts"): every stage area carries its stage's own short name (Quote and payment, not
+ * Purchase), and the preparation is its own area, so each of the six stages has one place and the delivery is no longer "step 5" twice.
  */
 export const PROJECT_AREAS: readonly ProjectAreaEntry[] = [
   { key: "overview", label: "nav.project.overview.label", screens: ["UI13"] },
@@ -176,7 +179,8 @@ export const PROJECT_AREAS: readonly ProjectAreaEntry[] = [
   { key: "check", label: "nav.project.check.label", screens: ["UI18"] },
   { key: "plan", label: "nav.project.plan.label", screens: ["UI19", "UI20", "UI21", "UI22"] },
   { key: "purchase", label: "nav.project.purchase.label", screens: ["UI23"] },
-  { key: "delivery", label: "nav.project.delivery.label", screens: ["UI26", "UI25"] },
+  { key: "preparation", label: "nav.project.preparation.label", screens: ["UI25"] },
+  { key: "delivery", label: "nav.project.delivery.label", screens: ["UI26"] },
   { key: "import", label: "nav.project.import.label", screens: ["UI27", "UI28"], modes: ["HUBSPOT", "SALESFORCE"] },
   { key: "activity", label: "nav.project.activity.label", screens: ["P-08"], apart: true, proposedPath: "/activity" },
   { key: "data", label: "nav.project.data.label", screens: ["UI29"], apart: true },
@@ -277,7 +281,8 @@ export const AGENCY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-
 
 /** The agency a pathname is in, or null for a path outside an agency (or one whose agency segment is not an agency id). */
 export function agencyOfPathname(pathname: string): string | null {
-  const agency = matchRoute(pathname)?.params["agencyId"];
+  // a project's proposed Activity area (P-08) lives under its project's path before a registry route holds it: it is in the same agency
+  const agency = matchRoute(pathname)?.params["agencyId"] ?? projectOfPathname(pathname)?.agencyId;
   return agency !== undefined && AGENCY_ID.test(agency) ? agency : null;
 }
 

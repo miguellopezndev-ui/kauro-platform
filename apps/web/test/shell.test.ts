@@ -350,16 +350,25 @@ test("Order 11: inside a project the menu nests its areas for its service; a des
   assert.doesNotMatch(markup, />Import</);
 });
 
-test("ProjectHeader (Order 11): a step names its place among the service's steps; a page apart names itself and where the project stands; no project, no header", async () => {
+test("ProjectHeader (round 2): the project's name is the h1 under its client and service; the six stages are named once each; the page's own name is its h2; without a project the page's name is the h1", async () => {
   const { ProjectHeader } = await import("../src/screens/shared/project-header.tsx");
   const { ProjectContext } = await import("../src/shell/frame.tsx");
   const project = { projectId: "p", name: "Contacts and companies", clientLabel: "Larch Studio", mode: "HUBSPOT" as const };
   const within = (child: ReactElement, value: unknown = project): string => renderToStaticMarkup(createElement(ProjectContext.Provider, { value: value as never }, child));
-  const step = within(createElement(ProjectHeader, { current: "purchase" }));
-  assert.ok(step.includes("Step 4 of 6 · Purchase"));
-  const apart = within(createElement(ProjectHeader, { current: "import", area: "nav.project.data.label" }));
-  assert.ok(apart.includes("Data and deletion · the project is at step 6 of 6, Import") && !apart.includes("Step 6 of 6"));
-  const clean = within(createElement(ProjectHeader, { current: "delivery" }), { ...project, mode: "CLEAN" });
-  assert.ok(clean.includes("Step 5 of 5 · Delivery") && !clean.includes("Import"), "Clean your data has no import step");
-  assert.equal(within(createElement(ProjectHeader, { current: "files" }), null), "");
+  const quote = within(createElement(ProjectHeader, { stage: "purchase", title: "Quote", lead: "Review price, scope and availability." }));
+  assert.match(quote, /<h1><bdi>Contacts and companies<\/bdi><\/h1>/);
+  assert.match(quote, /<h2>Quote<\/h2>/);
+  assert.ok(quote.includes("Larch Studio") && quote.includes("Prepare for HubSpot") && quote.includes("Stage 4 of 6 · Quote and payment"));
+  assert.equal((quote.match(/<h1/g) ?? []).length, 1, "exactly one h1");
+  // the preparation and the delivery are two stages (round 1 drew both as "step 5")
+  const preparing = within(createElement(ProjectHeader, { stage: "preparation", title: "Processing" }));
+  const delivered = within(createElement(ProjectHeader, { stage: "delivery", title: "Delivery" }));
+  assert.ok(preparing.includes("Stage 5 of 6 · Preparation") && delivered.includes("Stage 6 of 6 · Delivery and import"));
+  // "Clean your data" has six stages too; its sixth is the delivery alone
+  const clean = within(createElement(ProjectHeader, { stage: "import", title: "Delivery" }), { ...project, mode: "CLEAN" });
+  assert.ok(clean.includes("Stage 6 of 6 · Delivery<") && !clean.includes("and import"), "Clean your data has no import");
+  // no project read: the page's own name is the one h1
+  const alone = within(createElement(ProjectHeader, { stage: "files", title: "Upload the files" }), null);
+  assert.match(alone, /<h1>Upload the files<\/h1>/);
+  assert.ok(!alone.includes("<h2"));
 });

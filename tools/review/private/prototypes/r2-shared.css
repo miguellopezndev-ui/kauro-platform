@@ -1,0 +1,255 @@
+/* Round 2 (2026-10-21): the parts the rebuilt agency and company pages share. Tokens only, no inline style, reflow at 320 px, both themes.
+   One size per role: section headings 20 px, the next step's heading 22 px, body 16 px, meta 14 px, labels 13 px; never below 13 px. */
+
+/* ---- the next step: the one requirement of the page, first after the header ---- */
+.kauro-main .kauro-nextstep {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-7);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-nextstep + section {
+  margin-block-start: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+.kauro-main .kauro-nextstep > * {
+  margin: 0;
+}
+.kauro-main .kauro-nextstep-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-nextstep h2 {
+  margin: 0;
+  font-size: 1.375rem;
+}
+.kauro-main .kauro-nextstep-body > p {
+  margin: 0;
+}
+.kauro-main .kauro-nextstep-body > p + p {
+  margin-block-start: var(--kauro-space-2);
+}
+.kauro-main .kauro-nextstep-facts {
+  display: grid;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin: var(--kauro-space-1) 0 0;
+}
+.kauro-main .kauro-nextstep-facts > div {
+  display: grid;
+  grid-template-columns: none;
+  gap: var(--kauro-space-1);
+  padding: 0;
+  border: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-nextstep-facts {
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+}
+.kauro-main .kauro-nextstep-facts dt {
+  font-size: 0.8125rem;
+}
+.kauro-main .kauro-nextstep-facts dd {
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-nextstep-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin-block-start: var(--kauro-space-2);
+}
+
+/* ---- a limited role: one line instead of the control; a settings page: who a change reaches ---- */
+.kauro-main .kauro-only {
+  margin: 0;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-scope {
+  margin: 0 0 var(--kauro-space-6);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- a table of comparable rows: 16 px, figures right-aligned and tabular, the unit in the header; on a phone each row is a card ---- */
+.kauro-main .kauro-rtable {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--kauro-font-size-body);
+}
+.kauro-main .kauro-rtable caption {
+  margin-block-end: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  text-align: start;
+}
+.kauro-main .kauro-rtable th {
+  padding: var(--kauro-space-2) var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-control-border);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+  text-align: start;
+  vertical-align: bottom;
+}
+.kauro-main .kauro-rtable td {
+  padding: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+  vertical-align: top;
+}
+.kauro-main .kauro-rtable :is(th, td):first-child {
+  padding-inline-start: 0;
+}
+.kauro-main .kauro-rtable :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+.kauro-main .kauro-rtable .kauro-num {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+.kauro-main .kauro-rtable .kauro-sub {
+  display: block;
+  margin-block-start: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-rtable,
+  .kauro-main .kauro-rtable tbody,
+  .kauro-main .kauro-rtable tr,
+  .kauro-main .kauro-rtable td {
+    display: block;
+  }
+  .kauro-main .kauro-rtable thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-main .kauro-rtable tr {
+    padding: var(--kauro-space-3) 0;
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-rtable td {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    gap: var(--kauro-space-3);
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+  }
+  .kauro-main .kauro-rtable td::before {
+    content: attr(data-label);
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-main .kauro-rtable td[data-label=""] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kauro-main .kauro-rtable td[data-label=""]::before {
+    content: none;
+  }
+  .kauro-main .kauro-rtable .kauro-num {
+    text-align: start;
+    white-space: normal;
+  }
+}
+
+/* ---- check your answers: a part per row, its value, its way to change it (GOV.UK) ---- */
+.kauro-main .kauro-answers {
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-answers > div {
+  display: grid;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding-block: var(--kauro-space-4);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-answers > div {
+    grid-template-columns: 11rem minmax(0, 1fr) auto;
+    align-items: baseline;
+  }
+}
+.kauro-main .kauro-answers dd {
+  max-inline-size: none;
+}
+.kauro-main .kauro-answers .kauro-answers-change {
+  font-size: var(--kauro-font-size-dense);
+  white-space: nowrap;
+}
+
+/* ---- a focused task (approve, pay, delete): one column, the action at its foot (Wise, HubSpot's import) ---- */
+.kauro-main .kauro-focused {
+  max-inline-size: 44rem;
+}
+.kauro-main .kauro-focused-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin-block-start: var(--kauro-space-6);
+  padding-block-start: var(--kauro-space-5);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+
+/* ---- equal peers: vertical cards of one size and one anatomy, two to four a row, one on a phone ---- */
+.kauro-main .kauro-peers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-peers > li {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-peers > li > * {
+  margin: 0;
+}
+
+/* ---- empty states: a heading, one sentence, at most one action; no illustration, no zero counts ---- */
+.kauro-main .kauro-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-2);
+  padding: var(--kauro-space-6) 0;
+}
+.kauro-main .kauro-empty > * {
+  margin: 0;
+}
+.kauro-main .kauro-empty :is(h2, h3) {
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-nextstep-facts > div {
+  align-content: start;
+  align-items: start;
+  gap: 0.125rem;
+}
+.kauro-main .kauro-nextstep-facts :is(dt, dd) {
+  margin: 0;
+  line-height: 1.45;
+}

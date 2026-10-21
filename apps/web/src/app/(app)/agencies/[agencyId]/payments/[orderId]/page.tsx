@@ -12,8 +12,7 @@ export default async function Page({ params }: { readonly params: Promise<{ agen
   if (agency === null || order === null) notFound();
   return (
     <>
-      <ProjectHeader current="purchase" />
-      <h1>{message("screen.payment.title")}</h1>
+      <ProjectHeader stage="purchase" title={message("screen.payment.title")} lead={message("screen.payment.lead.body")} />
       <PaymentScreen agencyId={agency} orderId={order} />
     </>
   );

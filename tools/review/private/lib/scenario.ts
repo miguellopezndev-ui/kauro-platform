@@ -26,7 +26,7 @@ export const DENIED: Reply = { status: 403, problem: "NOT_AUTHORIZED", reason: "
 export const NOT_MEMBER: Reply = { status: 403, problem: "NOT_AUTHORIZED", reason: "NOT_A_MEMBER" };
 
 /** The role each synthetic person holds in their workspace (contexts.ts describes them). */
-const ROLE_OF: Partial<Record<ContextKey, "OWNER" | "ADMIN" | "OPERATOR">> = { agency: "OWNER", company: "OWNER", admin: "ADMIN", operator: "OPERATOR" };
+const ROLE_OF: Partial<Record<ContextKey, "OWNER" | "ADMIN" | "OPERATOR" | "APPROVER" | "BILLING" | "VIEWER">> = { agency: "OWNER", company: "OWNER", admin: "ADMIN", operator: "OPERATOR", approver: "APPROVER", billing: "BILLING", viewer: "VIEWER" };
 
 /** The answers the shell needs before any screen draws: the session, and the agency the address names. */
 export function baseScript(ctx: ReviewContext, base: StateDef["base"] = "SIGNED_IN"): Script {

@@ -10,12 +10,20 @@
 // their authenticator and recovery codes; they can never turn two-step verification off or let anyone in. Kauro checks the member's identity
 // independently, the admin confirms with a fresh code, the member and every owner are told, a waiting period applies, and the member's
 // sessions end when the recovery completes.
+//
+// Round 2 (2026-10-21; research agency-workspace.md §5.20, app-shell-settings.md §9.11): the two facts that drive every other page sit above
+// the table (who approves plans, who handles quotes and payments), with a way to invite when nobody holds the role; each role reads as Can
+// and Cannot (Stripe), from the code (roles.ts), not from a sentence; a role that cannot invite or change roles sees one line naming who can;
+// a row's menu closes on a click outside it and on Escape (listening to click, never closing a <details> inside pointerdown).
 import { Banner, Button, ConfirmDialog, ErrorSummary, Field } from "@kauro/ui";
-import { type FormEvent, type ReactElement, useState } from "react";
+import { type FormEvent, type ReactElement, useEffect, useState } from "react";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { StepUpPanel } from "@web/screens/shared/step-up.tsx";
+import { COMPANY_ID } from "../lib/contexts.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, day, PageHead, ROLE_NAME, ROLE_SCOPE, type Role } from "./kit.tsx";
+import { Badge, day, ROLE_NAME, ROLE_SCOPE, type Role } from "./kit.tsx";
+import { onlyLine } from "./people.ts";
 
 export const UI31_STATES: readonly StateDef[] = [
   { key: "normal", label: "Team", note: "The team as an owner sees it: who has which access, and what each role allows." },
@@ -50,9 +58,23 @@ const TEAM: readonly Member[] = [
   { ref: "3c9e", role: "OPERATOR", state: "ACTIVE", since: "2026-09-14T10:00:00Z", name: "Priya Nair", email: "priya.nair@northwind.example" },
   { ref: "8d27", role: "APPROVER", state: "ACTIVE", since: "2026-09-21T16:30:00Z", name: "Samuel Osei", email: "samuel.osei@northwind.example" },
   { ref: "41b0", role: "BILLING", state: "ACTIVE", since: "2026-10-01T08:45:00Z", name: "Ines Duarte", email: "ines.duarte@northwind.example" },
+  { ref: "c3d8", role: "VIEWER", state: "ACTIVE", since: "2026-10-06T12:00:00Z", name: "Ruth Okafor", email: "ruth.okafor@northwind.example" },
   { ref: "e6f2", role: "OPERATOR", state: "INVITED", since: "2026-10-18T11:20:00Z", name: "Invitation sent", email: "a.kowalski@northwind.example" },
   { ref: "92ad", role: "VIEWER", state: "SUSPENDED", since: "2026-09-10T13:00:00Z", name: "Tom Lindqvist", email: "tom.lindqvist@northwind.example" },
 ];
+
+/** A company buying for itself, run by its owner alone (people.ts). */
+const COMPANY_TEAM: readonly Member[] = [{ ref: "b201", role: "OWNER", state: "ACTIVE", self: true, since: "2026-09-20T10:05:00Z", name: "Tomas Reyes", email: "tomas.reyes@halden.example" }];
+
+/** What each role can and cannot do, from the code (packages/domain/src/model/roles.ts and the commands' roles), in the words a member reads. */
+const CAN: Readonly<Record<Role, { readonly can: string; readonly cannot: string }>> = {
+  OWNER: { can: "Everything: the team and roles, ownership, clients, projects, approving plans, quotes and payments, deletion, the name and logo, closing the workspace.", cannot: "Leave while they are the only owner." },
+  ADMIN: { can: "Invite and remove members (never an owner), clients, all project work, deletion requests, the name and logo.", cannot: "Approve plans, request quotes or pay, change roles, close the workspace." },
+  OPERATOR: { can: "Add clients; upload and seal files, start the free check, make plan decisions, start the preparation, return import results.", cannot: "Approve plans, pay, manage the team, delete data." },
+  APPROVER: { can: "Confirm the destination, approve or withdraw a plan, continue a staged import.", cannot: "Do the project work, pay, manage the team." },
+  BILLING: { can: "Request quotes, create payment orders, ask for refunds.", cannot: "Do the project work, approve plans, manage the team." },
+  VIEWER: { can: "Read every project, quote and payment; download delivered packages; open support cases.", cannot: "Change anything." },
+};
 
 const STATE_LABEL = { ACTIVE: "Active", INVITED: "Invited", SUSPENDED: "Suspended" } as const;
 const STATE_TONE = { ACTIVE: "success", INVITED: "info", SUSPENDED: "danger" } as const;
@@ -76,17 +98,19 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         ]
       : [],
   );
-  // the reader's own row follows who is reading: the owner, the admin or the operator of the review
-  const me = ctx.key === "admin" ? "5fb5" : ctx.key === "operator" ? "3c9e" : "7a01";
-  const everyone = TEAM.map((member) => ({ ...member, self: member.ref === me }));
-  const team = state === "only-you" ? everyone.filter((member) => member.self) : manages ? everyone : everyone.filter((member) => member.state === "ACTIVE");
+  // the reader's own row follows who is reading
+  const company = ctx.agency?.agencyId === COMPANY_ID;
+  const me = ({ admin: "5fb5", operator: "3c9e", approver: "8d27", billing: "41b0", viewer: "c3d8" } as Readonly<Record<string, string>>)[ctx.key] ?? (company ? "b201" : "7a01");
+  const everyone = (company ? COMPANY_TEAM : TEAM).map((member) => ({ ...member, self: member.ref === me }));
+  useCloseMenusOnOutsideClick();
+  const team = state === "only-you" || company ? everyone.filter((member) => member.self) : manages ? everyone : everyone.filter((member) => member.state === "ACTIVE");
   const who = (member: Member): string => (member.self === true ? `${contract ? "You" : member.name} (you)` : contract ? `Member ··${member.ref}` : member.name);
   const counts = { active: team.filter((member) => member.state === "ACTIVE").length, invited: team.filter((member) => member.state === "INVITED").length, suspended: team.filter((member) => member.state === "SUSPENDED").length };
 
   if (state === "loading" || state === "error")
     return (
       <>
-        <PageHead title="Team" lead="Give each person only the access they need." />
+        <ProjectHeader stage="files" title="Team" lead="Give each person only the access they need." />
         {state === "loading" ? (
           <div className="kauro-state" role="status">
             <p>Loading your team…</p>
@@ -118,17 +142,55 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
 
   return (
     <>
-      <PageHead
+      <ProjectHeader
+        stage="files"
         title="Team"
         lead="Give each person only the access they need."
-        aside={
-          manages && panel !== "invite" && panel !== "invite-invalid" ? (
-            <Button variant="primary" onClick={() => setPanel("invite")}>
-              Invite someone
-            </Button>
-          ) : undefined
-        }
+        {...(manages && panel !== "invite" && panel !== "invite-invalid"
+          ? {
+              action: (
+                <Button variant="primary" onClick={() => setPanel("invite")}>
+                  Invite someone
+                </Button>
+              ),
+            }
+          : {})}
       />
+      {manages ? null : <p className="kauro-a-only kauro-a-only--page">{onlyLine(ctx, "team", "invite people or remove access")}</p>}
+
+      <section className="kauro-a-duties" aria-labelledby="team-duties">
+        <h2 id="team-duties" className="kauro-visually-hidden">
+          Who approves and who pays
+        </h2>
+        <dl className="kauro-a-duties-list">
+          {(
+            [
+              ["Plans are approved by", ["APPROVER", "OWNER"], "an approver"],
+              ["Quotes and payments are handled by", ["BILLING", "OWNER"], "a billing member"],
+            ] as const
+          ).map(([label, roles, missing]) => {
+            const people = everyone.filter((member) => member.state === "ACTIVE" && (roles as readonly Role[]).includes(member.role));
+            const specialist = people.some((member) => member.role !== "OWNER");
+            return (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>
+                  {people.map((member) => `${member.name} (${ROLE_NAME[member.role]})`).join(", ")}
+                  {!specialist && manages && !company ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <button type="button" className="kauro-text-button" onClick={() => setPanel("invite")}>
+                        Invite {missing}
+                      </button>
+                    </>
+                  ) : null}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </section>
 
       {panel === "invited" ? (
         <Banner tone="success" title="Invitation sent" announce="status">
@@ -145,7 +207,7 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         <section className="kauro-panel kauro-team-panel" aria-labelledby="team-invite">
           <div className="kauro-section-head">
             <h2 id="team-invite">Invite someone</h2>
-            {contract ? null : <p className="kauro-proposed">Proposed: invite by email address (D-UI31-1)</p>}
+            {contract ? null : <p className="kauro-proposed kauro-a-proposed">Proposed: invite by email address (D-UI31-1)</p>}
           </div>
           <form className="kauro-form kauro-team-invite" noValidate onSubmit={submitInvite}>
             <ErrorSummary title="Check the invitation" errors={errors} />
@@ -213,10 +275,9 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
             {counts.active} active
             {counts.invited > 0 ? ` · ${counts.invited} invited` : ""}
             {counts.suspended > 0 ? ` · ${counts.suspended} suspended` : ""}
-            {contract ? null : <span className="kauro-proposed">Names proposed (D-UI31-2)</span>}
+            {contract ? null : <span className="kauro-proposed kauro-a-proposed">Names proposed (D-UI31-2)</span>}
           </p>
         </div>
-        {!manages ? <p className="kauro-muted">You see the active team and its roles. Owners and admins manage invitations and access.</p> : null}
         <div className="kauro-table-region" role="region" aria-labelledby="team-people" tabIndex={0}>
           <table className="kauro-table kauro-team-table">
             <caption className="kauro-visually-hidden">The members of {workspace}</caption>
@@ -287,7 +348,7 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
             </tbody>
           </table>
         </div>
-        {state === "only-you" ? <p className="kauro-team-alone">You are the only member. Invite the people who prepare, approve or pay for projects, each with the role they need.</p> : null}
+        {state === "only-you" || company ? <p className="kauro-team-alone">You are the only member. Invite the people who prepare, approve or pay for projects, each with the role they need.</p> : null}
       </section>
 
       <ConfirmDialog
@@ -317,20 +378,31 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         onCancel={() => setPanel("normal")}
       />
 
-      <section className="kauro-team-roles" aria-labelledby="team-roles">
-        <h2 id="team-roles">What each role can do</h2>
-        <ul>
-          {ALL_ROLES.map((role) => (
-            <li key={role}>
-              <strong>{ROLE_NAME[role]}</strong>
-              <span>{ROLE_SCOPE[role]}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="kauro-muted">Changing roles, transferring ownership, approving plans and closing the agency each ask for a fresh confirmation of identity.</p>
+      <section aria-labelledby="team-roles">
+        <h2 id="team-roles">What each role can and cannot do</h2>
+        <table className="kauro-rtable kauro-a-roles">
+          <caption className="kauro-visually-hidden">Each role, what it can do and what it cannot</caption>
+          <thead>
+            <tr>
+              <th scope="col">Role</th>
+              <th scope="col">Can</th>
+              <th scope="col">Cannot</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ALL_ROLES.map((role) => (
+              <tr key={role}>
+                <th scope="row">{ROLE_NAME[role]}</th>
+                <td data-label="Can">{CAN[role].can}</td>
+                <td data-label="Cannot">{CAN[role].cannot}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="kauro-muted">Every member can download a delivered package and open a support case. Changing a role, transferring ownership, approving a plan, downloading a package and closing the workspace ask the person to confirm it is them first.</p>
       </section>
 
-      {owner ? (
+      {owner && !company ? (
         <section className="kauro-team-ownership" aria-labelledby="team-ownership">
           <h2 id="team-ownership">Ownership</h2>
           <p>You own {workspace}. You can hand ownership to another active member; you then stay on the team as an admin.</p>
@@ -342,7 +414,7 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         title={`Transfer ownership to ${contract ? "Member ··5fb5" : "Marco Bianchi"}`}
         summary={<p>{contract ? "Member ··5fb5" : "Marco Bianchi"}, now an admin, becomes the owner of {workspace}. You become an admin.</p>}
         effects={[
-          { id: "owner", description: <p>The new owner can close the agency, change roles and transfer ownership again.</p>, acknowledgeLabel: "I understand who becomes the owner" },
+          { id: "owner", description: <p>The new owner can close the workspace, change roles and transfer ownership again.</p>, acknowledgeLabel: "I understand who becomes the owner" },
           { id: "me", description: <p>You lose the owner&apos;s actions and keep the admin&apos;s.</p>, acknowledgeLabel: "I understand I become an admin" },
         ]}
         copy={{ approve: "Confirm identity and transfer", cancel: "Keep ownership", errorSummaryTitle: "Check before transferring" }}
@@ -351,4 +423,27 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
       />
     </>
   );
+}
+
+/** A row's menu (a <details>) closes on a click outside it and on Escape; it listens to click, never closing it inside pointerdown. */
+function useCloseMenusOnOutsideClick(): void {
+  useEffect(() => {
+    const close = (except: EventTarget | null): void => {
+      for (const menu of document.querySelectorAll<HTMLDetailsElement>("details.kauro-menu[open]")) if (!(except instanceof Node && menu.contains(except))) menu.open = false;
+    };
+    const onClick = (event: MouseEvent): void => close(event.target);
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      const open = document.querySelector<HTMLDetailsElement>("details.kauro-menu[open]");
+      if (open === null) return;
+      open.open = false;
+      open.querySelector("summary")?.focus();
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 }

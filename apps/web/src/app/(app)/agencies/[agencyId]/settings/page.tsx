@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { message } from "../../../../../copy/en.ts";
 import { SettingsScreen } from "../../../../../screens/settings/container.tsx";
+import { PageHeader } from "../../../../../screens/shared/project-header.tsx";
 import { idOrNull } from "../../../../../screens/shared/params.ts";
 
 // UI32 Settings (design D-ROUTE-1): the agency comes from the path.
@@ -10,7 +11,7 @@ export default async function Page({ params }: { readonly params: Promise<{ agen
   if (agency === null) notFound();
   return (
     <>
-      <h1>{message("screen.settings.title")}</h1>
+      <PageHeader title={message("screen.settings.title")} lead={message("screen.settings.lead.body")} />
       <SettingsScreen agencyId={agency} />
     </>
   );

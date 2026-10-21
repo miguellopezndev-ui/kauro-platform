@@ -11,8 +11,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
   if (idOrNull(agencyId) === null || idOrNull(id) === null || (audit !== undefined && idOrNull(audit) === null)) notFound();
   return (
     <>
-      <ProjectHeader current="check" />
-      <h1>{message("health-check.title")}</h1>
+      <ProjectHeader stage="check" title={message("health-check.title")} lead={message("screen.health.lead.body")} />
       <HealthCheckScreen auditId={idOrNull(audit)} agencyId={agencyId} projectId={id} />
     </>
   );

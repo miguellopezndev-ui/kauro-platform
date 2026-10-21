@@ -12,8 +12,7 @@ export default async function Page({ params }: { readonly params: Promise<{ agen
   if (agency === null || project === null) notFound();
   return (
     <>
-      <ProjectHeader current="files" />
-      <h1>{message("screen.sources.seal.title")}</h1>
+      <ProjectHeader stage="files" title={message("screen.sources.seal.title")} lead={message("screen.sources.seal.lead.body")} />
       <SealScreen agencyId={agency} projectId={project} />
     </>
   );

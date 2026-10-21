@@ -121,7 +121,6 @@ export function BillingDetails({ agency, detail, refund, form, projectHref }: Bi
   const { order } = detail;
   return (
     <div className="kauro-billing">
-      <p className="kauro-screen-lead">{message("screen.billing.lead.body")}</p>
       <section className="kauro-ledger-head" aria-labelledby="billing-order">
         <h2 id="billing-order">{message("screen.billing.order.heading")}</h2>
         <dl>
