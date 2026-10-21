@@ -15,7 +15,7 @@ import { type ReactElement } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { Back, OPS_PATH, OpsHead, OpsPage, SectionHead, Word } from "./ops-kit.tsx";
-import { CLAIMS, CLAIM_DAYS, CUSTOMERS, FIRST_RATE, LINES, PAID_PROJECTS, REPEAT_RATE, SERVICE_NAME, WINDOW_MONTHS, amount, customerById, earnedOf, sellerById, type Customer } from "./sales.ts";
+import { CLAIMS, CLAIM_DAYS, CUSTOMERS, FIRST_RATE, LINES, PAID_PROJECTS, REPEAT_RATE, SERVICE_NAME, WINDOW_MONTHS, amount, customerById, earnedOf, sellerById, usd, type Customer, type Line } from "./sales.ts";
 
 export const UI35_STATES: readonly StateDef[] = [
   { key: "normal", label: "Customer", note: "Coastline Analytics: acquired and served by Daniel Kim, inside the 12-month window of repeats; its two paid projects." },
@@ -30,6 +30,7 @@ export function AgencyRelationship({ state }: PrototypeProps): ReactElement {
   const server = sellerById(customer.servedBy);
   const claim = CLAIMS.find((one) => one.organisation === customer.name && one.state === "CONVERTED");
   const projects = PAID_PROJECTS.filter((one) => one.customerId === customer.id);
+  const offsetOf = (name: string): Line | undefined => LINES.find((one) => one.customer === customer.name && one.project === name && one.offset !== undefined);
   const lineOf = (name: string, paidOn: string) => LINES.find((one) => one.customer === customer.name && one.project === name && one.paidOn === paidOn);
   const lead = `${customer.kind} · ${acquirer === undefined ? "came direct" : `came through ${acquirer.name}`} · first paid ${customer.firstPaid}`;
   return (
@@ -84,7 +85,7 @@ export function AgencyRelationship({ state }: PrototypeProps): ReactElement {
         </section>
       </div>
       <section aria-labelledby="projects-h">
-        <SectionHead id="projects-h" title="Paid projects" meta={`${customer.projects} paid since ${customer.firstPaid} · Collected is the service paid, after discount and without tax`} />
+        <SectionHead id="projects-h" title="Paid projects" meta={`${customer.projects} paid since ${customer.firstPaid} · Net revenue: what was actually paid for the service, after discount and refunds, without tax`} />
         <div className="kauro-ops-tablewrap">
           <div className="kauro-table-region">
             <table className="kauro-table kauro-ops-table kauro-ops-table--cards">
@@ -94,7 +95,7 @@ export function AgencyRelationship({ state }: PrototypeProps): ReactElement {
                   <th scope="col">Project</th>
                   <th scope="col">Paid on</th>
                   <th scope="col" className="kauro-table-end">
-                    Collected (USD)
+                    Net revenue (USD)
                   </th>
                   {acquirer === undefined ? null : (
                     <th scope="col" className="kauro-table-end">
@@ -114,12 +115,13 @@ export function AgencyRelationship({ state }: PrototypeProps): ReactElement {
                         <span className="kauro-ops-sub">
                           {SERVICE_NAME[project.service]}
                           {project.discount === null ? "" : ` · ${project.discount}`}
+                          {project.refund === undefined ? "" : ` · refund ${project.refund.reference} of ${usd(project.refund.cents)} on ${project.refund.on}`}
                         </span>
                       </th>
                       <td data-label="Paid on">
                         <span>{project.paidOn}</span>
                       </td>
-                      <td className="kauro-table-end" data-label="Collected (USD)">
+                      <td className="kauro-table-end" data-label="Net revenue (USD)">
                         <span>{amount(project.collectedCents)}</span>
                       </td>
                       {acquirer === undefined ? null : (
@@ -127,6 +129,7 @@ export function AgencyRelationship({ state }: PrototypeProps): ReactElement {
                           <span>
                             {line === undefined ? "—" : amount(earnedOf(line))}
                             {line === undefined ? null : <span className="kauro-ops-sub">{line.rate}% · {line.sequence === "FIRST" ? "first" : "repeat"}</span>}
+                            {offsetOf(project.name) === undefined ? null : <span className="kauro-ops-sub">{amount(earnedOf(offsetOf(project.name) as Line))} offset, {offsetOf(project.name)?.offset?.approvedOn}</span>}
                           </span>
                         </td>
                       )}

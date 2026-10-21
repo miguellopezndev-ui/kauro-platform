@@ -43,13 +43,13 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
         <p className="kauro-muted">The largest drop is between a finished check and an approved plan: 14 to 6.</p>
       </section>
       <section aria-labelledby="money-h">
-        <SectionHead id="money-h" title="Money this month" meta="Service collected after discounts, without tax; costs as invoiced" aside={<Link href={OPS_PATH.payouts}>What is owed to sellers</Link>} />
+        <SectionHead id="money-h" title="Money this month" meta="Collections, not invoices: the service actually paid, after discounts and refunds, without tax; costs as invoiced" aside={<Link href={OPS_PATH.payouts}>What is owed to sellers</Link>} />
         <Figures
           label="Money this month"
           items={[
-            { label: "Collected", value: usd(400_575), note: "4 paid projects" },
+            { label: "Net revenue", value: usd(370_575), note: "4 paid projects, less a USD 300.00 refund" },
             { label: "Direct costs", value: usd(60_480), note: "Computing, storage, providers, bank fees" },
-            { label: "Left after direct costs", value: usd(340_095), note: "Before seller commission and tax" },
+            { label: "Left after direct costs", value: usd(310_095), note: "Before seller commission and retainers" },
           ]}
         />
       </section>
@@ -62,7 +62,7 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Largest customer</dt>
-            <dd>Northwind Data: 52% of the money collected, from 2 projects</dd>
+            <dd>Northwind Data: 56% of the net revenue, from 2 projects</dd>
           </div>
           <div>
             <dt>Taxes</dt>

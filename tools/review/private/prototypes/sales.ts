@@ -28,9 +28,9 @@ export const TODAY = "Wednesday, Oct 21, 2026";
 export const AS_OF = "09:12 Bogotá";
 
 /** "USD 1,295.00": money in a sentence. */
-export const usd = (cents: number): string => `USD ${amount(cents)}`;
+export const usd = (cents: number): string => (cents < 0 ? `\u2212USD ${amount(-cents)}` : `USD ${amount(cents)}`);
 /** "1,295.00": money in a table cell, its currency in the column's header. */
-export const amount = (cents: number): string => (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const amount = (cents: number): string => `${cents < 0 ? "\u2212" : ""}${(Math.abs(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const commissionOf = (basisCents: number, rate: number): number => Math.round((basisCents * rate) / 100);
 
 export type Service = "CLEAN" | "HUBSPOT" | "SALESFORCE";
@@ -58,6 +58,9 @@ export interface Seller {
   readonly training?: string;
   readonly taxDocument?: string;
   readonly pilot?: string;
+  /** The agreement's fixed monthly payment (retainerCentsPerMonth): 0 unless a signed agreement sets one (owner, 2026-10-21). */
+  readonly retainerCents: number;
+  readonly retainerFrom?: string;
 }
 
 const uuid = (tail: string): string => `0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e${tail}`;
@@ -78,7 +81,8 @@ export const SELLERS: readonly Seller[] = [
     assessment: "Product and English, Jun 12, 2026",
     training: "Offer, data handling and outreach rules, Jul 4, 2026",
     taxDocument: "RUT on file since Jun 28, 2026",
-    pilot: "Jul 1 to Dec 31, 2026; review due Dec 15, 2026",
+    pilot: "Jul 1 to Dec 31, 2026; its review is prepared from Dec 17, 14 days before it ends",
+    retainerCents: 0,
   },
   {
     id: SELLER_ID.amara,
@@ -94,7 +98,9 @@ export const SELLERS: readonly Seller[] = [
     assessment: "Product and English, Aug 4, 2026",
     training: "Offer, data handling and outreach rules, Aug 19, 2026",
     taxDocument: "RUT on file since Aug 12, 2026",
-    pilot: "Aug 17, 2026 to Feb 16, 2027; review due Feb 1, 2027",
+    pilot: "Aug 17, 2026 to Feb 16, 2027; its review is prepared from Feb 2, 2027, 14 days before it ends",
+    retainerCents: 15_000,
+    retainerFrom: "Sep 1, 2026",
   },
   {
     id: SELLER_ID.lucia,
@@ -106,6 +112,7 @@ export const SELLERS: readonly Seller[] = [
     signed: null,
     payout: { label: "—", currency: "USD", state: "NONE" },
     legalReview: "Independent contractor in Colombia, reviewed by counsel on Oct 9, 2026",
+    retainerCents: 0,
   },
   {
     id: SELLER_ID.tomas,
@@ -123,6 +130,7 @@ export const SELLERS: readonly Seller[] = [
     assessment: "Product and English, Jun 15, 2026",
     training: "Offer, data handling and outreach rules, Jul 4, 2026",
     taxDocument: "RUT on file since Jun 30, 2026",
+    retainerCents: 0,
   },
 ];
 /** The seller the seller's console is signed in as (the review's "Seller" person). */
@@ -152,7 +160,7 @@ export const CUSTOMER_ID = { coastline: uuid("7c01"), juniper: uuid("7c11"), lar
 
 export const CUSTOMERS: readonly Customer[] = [
   { id: CUSTOMER_ID.northwind, name: "Northwind Data", kind: "Agency", acquiredBy: null, servedBy: null, firstPaid: "Aug 4, 2026", repeatsUntil: null, projects: 6, collectedCents: 744_625, lastPaid: "Oct 16, 2026" },
-  { id: CUSTOMER_ID.coastline, name: "Coastline Analytics", kind: "Agency", acquiredBy: SELLER_ID.daniel, servedBy: SELLER_ID.daniel, firstPaid: "Aug 26, 2026", repeatsUntil: "Aug 26, 2027", projects: 2, collectedCents: 352_525, lastPaid: "Oct 14, 2026" },
+  { id: CUSTOMER_ID.coastline, name: "Coastline Analytics", kind: "Agency", acquiredBy: SELLER_ID.daniel, servedBy: SELLER_ID.daniel, firstPaid: "Aug 26, 2026", repeatsUntil: "Aug 26, 2027", projects: 2, collectedCents: 322_525, lastPaid: "Oct 14, 2026" },
   { id: CUSTOMER_ID.juniper, name: "Juniper Digital", kind: "Agency", acquiredBy: SELLER_ID.daniel, servedBy: SELLER_ID.daniel, firstPaid: "Sep 3, 2026", repeatsUntil: "Sep 3, 2027", projects: 1, collectedCents: 129_500, lastPaid: "Sep 3, 2026" },
   { id: CUSTOMER_ID.larkspur, name: "Larkspur Home Goods", kind: "Company", acquiredBy: SELLER_ID.daniel, servedBy: SELLER_ID.daniel, firstPaid: "Oct 19, 2026", repeatsUntil: "Oct 19, 2027", projects: 1, collectedCents: 69_500, lastPaid: "Oct 19, 2026" },
   { id: CUSTOMER_ID.fjordline, name: "Fjordline Media", kind: "Agency", acquiredBy: SELLER_ID.amara, servedBy: SELLER_ID.amara, firstPaid: "Sep 2, 2026", repeatsUntil: "Sep 2, 2027", projects: 1, collectedCents: 129_500, lastPaid: "Sep 2, 2026" },
@@ -171,6 +179,8 @@ export interface PaidProject {
   readonly collectedCents: number;
   readonly discount: string | null;
   readonly state: "Preparing" | "Delivered";
+  /** A refund on this project: what was paid back, when, and its reference (the collected figure is net of it). */
+  readonly refund?: { readonly cents: number; readonly on: string; readonly reference: string };
 }
 export const PAID_PROJECTS: readonly PaidProject[] = [
   { customerId: CUSTOMER_ID.northwind, name: "Opportunities", service: "SALESFORCE", paidOn: "Oct 16, 2026", collectedCents: 142_025, discount: "5% repeat discount", state: "Preparing" },
@@ -180,7 +190,7 @@ export const PAID_PROJECTS: readonly PaidProject[] = [
   { customerId: CUSTOMER_ID.northwind, name: "Accounts migration", service: "SALESFORCE", paidOn: "Aug 20, 2026", collectedCents: 218_025, discount: "5% repeat discount", state: "Delivered" },
   { customerId: CUSTOMER_ID.northwind, name: "First import", service: "HUBSPOT", paidOn: "Aug 4, 2026", collectedCents: 129_500, discount: null, state: "Delivered" },
   { customerId: CUSTOMER_ID.coastline, name: "Q4 contacts", service: "HUBSPOT", paidOn: "Oct 14, 2026", collectedCents: 123_025, discount: "5% repeat discount", state: "Preparing" },
-  { customerId: CUSTOMER_ID.coastline, name: "Accounts and contacts", service: "SALESFORCE", paidOn: "Aug 26, 2026", collectedCents: 229_500, discount: null, state: "Delivered" },
+  { customerId: CUSTOMER_ID.coastline, name: "Accounts and contacts", service: "SALESFORCE", paidOn: "Aug 26, 2026", collectedCents: 199_500, discount: null, state: "Delivered", refund: { cents: 30_000, on: "Oct 13, 2026", reference: "RF-2026-0007" } },
   { customerId: CUSTOMER_ID.juniper, name: "HubSpot contacts", service: "HUBSPOT", paidOn: "Sep 3, 2026", collectedCents: 129_500, discount: null, state: "Delivered" },
   { customerId: CUSTOMER_ID.larkspur, name: "Customer list", service: "CLEAN", paidOn: "Oct 19, 2026", collectedCents: 69_500, discount: null, state: "Preparing" },
   { customerId: CUSTOMER_ID.fjordline, name: "Contacts", service: "HUBSPOT", paidOn: "Sep 2, 2026", collectedCents: 129_500, discount: null, state: "Delivered" },
@@ -197,7 +207,8 @@ export interface Line {
   readonly customer: string;
   readonly project: string;
   readonly service: Service;
-  readonly sequence: "FIRST" | "REPEAT";
+  /** FIRST and REPEAT earn the rate; ADJUSTMENT offsets an earlier line after a refund; RETAINER is the agreement's fixed monthly payment. */
+  readonly sequence: "FIRST" | "REPEAT" | "ADJUSTMENT" | "RETAINER";
   readonly basisCents: number;
   readonly rate: number;
   readonly paidOn: string;
@@ -206,8 +217,12 @@ export interface Line {
   readonly state: LineState;
   readonly statement: string | null;
   readonly hold?: { readonly reason: string; readonly review: string };
+  /** An offset after a refund: which refund, which line it adjusts, the rule it applies (owner, 2026-10-21). */
+  readonly offset?: { readonly refund: string; readonly refundCents: number; readonly approvedOn: string; readonly adjusts: string; readonly rule: string };
+  /** A retainer's fixed amount (no rate). */
+  readonly fixedCents?: number;
 }
-const line = (one: Omit<Line, "rate">): Line => ({ ...one, rate: one.sequence === "FIRST" ? FIRST_RATE : REPEAT_RATE });
+const line = (one: Omit<Line, "rate">): Line => ({ ...one, rate: one.sequence === "REPEAT" ? REPEAT_RATE : one.sequence === "RETAINER" ? 0 : FIRST_RATE });
 export const LINES: readonly Line[] = [
   line({ id: "l-01", sellerId: SELLER_ID.daniel, customer: "Coastline Analytics", project: "Accounts and contacts", service: "SALESFORCE", sequence: "FIRST", basisCents: 229_500, paidOn: "Aug 26, 2026", completedOn: "Aug 28, 2026", payableFrom: "Sep 27, 2026", state: "PAID", statement: "st-dk-2026-09" }),
   line({ id: "l-02", sellerId: SELLER_ID.daniel, customer: "Juniper Digital", project: "HubSpot contacts", service: "HUBSPOT", sequence: "FIRST", basisCents: 129_500, paidOn: "Sep 3, 2026", completedOn: "Sep 15, 2026", payableFrom: "Oct 15, 2026", state: "ELIGIBLE", statement: "st-dk-2026-10" }),
@@ -215,9 +230,27 @@ export const LINES: readonly Line[] = [
   line({ id: "l-04", sellerId: SELLER_ID.daniel, customer: "Larkspur Home Goods", project: "Customer list", service: "CLEAN", sequence: "FIRST", basisCents: 69_500, paidOn: "Oct 19, 2026", completedOn: null, payableFrom: null, state: "ACCRUED_PENDING", statement: null }),
   line({ id: "l-05", sellerId: SELLER_ID.amara, customer: "Fjordline Media", project: "Contacts", service: "HUBSPOT", sequence: "FIRST", basisCents: 129_500, paidOn: "Sep 2, 2026", completedOn: "Sep 10, 2026", payableFrom: "Oct 10, 2026", state: "HELD", statement: "st-ao-2026-10", hold: { reason: "A defect report on this project is open (support case 115); held until it is resolved", review: "Nov 4, 2026" } }),
   line({ id: "l-06", sellerId: SELLER_ID.amara, customer: "Halden Outdoor", project: "Dealer list", service: "CLEAN", sequence: "FIRST", basisCents: 69_500, paidOn: "Sep 18, 2026", completedOn: "Sep 28, 2026", payableFrom: "Oct 28, 2026", state: "ELIGIBLE", statement: "st-ao-2026-10" }),
+  line({
+    id: "l-08",
+    sellerId: SELLER_ID.daniel,
+    customer: "Coastline Analytics",
+    project: "Accounts and contacts",
+    service: "SALESFORCE",
+    sequence: "ADJUSTMENT",
+    basisCents: -30_000,
+    paidOn: "Oct 13, 2026",
+    completedOn: null,
+    payableFrom: null,
+    state: "ADJUSTED",
+    statement: "st-dk-2026-10",
+    offset: { refund: "RF-2026-0007", refundCents: 30_000, approvedOn: "Oct 13, 2026", adjusts: "l-01", rule: "Seller agreement 2026-07: commission is counted on the service collected net of refunds" },
+  }),
+  line({ id: "l-09", sellerId: SELLER_ID.amara, customer: "Monthly retainer", project: "September 2026", service: "CLEAN", sequence: "RETAINER", basisCents: 0, fixedCents: 15_000, paidOn: "Sep 30, 2026", completedOn: null, payableFrom: null, state: "PAID", statement: "st-ao-2026-09" }),
+  line({ id: "l-10", sellerId: SELLER_ID.amara, customer: "Monthly retainer", project: "October 2026", service: "CLEAN", sequence: "RETAINER", basisCents: 0, fixedCents: 15_000, paidOn: "Oct 31, 2026", completedOn: null, payableFrom: null, state: "ELIGIBLE", statement: "st-ao-2026-10" }),
   line({ id: "l-07", sellerId: SELLER_ID.tomas, customer: "Quillon Partners", project: "Contacts and deals", service: "HUBSPOT", sequence: "FIRST", basisCents: 199_500, paidOn: "Jul 20, 2026", completedOn: "Jul 28, 2026", payableFrom: "Aug 27, 2026", state: "PAID", statement: "st-tv-2026-08" }),
 ];
-export const earnedOf = (one: Line): number => commissionOf(one.basisCents, one.rate);
+export const earnedOf = (one: Line): number => one.fixedCents ?? commissionOf(one.basisCents, one.rate);
+export const isRetainer = (one: Line): boolean => one.sequence === "RETAINER";
 export const linesOf = (sellerId: string): readonly Line[] => LINES.filter((one) => one.sellerId === sellerId);
 
 export type StatementState = "DRAFT" | "ISSUED" | "DISPUTED" | "APPROVED" | "PAID" | "CORRECTED";
@@ -235,6 +268,7 @@ export const STATEMENTS: readonly Statement[] = [
   { id: "st-dk-2026-10", sellerId: SELLER_ID.daniel, period: "October 2026", state: "DRAFT", issuedOn: "Nov 9, 2026", payDue: "Nov 17, 2026", paidOn: null, reference: null },
   { id: "st-ao-2026-10", sellerId: SELLER_ID.amara, period: "October 2026", state: "DRAFT", issuedOn: "Nov 9, 2026", payDue: "Nov 17, 2026", paidOn: null, reference: null },
   { id: "st-dk-2026-09", sellerId: SELLER_ID.daniel, period: "September 2026", state: "PAID", issuedOn: "Oct 7, 2026", payDue: "Oct 15, 2026", paidOn: "Oct 15, 2026", reference: "KAU-CP-2026-09-001" },
+  { id: "st-ao-2026-09", sellerId: SELLER_ID.amara, period: "September 2026", state: "PAID", issuedOn: "Oct 7, 2026", payDue: "Oct 15, 2026", paidOn: "Oct 15, 2026", reference: "KAU-CP-2026-09-002" },
   { id: "st-tv-2026-08", sellerId: SELLER_ID.tomas, period: "August 2026", state: "PAID", issuedOn: "Sep 7, 2026", payDue: "Sep 14, 2026", paidOn: "Sep 14, 2026", reference: "KAU-CP-2026-08-001" },
 ];
 export const statementLines = (statement: Statement): readonly Line[] => LINES.filter((one) => one.statement === statement.id);
@@ -265,18 +299,34 @@ export function lineWord(one: Line): string {
   }
 }
 
-/** A seller's money, by state, from the lines (what the owner's Sellers and Seller pages total). */
-export function moneyOf(sellerId: string) {
-  const lines = linesOf(sellerId);
+/**
+ * A seller's money, by state, from the lines (the owner's Sellers and Seller pages). Net revenue is what the seller's customers actually
+ * paid for the service, net of refunds and without tax, each collection counted once, in the month it happened (a refund in the month of
+ * the refund). Commission generated, pending and paid leave the retainer out; the retainer is kept apart and never hidden.
+ * `month` ("Oct", "Sep") narrows revenue, commission generated and paid to that month; pending is always as of now.
+ */
+export function moneyOf(sellerId: string, month: string | null = null) {
+  const all = linesOf(sellerId);
+  const lines = all.filter((one) => !isRetainer(one));
+  const retainers = all.filter(isRetainer);
+  const statementOf = (one: Line): Statement | undefined => STATEMENTS.find((statement) => statement.id === one.statement);
+  const inMonth = (one: Line): boolean => month === null || one.paidOn.startsWith(month);
+  const isPaid = (one: Line): boolean => one.state === "PAID" || statementOf(one)?.state === "PAID";
+  const paidIn = (one: Line): boolean => month === null || (statementOf(one)?.paidOn ?? "").startsWith(month);
   const open = STATEMENTS.filter((one) => one.sellerId === sellerId && one.state !== "PAID");
   const onOpen = lines.filter((one) => open.some((statement) => statement.id === one.statement));
+  const sum = (list: readonly Line[]): number => list.reduce((total, one) => total + earnedOf(one), 0);
   return {
-    collected: lines.reduce((sum, one) => sum + one.basisCents, 0),
-    earned: lines.reduce((sum, one) => sum + earnedOf(one), 0),
+    collected: lines.filter(inMonth).reduce((total, one) => total + one.basisCents, 0),
+    earned: sum(lines.filter(inMonth)),
     payable: payableOf(onOpen),
     held: heldOf(lines),
-    accruing: lines.filter((one) => one.state === "ACCRUED_PENDING").reduce((sum, one) => sum + earnedOf(one), 0),
-    paid: lines.filter((one) => one.state === "PAID").reduce((sum, one) => sum + earnedOf(one), 0),
+    accruing: sum(lines.filter((one) => one.state === "ACCRUED_PENDING")),
+    pending: sum(lines.filter((one) => !isPaid(one))),
+    paid: sum(lines.filter((one) => isPaid(one) && paidIn(one))),
+    offsets: sum(lines.filter((one) => one.sequence === "ADJUSTMENT")),
+    retainerPending: sum(retainers.filter((one) => !isPaid(one))),
+    retainerPaid: sum(retainers.filter((one) => isPaid(one) && paidIn(one))),
   };
 }
 
@@ -293,10 +343,32 @@ export interface Claim {
   readonly decided: string | null;
   readonly ends: string | null;
   readonly evidence: string;
-  readonly reason?: string;
+  /** The internal reason of a refusal, from the closed list (owner only), with its evidence; the seller reads only its message. */
+  readonly reason?: ClaimReasonKey;
+  readonly reasonEvidence?: string;
+  readonly reasonNote?: string;
+  /** Every decision on the claim, oldest first (owner only). */
+  readonly history?: readonly (readonly [date: string, event: string])[];
 }
+
+/**
+ * The closed list of reasons a claim can be refused for (owner, 2026-10-21: approved; the legal validation of the contractual claim rules is
+ * still pending). Each has its internal label (the owner's) and the message the seller reads, which never reveals a commercial relationship
+ * or another seller's claim. "Other" is the one documented exception and needs a written note.
+ */
+export type ClaimReasonKey = "CUSTOMER_OR_DIRECT" | "OTHER_CLAIM" | "OWNER_RULE" | "EVIDENCE" | "AGREEMENT_SCOPE" | "DUPLICATE" | "OTHER";
+export const CLAIM_REASONS: readonly { readonly key: ClaimReasonKey; readonly internal: string; readonly seller: string; readonly note: boolean }[] = [
+  { key: "CUSTOMER_OR_DIRECT", internal: "Already a customer, or already in direct contact with Kauro", seller: "Not available to claim", note: false },
+  { key: "OTHER_CLAIM", internal: "Another seller holds a live claim on it", seller: "Not available to claim", note: false },
+  { key: "OWNER_RULE", internal: "Excluded by a recorded owner rule", seller: "Not available to claim", note: false },
+  { key: "EVIDENCE", internal: "Not enough evidence of the seller's own work", seller: "Not enough evidence of your own work", note: false },
+  { key: "AGREEMENT_SCOPE", internal: "Outside the seller agreement (for example a consumer)", seller: "Outside your seller agreement", note: false },
+  { key: "DUPLICATE", internal: "Duplicate of the seller's own claim", seller: "Duplicate of a claim you already made", note: false },
+  { key: "OTHER", internal: "Other", seller: "Not available to claim", note: true },
+];
+export const claimReason = (key: ClaimReasonKey | undefined) => CLAIM_REASONS.find((one) => one.key === key);
 export const CLAIMS: readonly Claim[] = [
-  { id: "c-01", organisation: "Fernhill Growth Partners", kind: "Agency", sellerId: SELLER_ID.daniel, state: "SUBMITTED", submitted: "Oct 20, 2026", decided: null, ends: null, evidence: "Its own site and the HubSpot partner directory, seen on Oct 14, 2026; qualified on Oct 19 (runs HubSpot migrations for clients)" },
+  { id: "c-01", organisation: "Fernhill Growth Partners", kind: "Agency", sellerId: SELLER_ID.daniel, state: "SUBMITTED", submitted: "Oct 20, 2026", decided: null, ends: null, evidence: "Its own site and the HubSpot partner directory, seen on Oct 14, 2026; qualified on Oct 19 (runs HubSpot migrations for clients)", history: [["Oct 20, 2026", "Claim submitted by Daniel Kim, with the source"], ["Oct 20, 2026", "Checked against Kauro's records: no other claim, no customer, no fit inquiry"]] },
   { id: "c-02", organisation: "Brightwater Collective", kind: "Agency", sellerId: SELLER_ID.amara, state: "ACCEPTED", submitted: "Aug 21, 2026", decided: "Aug 22, 2026", ends: "Nov 20, 2026", evidence: "Its own site, seen on Aug 19, 2026" },
   { id: "c-03", organisation: "Ostra Revenue Ops", kind: "Agency", sellerId: SELLER_ID.daniel, state: "ACCEPTED", submitted: "Oct 1, 2026", decided: "Oct 2, 2026", ends: "Dec 31, 2026", evidence: "A published conference speaker list, seen on Sep 30, 2026" },
   { id: "c-04", organisation: "Marlow & Pike", kind: "Company", sellerId: SELLER_ID.tomas, state: "ACCEPTED", submitted: "Sep 1, 2026", decided: "Sep 2, 2026", ends: "Dec 1, 2026", evidence: "Its own careers page (CRM administrator role), seen on Aug 31, 2026" },
@@ -307,7 +379,25 @@ export const CLAIMS: readonly Claim[] = [
   { id: "c-09", organisation: "Fjordline Media", kind: "Agency", sellerId: SELLER_ID.amara, state: "CONVERTED", submitted: "Aug 18, 2026", decided: "Aug 19, 2026", ends: "Sep 2, 2026", evidence: "Its own site, seen on Aug 17, 2026" },
   { id: "c-10", organisation: "Coastline Analytics", kind: "Agency", sellerId: SELLER_ID.daniel, state: "CONVERTED", submitted: "Jul 17, 2026", decided: "Jul 18, 2026", ends: "Aug 26, 2026", evidence: "Its own site, seen on Jul 9, 2026" },
   { id: "c-11", organisation: "Quillon Partners", kind: "Agency", sellerId: SELLER_ID.tomas, state: "CONVERTED", submitted: "Jul 6, 2026", decided: "Jul 7, 2026", ends: "Jul 20, 2026", evidence: "Its own site, seen on Jul 3, 2026" },
-  { id: "c-12", organisation: "Pinewood Analytics", kind: "Agency", sellerId: SELLER_ID.amara, state: "REJECTED", submitted: "Sep 14, 2026", decided: "Sep 15, 2026", ends: null, evidence: "Its own site, seen on Sep 12, 2026", reason: "Not available to claim" },
+  {
+    id: "c-12",
+    organisation: "Pinewood Analytics",
+    kind: "Agency",
+    sellerId: SELLER_ID.amara,
+    state: "REJECTED",
+    submitted: "Sep 14, 2026",
+    decided: "Sep 18, 2026",
+    ends: null,
+    evidence: "Its own site, seen on Sep 12, 2026",
+    reason: "CUSTOMER_OR_DIRECT",
+    reasonEvidence: "Pinewood Analytics sent Kauro's contact form on Sep 10, 2026, four days before the claim (fit inquiry FI-2026-0031)",
+    history: [
+      ["Sep 14, 2026", "Claim submitted by Amara Okafor, with the source"],
+      ["Sep 15, 2026", "Refused: already in direct contact with Kauro. Amara Okafor read: Not available to claim"],
+      ["Sep 16, 2026", "Amara Okafor asked for a review"],
+      ["Sep 18, 2026", "Review: refusal upheld, with the same reason; the fit inquiry predates the claim"],
+    ],
+  },
 ];
 export const claimsOf = (sellerId: string): readonly Claim[] => CLAIMS.filter((one) => one.sellerId === sellerId);
 

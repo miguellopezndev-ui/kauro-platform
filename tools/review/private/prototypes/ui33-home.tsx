@@ -16,7 +16,7 @@ import { type ReactElement } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { Rings } from "./kit.tsx";
-import { Figures, OPS_PATH, OpsHead, OpsPage, Queue, type QueueItem, SectionHead, Word } from "./ops-kit.tsx";
+import { type AlertItem, Alerts, Figures, OPS_PATH, OpsHead, OpsPage, Queue, type QueueItem, SectionHead, Word } from "./ops-kit.tsx";
 import { AS_OF, CLAIMS, CLAIM_DAYS, ELIGIBLE_DAYS, FIRST_RATE, SELLER, SELLER_ID, TODAY, linesOf, moneyOf, statementsOf, usd } from "./sales.ts";
 
 export const UI33_STATES: readonly StateDef[] = [
@@ -28,7 +28,7 @@ export const UI33_STATES: readonly StateDef[] = [
 const STAGES = [
   { name: "Upload and seal your files", open: 1, kauro: 0, customer: 1, stalled: 1 },
   { name: "The free data health check", open: 1, kauro: 1, customer: 0, stalled: 0 },
-  { name: "Review and approve the plan", open: 2, kauro: 0, customer: 2, stalled: 0 },
+  { name: "Review and approve the plan", open: 2, kauro: 0, customer: 2, stalled: 1 },
   { name: "Quote and payment", open: 1, kauro: 1, customer: 0, stalled: 0 },
   { name: "Preparation and verification", open: 3, kauro: 3, customer: 0, stalled: 0 },
   { name: "Delivery and your import", open: 1, kauro: 0, customer: 1, stalled: 0 },
@@ -46,9 +46,31 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
     { key: "message", what: "Authorise Daniel Kim's follow-up to Saltmarsh Digital", why: "Prepared from the current resources, for one send.", due: "Since Oct 20", action: { label: "Review the message", href: OPS_PATH.outreach } },
     { key: "release", what: "Promote release 2026.10.3", why: "Every gate passed on this exact image.", due: "Since Oct 20", action: { label: "Open the release", href: OPS_PATH.releases } },
   ];
-  const owed = [SELLER_ID.daniel, SELLER_ID.amara, SELLER_ID.tomas].map(moneyOf);
-  const payable = owed.reduce((sum, one) => sum + one.payable, 0);
+  const owed = [SELLER_ID.daniel, SELLER_ID.amara, SELLER_ID.tomas].map((id) => moneyOf(id));
+  const retainer = owed.reduce((sum, one) => sum + one.retainerPending, 0);
+  const payable = owed.reduce((sum, one) => sum + one.payable, 0) + retainer;
   const held = owed.reduce((sum, one) => sum + one.held, 0);
+  const alerts: readonly AlertItem[] = [
+    {
+      key: "spring",
+      kind: "INACTIVE",
+      what: "Northwind Data · Spring contacts",
+      detail: "No relevant progress since Oct 5, 16 days ago: no file has been sealed yet. No deadline is near.",
+    },
+    {
+      key: "customer-list",
+      kind: "DEADLINE_SOON",
+      what: "Northwind Data · Customer list",
+      detail: "The files of its free data health check are deleted on Oct 23, 7 days after the check was ready, unless the project is bought.",
+    },
+    {
+      key: "accounts",
+      kind: "BLOCKED",
+      what: "Northwind Data · Accounts and contacts",
+      detail: "The plan cannot be approved: the destination settings were confirmed more than 30 days ago and must be confirmed again.",
+      also: "inactive since Oct 6, 15 days without relevant progress.",
+    },
+  ];
   const total = STAGES.reduce((sum, stage) => ({ open: sum.open + stage.open, kauro: sum.kauro + stage.kauro, customer: sum.customer + stage.customer, stalled: sum.stalled + stage.stalled }), { open: 0, kauro: 0, customer: 0, stalled: 0 });
   return (
     <>
@@ -64,9 +86,13 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
           items={[
             { label: "Received and matched", value: usd(400_575), note: "4 transfers, each matched to its order", href: OPS_PATH.finance },
             { label: "To match", value: quiet ? usd(0) : usd(227_500), note: quiet ? "Every transfer matched · checked 09:12" : "2 transfers received, not matched yet", href: OPS_PATH.finance },
-            { label: "Owed to sellers", value: usd(payable), note: `Payable by Nov 17 · ${usd(held)} held`, href: OPS_PATH.payouts },
+            { label: "Owed to sellers", value: usd(payable), note: `By Nov 17, with a ${usd(retainer)} retainer · ${usd(held)} held`, href: OPS_PATH.payouts },
           ]}
         />
+      </section>
+      <section aria-labelledby="alerts-h">
+        <SectionHead id="alerts-h" title="Alerts" meta="Each project once, under its most urgent kind: blocked, deadline passed, deadline in 2 days, inactive 14 days" />
+        {quiet ? <p className="kauro-ops-sentence">No project is blocked, past or near a deadline, or inactive.</p> : <Alerts items={alerts} label="Projects that need attention, most urgent first" />}
       </section>
       <section aria-labelledby="stage-h">
         <SectionHead id="stage-h" title="Projects by stage" meta="Every open project of every workspace" />
@@ -75,7 +101,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
             <li key={stage.name}>
               <span className="kauro-ops-stages-name">{stage.name}</span>
               <span className="kauro-ops-sub">
-                {[`${stage.open} open`, stage.kauro > 0 ? `${stage.kauro} waiting on Kauro` : null, stage.customer > 0 ? `${stage.customer} on the customer` : null, stage.stalled > 0 ? `${stage.stalled} over 14 days` : null].filter((part) => part !== null).join(" · ")}
+                {[`${stage.open} open`, stage.kauro > 0 ? `${stage.kauro} waiting on Kauro` : null, stage.customer > 0 ? `${stage.customer} on the customer` : null, stage.stalled > 0 ? `${stage.stalled} inactive 14 days` : null].filter((part) => part !== null).join(" · ")}
               </span>
             </li>
           ))}
@@ -97,7 +123,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
                     Waiting on the customer
                   </th>
                   <th scope="col" className="kauro-table-end">
-                    In the stage over 14 days
+                    Inactive 14 days
                   </th>
                 </tr>
               </thead>
@@ -114,7 +140,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
                     <td className="kauro-table-end" data-label="Waiting on the customer">
                       <span>{count(stage.customer)}</span>
                     </td>
-                    <td className="kauro-table-end" data-label="Over 14 days">
+                    <td className="kauro-table-end" data-label="Inactive 14 days">
                       <span>{count(stage.stalled, true)}</span>
                     </td>
                   </tr>
@@ -132,7 +158,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
                   <td className="kauro-table-end" data-label="Waiting on the customer">
                     <span>{total.customer}</span>
                   </td>
-                  <td className="kauro-table-end" data-label="Over 14 days">
+                  <td className="kauro-table-end" data-label="Inactive 14 days">
                     <span>{total.stalled}</span>
                   </td>
                 </tr>
@@ -140,7 +166,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
             </table>
           </div>
         </div>
-        <p className="kauro-muted">Over 14 days: Harbor Mill&apos;s files for Northwind Data, uploading since Oct 5.</p>
+        <p className="kauro-muted">Inactive: 14 days without relevant progress, counted from the project&apos;s recorded events.</p>
       </section>
       <section aria-labelledby="channels-h">
         <SectionHead id="channels-h" title="Sellers and customers this month" />
@@ -149,7 +175,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
             New customers in October: 1, a company (Larkspur Home Goods), brought by Daniel Kim. Direct: none. <a href={OPS_PATH.customers}>Customers</a>
           </li>
           <li>
-            Claims: {quiet ? "none to decide" : "1 to decide"}; 4 accepted and running, the next to end Brightwater Collective&apos;s on Nov 20. <a href={OPS_PATH.sellers}>Sellers</a>
+            Claims: {quiet ? "none to decide" : "1 to decide"}; 4 accepted and running, the next to end Brightwater Collective&apos;s on Nov 20, with alerts on Nov 6 and Nov 17. <a href={OPS_PATH.sellers}>Sellers</a>
           </li>
         </ul>
       </section>
@@ -236,14 +262,14 @@ function SellerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
         <Figures
           label="Your money"
           items={[
-            { label: "Next payment", value: usd(money.payable), note: "By Nov 17 · October statement, issued Nov 9" },
+            { label: "Next payment", value: usd(money.payable), note: money.offsets < 0 ? `By Nov 17 · after a ${usd(-money.offsets)} offset for a refund` : "By Nov 17 · October statement, issued Nov 9" },
             { label: "Earned, not yet payable", value: usd(money.accruing), note: `${accruing.length} lines · each payable ${ELIGIBLE_DAYS} days after its project is complete` },
             { label: "Paid in 2026", value: usd(money.paid), note: `Last paid ${paid[0]?.paidOn ?? "—"}` },
           ]}
         />
       </section>
       <section aria-labelledby="claims-h">
-        <SectionHead id="claims-h" title="Your claims" meta={`An accepted claim lasts ${CLAIM_DAYS} days`} aside={<a href={OPS_PATH.prospects}>All prospects</a>} />
+        <SectionHead id="claims-h" title="Your claims" meta={`An accepted claim lasts ${CLAIM_DAYS} days. You are alerted 14 and 3 days before it ends.`} aside={<a href={OPS_PATH.prospects}>All prospects</a>} />
         <div className="kauro-ops-tablewrap">
           <div className="kauro-table-region">
             <table className="kauro-table kauro-ops-table kauro-ops-table--cards kauro-ops-table--compact">

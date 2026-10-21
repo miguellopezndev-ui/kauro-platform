@@ -46,6 +46,7 @@ import {
 
 export const UI37_STATES: readonly StateDef[] = [
   { key: "normal", label: "Active seller", note: "Daniel Kim: two things need you, money by state, three customers, claims and the agreement." },
+  { key: "retainer", label: "With a retainer and a held line", note: "Amara Okafor: the signed agreement sets a USD 150.00 monthly retainer, shown with the rates and counted in what is owed; one line held." },
   { key: "candidate", label: "Onboarding", note: "Lucía Ferrer, a candidate: the setup steps are the page's purpose and come first; no money section is drawn yet." },
   { key: "ended", label: "Ended", note: "Tomás Vidal, ended on Sep 30: what Kauro still owes, and the history, kept." },
   { key: "terminate", label: "Preparing a termination", note: "What ends at once, and what Kauro still owes and keeps paying." },
@@ -101,10 +102,16 @@ function MoneyFigures({ seller }: { readonly seller: Seller }): ReactElement {
       <Figures
         label="Money since the start"
         items={[
-          { label: "Collected", value: usd(money.collected), note: `From ${customers} ${customers === 1 ? "customer" : "customers"}; the commission base` },
-          { label: "Commission", value: usd(money.earned), note: "Earned on every line, whatever its state" },
-          { label: "Owed now", value: usd(money.payable), note: money.payable > 0 ? `By Nov 17${money.held > 0 ? ` · ${usd(money.held)} held` : ""}` : "Nothing on an open statement" },
-          { label: "Paid", value: usd(money.paid), note: paid[0]?.paidOn === undefined ? "No statement paid yet" : `Last paid ${paid[0].paidOn}` },
+          { label: "Net revenue", value: usd(money.collected), note: `Collected from ${customers} ${customers === 1 ? "customer" : "customers"}, net of refunds, without tax` },
+          { label: "Commission generated", value: usd(money.earned), note: money.offsets < 0 ? `After a ${usd(-money.offsets)} offset for a refund` : "Every line, whatever its state" },
+          {
+            label: "Commission pending",
+            value: usd(money.pending),
+            note: [money.payable !== 0 ? `${usd(money.payable)} by Nov 17` : null, money.held > 0 ? `${usd(money.held)} held` : null, money.accruing > 0 ? `${usd(money.accruing)} waiting` : null, money.retainerPending > 0 ? `plus a ${usd(money.retainerPending)} retainer` : null]
+              .filter((part) => part !== null)
+              .join(" · ") || "Nothing pending",
+          },
+          { label: "Commission paid", value: usd(money.paid), note: `${paid[0]?.paidOn === undefined ? "No statement paid yet" : `Last paid ${paid[0].paidOn}`}${money.retainerPaid > 0 ? ` · plus a ${usd(money.retainerPaid)} retainer` : ""}` },
         ]}
       />
     </section>
@@ -122,6 +129,17 @@ function ByState({ seller }: { readonly seller: Seller }): ReactElement {
     <section aria-labelledby="state-h">
       <SectionHead id="state-h" title="Money by state" aside={<Link href={OPS_PATH.statements(seller.id)}>Statements and lines</Link>} />
       <dl className="kauro-ops-facts kauro-ops-money">
+        {lines
+          .filter((one) => one.offset !== undefined)
+          .map((one) => (
+            <div key={one.id}>
+              <dt>Offset after a refund</dt>
+              <dd>{usd(earnedOf(one))}</dd>
+              <dd className="kauro-ops-sub">
+                {one.customer}, {one.project}: refund {one.offset?.refund} of {usd(one.offset?.refundCents ?? 0)}, approved {one.offset?.approvedOn}. {one.offset?.rule}. On the October statement.
+              </dd>
+            </div>
+          ))}
         {accruing.length === 0 ? null : (
           <div>
             <dt>Earned, waits for the projects to finish</dt>
@@ -143,7 +161,7 @@ function ByState({ seller }: { readonly seller: Seller }): ReactElement {
             <dt>Payable by {statement.payDue}</dt>
             <dd>{usd(payableOf(statementLines(statement)))}</dd>
             <dd className="kauro-ops-sub">
-              The {statement.period} statement, a draft until it is issued on {statement.issuedOn}.
+              The {statement.period} statement{statementLines(statement).some((one) => one.sequence === "RETAINER") ? `, including the ${usd(seller.retainerCents)} monthly retainer of the signed agreement` : ""}, a draft until it is issued on {statement.issuedOn}.
             </dd>
           </div>
         ))}
@@ -152,7 +170,7 @@ function ByState({ seller }: { readonly seller: Seller }): ReactElement {
             <dt>Paid on {statement.paidOn}</dt>
             <dd>{usd(payableOf(statementLines(statement)))}</dd>
             <dd className="kauro-ops-sub">
-              The {statement.period} statement · reference {statement.reference}, confirmed by the bank.
+              The {statement.period} statement{statementLines(statement).some((one) => one.sequence === "RETAINER") ? " (the monthly retainer)" : ""} · reference {statement.reference}, confirmed by the bank.
             </dd>
           </div>
         ))}
@@ -241,7 +259,7 @@ function Customers({ seller }: { readonly seller: Seller }): ReactElement {
                   Projects
                 </th>
                 <th scope="col" className="kauro-table-end">
-                  Collected (USD)
+                  Net revenue (USD)
                 </th>
                 <th scope="col" className="kauro-table-end">
                   Commission (USD)
@@ -269,7 +287,7 @@ function Customers({ seller }: { readonly seller: Seller }): ReactElement {
                   <td className="kauro-table-end" data-label="Projects">
                     <span>{customer.projects}</span>
                   </td>
-                  <td className="kauro-table-end" data-label="Collected (USD)">
+                  <td className="kauro-table-end" data-label="Net revenue (USD)">
                     <span>{amount(customer.collectedCents)}</span>
                   </td>
                   <td className="kauro-table-end" data-label="Commission (USD)">
@@ -326,6 +344,7 @@ function Agreement({ seller }: { readonly seller: Seller }): ReactElement {
   const rows: (readonly [string, string])[] = [
     ["Agreement", seller.signed === null ? `${seller.agreement}, waiting for the seller's signature` : `${seller.agreement}, signed by both on ${seller.signed}`],
     ["Rates", `${FIRST_RATE}% of a customer's first project · ${REPEAT_RATE}% of its repeats for ${WINDOW_MONTHS} months after its first payment`],
+    ...(seller.retainerCents > 0 ? [["Retainer", `${usd(seller.retainerCents)} a month since ${seller.retainerFrom ?? ""}, set by the signed agreement`] as const] : []),
     ["Legal review", seller.legalReview ?? "Not recorded"],
   ];
   if (seller.state !== "CANDIDATE") {
@@ -449,14 +468,14 @@ function Ending({ seller, terminate }: { readonly seller: Seller; readonly termi
 export function SellerLifecycle({ state }: PrototypeProps): ReactElement {
   const pathname = usePathname();
   const fromPath = sellerById(pathname?.split("/").pop());
-  const seller = (state === "candidate" ? sellerById(SELLER_ID.lucia) : state === "ended" ? sellerById(SELLER_ID.tomas) : state === "terminate" ? sellerById(SELLER_ID.daniel) : fromPath) ?? (SELLERS[0] as Seller);
+  const seller = (state === "candidate" ? sellerById(SELLER_ID.lucia) : state === "ended" ? sellerById(SELLER_ID.tomas) : state === "terminate" ? sellerById(SELLER_ID.daniel) : state === "retainer" ? sellerById(SELLER_ID.amara) : fromPath) ?? (SELLERS[0] as Seller);
   const needs = NEEDS[seller.id] ?? [];
   const lead =
     seller.state === "CANDIDATE"
       ? `Invited ${seller.since} · ${seller.agreement} sent for signature · ${rates}`
       : seller.state === "TERMINATED"
         ? `Ended ${seller.endedOn ?? ""} · claims already accepted run until ${seller.tailUntil ?? ""} · ${seller.agreement}`
-        : `${seller.agreement} · ${rates} · since ${seller.since}`;
+        : `${seller.agreement} · ${rates}${seller.retainerCents > 0 ? ` · retainer ${usd(seller.retainerCents)} a month` : ""} · since ${seller.since}`;
   return (
     <OpsPage>
       <OpsHead back={<Back href={OPS_PATH.sellers}>Sellers</Back>} title={seller.name} badge={<Word tone={SELLER_STATE_TONE[seller.state]}>{SELLER_STATE_WORD[seller.state]}</Word>} lead={lead} />

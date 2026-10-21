@@ -184,3 +184,57 @@ export const pathTo = (id: string, ctx: ReviewContext): string => appPathOf(id, 
 export function Attention({ children }: { readonly children: ReactNode }): ReactElement {
   return <span className="kauro-ops-attention">{children}</span>;
 }
+
+/**
+ * Alerts (owner, 2026-10-21): three labelled kinds, said in words, never by colour alone. Inactivity flags 14 days without relevant progress,
+ * whatever the deadlines; a deadline alerts 2 days before it, or at once once it has passed, whatever the activity; blocked means the next
+ * step cannot happen. An item appears once, under its most urgent kind (blocked, then deadline passed, then deadline within 2 days, then
+ * inactivity); its other conditions are its second line.
+ */
+export type AlertKind = "BLOCKED" | "DEADLINE_PASSED" | "DEADLINE_SOON" | "INACTIVE";
+const ALERT_RANK: Readonly<Record<AlertKind, number>> = { BLOCKED: 0, DEADLINE_PASSED: 1, DEADLINE_SOON: 2, INACTIVE: 3 };
+export const ALERT_WORD: Readonly<Record<AlertKind, string>> = { BLOCKED: "Blocked", DEADLINE_PASSED: "Deadline passed", DEADLINE_SOON: "Deadline in 2 days", INACTIVE: "Inactive 14 days" };
+const ALERT_TONE: Readonly<Record<AlertKind, Tone>> = { BLOCKED: "danger", DEADLINE_PASSED: "danger", DEADLINE_SOON: "warning", INACTIVE: "neutral" };
+
+export interface AlertItem {
+  readonly key: string;
+  readonly kind: AlertKind;
+  readonly what: string;
+  readonly href?: string;
+  readonly detail: ReactNode;
+  /** The item's other conditions, in words (never a second alert). */
+  readonly also?: string;
+}
+
+export function Alerts({ items, label }: { readonly items: readonly AlertItem[]; readonly label: string }): ReactElement {
+  const sorted = [...items].sort((a, b) => ALERT_RANK[a.kind] - ALERT_RANK[b.kind]);
+  return (
+    <ul className="kauro-ops-alerts" aria-label={label}>
+      {sorted.map((item) => (
+        <li key={item.key}>
+          <span className="kauro-ops-alert-kind">
+            <StatusBadge tone={ALERT_TONE[item.kind]}>{ALERT_WORD[item.kind]}</StatusBadge>
+          </span>
+          <div>
+            <p className="kauro-ops-alert-what">
+              {item.href === undefined ? (
+                item.what
+              ) : (
+                <Link href={item.href} prefetch={false}>
+                  {item.what}
+                </Link>
+              )}
+            </p>
+            <p className="kauro-ops-alert-detail">{item.detail}</p>
+            {item.also === undefined ? null : <p className="kauro-ops-alert-also">Also: {item.also}</p>}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A rule whose legal validation is pending (owner, 2026-10-21): never shown as final on the owner's screens. */
+export function PendingLegal(): ReactElement {
+  return <span className="kauro-ops-legal">Pending legal review</span>;
+}

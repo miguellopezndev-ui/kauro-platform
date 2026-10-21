@@ -31,6 +31,9 @@ export function Payouts({ state }: PrototypeProps): ReactElement {
   const totals = rows.reduce((sum, one) => ({ held: sum.held + heldOf(statementLines(one)), payable: sum.payable + payableOf(statementLines(one)) }), { held: 0, payable: 0 });
   const owed = october.reduce((sum, one) => ({ held: sum.held + heldOf(statementLines(one)), payable: sum.payable + payableOf(statementLines(one)) }), { held: 0, payable: 0 });
   const accruing = LINES.filter((one) => one.state === "ACCRUED_PENDING");
+  const octoberLines = october.flatMap((one) => statementLines(one));
+  const retainer = octoberLines.filter((one) => one.sequence === "RETAINER").reduce((sum, one) => sum + earnedOf(one), 0);
+  const offsets = octoberLines.filter((one) => one.sequence === "ADJUSTMENT").reduce((sum, one) => sum + earnedOf(one), 0);
   const heldLine = LINES.find((one) => one.state === "HELD");
   return (
     <OpsPage>
@@ -46,7 +49,7 @@ export function Payouts({ state }: PrototypeProps): ReactElement {
           </>
         ) : (
           <>
-            October 2026 statements are drafts until <strong>Nov 9, 2026</strong>, when they are issued, and are paid by <strong>Nov 17, 2026</strong>: <strong>{usd(owed.payable)}</strong> payable, <strong>{usd(owed.held)}</strong> held. Bogotá business days; as of {AS_OF}.
+            October 2026 statements are drafts until <strong>Nov 9, 2026</strong>, when they are issued, and are paid by <strong>Nov 17, 2026</strong>: <strong>{usd(owed.payable)}</strong> payable, <strong>{usd(owed.held)}</strong> held. The payable amount includes a {usd(retainer)} retainer and is net of a {usd(-offsets)} offset after a refund, each shown on its statement. Bogotá business days; as of {AS_OF}.
           </>
         )}
       </p>

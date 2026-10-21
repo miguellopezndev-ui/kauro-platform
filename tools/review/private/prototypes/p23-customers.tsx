@@ -65,7 +65,7 @@ export function CustomersList(_props: PrototypeProps): ReactElement {
                   Projects paid
                 </th>
                 <th scope="col" className="kauro-table-end">
-                  Collected (USD)
+                  Net revenue (USD)
                   <span className="kauro-ops-sub">Since the start</span>
                 </th>
                 <th scope="col">Last payment</th>
@@ -89,7 +89,7 @@ export function CustomersList(_props: PrototypeProps): ReactElement {
                   <td className="kauro-table-end" data-label="Projects paid">
                     <span>{customer.projects}</span>
                   </td>
-                  <td className="kauro-table-end" data-label="Collected (USD)">
+                  <td className="kauro-table-end" data-label="Net revenue (USD)">
                     <span>{amount(customer.collectedCents)}</span>
                   </td>
                   <td data-label="Last payment">
@@ -108,7 +108,7 @@ export function CustomersList(_props: PrototypeProps): ReactElement {
                 <td className="kauro-table-end" data-label="Projects paid">
                   <span>{total.projects}</span>
                 </td>
-                <td className="kauro-table-end" data-label="Collected (USD)">
+                <td className="kauro-table-end" data-label="Net revenue (USD)">
                   <span>{amount(total.collected)}</span>
                 </td>
                 <td />
@@ -117,7 +117,7 @@ export function CustomersList(_props: PrototypeProps): ReactElement {
           </table>
         </div>
       </div>
-      <p className="kauro-muted">Collected is the service paid, after discount, net of refunds and without tax. An agency&apos;s own clients are never listed here.</p>
+      <p className="kauro-muted">Net revenue is what the customer actually paid for the service: collections, not invoices; after discount and refunds; without tax, which is never Kauro&apos;s revenue. An agency&apos;s own clients are never listed here.</p>
     </OpsPage>
   );
 }

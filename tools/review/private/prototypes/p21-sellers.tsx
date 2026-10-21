@@ -1,27 +1,28 @@
 "use client";
-// P-21 Sellers (proposed; round 2, owner-console.md §4). The owner's answer to "who sells for Kauro, what did each bring in, and what do I
-// owe each": one row per seller, the identifier first and the decision-driving figure (owed now) beside it, then the next date, the
-// customers they brought by kind and count, what those customers paid (the commission base, so the two money columns agree), the
-// commission earned, and the claims running. A total closes the table. Status is a filter with counts (Stripe's connected accounts); a
-// status with no seller is not drawn. A period changes only the two money columns, and their headers say which period.
+// P-21 Sellers (proposed; round 2, owner-console.md §4; the owner's decisions of 2026-10-21). The owner's answer to "who sells for Kauro,
+// what did each bring in, and what do I owe each": one row per seller, the identifier first, then four money figures that are never mixed:
+//   - Net revenue: what the customers attributed to the seller actually paid for the service (collections, not invoices), net of refunds,
+//     without tax (tax is never Kauro's revenue). Each collection is counted once, for one seller, in the month it happened; a refund counts
+//     in the month of the refund.
+//   - Commission generated: earned on that revenue, offsets after refunds included.
+//   - Commission pending: generated and not yet paid (payable on a statement, held, or waiting for a project to finish).
+//   - Commission paid: confirmed by the bank.
+// A retainer (a fixed monthly payment a signed agreement may set; zero by default) is never hidden: it is named beside the seller and
+// counted in what is owed, apart from commission. A period changes revenue, generated and paid; pending is always as of now.
 //
-// Not here, on purpose: clicks, visitors, conversion, rankings, medals or charts (Kauro sellers use no tracking links; a ranking among a few
-// independent contractors is noise). Rates: every agreement today carries the default rates, so they are one sentence, not a column of
-// identical values; an agreement that differs would show its rates beside the name.
-//
-// Needs a read (gap): the api lists no sellers and aggregates nothing across them (owner-console.md §2.2). This page is drawn from the
-// review's fixture.
+// Not here, on purpose: clicks, visitors, conversion, rankings, medals or charts. Needs reads (gaps F-11, F-12): the api lists no sellers and
+// aggregates nothing across them. This page is drawn from the review's fixture.
 import { Button } from "@kauro/ui";
 import Link from "next/link";
 import { type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { Filter, OPS_PATH, OpsHead, OpsPage, Word } from "./ops-kit.tsx";
-import { AS_OF, CLAIMS, CUSTOMERS, FIRST_RATE, REPEAT_RATE, SELLERS, SELLER_ID, SELLER_STATE_TONE, SELLER_STATE_WORD, WINDOW_MONTHS, amount, earnedOf, linesOf, moneyOf, usd, type Seller } from "./sales.ts";
+import { AS_OF, CLAIMS, CUSTOMERS, FIRST_RATE, REPEAT_RATE, SELLERS, SELLER_ID, SELLER_STATE_TONE, SELLER_STATE_WORD, WINDOW_MONTHS, amount, moneyOf, usd, type Seller } from "./sales.ts";
 
 export const P21_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Sellers", note: "Four sellers: two active, one onboarding, one ended. Owed now first; a total closes the table." },
-  { key: "month", label: "This month", note: "The same list for October 2026 so far: only the two money columns change, and their headers say so." },
+  { key: "normal", label: "Sellers", note: "Four sellers since the start: net revenue, commission generated, pending and paid; one seller with a retainer; a total." },
+  { key: "month", label: "This month", note: "October 2026 so far: revenue, generated and paid for the month (a refund counts in its month); pending stays as of now." },
 ];
 
 type Period = "month" | "last" | "start";
@@ -38,27 +39,21 @@ const NEEDS: Readonly<Record<string, string>> = {
   [SELLER_ID.lucia]: "Needs you: the assessment, Oct 23",
 };
 
-
-function customersOf(seller: Seller): { readonly count: number; readonly kinds: string } {
+function customersOf(seller: Seller): string {
   const mine = CUSTOMERS.filter((one) => one.acquiredBy === seller.id);
+  if (mine.length === 0) return "No customers yet";
   const agencies = mine.filter((one) => one.kind === "Agency").length;
   const companies = mine.length - agencies;
   const parts = [agencies > 0 ? `${agencies} ${agencies === 1 ? "agency" : "agencies"}` : null, companies > 0 ? `${companies} ${companies === 1 ? "company" : "companies"}` : null].filter((part) => part !== null);
-  return { count: mine.length, kinds: parts.join(", ") };
+  return `${mine.length} ${mine.length === 1 ? "customer" : "customers"}: ${parts.join(", ")}`;
 }
 
-function claimsLine(seller: Seller): string {
+function claimsLine(seller: Seller): string | null {
   const mine = CLAIMS.filter((one) => one.sellerId === seller.id);
   const accepted = mine.filter((one) => one.state === "ACCEPTED").length;
   const deciding = mine.filter((one) => one.state === "SUBMITTED" || one.state === "DISPUTED").length;
   const parts = [accepted > 0 ? `${accepted} accepted` : null, deciding > 0 ? `${deciding} to decide` : null].filter((part) => part !== null);
-  return parts.length === 0 ? "None" : parts.join(" · ");
-}
-
-function periodMoney(seller: Seller, period: Period): { readonly collected: number; readonly commission: number } {
-  const month = PERIOD[period].month;
-  const lines = linesOf(seller.id).filter((one) => month === null || one.paidOn.startsWith(month));
-  return { collected: lines.reduce((sum, one) => sum + one.basisCents, 0), commission: lines.reduce((sum, one) => sum + earnedOf(one), 0) };
+  return parts.length === 0 ? null : `Claims: ${parts.join(" · ")}`;
 }
 
 const cents = (value: number): ReactElement => (value === 0 ? <span className="kauro-ops-zero">0.00</span> : <>{amount(value)}</>);
@@ -73,25 +68,34 @@ export function SellersList({ state }: PrototypeProps): ReactElement {
     needs: SELLERS.filter((one) => NEEDS[one.id] !== undefined).length,
     active: SELLERS.filter((one) => one.state === "ACTIVE").length,
     onboarding: SELLERS.filter((one) => one.state === "CANDIDATE").length,
-    suspended: SELLERS.filter((one) => one.state === "SUSPENDED").length,
     ended: SELLERS.filter((one) => one.state === "TERMINATED").length,
   };
+  const month = PERIOD[period].month;
   const rows = SELLERS.filter(inTab)
-    .map((seller) => ({ seller, money: moneyOf(seller.id), period: periodMoney(seller, period), customers: customersOf(seller) }))
-    .sort((a, b) => b.money.payable - a.money.payable || b.period.collected - a.period.collected);
-  const sum = rows.reduce((acc, row) => ({ payable: acc.payable + row.money.payable, held: acc.held + row.money.held, customers: acc.customers + row.customers.count, collected: acc.collected + row.period.collected, commission: acc.commission + row.period.commission }), { payable: 0, held: 0, customers: 0, collected: 0, commission: 0 });
-  const owed = SELLERS.map((one) => moneyOf(one.id)).reduce((acc, one) => ({ payable: acc.payable + one.payable, held: acc.held + one.held }), { payable: 0, held: 0 });
+    .map((seller) => ({ seller, now: moneyOf(seller.id), money: moneyOf(seller.id, month) }))
+    .sort((a, b) => b.now.pending + b.now.retainerPending - (a.now.pending + a.now.retainerPending) || b.money.collected - a.money.collected);
+  const sum = rows.reduce(
+    (acc, row) => ({
+      collected: acc.collected + row.money.collected,
+      earned: acc.earned + row.money.earned,
+      pending: acc.pending + row.now.pending,
+      paid: acc.paid + row.money.paid,
+      retainerPending: acc.retainerPending + row.now.retainerPending,
+      retainerPaid: acc.retainerPaid + row.money.retainerPaid,
+    }),
+    { collected: 0, earned: 0, pending: 0, paid: 0, retainerPending: 0, retainerPaid: 0 },
+  );
+  const all = SELLERS.map((one) => moneyOf(one.id));
+  const owedCommission = all.reduce((total, one) => total + one.payable, 0);
+  const owedRetainer = all.reduce((total, one) => total + one.retainerPending, 0);
+  const held = all.reduce((total, one) => total + one.held, 0);
+  const withRetainer = SELLERS.filter((one) => one.retainerCents > 0);
   return (
     <OpsPage>
-      <OpsHead
-        title="Sellers"
-        lead="Who sells for Kauro, what they brought in and what you owe them."
-        action={
-          <Button variant="primary">Register a seller</Button>
-        }
-      />
+      <OpsHead title="Sellers" lead="Who sells for Kauro, what they brought in and what you owe them." action={<Button variant="primary">Register a seller</Button>} />
       <p className="kauro-ops-sentence">
-        You owe sellers <strong>{usd(owed.payable)}</strong>, payable by Nov 17, 2026, and <strong>{usd(owed.held)}</strong> is held. As of {AS_OF}. <Link href={OPS_PATH.payouts}>Payouts</Link>
+        You owe sellers <strong>{usd(owedCommission + owedRetainer)}</strong> by Nov 17, 2026: {usd(owedCommission)} of commission and a {usd(owedRetainer)} retainer. {usd(held)} of commission is held. As of {AS_OF}.{" "}
+        <Link href={OPS_PATH.payouts}>Payouts</Link>
       </p>
       <div className="kauro-ops-toolbar">
         <Filter<Tab>
@@ -107,7 +111,7 @@ export function SellersList({ state }: PrototypeProps): ReactElement {
           ]}
         />
         <Filter<Period>
-          label="Period of the money columns"
+          label="Period of revenue, generated and paid"
           value={period}
           onChange={setPeriod}
           options={[
@@ -120,27 +124,30 @@ export function SellersList({ state }: PrototypeProps): ReactElement {
       <div className="kauro-ops-tablewrap">
         <div className="kauro-table-region">
           <table className="kauro-table kauro-ops-table kauro-ops-table--cards">
-            <caption className="kauro-visually-hidden">Sellers, what each brought in and what is owed, sorted by what is owed now</caption>
+            <caption className="kauro-visually-hidden">Sellers: net revenue from their customers, and commission generated, pending and paid</caption>
             <thead>
               <tr>
                 <th scope="col">Seller</th>
+                <th scope="col" className="kauro-table-end">
+                  Net revenue (USD)
+                  <span className="kauro-ops-sub">{PERIOD[period].header}</span>
+                </th>
+                <th scope="col" className="kauro-table-end">
+                  Commission generated (USD)
+                  <span className="kauro-ops-sub">{PERIOD[period].header}</span>
+                </th>
                 <th scope="col" className="kauro-table-end" aria-sort="descending">
-                  Owed now (USD)
-                </th>
-                <th scope="col">Customers</th>
-                <th scope="col" className="kauro-table-end">
-                  Collected (USD)
-                  <span className="kauro-ops-sub">{PERIOD[period].header}</span>
+                  Commission pending (USD)
+                  <span className="kauro-ops-sub">Now</span>
                 </th>
                 <th scope="col" className="kauro-table-end">
-                  Commission (USD)
+                  Commission paid (USD)
                   <span className="kauro-ops-sub">{PERIOD[period].header}</span>
                 </th>
-                <th scope="col">Claims</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ seller, money, period: inPeriod, customers }) => (
+              {rows.map(({ seller, now, money }) => (
                 <tr key={seller.id}>
                   <th scope="row">
                     <Link href={OPS_PATH.seller(seller.id)} prefetch={false}>
@@ -150,29 +157,34 @@ export function SellersList({ state }: PrototypeProps): ReactElement {
                       <Word tone={SELLER_STATE_TONE[seller.state]}>{SELLER_STATE_WORD[seller.state]}</Word>
                     </span>
                     <span className="kauro-ops-sub">{seller.state === "CANDIDATE" ? `Invited ${seller.since}` : seller.state === "TERMINATED" ? `Ended ${seller.endedOn ?? ""} · claims run to ${seller.tailUntil ?? ""}` : `Since ${seller.since}`}</span>
+                    <span className="kauro-ops-sub">{customersOf(seller)}</span>
+                    {claimsLine(seller) === null ? null : <span className="kauro-ops-sub">{claimsLine(seller)}</span>}
+                    {seller.retainerCents > 0 ? <span className="kauro-ops-sub">Retainer {usd(seller.retainerCents)} a month, by its signed agreement</span> : null}
                     {NEEDS[seller.id] === undefined ? null : <span className="kauro-ops-sub kauro-ops-attention">{NEEDS[seller.id]}</span>}
                   </th>
-                  <td className="kauro-table-end" data-label="Owed now (USD)">
+                  <td className="kauro-table-end" data-label="Net revenue (USD)">
+                    <span>{cents(money.collected)}</span>
+                  </td>
+                  <td className="kauro-table-end" data-label="Commission generated (USD)">
                     <span>
-                      {cents(money.payable)}
-                      {money.payable > 0 ? <span className="kauro-ops-sub">pays Nov 17</span> : null}
-                      {money.held > 0 ? <span className="kauro-ops-sub">{amount(money.held)} held</span> : null}
+                      {cents(money.earned)}
+                      {money.offsets < 0 && month === null ? <span className="kauro-ops-sub">after {amount(-money.offsets)} offset</span> : null}
                     </span>
                   </td>
-                  <td data-label="Customers">
+                  <td className="kauro-table-end" data-label="Commission pending (USD)">
                     <span>
-                      {customers.count === 0 ? <span className="kauro-ops-zero">None yet</span> : customers.count}
-                      {customers.count === 0 ? null : <span className="kauro-ops-sub">{customers.kinds}</span>}
+                      {cents(now.pending)}
+                      {now.payable !== 0 ? <span className="kauro-ops-sub">{amount(now.payable)} by Nov 17</span> : null}
+                      {now.held > 0 ? <span className="kauro-ops-sub">{amount(now.held)} held</span> : null}
+                      {now.accruing > 0 ? <span className="kauro-ops-sub">{amount(now.accruing)} waiting</span> : null}
+                      {now.retainerPending > 0 ? <span className="kauro-ops-sub">+ retainer {amount(now.retainerPending)}</span> : null}
                     </span>
                   </td>
-                  <td className="kauro-table-end" data-label={`Collected (USD) · ${PERIOD[period].label.toLowerCase()}`}>
-                    <span>{cents(inPeriod.collected)}</span>
-                  </td>
-                  <td className="kauro-table-end" data-label={`Commission (USD) · ${PERIOD[period].label.toLowerCase()}`}>
-                    <span>{cents(inPeriod.commission)}</span>
-                  </td>
-                  <td data-label="Claims">
-                    <span>{claimsLine(seller)}</span>
+                  <td className="kauro-table-end" data-label="Commission paid (USD)">
+                    <span>
+                      {cents(money.paid)}
+                      {money.retainerPaid > 0 ? <span className="kauro-ops-sub">+ retainer {amount(money.retainerPaid)}</span> : null}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -182,31 +194,48 @@ export function SellersList({ state }: PrototypeProps): ReactElement {
                 <th scope="row">
                   {rows.length} {rows.length === 1 ? "seller" : "sellers"}
                 </th>
-                <td className="kauro-table-end" data-label="Owed now (USD)">
-                  <span>
-                    {amount(sum.payable)}
-                    {sum.held > 0 ? <span className="kauro-ops-sub">{amount(sum.held)} held</span> : null}
-                  </span>
-                </td>
-                <td data-label="Customers">
-                  <span>{sum.customers}</span>
-                </td>
-                <td className="kauro-table-end" data-label="Collected (USD)">
+                <td className="kauro-table-end" data-label="Net revenue (USD)">
                   <span>{amount(sum.collected)}</span>
                 </td>
-                <td className="kauro-table-end" data-label="Commission (USD)">
-                  <span>{amount(sum.commission)}</span>
+                <td className="kauro-table-end" data-label="Commission generated (USD)">
+                  <span>{amount(sum.earned)}</span>
                 </td>
-                <td />
+                <td className="kauro-table-end" data-label="Commission pending (USD)">
+                  <span>
+                    {amount(sum.pending)}
+                    {sum.retainerPending > 0 ? <span className="kauro-ops-sub">+ retainer {amount(sum.retainerPending)}</span> : null}
+                  </span>
+                </td>
+                <td className="kauro-table-end" data-label="Commission paid (USD)">
+                  <span>
+                    {amount(sum.paid)}
+                    {sum.retainerPaid > 0 ? <span className="kauro-ops-sub">+ retainer {amount(sum.retainerPaid)}</span> : null}
+                  </span>
+                </td>
               </tr>
             </tfoot>
           </table>
         </div>
       </div>
-      <div className="kauro-ops-toolbar kauro-ops-after-table">
-        <p className="kauro-muted">
-          Rates: every agreement in force sets the default, {FIRST_RATE}% of a customer&apos;s first project and {REPEAT_RATE}% of its repeats for {WINDOW_MONTHS} months. Collected is what those customers paid for the service, after discount, net of refunds and without tax: the base the commission is counted on.
-        </p>
+      <dl className="kauro-ops-facts kauro-ops-after-table">
+        <div>
+          <dt>Net revenue</dt>
+          <dd>What the seller&apos;s customers actually paid for the service: collections, not invoices; net of refunds; without tax, which is never Kauro&apos;s revenue. Each collection counts once, for one seller, in the month it happened.</dd>
+        </div>
+        <div>
+          <dt>Commission</dt>
+          <dd>
+            Generated on that revenue at the agreement&apos;s rates ({FIRST_RATE}% of a first project, {REPEAT_RATE}% of repeats for {WINDOW_MONTHS} months), after any offset for a refund. Pending: not paid yet (payable on a statement, held, or waiting for a project to finish). Paid: confirmed by the bank.
+          </dd>
+        </div>
+        <div>
+          <dt>Retainer</dt>
+          <dd>
+            {withRetainer.length === 0 ? "No agreement in force sets one." : withRetainer.map((one) => `${one.name}: ${usd(one.retainerCents)} a month since ${one.retainerFrom ?? ""}, by the signed ${one.agreement}`).join(" · ")}. It is owed apart from commission. New agreements start at USD 0.00.
+          </dd>
+        </div>
+      </dl>
+      <div className="kauro-actions">
         <Button>Download CSV</Button>
       </div>
     </OpsPage>
