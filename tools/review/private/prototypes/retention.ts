@@ -29,14 +29,17 @@ export const UNPAID_CEILING_DAYS = 24;
 /** The one soft extension (policy softExtensionMaximumSeconds 259200, one per project). */
 const EXTENSION_HOURS = 72;
 
-/** n business days after an instant (Monday to Friday; the coverage calendar's holidays would be added by the real rule, F-21). */
+/** The Bogotá public holidays of the review's weeks (the same calendar the seller statements use: Nov 2 and Nov 16, 2026). */
+const HOLIDAYS: ReadonlySet<string> = new Set(["2026-11-02", "2026-11-16"]);
+
+/** n business days after an instant: Monday to Friday, skipping the holidays above (the real rule takes the payment method's calendar, F-21). */
 function plusBusinessDays(from: string, days: number): string {
   let ms = at(from);
   let left = days;
   while (left > 0) {
     ms += DAY;
     const weekday = new Date(ms).getUTCDay();
-    if (weekday !== 0 && weekday !== 6) left -= 1;
+    if (weekday !== 0 && weekday !== 6 && !HOLIDAYS.has(new Date(ms).toISOString().slice(0, 10))) left -= 1;
   }
   return iso(ms);
 }

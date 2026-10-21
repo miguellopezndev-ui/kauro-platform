@@ -26,7 +26,7 @@ import { TIMELINE } from "./timeline.ts";
 
 export const P31_STATES: readonly StateDef[] = [
   { key: "normal", label: "Waiting, proof can be given", note: "The order waits for the transfer. If the transfer was already sent, an owner or billing member can give its proof to hold the files while the money arrives." },
-  { key: "held", label: "Transfer pending, within its hold", note: "The proof was given: the files are held until Nov 2 (5 business days, proposed). Not payment; preparation cannot start." },
+  { key: "held", label: "Transfer pending, within its hold", note: "The proof was given: the files are held until Nov 3 (5 business days on the Bogotá calendar, Nov 2 being a holiday; proposed). Not payment; preparation cannot start." },
   { key: "second", label: "A second proof is refused", note: "The quote already had its hold: another proof, another order or a new quote for the same files starts no new hold." },
   { key: "hold-expired", label: "Hold ended, no payment", note: "The hold ended without the money: the files are deleted; a transfer that still arrives is reviewed and returned." },
   { key: "confirmed", label: "Payment confirmed during the hold", note: "Kauro matched the exact amount during the hold: the paid project's dates apply and the team can start the preparation." },
