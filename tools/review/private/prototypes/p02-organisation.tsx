@@ -44,7 +44,7 @@ export function OrganisationSettings({ ctx, state }: PrototypeProps): ReactEleme
 
   return (
     <>
-      <PageHead eyebrow={name} title="Settings" lead={company ? "Manage your company's details and safe branding." : "Manage agency details and safe branding."} />
+      <PageHead title="Settings" lead={company ? "Manage your company's details and safe branding." : "Manage agency details and safe branding."} />
       <nav className="kauro-local-nav" aria-label="Sections of this page">
         <ul>
           <li>

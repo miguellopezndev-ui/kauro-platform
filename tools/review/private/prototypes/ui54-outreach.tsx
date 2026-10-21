@@ -32,7 +32,7 @@ export function Outreach({ ctx, state }: PrototypeProps): ReactElement {
   const shown = STATE[state] ?? STATE["normal"] ?? { word: "", tone: "neutral" };
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Reviewed correspondence" lead="Review exactly what will be sent." />
+      <PageHead title="Reviewed correspondence" lead="Review exactly what will be sent." />
       {state === "accepted" ? (
         <Banner tone="success" title="The provider accepted the message" announce="status">
           <p>At 10:42 UTC. That means it left Kauro&apos;s provider; it does not mean it reached the inbox, or that anyone read it. A reply, if one comes, appears here.</p>

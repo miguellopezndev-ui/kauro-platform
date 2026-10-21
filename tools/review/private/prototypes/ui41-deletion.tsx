@@ -26,7 +26,7 @@ export function Deletion({ state }: PrototypeProps): ReactElement {
   ];
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Deletion" lead="Verify what was actually removed." />
+      <PageHead title="Deletion" lead="Verify what was actually removed." />
       <section className="kauro-prospect" aria-labelledby="del-h">
         <div className="kauro-prospect-head">
           <h2 id="del-h">Ridge &amp; Fennel Consulting · Archive contacts</h2>

@@ -12,28 +12,13 @@
   box-sizing: border-box;
   inline-size: min(100%, 27rem);
 }
-/* a small padlock at the end of the bar: the page is the secure doorway */
-.kauro-auth-lock {
-  position: relative;
-  flex: none;
-  inline-size: 0.625rem;
-  block-size: 0.5rem;
-  margin-block-start: 0.3125rem;
+/* the step and where it stands, at the end of the bar (no padlock: an icon that imitates the browser's lock is advised against) */
+.kauro-auth-step-count {
   margin-inline-start: auto;
-  border: 1.5px solid var(--kauro-color-ink-muted);
-  border-radius: 0.125rem;
-}
-.kauro-auth-lock::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 50%;
-  inset-block-end: calc(100% + 1.5px);
-  inline-size: 0.375rem;
-  block-size: 0.3125rem;
-  border: 1.5px solid var(--kauro-color-ink-muted);
-  border-block-end: 0;
-  border-radius: 0.25rem 0.25rem 0 0;
-  transform: translateX(-50%);
+  color: var(--kauro-color-ink-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 .kauro-main .kauro-auth-body {
   padding: clamp(1.5rem, 5vw, 2.25rem);
@@ -433,4 +418,74 @@
 .kauro-main .kauro-auth-step > p,
 .kauro-main .kauro-auth-step .kauro-checklist {
   margin: 0;
+}
+
+
+/* ===== Order 11 revision: the footer of every identity step, and the recovery pages ===== */
+.kauro-main .kauro-auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  inline-size: min(100%, 27rem);
+  margin-block-start: var(--kauro-space-2);
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-auth-footer a {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-recover-ways {
+  display: grid;
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-recover-way {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-recover-way > * {
+  margin: 0;
+}
+.kauro-main .kauro-recover-way h2,
+.kauro-main .kauro-recover-what h2,
+.kauro-main .kauro-auth-subhead {
+  margin: 0;
+  font-family: var(--kauro-font-family);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.kauro-main .kauro-recover-way p {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-recover-way .kauro-button {
+  justify-self: start;
+}
+.kauro-main .kauro-recover-what {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+}
+.kauro-recover-what ol,
+.kauro-main .kauro-auth-list {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-recover-facts {
+  margin: 0;
+}
+.kauro-main .kauro-recover-facts > div {
+  grid-template-columns: minmax(0, 1fr);
 }

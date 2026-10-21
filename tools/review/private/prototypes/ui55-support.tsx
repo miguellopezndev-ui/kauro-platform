@@ -27,7 +27,7 @@ export function SupportOperations({ state }: PrototypeProps): ReactElement {
   const one = CASES.find((item) => item.id === open) ?? CASES[0];
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Support cases" lead="Resolve the issue with scoped evidence." />
+      <PageHead title="Support cases" lead="Resolve the issue with scoped evidence." />
       <div className="kauro-table-region">
         <table className="kauro-table kauro-prospects">
           <caption className="kauro-visually-hidden">Open cases, by when the next answer is due</caption>

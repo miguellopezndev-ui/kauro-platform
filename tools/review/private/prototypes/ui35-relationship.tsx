@@ -20,7 +20,7 @@ export function AgencyRelationship({ ctx, state }: PrototypeProps): ReactElement
   const reassign = state === "reassign";
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Coastline Analytics" lead="Assignment and acquisition entitlement are separate." />
+      <PageHead title="Coastline Analytics" lead="Assignment and acquisition entitlement are separate." />
       <div className="kauro-lifecycle-actions">
         <section className="kauro-lifecycle-card" aria-labelledby="service-h">
           <h2 id="service-h">Who serves them</h2>

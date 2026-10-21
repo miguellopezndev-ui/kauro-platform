@@ -23,7 +23,7 @@ export function Resources({ ctx }: PrototypeProps): ReactElement {
     .join(", ");
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Resources" lead="Use the current approved offer." />
+      <PageHead title="Resources" lead="Use the current approved offer." />
       <ul className="kauro-resources">
         {current.map((resource) => (
           <li key={resource.family} className="kauro-resource">

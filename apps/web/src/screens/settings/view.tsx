@@ -6,6 +6,12 @@ import type { AgencyClosureView, AgencyView } from "../../api/generated.ts";
 import { message } from "../../copy/en.ts";
 import { settingsModel } from "./model.ts";
 
+/** An agreement's recorded version as people read it: "TERMS_2026_10" is "Version 2026-10"; anything else is shown as recorded. */
+export function versionLabel(recorded: string): string {
+  const found = /^[A-Z]+_(\d{4})_(\d{2})$/.exec(recorded);
+  return found === null ? recorded : message("screen.settings.legal.version", { version: `${found[1]}-${found[2]}` });
+}
+
 export interface SettingsViewProps {
   readonly agency: AgencyView;
   readonly onClose: () => void;
@@ -51,8 +57,8 @@ export function SettingsDetails({ agency, onClose, closing, closure }: SettingsV
       <section aria-labelledby="settings-legal">
         <h2 id="settings-legal">{message("screen.settings.legal.heading")}</h2>
         <dl>
-          <div><dt>{message("screen.settings.legal.terms.label")}</dt><dd>{agency.termsVersion ?? message("screen.settings.legal.none.body")}</dd></div>
-          <div><dt>{message("screen.settings.legal.privacy.label")}</dt><dd>{agency.privacyAgreementVersion ?? message("screen.settings.legal.none.body")}</dd></div>
+          <div><dt>{message("screen.settings.legal.terms.label")}</dt><dd>{agency.termsVersion === undefined || agency.termsVersion === null ? message("screen.settings.legal.none.body") : versionLabel(agency.termsVersion)}</dd></div>
+          <div><dt>{message("screen.settings.legal.privacy.label")}</dt><dd>{agency.privacyAgreementVersion === undefined || agency.privacyAgreementVersion === null ? message("screen.settings.legal.none.body") : versionLabel(agency.privacyAgreementVersion)}</dd></div>
         </dl>
         <p>{message("screen.settings.legal.hint")}</p>
       </section>

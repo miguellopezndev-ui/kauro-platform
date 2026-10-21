@@ -5,6 +5,10 @@
 // The Google button follows Google's sign-in branding: the standard four-colour "G" unaltered, "Continue with Google", white with a #747775
 // stroke and #1F1F1F text in the light theme, #131314 with a #8E918F stroke and #E3E3E3 text in the dark one, and never less prominent than
 // the other way in. Everything secret on these pages (a setup key, recovery codes, a QR code) is synthetic and says so.
+//
+// Order 11 revision, from the research (research/auth-onboarding.md; NIST SP 800-63B-4 §8.1, WCAG 2.2 3.3.8, GOV.UK patterns): the window's
+// bar names the step instead of drawing a padlock (an icon that imitates the browser's security indicator is advised against); a code field
+// is one text input that takes a pasted code with spaces; every page of an identity step ends with the same small footer.
 import { Field } from "@kauro/ui";
 import { type ReactElement, type ReactNode, useState } from "react";
 
@@ -13,11 +17,13 @@ export const SIGN_UP = "/signup";
 export const RESET = "/login/reset";
 export const HELP = "/help";
 export const PRIVACY = "/legal/privacy";
+export const POLICY = "/legal/data-processing-policy";
 export const TERMS = "/legal/terms";
+export const STATUS = "/status";
 
-/** The page of an identity step: one window, its heading and lead, the step, then the way to the other page. The bar shows a padlock, or
- * the state of the thing the page is about (an invitation), and a verdict may be stamped on the window's edge. */
-export function AuthFrame({ title, lead, bar, state, stateTone = "neutral", stamp, children, after }: { readonly title: ReactNode; readonly lead?: ReactNode; readonly bar: string; readonly state?: string; readonly stateTone?: "neutral" | "done" | "attention"; readonly stamp?: string | null; readonly children: ReactNode; readonly after?: ReactNode }): ReactElement {
+/** The page of an identity step: one window, its heading and lead, the step, then the way to the other page. The bar names the step (and
+ * where it stands, "step 2 of 2"), or the state of the thing the page is about (an invitation); a verdict may be stamped on the window. */
+export function AuthFrame({ title, lead, bar, step, state, stateTone = "neutral", stamp, children, after }: { readonly title: ReactNode; readonly lead?: ReactNode; readonly bar: string; readonly step?: string; readonly state?: string; readonly stateTone?: "neutral" | "done" | "attention"; readonly stamp?: string | null; readonly children: ReactNode; readonly after?: ReactNode }): ReactElement {
   return (
     <div className="kauro-auth">
       <div className="kauro-auth-object">
@@ -25,7 +31,7 @@ export function AuthFrame({ title, lead, bar, state, stateTone = "neutral", stam
           <div className="kauro-window-bar">
             <span className="kauro-window-brand">Kauro</span>
             <span className="kauro-window-title">{bar}</span>
-            {state === undefined ? <span className="kauro-auth-lock" aria-hidden="true" /> : <span className={`kauro-window-state kauro-window-state--${stateTone}`}>{state}</span>}
+            {state !== undefined ? <span className={`kauro-window-state kauro-window-state--${stateTone}`}>{state}</span> : step === undefined ? null : <span className="kauro-auth-step-count">{step}</span>}
           </div>
           <div className="kauro-window-body kauro-auth-body">
             <h1 id="auth-title">{title}</h1>
@@ -42,7 +48,20 @@ export function AuthFrame({ title, lead, bar, state, stateTone = "neutral", stam
         )}
       </div>
       {after === undefined ? null : <div className="kauro-auth-after">{after}</div>}
+      <AuthFooter />
     </div>
+  );
+}
+
+/** The same quiet footer under every identity step: what governs the account, where to get help, whether the service is up. */
+export function AuthFooter(): ReactElement {
+  return (
+    <nav className="kauro-auth-footer" aria-label="Kauro">
+      <a href={PRIVACY}>Privacy notice</a>
+      <a href={TERMS}>Terms</a>
+      <a href={HELP}>Help</a>
+      <a href={STATUS}>Service status</a>
+    </nav>
   );
 }
 
@@ -97,14 +116,44 @@ export function PasswordField({ id, label, hint, error, autoComplete, aside }: {
   );
 }
 
-/** The six digits of an authenticator app (or of an email, where the page says so). */
+/** The six digits of an authenticator app (or of an email, where the page says so): one field that takes a pasted code, spaces included. */
 export function CodeField({ id, label = "Six-digit code", hint, error }: { readonly id: string; readonly label?: string; readonly hint?: ReactNode; readonly error?: string | undefined }): ReactElement {
   return (
     <Field id={id} label={label} hint={hint} error={error}>
-      {(control) => <input {...control} name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} spellCheck={false} className="kauro-code-input" />}
+      {(control) => <input {...control} name="code" inputMode="numeric" autoComplete="one-time-code" spellCheck={false} autoCapitalize="off" className="kauro-code-input" />}
     </Field>
   );
 }
+
+/**
+ * The authorisation a registration needs (Data Processing Policy §8.1; internal data manual §5.3 A-01): prior, express and informed, by an
+ * unticked checkbox with links to the Policy and the Privacy notice, its version and time kept as proof. Commercial messages are a
+ * separate, optional, unticked choice (A-14).
+ */
+export function RegistrationConsent({ error }: { readonly error?: string | undefined }): ReactElement {
+  return (
+    <div className="kauro-auth-consent">
+      {error === undefined ? null : (
+        <p className="kauro-auth-consent-error" id="signup-consent-error">
+          {error}
+        </p>
+      )}
+      <label className="kauro-confirm" id="signup-consent">
+        <input type="checkbox" name="consent" aria-describedby={error === undefined ? undefined : "signup-consent-error"} />
+        <span>
+          I authorise Kauro to process my personal data to run my account, as the <a href={POLICY}>Data processing policy</a> and the <a href={PRIVACY}>Privacy notice</a> explain.
+        </span>
+      </label>
+      <label className="kauro-confirm kauro-confirm--optional">
+        <input type="checkbox" name="news" />
+        <span>Optional: send me occasional news about Kauro. I can stop it at any time.</span>
+      </label>
+    </div>
+  );
+}
+
+/** A code's six digits, read the way people paste them ("123 456", "123-456"). */
+export const codeOf = (raw: string): string => raw.replace(/[\s-]/g, "");
 
 /** The account a step is about, with the way out of it. */
 export function Who({ email, onChange, change = "Change" }: { readonly email: string; readonly onChange?: () => void; readonly change?: string }): ReactElement {
@@ -177,7 +226,7 @@ export function EnrolSteps(): ReactElement {
 }
 
 /** The recovery codes, shown once at enrolment: each opens the account once if the authenticator app is lost. */
-export const RECOVERY_CODES = ["REVW-0001", "REVW-0002", "REVW-0003", "REVW-0004", "REVW-0005", "REVW-0006", "REVW-0007", "REVW-0008", "REVW-0009", "REVW-0010"] as const;
+export const RECOVERY_CODES = ["RVW7-K2QM-9DXW-4TPL", "RVWA-6N3H-8JCY-2ZFE", "RVWQ-5MBT-7KLR-9WDS", "RVW3-XPV8-4HNG-6CJA", "RVWM-2DTY-9QEK-5LWB", "RVW9-HJ4C-7ZSN-3PXF", "RVWE-8GKW-2MVD-6RTQ", "RVW6-LCBN-5YXJ-8HSK", "RVWT-3WQP-7FDA-4MZG", "RVW2-9KRE-6NHX-5CBV"] as const;
 export function RecoveryList(): ReactElement {
   return (
     <div className="kauro-recovery">
@@ -188,7 +237,7 @@ export function RecoveryList(): ReactElement {
           </li>
         ))}
       </ol>
-      <p className="kauro-auth-small">Synthetic codes, for review. Real codes are shown only once, here.</p>
+      <p className="kauro-auth-small">Synthetic codes, for review. Real codes are shown once, here; each works once.</p>
     </div>
   );
 }

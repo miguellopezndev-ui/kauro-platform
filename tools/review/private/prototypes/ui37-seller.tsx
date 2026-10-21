@@ -29,7 +29,7 @@ export function SellerLifecycle({ state }: PrototypeProps): ReactElement {
   const terminate = state === "terminate";
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title={SELLER.name} lead="Track the actual reviewed engagement." aside={<Badge tone="success">Active</Badge>} />
+      <PageHead title={SELLER.name} lead="Track the actual reviewed engagement." aside={<Badge tone="success">Active</Badge>} />
       <ol className="kauro-seller-steps">
         {STEPS.map((step) => (
           <li key={step.name} className={step.done ? "is-done" : "is-current"}>

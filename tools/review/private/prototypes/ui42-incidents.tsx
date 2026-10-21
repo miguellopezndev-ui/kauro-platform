@@ -19,7 +19,7 @@ export function Incidents({ state }: PrototypeProps): ReactElement {
   const open = state === "open";
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Incidents" lead="Contain the affected scope and prove recovery." />
+      <PageHead title="Incidents" lead="Contain the affected scope and prove recovery." />
       {open ? null : (
         <Banner tone="success" title="No incident is open" announce="status">
           <p>The last one closed on 9 Oct 2026. Checks run every minute; a new incident opens here by itself.</p>

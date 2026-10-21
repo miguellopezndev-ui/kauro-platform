@@ -22,7 +22,7 @@ export function SellerSettings({ ctx, state }: PrototypeProps): ReactElement {
   const suspended = state === "suspended";
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Your seller settings" lead="Your seller account, payouts and sending identity." />
+      <PageHead title="Your seller settings" lead="Your seller account, payouts and sending identity." />
       <div className="kauro-settings-split">
       {suspended ? (
         <Banner tone="warning" title="Your seller account is suspended" announce="status">

@@ -117,7 +117,7 @@ function StatementCard({ statement, submitted, contest }: { readonly statement: 
 export function Commissions({ state }: PrototypeProps): ReactElement {
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Commissions" lead="Understand what was earned, held and paid." />
+      <PageHead title="Commissions" lead="Understand what was earned, held and paid." />
       {state === "submitted" ? (
         <Banner tone="info" title="September's transfer is on its way" announce="status">
           <p>Sent on 15 Oct 2026. A transfer that has been sent is not yet money received: this page says paid when the bank confirms it.</p>

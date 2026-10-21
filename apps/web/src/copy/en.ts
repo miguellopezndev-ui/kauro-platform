@@ -49,6 +49,7 @@ export const APPLICATION_COPY = {
   "nav.settings.label": "Settings",
   "nav.support.label": "Support",
   "nav.project.label": "Project sections",
+  "shell.workspaces.label": "Your workspaces",
   "service.CLEAN.name": "Clean your data",
   "service.HUBSPOT.name": "Prepare for HubSpot",
   "service.SALESFORCE.name": "Prepare for Salesforce",

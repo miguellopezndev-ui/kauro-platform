@@ -25,7 +25,7 @@ export function Releases({ state }: PrototypeProps): ReactElement {
   ] as const;
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Releases" lead="Promote only the accepted exact candidate." />
+      <PageHead title="Releases" lead="Promote only the accepted exact candidate." />
       {rebuilt ? (
         <Banner tone="danger" title="This image is not the one that was tested" announce="alert">
           <p>The image was rebuilt at 15:02 UTC from the same commit. Its digest is new, so the gates that passed at 14:10 UTC do not apply to it. Promotion is held until the gates run on this exact image.</p>

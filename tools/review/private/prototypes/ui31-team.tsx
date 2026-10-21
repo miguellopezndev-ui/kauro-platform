@@ -6,6 +6,10 @@
 // membership with its lifecycle; anyone else sees the active team's roles only.
 // Commands: invite (CMD003, owner or admin; an admin never grants owner), change a role (CMD005, owner, fresh step-up), revoke (CMD006,
 // owner or admin; an admin never acts on an owner), transfer ownership (CMD007, owner, fresh step-up). The last owner is protected.
+// Recovery (the owner's decision of 2026-10-20, proposed, F-07): an owner or admin may START a member's recovery when the member has lost
+// their authenticator and recovery codes; they can never turn two-step verification off or let anyone in. Kauro checks the member's identity
+// independently, the admin confirms with a fresh code, the member and every owner are told, a waiting period applies, and the member's
+// sessions end when the recovery completes.
 import { Banner, Button, ConfirmDialog, ErrorSummary, Field } from "@kauro/ui";
 import { type FormEvent, type ReactElement, useState } from "react";
 import { StepUpPanel } from "@web/screens/shared/step-up.tsx";
@@ -23,6 +27,7 @@ export const UI31_STATES: readonly StateDef[] = [
   { key: "revoke", label: "Remove access", note: "The confirmation for removing a member: what happens, acknowledged before it is done." },
   { key: "last-owner", label: "Last owner protected", note: "Removing or demoting the only owner is refused, with what to do instead." },
   { key: "transfer", label: "Transfer ownership", note: "Ownership moves to an active member after a fresh identity confirmation; the previous owner stays as admin." },
+  { key: "recovery", label: "Start a member's recovery", note: "Proposed: an admin starts the recovery of a member who lost their app and codes; Kauro checks identity; nobody turns two-step verification off." },
   { key: "only-you", label: "Only you", note: "A team of one: the page invites the next person." },
   { key: "contract", label: "As the contract allows today", note: "Without the proposed names: each person is shown by the end of their membership reference." },
   { key: "loading", label: "Loading", note: "The team has not arrived: the place is held and announced." },
@@ -66,8 +71,8 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
   const [errors, setErrors] = useState<readonly { fieldId: string; message: string }[]>(
     state === "invite-invalid"
       ? [
-          { fieldId: "invite-who", message: "Enter the person's email address, such as name@company.com." },
-          { fieldId: "invite-role", message: "Choose the role this person needs." },
+          { fieldId: "invite-who", message: "Enter an email address in the correct format, like name@example.com" },
+          { fieldId: "invite-role", message: "Choose the role this person needs" },
         ]
       : [],
   );
@@ -81,7 +86,7 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
   if (state === "loading" || state === "error")
     return (
       <>
-        <PageHead eyebrow={workspace} title="Team" lead="Give each person only the access they need." />
+        <PageHead title="Team" lead="Give each person only the access they need." />
         {state === "loading" ? (
           <div className="kauro-state" role="status">
             <p>Loading your team…</p>
@@ -114,7 +119,6 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
   return (
     <>
       <PageHead
-        eyebrow={workspace}
         title="Team"
         lead="Give each person only the access they need."
         aside={
@@ -245,10 +249,8 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
                     <td data-label="Since">{day(member.since)}</td>
                     {manages ? (
                       <td className="kauro-row-manage">
-                        {member.self === true && owner ? (
-                          <button type="button" className="kauro-text-button" onClick={() => setPanel("last-owner")}>
-                            Change my role
-                          </button>
+                        {member.self === true ? (
+                          <span className="kauro-muted-text">Your access</span>
                         ) : canAct ? (
                           <details className="kauro-menu">
                             <summary>
@@ -259,6 +261,13 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
                                 <li>
                                   <button type="button" onClick={() => manage(member, "change-role")}>
                                     Change role
+                                  </button>
+                                </li>
+                              ) : null}
+                              {member.state === "ACTIVE" ? (
+                                <li>
+                                  <button type="button" onClick={() => manage(member, "recovery")}>
+                                    Start a recovery
                                   </button>
                                 </li>
                               ) : null}
@@ -286,11 +295,25 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         title={subject.state === "INVITED" ? "Withdraw this invitation" : `Remove access for ${who(subject)}`}
         summary={<p>{subject.state === "INVITED" ? "The invitation stops working at once." : `${who(subject)} will no longer be able to open ${workspace}. What they did stays in the record.`}</p>}
         effects={[
-          { id: "access", description: <p>{subject.state === "INVITED" ? "The link can no longer be used." : "Their access ends at once, including any page they have open."}</p>, count: 1, countLabel: subject.state === "INVITED" ? "invitation withdrawn" : "person loses access", acknowledgeLabel: "I understand this takes effect now" },
-          { id: "return", description: <p>To come back, they need a new invitation.</p>, count: 1, countLabel: "new invitation needed", acknowledgeLabel: "I understand they need a new invitation" },
+          { id: "access", description: <p>{subject.state === "INVITED" ? "The link can no longer be used." : "Their access ends at once, including any page they have open."}</p>, acknowledgeLabel: "I understand this takes effect now" },
+          { id: "return", description: <p>To come back, they need a new invitation.</p>, acknowledgeLabel: "I understand they need a new invitation" },
         ]}
         copy={{ approve: subject.state === "INVITED" ? "Withdraw invitation" : "Remove access", cancel: "Keep it", errorSummaryTitle: "Check before continuing" }}
         onApprove={() => setPanel("normal")}
+        onCancel={() => setPanel("normal")}
+      />
+
+      <ConfirmDialog
+        open={panel === "recovery"}
+        title={`Start a recovery for ${who(subject)}`}
+        summary={<p>Use this only when {who(subject)} has lost both their authenticator app and their recovery codes. You start the recovery; you cannot turn two-step verification off or let anyone in.</p>}
+        effects={[
+          { id: "check", description: <p>Kauro checks who they are with evidence independent of this account before anything changes.</p>, acknowledgeLabel: "I understand Kauro checks their identity" },
+          { id: "wait", description: <p>A waiting period, set by the risk, follows. {who(subject)} and every owner are told, and any of them can stop it.</p>, acknowledgeLabel: "I understand a waiting period applies" },
+          { id: "sessions", description: <p>When it completes, {who(subject)} sets up two-step verification again and every session of their account ends.</p>, acknowledgeLabel: "I understand their sessions end" },
+        ]}
+        copy={{ approve: "Confirm identity and start", cancel: "Do not start", errorSummaryTitle: "Check before starting" }}
+        onApprove={() => setPanel("step-up")}
         onCancel={() => setPanel("normal")}
       />
 
@@ -319,8 +342,8 @@ export function Team({ ctx, state }: PrototypeProps): ReactElement {
         title={`Transfer ownership to ${contract ? "Member ··5fb5" : "Marco Bianchi"}`}
         summary={<p>{contract ? "Member ··5fb5" : "Marco Bianchi"}, now an admin, becomes the owner of {workspace}. You become an admin.</p>}
         effects={[
-          { id: "owner", description: <p>The new owner can close the agency, change roles and transfer ownership again.</p>, count: 1, countLabel: "new owner", acknowledgeLabel: "I understand who becomes the owner" },
-          { id: "me", description: <p>You lose the owner&apos;s actions and keep the admin&apos;s.</p>, count: 1, countLabel: "role changes for you", acknowledgeLabel: "I understand I become an admin" },
+          { id: "owner", description: <p>The new owner can close the agency, change roles and transfer ownership again.</p>, acknowledgeLabel: "I understand who becomes the owner" },
+          { id: "me", description: <p>You lose the owner&apos;s actions and keep the admin&apos;s.</p>, acknowledgeLabel: "I understand I become an admin" },
         ]}
         copy={{ approve: "Confirm identity and transfer", cancel: "Keep ownership", errorSummaryTitle: "Check before transferring" }}
         onApprove={() => setPanel("step-up")}

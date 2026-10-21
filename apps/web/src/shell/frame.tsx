@@ -204,7 +204,7 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
           {view.switchHref === null ? null : (
             <p className="kauro-shell-switch">
               <Link href={view.switchHref} prefetch={false}>
-                {message("shell.agency.switch.label")}
+                {message(view.agency === null && !view.ops ? "shell.workspaces.label" : "shell.agency.switch.label")}
               </Link>
             </p>
           )}

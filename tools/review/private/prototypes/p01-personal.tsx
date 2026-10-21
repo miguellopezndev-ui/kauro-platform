@@ -32,7 +32,8 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
   const person = ctx.key === "company" ? { name: "Tomas Reyes", email: "tomas.reyes@halden.example" } : ctx.key === "operator" ? { name: "Priya Nair", email: "priya.nair@northwind.example" } : { name: "Lena Ortiz", email: "lena.ortiz@northwind.example" };
   return (
     <>
-      <PageHead eyebrow="Your account" title="Your settings" lead="Your own settings, the same in every agency." />
+      <PageHead title="Your settings" lead="Your own account, the same in every workspace you belong to." />
+      <p className="kauro-proposed kauro-proposed--page">Proposed — your profile, sign-in methods, sessions and notices need reads and commands the API does not have yet (D-P01-1 to D-P01-4, F-07)</p>
       <nav className="kauro-local-nav" aria-label="Sections of this page">
         <ul>
           <li>
@@ -62,7 +63,6 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
 
       <section id="me-profile" aria-labelledby="me-profile-h">
         <h2 id="me-profile-h">Profile</h2>
-        <p className="kauro-proposed">Proposed — needs a read of the identity provider&apos;s profile (D-P01-1)</p>
         <Facts
           rows={[
             ["Name", person.name],
@@ -74,7 +74,6 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
 
       <section id="me-security" aria-labelledby="me-security-h">
         <h2 id="me-security-h">Sign-in and security</h2>
-        <p className="kauro-proposed">Proposed — sign-in methods and recovery codes need a read and commands (D-P01-4)</p>
         <Facts
           rows={[
             ["Google", ctx.key === "operator" ? "Not connected" : <span key="g">Connected as <bdi>{person.email}</bdi></span>],
@@ -105,7 +104,6 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
             <p>You are now signed in only here. Anyone on another device must sign in again, with your password and Kauro code.</p>
           </Banner>
         ) : null}
-        <p className="kauro-proposed">Proposed — listing and ending other sessions needs a contract (D-P01-2)</p>
         <ul className="kauro-sessions">
           <li>
             <span className="kauro-sessions-what">
@@ -119,14 +117,14 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
               <li>
                 <span className="kauro-sessions-what">
                   <strong>Safari on iPhone</strong>
-                  <span>Signed in 18 Oct 2026 · last active yesterday</span>
+                  <span>Signed in on 18 Oct 2026 · last active yesterday · near Bogotá, CO</span>
                 </span>
                 <Button>Sign out</Button>
               </li>
               <li>
                 <span className="kauro-sessions-what">
                   <strong>Firefox on macOS</strong>
-                  <span>Signed in 12 Oct 2026 · last active 14 Oct 2026</span>
+                  <span>Signed in on 12 Oct 2026 · last active 14 Oct 2026 · near Medellín, CO</span>
                 </span>
                 <Button>Sign out</Button>
               </li>
@@ -134,7 +132,7 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
           )}
         </ul>
         <div className="kauro-actions">
-          {state === "signed-out" ? null : <Button>Sign out of all other sessions</Button>}
+          {state === "signed-out" ? null : <Button>Sign out all other sessions</Button>}
           <Button>Sign out here</Button>
         </div>
         <Facts
@@ -147,7 +145,6 @@ export function PersonalSettings({ ctx, state }: PrototypeProps): ReactElement {
 
       <section id="me-notices" aria-labelledby="me-notices-h">
         <h2 id="me-notices-h">Notices</h2>
-        <p className="kauro-proposed">Proposed — notices need a contract and an email route (D-P01-3)</p>
         <form
           className="kauro-notice-form"
           onSubmit={(event) => {

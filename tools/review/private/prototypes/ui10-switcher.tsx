@@ -80,7 +80,7 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
 
   return (
     <>
-      <PageHead eyebrow="Signed in" title="Your workspaces" accent={1} lead="Choose the workspace you are working in." />
+      <PageHead title="Your workspaces" lead="Choose the workspace you are working in." />
       {state === "loading" ? (
         <div className="kauro-state" role="status">
           <p>Loading your workspaces…</p>
@@ -164,33 +164,33 @@ function Welcome({ ctx }: { readonly ctx: ReviewContext }): ReactElement {
   const example: ReviewContext = { ...ctx, agency: { agencyId: EXAMPLE_ID, version: 1, displayName: "Example workspace", state: "ACTIVE", createdAt: "2026-10-01T00:00:00Z", permittedActions: ["VIEW"] } };
   return (
     <>
-      <PageHead eyebrow="Your account is ready" title="Welcome to Kauro." lead="See exactly what you would receive, then check your own files for free when you are ready." />
+      <PageHead title="Welcome to Kauro" lead="See exactly what you would receive, then check your own files for free when you are ready." />
       <div className="kauro-welcome">
         <section className="kauro-welcome-start" aria-labelledby="welcome-start-h">
           <h2 id="welcome-start-h">Check your own files</h2>
           <ol className="kauro-welcome-steps">
             <li>
               <strong>Set up your agency or company</strong>
-              <span>Its name, who buys, and the agreements. About a minute.</span>
+              <span>Who buys, its name, what your files hold, and the agreements. About a minute.</span>
             </li>
             <li>
               <strong>Upload your exports</strong>
-              <span>CSV or spreadsheet files of contacts, companies and deals.</span>
+              <span>CSV or XLSX exports of contacts, companies, deals or similar records.</span>
             </li>
             <li>
               <strong>Read your free data health check</strong>
-              <span>What Kauro found in your files, and the exact price to prepare them.</span>
+              <span>What Kauro found in every row, then an estimate for preparing your files.</span>
             </li>
           </ol>
           <ScreenButton to="UI09" ctx={ctx} variant="primary">
             <span className="kauro-go">Set up your agency or company</span>
           </ScreenButton>
           <ul className="kauro-checklist kauro-welcome-promises" aria-label="What Kauro promises">
-            <li>An exact quote before you pay anything</li>
-            <li>You approve every change before it is prepared</li>
+            <li>No card for the free check, and no obligation after it</li>
+            <li>You approve every change before anything is prepared, and a formal quote comes before you pay</li>
             <li>Kauro never connects to your CRM</li>
             <li>
-              Unless you buy, your files are deleted {UNPAID_RETENTION.days} days after the check, {UNPAID_RETENTION.hardDays} at the latest
+              If you do not buy, your files are deleted {UNPAID_RETENTION.days} days after your results, and never later than {UNPAID_RETENTION.hardDays} days after you sealed them
             </li>
           </ul>
         </section>

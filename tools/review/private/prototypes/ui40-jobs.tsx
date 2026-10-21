@@ -28,7 +28,7 @@ export function Jobs({ state }: PrototypeProps): ReactElement {
   const running = job.state === "RUNNING";
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Jobs" lead="Inspect safe execution and recovery facts." />
+      <PageHead title="Jobs" lead="Inspect safe execution and recovery facts." />
       <div className="kauro-table-region">
         <table className="kauro-table kauro-prospects">
           <caption className="kauro-visually-hidden">Preparation jobs</caption>

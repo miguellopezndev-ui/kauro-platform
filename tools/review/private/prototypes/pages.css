@@ -1,49 +1,91 @@
 /* Pages of the private application (Order 11), each in its own block, in the order the owner reviews them. */
 
-/* ===== UI09 Agency setup: one window; the steps as rings beside the step's work ===== */
-.kauro-setup-object {
-  position: relative;
-  margin-block-end: var(--kauro-space-6);
+/* ===== UI09 Agency setup: the account done, then four numbered parts (revision of 2026-10-20) ===== */
+.kauro-main .kauro-setup-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-5);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
 }
-.kauro-setup .kauro-window-body {
-  padding: 0;
+.kauro-setup-done bdi {
+  color: var(--kauro-color-text);
+  font-weight: 600;
 }
-.kauro-setup-grid {
+.kauro-setup-done-mark {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 50%;
+  background: var(--kauro-color-success-text);
+}
+.kauro-setup-done-mark::after {
+  content: "\2713";
+  color: var(--kauro-color-success-surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.kauro-main .kauro-setup-form {
   display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 44rem;
 }
-.kauro-setup-path {
-  padding: clamp(1.125rem, 3vw, 1.75rem);
-  border-block-end: 1px solid var(--kauro-color-border);
-  background: var(--kauro-color-surface);
-}
-.kauro-main .kauro-setup-path .kauro-window-label {
-  margin-block-start: 0;
-}
-.kauro-main .kauro-setup-step {
+.kauro-main .kauro-setup-part {
+  display: grid;
+  gap: var(--kauro-space-3);
   margin: 0;
-  padding: clamp(1.25rem, 3.5vw, 2.25rem);
-  border: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
 }
-.kauro-main .kauro-setup-step h2 {
-  margin-block: 0 var(--kauro-space-4);
+.kauro-main .kauro-setup-part > * {
+  margin: 0;
 }
-.kauro-setup-step .kauro-form > .kauro-button {
-  margin-block-start: var(--kauro-space-2);
+.kauro-main .kauro-setup-part legend {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  float: left;
+  inline-size: 100%;
+  margin-block-end: var(--kauro-space-3);
+  padding: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
 }
-@media (min-width: 60rem) {
-  .kauro-setup-grid {
-    grid-template-columns: minmax(17rem, 0.8fr) minmax(0, 1.5fr);
-  }
-  .kauro-setup-path {
-    border-block-end: 0;
-    border-inline-end: 1px solid var(--kauro-color-border);
-  }
+.kauro-main .kauro-setup-part legend + * {
+  clear: both;
 }
-.kauro-main .kauro-setup-object > .kauro-stamp {
-  position: absolute;
-  inset-block-end: -1.125rem;
-  inset-inline-end: 2rem;
+.kauro-setup-number {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
   font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-main .kauro-setup-part .kauro-choice,
+.kauro-main .kauro-setup-part .kauro-confirm,
+.kauro-main .kauro-setup-part .kauro-field,
+.kauro-main .kauro-setup-part .kauro-documents {
+  margin: 0;
+}
+.kauro-main .kauro-setup-explain {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-setup-error {
+  color: var(--kauro-color-danger-text);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-setup-form > .kauro-actions {
+  margin: var(--kauro-space-2) 0 0;
 }
 .kauro-documents {
   display: grid;
@@ -691,44 +733,6 @@ fieldset.kauro-notice-form {
 }
 .kauro-welcome-example-go {
   margin-block-start: var(--kauro-space-5);
-}
-
-/* UI09: who accepts, and the agreements, as one block under the choices */
-.kauro-setup-accept {
-  display: grid;
-  gap: var(--kauro-space-3);
-  padding-block-start: var(--kauro-space-4);
-  border-block-start: 1px solid var(--kauro-color-border);
-}
-.kauro-main .kauro-setup-accept h3 {
-  margin: 0;
-}
-.kauro-main .kauro-setup-who {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--kauro-space-3);
-  margin: 0;
-}
-.kauro-setup-who bdi {
-  color: var(--kauro-color-text-muted);
-  font-family: var(--kauro-mono-family);
-  font-size: var(--kauro-font-size-dense);
-  overflow-wrap: anywhere;
-}
-.kauro-setup-accept .kauro-confirm,
-.kauro-setup-accept .kauro-documents {
-  margin: 0;
-}
-.kauro-main .kauro-setup-step {
-  display: grid;
-  gap: var(--kauro-space-4);
-  align-content: start;
-}
-.kauro-main .kauro-setup-step > :is(h2, p, .kauro-field, .kauro-choice, .kauro-note) {
-  margin: 0;
-}
-.kauro-main .kauro-setup-step > .kauro-button {
-  justify-self: start;
 }
 
 /* the two sides of the welcome are not two sections of a page: no rule between them */
@@ -2960,4 +2964,20 @@ fieldset.kauro-notice-form {
   .kauro-main .kauro-tiles > li {
     padding: var(--kauro-space-3);
   }
+}
+
+/* one proposal note for a whole page, under its head (design decisions 2.4) */
+.kauro-main .kauro-proposed--page {
+  display: inline-block;
+  margin: calc(var(--kauro-space-3) * -1) 0 var(--kauro-space-6);
+}
+
+/* UI09: the two answers to "who buys" share the part's width */
+.kauro-main .kauro-setup-part .kauro-choice--row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-setup-part .kauro-choice--row label {
+  margin: 0;
 }

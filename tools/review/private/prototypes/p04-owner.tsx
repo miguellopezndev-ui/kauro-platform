@@ -46,7 +46,7 @@ export function OwnerSettings({ ctx, state }: PrototypeProps): ReactElement {
   ];
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Owner settings" lead="How Kauro is connected, protected and recovered." />
+      <PageHead title="Owner settings" lead="How Kauro is connected, protected and recovered." />
       <nav className="kauro-local-nav" aria-label="Sections of this page">
         <ul>
           <li>

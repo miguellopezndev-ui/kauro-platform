@@ -50,7 +50,7 @@ export function Clients({ ctx, state }: PrototypeProps): ReactElement {
   if (company)
     return (
       <>
-        <PageHead eyebrow={<bdi>{name}</bdi>} title="Clients" lead="Keep each end client's work separate." />
+        <PageHead title="Clients" lead="Keep each end client's work separate." />
         <section className="kauro-clients-company" aria-labelledby="clients-company-h">
           <h2 id="clients-company-h">
             <bdi>{name}</bdi> prepares its own data
@@ -66,7 +66,6 @@ export function Clients({ ctx, state }: PrototypeProps): ReactElement {
   return (
     <>
       <PageHead
-        eyebrow={<bdi>{name}</bdi>}
         title="Clients"
         lead="Keep each end client's work separate."
         aside={

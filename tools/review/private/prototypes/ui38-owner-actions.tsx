@@ -86,7 +86,7 @@ function Prepared({ state }: { readonly state: string }): ReactElement {
 export function OwnerActions({ state }: PrototypeProps): ReactElement {
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Owner actions" lead="Personal actions are prepared before they reach you." />
+      <PageHead title="Owner actions" lead="Personal actions are prepared before they reach you." />
       <Prepared state={state} />
       <section className="kauro-owner-action is-not-ready" aria-labelledby="tax-h">
         <div className="kauro-owner-action-head">

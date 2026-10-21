@@ -45,7 +45,7 @@ function SellerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; reado
   const open = PROSPECTS.filter((one) => one.state !== "SUPPRESSED" && one.state !== "WON" && one.state !== "LOST");
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Today" lead="Your permitted operational and commercial work." />
+      <PageHead title="Today" lead="Your permitted operational and commercial work." />
       {quiet ? (
         <section className="kauro-next" aria-labelledby="next-h">
           <p className="kauro-next-label">Today</p>
@@ -80,7 +80,7 @@ function SellerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; reado
 function OwnerHome({ ctx, quiet }: { readonly ctx: PrototypeProps["ctx"]; readonly quiet: boolean }): ReactElement {
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Today" lead="Your permitted operational and commercial work." />
+      <PageHead title="Today" lead="Your permitted operational and commercial work." />
       {quiet ? (
         <section className="kauro-next" aria-labelledby="next-h">
           <p className="kauro-next-label">Waiting for you</p>

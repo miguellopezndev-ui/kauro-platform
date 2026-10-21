@@ -155,9 +155,7 @@ export function Projects({ ctx, state }: PrototypeProps): ReactElement {
   return (
     <>
       <PageHead
-        eyebrow={<bdi>{workspace}</bdi>}
         title="Your projects"
-        accent={1}
         lead={company ? "Your preparation projects." : "Your client preparation projects."}
         aside={
           canStart && !starting && all.length > 0 ? (

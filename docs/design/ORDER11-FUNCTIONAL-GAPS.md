@@ -86,3 +86,14 @@ factor; owners and accounts without another admin recover through Kauro with ind
 without reliable evidence). **Code.** The identity provider is undecided (research/kauro-baseline.md Q-8: Google Identity Platform in code,
 Cognito in A9); no sign-up, enrolment, recovery or session-list screens exist (UI50 is blocked). **Needs.** The provider decision, the
 flows and their abuse tests (impersonation, administrative abuse, loss of the owner, fraudulent recovery).
+
+## F-08. The registration needs a page the site does not have
+
+**Rule in force.** Data Processing Policy §8.1 and the internal data manual §5.3 (A-01): account registration and the contact form show
+an unticked authorisation checkbox with links to the Policy and the Privacy notice, and keep user, document version, date and time as
+proof; commercial messages are a separate, optional, unticked choice (A-14). **Gap.** The registry publishes the Service terms (UI45),
+the Privacy notice (UI46) and the Data processing terms (UI47), but no page for the Data Processing Policy
+(`docs/legal/DATA_PROCESSING_POLICY.md`). **Design in Order 11.** Create account (P-05) shows the required checkbox and the optional one,
+linking the Policy at a proposed `/legal/data-processing-policy`. **Needs.** A registry addition for the Policy's page (legal text
+published by its own procedure), and the consent record at registration (F-07). The approved contact form should be checked against the
+same rule when the public site is next changed.

@@ -26,7 +26,7 @@ export function OperatingReview(_props: PrototypeProps): ReactElement {
   const top = FUNNEL[0][1];
   return (
     <>
-      <PageHead eyebrow="Kauro operations" title="Operating review" lead="Choose the next action from actual evidence." />
+      <PageHead title="Operating review" lead="Choose the next action from actual evidence." />
       <section className="kauro-screen-section" aria-labelledby="funnel-h">
         <h2 id="funnel-h">October&apos;s new accounts, so far</h2>
         <ol className="kauro-funnel">

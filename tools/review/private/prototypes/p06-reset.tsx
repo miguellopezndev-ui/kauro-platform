@@ -7,12 +7,13 @@ import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
 import { type FormEvent, type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { AuthFrame, CodeField, HELP, PasswordField, SIGN_IN, Who } from "./auth.tsx";
+import { AuthFrame, CodeField, codeOf, PasswordField, SIGN_IN, Who } from "./auth.tsx";
 
 export const P06_STATES: readonly StateDef[] = [
   { key: "normal", label: "Ask for a code", note: "The email address the person signs in with." },
   { key: "sent", label: "Code sent", note: "The same words whether or not the address has an account." },
   { key: "wrong", label: "Code not accepted", note: "A wrong or expired code, with a way to send a new one." },
+  { key: "factor", label: "Kauro code", note: "An email alone never changes a password: the person also enters the code of their authenticator app (or a recovery code)." },
   { key: "new", label: "New password", note: "One field with a show switch; no second copy to type." },
   { key: "done", label: "Password changed", note: "Every other session has ended. The next sign-in asks for Kauro's code as always." },
   { key: "limited", label: "Too many requests", note: "Repeated requests pause sending for a while, without naming any account." },
@@ -23,7 +24,7 @@ type Errors = readonly { readonly fieldId: string; readonly message: string }[];
 
 export function ResetPassword({ state }: PrototypeProps): ReactElement {
   const [step, setStep] = useState(state);
-  const [errors, setErrors] = useState<Errors>(state === "wrong" ? [{ fieldId: "reset-code", message: "That code is not right or has expired. Check the latest email, or send a new code." }] : []);
+  const [errors, setErrors] = useState<Errors>(state === "wrong" ? [{ fieldId: "reset-code", message: "The code is not correct or has expired. Enter the code from the latest email, or send a new one" }] : []);
   const errorOf = (id: string): string | undefined => errors.find((entry) => entry.fieldId === id)?.message;
   const go = (next: string): void => {
     setErrors([]);
@@ -45,11 +46,11 @@ export function ResetPassword({ state }: PrototypeProps): ReactElement {
       title = "Check your email";
       lead = undefined;
       body = (
-        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (/^[0-9]{6}$/.test(String(data.get("code") ?? "").trim()) ? null : { fieldId: "reset-code", message: "That code is not right or has expired. Check the latest email, or send a new code." }), "new")}>
+        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (/^[0-9]{6}$/.test(codeOf(String(data.get("code") ?? ""))) ? null : { fieldId: "reset-code", message: "The code is not correct or has expired. Enter the code from the latest email, or send a new one" }), "factor")}>
           <p>
             If <bdi className="kauro-auth-inline">{EMAIL}</bdi> has a Kauro account, a six-digit code is on its way to it.
           </p>
-          <ErrorSummary title="Check the code" errors={errors} />
+          <ErrorSummary title="There is a problem" errors={errors} />
           <CodeField id="reset-code" label="Code from the email" hint="It works for a short time. Look in spam if it has not arrived." error={errorOf("reset-code")} />
           <Button type="submit" variant="primary">
             <span className="kauro-go">Continue</span>
@@ -60,14 +61,31 @@ export function ResetPassword({ state }: PrototypeProps): ReactElement {
         </form>
       );
       break;
+    case "factor":
+      title = "Enter your Kauro code";
+      lead = "An email alone never changes a password. Enter the code your authenticator app shows for Kauro.";
+      body = (
+        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (/^[0-9]{6}$/.test(codeOf(String(data.get("code") ?? ""))) ? null : { fieldId: "reset-factor", message: "Enter the 6-digit code from your authenticator app" }), "new")}>
+          <Who email={EMAIL} />
+          <ErrorSummary title="There is a problem" errors={errors} />
+          <CodeField id="reset-factor" hint="The code changes every 30 seconds." error={errorOf("reset-factor")} />
+          <Button type="submit" variant="primary">
+            <span className="kauro-go">Continue</span>
+          </Button>
+          <p className="kauro-auth-small">
+            No app and no recovery codes? <a href="/login?review-state=lost">See how to get back in safely</a>
+          </p>
+        </form>
+      );
+      break;
     case "new":
       title = "Choose a new password";
       lead = undefined;
       body = (
-        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (String(data.get("password") ?? "").length >= 12 ? null : { fieldId: "reset-password", message: "Use at least 12 characters." }), "done")}>
+        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (String(data.get("password") ?? "").length >= 12 ? null : { fieldId: "reset-password", message: "Password must be 12 characters or more" }), "done")}>
           <Who email={EMAIL} />
-          <ErrorSummary title="Check the password" errors={errors} />
-          <PasswordField id="reset-password" label="New password" autoComplete="new-password" hint="At least 12 characters, different from the one before." error={errorOf("reset-password")} />
+          <ErrorSummary title="There is a problem" errors={errors} />
+          <PasswordField id="reset-password" label="New password" autoComplete="new-password" hint="12 characters or more, different from the one before. We check it against passwords exposed in known breaches." error={errorOf("reset-password")} />
           <p className="kauro-auth-small">Changing it signs you out of Kauro everywhere else.</p>
           <Button type="submit" variant="primary">
             <span className="kauro-go">Change password</span>
@@ -100,8 +118,8 @@ export function ResetPassword({ state }: PrototypeProps): ReactElement {
       break;
     default:
       body = (
-        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (/^\S+@\S+\.\S+$/.test(String(data.get("email") ?? "").trim()) ? null : { fieldId: "reset-email", message: "Enter an email address, such as name@company.com." }), "sent")}>
-          <ErrorSummary title="Check the address" errors={errors} />
+        <form className="kauro-form" noValidate onSubmit={(event) => submit(event, (data) => (/^\S+@\S+\.\S+$/.test(String(data.get("email") ?? "").trim()) ? null : { fieldId: "reset-email", message: "Enter an email address in the correct format, like name@example.com" }), "sent")}>
+          <ErrorSummary title="There is a problem" errors={errors} />
           <Field id="reset-email" label="Email address" error={errorOf("reset-email")}>
             {(control) => <input {...control} name="email" type="email" autoComplete="username" spellCheck={false} />}
           </Field>
@@ -120,8 +138,6 @@ export function ResetPassword({ state }: PrototypeProps): ReactElement {
       after={
         <p>
           <a href={SIGN_IN}>Back to sign in</a>
-          <br />
-          <a href={HELP}>Help signing in</a>
         </p>
       }
     >

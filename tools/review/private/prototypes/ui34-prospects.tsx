@@ -87,7 +87,7 @@ export function Prospects({ ctx, state }: PrototypeProps): ReactElement {
   const prospect = PROSPECTS.find((one) => one.id === open) ?? PROSPECTS[0];
   return (
     <>
-      <PageHead eyebrow="Kauro sales" title="Prospects" lead="Work only qualified, permitted opportunities." />
+      <PageHead title="Prospects" lead="Work only qualified, permitted opportunities." />
       {state === "claim" ? (
         <Banner tone="info" title="Your claim on Fernhill Growth Partners is with the owner" announce="status">
           <p>It records that you found them, from which source and when. Once accepted, it lasts {CLAIM_DAYS} days; a first project in that time is yours under the seller agreement.</p>
