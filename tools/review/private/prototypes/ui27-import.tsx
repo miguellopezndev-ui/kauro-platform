@@ -6,7 +6,7 @@
 // result" (registry exception for AWAITING_AGENCY_IMPORT), and a later stage stays locked until the stage before it is verified.
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -44,7 +44,7 @@ export function ImportSteps({ ctx, state }: PrototypeProps): ReactElement {
   const done = state === "done";
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="import" />
+      <ProjectHeader current="import" />
       <PageHead title="Import steps" lead="Use the specified tool and settings for each stage." />
       {done ? (
         <Banner tone="success" title="The import is complete" announce="status">

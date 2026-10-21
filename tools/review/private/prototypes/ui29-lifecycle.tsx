@@ -6,7 +6,7 @@
 // What deletion does not reach is said plainly: copies already downloaded, and financial and legal records kept apart from CRM content.
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -68,7 +68,7 @@ export function Lifecycle({ ctx, state }: PrototypeProps): ReactElement {
   ];
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="import" />
+      <ProjectHeader current="import" />
       <PageHead title="Data lifecycle" lead="See what remains and what will be deleted." />
       {deleting ? (
         <Banner tone="info" title="Deletion requested on 22 Oct 2026 at 10:30 UTC" announce="status">

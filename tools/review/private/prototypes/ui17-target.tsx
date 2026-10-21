@@ -9,7 +9,7 @@ import { Banner, Button, StatusBadge } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
 import { IDS } from "../lib/ids.ts";
 import { Facts, PageHead, ScreenButton } from "./kit.tsx";
@@ -34,7 +34,7 @@ export function TargetSetup({ ctx, state }: PrototypeProps): ReactElement {
   const days = POLICY_SNAPSHOT.retention.targetExecutionFreshnessDays;
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="files" />
+      <ProjectHeader current="files" />
       <PageHead title="Target setup" lead="Confirm the destination and import method." />
       {state === "clean" ? (
         <section className="kauro-next" aria-labelledby="target-clean-h">

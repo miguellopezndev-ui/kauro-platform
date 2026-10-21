@@ -7,7 +7,7 @@
 // and holds the next stage.
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -56,7 +56,7 @@ export function ImportResults({ ctx, state }: PrototypeProps): ReactElement {
   const agencyId = ctx.agency?.agencyId ?? "";
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="import" />
+      <ProjectHeader current="import" />
       <PageHead title="Import results" lead="Match the actual target result to this stage." />
       <p className="kauro-result-stage">
         <strong>

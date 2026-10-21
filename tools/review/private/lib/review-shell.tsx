@@ -9,12 +9,14 @@ import type { BrowserPage } from "@web/client/browser-session.ts";
 import type { SessionPhase } from "@web/client/session.ts";
 import type { AgencyContext } from "@web/shell/agency-context.ts";
 import { type AnchorComponent, type AnchorProps, ShellFrame } from "@web/shell/frame.tsx";
-import { ImplementedScreens } from "@web/screens/shared/project-stages.tsx";
+import { ImplementedScreens } from "@web/screens/shared/implemented-screens.ts";
 import { ShellContext } from "@web/shell/shell-context.ts";
 import { createShell, type Shell } from "@web/shell/shell-runtime.ts";
 import { viewOf } from "@web/shell/view.ts";
 import { fixtureFetch, type ReviewCall, type Script } from "./fixture-fetch.ts";
 import { PRIVATE_IDS } from "./inventory.ts";
+import { worldProject } from "./world-projects.ts";
+import { projectOfPathname } from "@web/screens.ts";
 
 const CHECKING: SessionPhase = { kind: "CHECKING" };
 const LOADING: AgencyContext = { kind: "LOADING" };
@@ -85,7 +87,10 @@ export function ReviewShell({ appPath, context, script, children }: ReviewShellP
   }, [appPath, script]);
   const phase = useStore(shell, sessionOf, CHECKING);
   const agency = useStore(shell, agencyOf, LOADING);
-  const base = viewOf({ phase, agency, pathname: appPath, activeAgency: shell === null ? null : shell.session.activeAgency(), implemented: ALL_PRIVATE, ...(context === "seller" ? { allowedOps: SELLER_SCREENS } : {}) });
+  // the project of the page, as the product reads it once for the menu and the project header
+  const inside = projectOfPathname(appPath);
+  const found = inside === null ? null : worldProject(inside.agencyId, inside.projectId);
+  const base = viewOf({ phase, agency, pathname: appPath, activeAgency: shell === null ? null : shell.session.activeAgency(), implemented: ALL_PRIVATE, ...(context === "seller" ? { allowedOps: SELLER_SCREENS } : {}), ...(found === null ? {} : { project: found }) });
   // the person's own settings are proposals (P-01, P-03, P-04): the review links them from the menu, where they would live
   const view = base.signOut ? { ...base, accountHref: base.ops ? "/ops/settings" : "/account" } : base;
   // the application's own links: the review serves every private path, so they are followed exactly as in the product

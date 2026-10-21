@@ -7,7 +7,7 @@
 // a candidate group is a signal, not a confirmed duplicate (the site's own words). The api has no findings view yet (UI18 shows the check's
 // progress and its counts of rows), so this page is a proposal beside UI18.
 import { type ReactElement } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -80,7 +80,7 @@ export function HealthResults({ ctx, state }: PrototypeProps): ReactElement {
   const agencyId = ctx.agency?.agencyId ?? "";
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="check" />
+      <ProjectHeader current="check" />
       <PageHead title="Health check results" lead="What the free check found in your files, and what fixing it involves." />
       <section className="kauro-verdict" aria-labelledby="verdict-h">
         <p className="kauro-next-label">The check of contacts.csv · {n(EXAMPLE.contacts)} contacts, every row measured</p>

@@ -131,6 +131,68 @@ export const OPS_NAVIGATION: readonly NavigationEntry[] = [
   { screen: "UI54", label: "nav.ops.outreach.label", group: "nav.group.sales.label" },
 ];
 
+export type ServiceMode = "CLEAN" | "HUBSPOT" | "SALESFORCE";
+
+/** One area of a project in the menu: the screens it holds, the first of which it opens, and the services that have it. */
+export interface ProjectAreaEntry {
+  readonly key: "overview" | "files" | "destination" | "check" | "plan" | "purchase" | "delivery" | "import" | "activity" | "data";
+  readonly label: MessageId;
+  /** The screens of this area; the first is where the area's link goes. An id that is not a built screen (a proposal) hides the area. */
+  readonly screens: readonly string[];
+  /** The services that have this area; absent, every service. */
+  readonly modes?: readonly ServiceMode[];
+  /** Drawn apart, after the project's work: the record of what happened and the data it keeps. */
+  readonly apart?: true;
+  /** The path of a proposed area that no registry route holds yet, after the project's path. */
+  readonly proposedPath?: string;
+}
+
+/**
+ * The areas of a project (Order 11, the owner's decision of 2026-10-20): places for the real tasks, in the order the work meets them, adapted
+ * to the service (a destination and an import exist for HubSpot and Salesforce, never for "Clean your data"); Activity and the data kept are
+ * reachable and never a step. The areas nest under Projects in the menu; the project's progress is drawn once, in the project's header.
+ */
+export const PROJECT_AREAS: readonly ProjectAreaEntry[] = [
+  { key: "overview", label: "nav.project.overview.label", screens: ["UI13"] },
+  { key: "files", label: "nav.project.files.label", screens: ["UI14", "UI15", "UI16"] },
+  { key: "destination", label: "nav.project.destination.label", screens: ["UI17"], modes: ["HUBSPOT", "SALESFORCE"] },
+  { key: "check", label: "nav.project.check.label", screens: ["UI18"] },
+  { key: "plan", label: "nav.project.plan.label", screens: ["UI19", "UI20", "UI21", "UI22"] },
+  { key: "purchase", label: "nav.project.purchase.label", screens: ["UI23"] },
+  { key: "delivery", label: "nav.project.delivery.label", screens: ["UI26", "UI25"] },
+  { key: "import", label: "nav.project.import.label", screens: ["UI27", "UI28"], modes: ["HUBSPOT", "SALESFORCE"] },
+  { key: "activity", label: "nav.project.activity.label", screens: ["P-08"], apart: true, proposedPath: "/activity" },
+  { key: "data", label: "nav.project.data.label", screens: ["UI29"], apart: true },
+];
+
+/** The project a pathname is inside, when it is a project's page of an agency. */
+export function projectOfPathname(pathname: string): { readonly agencyId: string; readonly projectId: string } | null {
+  const proposed = /^\/agencies\/([^/]+)\/projects\/([^/]+)\/activity$/.exec(pathname);
+  if (proposed !== null) return { agencyId: proposed[1] ?? "", projectId: proposed[2] ?? "" };
+  const match = matchRoute(pathname);
+  const agencyId = match?.params["agencyId"];
+  const projectId = match?.params["id"];
+  return match !== null && match.screen.tenant && agencyId !== undefined && projectId !== undefined && match.screen.route.includes("/projects/{id}") ? { agencyId, projectId } : null;
+}
+
+/** The areas of one project for its service, each with its link and whether the pathname is inside it. */
+export function projectAreasFor(
+  pathname: string,
+  mode: ServiceMode,
+  implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS,
+): readonly { readonly key: ProjectAreaEntry["key"]; readonly label: MessageId; readonly href: string; readonly current: boolean; readonly apart: boolean }[] {
+  const project = projectOfPathname(pathname);
+  if (project === null) return [];
+  const here = matchRoute(pathname)?.screen.id;
+  const base = pathOf("UI13", { agencyId: project.agencyId, id: project.projectId });
+  return PROJECT_AREAS.filter((area) => (area.modes === undefined || area.modes.includes(mode)) && area.screens[0] !== undefined && implemented.has(area.screens[0])).map((area) => {
+    const first = area.screens[0] as string;
+    const href = area.proposedPath !== undefined ? base + area.proposedPath : pathOf(first, { agencyId: project.agencyId, id: project.projectId });
+    const current = area.proposedPath !== undefined ? pathname === href : here !== undefined && area.screens.includes(here);
+    return { key: area.key, label: area.label, href, current, apart: area.apart === true };
+  });
+}
+
 const SEGMENT = /^[A-Za-z0-9_-]{1,128}$/;
 const PARAMETER = /^\{([A-Za-z][A-Za-z0-9]*)\}$/;
 

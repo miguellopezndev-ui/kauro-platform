@@ -329,3 +329,20 @@ test("D-PRIV-1: a shell outside an agency reads no agency, and a session that is
   assert.deepEqual(signedOut.sent.map((request) => request.url), ["/api/v1/sessions/current"], "no agency is read without a session");
   anonymous.detach();
 });
+
+test("Order 11: inside a project the menu nests its areas for its service; a destination and an import exist only for HubSpot and Salesforce", () => {
+  const project = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa2";
+  const built = new Set([...ALL, "UI13", "UI14", "UI17", "UI18", "UI19", "UI23", "UI26", "UI27", "UI29"]);
+  const input = (mode: "CLEAN" | "HUBSPOT", path: string): ShellInput => ({ phase: SIGNED_IN, agency: READY, pathname: path, activeAgency: AGENCY, implemented: built, project: { projectId: project, name: "Contacts and companies", clientLabel: "Larch Studio", mode } });
+  const audit = pathOf("UI18", { agencyId: AGENCY, id: project });
+  const hubspot = viewOf(input("HUBSPOT", audit)).project;
+  assert.deepEqual(hubspot?.areas.map((area) => area.key), ["overview", "files", "destination", "check", "plan", "purchase", "delivery", "import", "data"]);
+  assert.equal(hubspot?.areas.find((area) => area.current)?.key, "check");
+  const clean = viewOf(input("CLEAN", audit)).project;
+  assert.deepEqual(clean?.areas.map((area) => area.key), ["overview", "files", "check", "plan", "purchase", "delivery", "data"]);
+  // a project the page does not name, or a page outside every project, nests nothing
+  assert.equal(viewOf({ ...input("HUBSPOT", PROJECTS), project: { projectId: project, name: "x", clientLabel: "y", mode: "HUBSPOT" } }).project, null);
+  const markup = renderToStaticMarkup(createElement(ShellFrame, { view: viewOf(input("CLEAN", audit)), actions: { signOut: () => undefined, checkAgain: () => undefined }, children: null }));
+  assert.match(markup, /Contacts and companies/);
+  assert.doesNotMatch(markup, />Import</);
+});

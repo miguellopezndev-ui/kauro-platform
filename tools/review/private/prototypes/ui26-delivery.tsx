@@ -6,7 +6,7 @@
 // what changed (registry exceptions). Downloading is not importing: the project stays prepared for import (How it works).
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -37,7 +37,7 @@ export function Delivery({ ctx, state }: PrototypeProps): ReactElement {
     });
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="import" />
+      <ProjectHeader current="import" />
       <PageHead title="Delivery" lead="Download the verified package before its deadline." />
       {expired ? (
         <Banner tone="neutral" title="This package was removed on 27 Oct 2026" announce="status">

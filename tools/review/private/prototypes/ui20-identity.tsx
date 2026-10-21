@@ -7,7 +7,7 @@
 // they can change until it is approved (research: app-ui-patterns.md 4, against one-click merge-all).
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -29,7 +29,7 @@ export function Identity({ ctx, state }: PrototypeProps): ReactElement {
   const left = decided ? 0 : 21;
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="decide" />
+      <ProjectHeader current="plan" />
       <PageHead title="Duplicates" lead="Similarity is a signal; merging needs a decision." />
       <PlanTasks ctx={ctx} current="identity" states={decided ? { ...STATES, identity: "done" } : STATES} />
       <dl className="kauro-identity-counts">

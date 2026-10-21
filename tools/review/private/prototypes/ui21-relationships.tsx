@@ -5,7 +5,7 @@
 // not prepare as made (registry exceptions). The team approves the links that can be made and says what happens to the rest.
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -34,7 +34,7 @@ export function Relationships({ ctx, state }: PrototypeProps): ReactElement {
   const output = PLAN.output;
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="decide" />
+      <ProjectHeader current="plan" />
       <PageHead title="Links between records" lead="Confirm how records stay connected." />
       <PlanTasks ctx={ctx} current="relationships" states={confirmed ? { ...STATES, relationships: "done" } : STATES} />
       <section className="kauro-links" aria-labelledby="links-h">

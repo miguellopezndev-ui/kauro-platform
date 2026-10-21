@@ -2,7 +2,7 @@
 // The container of UI18 (design D-PRIV-1, D-OPS-1): reads the check named in the address, and runs CMD021 through the page's runner.
 import { type ReactElement, useContext } from "react";
 import { pathOf } from "../../screens.ts";
-import { ImplementedScreens } from "../shared/project-stages.tsx";
+import { ImplementedScreens } from "../shared/implemented-screens.ts";
 import { useShell } from "../../shell/shell-context.ts";
 import { pageRunner, useCommand } from "../shared/run-command.ts";
 import { StatePanel } from "../shared/state-panel.tsx";

@@ -5,7 +5,7 @@
 // and a property the destination does not have cannot be invented (registry exceptions). Validating says exactly what blocks.
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -44,7 +44,7 @@ export function Mapping({ ctx, state }: PrototypeProps): ReactElement {
   const agencyId = ctx.agency?.agencyId ?? "";
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="decide" />
+      <ProjectHeader current="plan" />
       <PageHead title="Fields" lead="Choose where each field goes and what changes." />
       <PlanTasks ctx={ctx} current="mapping" states={state === "validated" ? { ...STATES, mapping: "done" } : state === "blocked" ? { ...STATES, mapping: "blocked" } : STATES} />
       <div className="kauro-tabs" role="tablist" aria-label="Files">

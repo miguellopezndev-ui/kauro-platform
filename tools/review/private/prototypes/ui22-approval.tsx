@@ -6,7 +6,7 @@
 // exceptions). A newer version, or an effect not shown, blocks approval. Only an approver or an owner approves; Kauro proposes.
 import { Banner, Button } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
-import { ProjectStages } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
@@ -50,7 +50,7 @@ export function Approval({ ctx, state }: PrototypeProps): ReactElement {
   const workspace = ctx.agency?.displayName ?? "Northwind Data";
   return (
     <>
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current="decide" />
+      <ProjectHeader current="plan" />
       <PageHead title="Approval" lead="Approve these exact preparation decisions." />
       <PlanTasks ctx={ctx} current="approval" states={approved ? { ...STATES, approval: "done" } : state === "stale" ? { ...STATES, identity: "review", approval: "blocked" } : STATES} />
       {state === "stale" ? (

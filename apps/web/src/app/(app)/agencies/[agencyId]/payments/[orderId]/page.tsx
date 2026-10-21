@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { message } from "../../../../../../copy/en.ts";
 import { PaymentScreen } from "../../../../../../screens/payments/containers.tsx";
 import { idOrNull } from "../../../../../../screens/shared/params.ts";
-import { ProjectStages } from "../../../../../../screens/shared/project-stages.tsx";
+import { ProjectHeader } from "../../../../../../screens/shared/project-header.tsx";
 
 // UI24 Payment (design D-ROUTE-1): the order is named in the path, so a return from the bank lands on the same page and reads the same order.
 export default async function Page({ params }: { readonly params: Promise<{ agencyId: string; orderId: string }> }) {
@@ -12,7 +12,7 @@ export default async function Page({ params }: { readonly params: Promise<{ agen
   if (agency === null || order === null) notFound();
   return (
     <>
-      <ProjectStages agencyId={agency} projectId={null} current="quote" />
+      <ProjectHeader current="purchase" />
       <h1>{message("screen.payment.title")}</h1>
       <PaymentScreen agencyId={agency} orderId={order} />
     </>

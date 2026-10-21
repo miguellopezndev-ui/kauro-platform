@@ -8,7 +8,7 @@
 //   - The navigation lists a screen only when its page exists in this build; an agency with no implemented entry has no navigation.
 import type { SessionPhase } from "../client/session.ts";
 import type { MessageId } from "../copy/en.ts";
-import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, opsNavigationFor, originOfPath, pathOf, signInHref } from "../screens.ts";
+import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, opsNavigationFor, originOfPath, pathOf, projectAreasFor, projectOfPathname, type ServiceMode, signInHref } from "../screens.ts";
 import type { AgencyContext, AgencyState } from "./agency-context.ts";
 
 export type RefusedAction = { readonly kind: "SIGN_IN"; readonly href: string } | { readonly kind: "CHECK_AGAIN" } | { readonly kind: "SIGN_OUT" } | { readonly kind: "NONE" };
@@ -27,6 +27,14 @@ export interface NavigationItem {
   readonly group?: MessageId;
 }
 
+/** The project a page is inside, as the menu nests it under Projects and the project's header names it. */
+export interface ProjectInView {
+  readonly name: string;
+  readonly clientLabel: string;
+  readonly mode: ServiceMode;
+  readonly areas: readonly { readonly key: string; readonly label: MessageId; readonly href: string; readonly current: boolean; readonly apart: boolean }[];
+}
+
 export interface ShellView {
   readonly gate: Gate;
   /** The agency indicator: its name (a customer string, drawn as a text node) and the message id of its state. */
@@ -41,6 +49,8 @@ export interface ShellView {
   readonly accountHref: string | null;
   /** True on a screen without a person (sign-in, invitation): a plain header, never the private menu. */
   readonly anonymous?: boolean;
+  /** The project the page is inside, with its areas for its service (Order 11); null outside a project or before the project is read. */
+  readonly project?: ProjectInView | null;
 }
 
 export interface ShellInput {
@@ -52,6 +62,8 @@ export interface ShellInput {
   readonly implemented?: ReadonlySet<string>;
   /** The operations screens this person may open, as their capabilities say; absent, every implemented entry is listed. */
   readonly allowedOps?: ReadonlySet<string>;
+  /** The project of the page, once read: its name, its client and its service. Absent, the menu does not nest a project. */
+  readonly project?: { readonly projectId: string; readonly name: string; readonly clientLabel: string; readonly mode: ServiceMode };
 }
 
 const stateLabel = (state: AgencyState): MessageId => `shell.agency.state.${state}.label`;
@@ -115,7 +127,13 @@ function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellVie
       return { gate: refused("state.DENIED.title", "shell.agency.unavailable.body", { kind: "CHECK_AGAIN" }), ...withPerson };
     case "READY": {
       const navigation = navigationFor(input.activeAgency, implemented).map((entry) => ({ ...entry, current: current(entry) }));
-      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state) }, navigation, switchHref, signOut: true, ops: false, accountHref: null };
+      // inside a project the menu nests the project's areas under Projects; the project must be the one the URL names
+      const inside = projectOfPathname(input.pathname);
+      const project =
+        inside !== null && input.project !== undefined && input.project.projectId === inside.projectId
+          ? { name: input.project.name, clientLabel: input.project.clientLabel, mode: input.project.mode, areas: projectAreasFor(input.pathname, input.project.mode, implemented) }
+          : null;
+      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state) }, navigation, switchHref, signOut: true, ops: false, accountHref: null, project };
     }
   }
 }

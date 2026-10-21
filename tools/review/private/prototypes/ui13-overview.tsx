@@ -7,7 +7,10 @@
 //
 // The example project (opened from a new account's welcome) is the same page with synthetic data and says so at the top, with the way to
 // check one's own files. PROPOSED (D-UI13-1): the activity's names and events need a read the api does not serve yet.
-import { ProjectStages, type ProjectStage } from "@web/screens/shared/project-stages.tsx";
+import { ProjectHeader, type ProjectStep } from "@web/screens/shared/project-header.tsx";
+
+type ProjectStage = "files" | "check" | "decide" | "quote" | "prepare" | "import";
+const STEP_OF: Readonly<Record<ProjectStage, ProjectStep>> = { files: "files", check: "check", decide: "plan", quote: "purchase", prepare: "delivery", import: "import" };
 import { Banner } from "@kauro/ui";
 import { type ReactElement } from "react";
 import { IDS } from "../lib/ids.ts";
@@ -85,7 +88,7 @@ export function Overview({ ctx, state }: PrototypeProps): ReactElement {
           </p>
         </Banner>
       ) : null}
-      <ProjectStages agencyId={agencyId} projectId={IDS.project} current={stage} />
+      <ProjectHeader current={STEP_OF[stage]} />
       <header className="kauro-project-head">
         <Eyebrow>
           <bdi>{EXAMPLE.client.replace(" (synthetic)", "")}</bdi> · {EXAMPLE.destination}

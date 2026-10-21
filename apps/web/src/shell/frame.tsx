@@ -13,7 +13,7 @@ import { type ComponentType, createContext, type ReactElement, type ReactNode, u
 import { message } from "../copy/en.ts";
 import { Main, SkipLink } from "./landmarks.tsx";
 import { ThemeControl } from "./theme-control.tsx";
-import type { NavigationItem, RefusedAction, ShellView } from "./view.ts";
+import type { NavigationItem, ProjectInView, RefusedAction, ShellView } from "./view.ts";
 
 export interface AnchorProps {
   readonly href: string;
@@ -31,8 +31,33 @@ export const PlainAnchor: AnchorComponent = ({ href, "aria-current": current, ch
   </a>
 );
 
-/** The anchor of the running frame, for the links a screen draws inside it (the project stages): the router's in the app, a plain one elsewhere. */
+/** The anchor of the running frame, for the links a screen draws inside it: the router's in the app, a plain one elsewhere. */
 export const AnchorContext = createContext<AnchorComponent>(PlainAnchor);
+
+/** The project the page is inside, as the frame read it for the menu: the project's header names it from here. */
+export const ProjectContext = createContext<Pick<ProjectInView, "name" | "clientLabel" | "mode"> | null>(null);
+
+/** A project's areas, nested under Projects: its work in order, then, apart, its activity and the data it keeps. */
+function ProjectAreas({ project, Link }: { readonly project: ProjectInView; readonly Link: AnchorComponent }): ReactElement {
+  const work = project.areas.filter((area) => !area.apart);
+  const apart = project.areas.filter((area) => area.apart);
+  const item = (area: ProjectInView["areas"][number]): ReactElement => (
+    <li key={area.key}>
+      <Link href={area.href} prefetch={false} {...(area.current ? { "aria-current": "page" as const } : {})}>
+        {message(area.label)}
+      </Link>
+    </li>
+  );
+  return (
+    <div className="kauro-shell-project">
+      <p className="kauro-shell-project-name">
+        <bdi>{project.name}</bdi>
+      </p>
+      <ul aria-label={message("nav.project.label")}>{work.map(item)}</ul>
+      {apart.length === 0 ? null : <ul className="kauro-shell-project-apart">{apart.map(item)}</ul>}
+    </div>
+  );
+}
 
 export interface ShellActions {
   readonly signOut: () => void;
@@ -80,7 +105,7 @@ function initials(name: string): string {
 }
 
 /** The menu's entries in their groups, each group under its heading; Help is left for the foot of the menu. */
-function Groups({ items, Link }: { readonly items: readonly NavigationItem[]; readonly Link: AnchorComponent }): ReactElement {
+function Groups({ items, Link, project }: { readonly items: readonly NavigationItem[]; readonly Link: AnchorComponent; readonly project?: ProjectInView | null | undefined }): ReactElement {
   const groups: { readonly heading: NavigationItem["group"]; readonly items: NavigationItem[] }[] = [];
   for (const item of items) {
     if (item.group === "nav.group.help.label") continue;
@@ -96,9 +121,10 @@ function Groups({ items, Link }: { readonly items: readonly NavigationItem[]; re
           <ul>
             {group.items.map((item) => (
               <li key={item.screen}>
-                <Link href={item.href} prefetch={false} {...(item.current ? { "aria-current": "page" as const } : {})}>
+                <Link href={item.href} prefetch={false} {...(item.current && (project === null || project === undefined) ? { "aria-current": "page" as const } : {})}>
                   {message(item.label)}
                 </Link>
+                {item.screen === "UI11" && project !== null && project !== undefined ? <ProjectAreas project={project} Link={Link} /> : null}
               </li>
             ))}
           </ul>
@@ -118,7 +144,11 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
       <div role="status" className="kauro-live">
         {gate.kind === "WAIT" ? <p>{message(gate.message)}</p> : null}
       </div>
-      {gate.kind === "OPEN" ? <AnchorContext value={Link}>{children}</AnchorContext> : null}
+      {gate.kind === "OPEN" ? (
+        <AnchorContext value={Link}>
+          <ProjectContext value={view.project === null || view.project === undefined ? null : { name: view.project.name, clientLabel: view.project.clientLabel, mode: view.project.mode }}>{children}</ProjectContext>
+        </AnchorContext>
+      ) : null}
       {gate.kind === "REFUSED" ? <Refused key={gate.title} title={message(gate.title)} body={message(gate.body)} action={gate.action} Anchor={Link} actions={actions} /> : null}
     </Main>
   );
@@ -180,7 +210,7 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
           )}
           {view.navigation.length === 0 ? null : (
             <nav className="kauro-shell-nav" aria-label={message(view.ops ? "shell.navigation.ops.label" : "shell.navigation.label")}>
-              <Groups items={view.navigation} Link={Link} />
+              <Groups items={view.navigation} Link={Link} project={view.project} />
               {help.length === 0 ? null : (
                 <div className="kauro-shell-group kauro-shell-group--foot">
                   <ul>

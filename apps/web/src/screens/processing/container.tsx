@@ -7,7 +7,7 @@ import type { ReactElement } from "react";
 import { pathOf } from "../../screens.ts";
 import { useShell } from "../../shell/shell-context.ts";
 import { pageRunner, useCommand } from "../shared/run-command.ts";
-import { ImplementedScreens } from "../shared/project-stages.tsx";
+import { ImplementedScreens } from "../shared/implemented-screens.ts";
 import { StatePanel } from "../shared/state-panel.tsx";
 import { useNow } from "../shared/use-now.ts";
 import { useRead } from "../shared/use-read.ts";
