@@ -93,9 +93,10 @@ test("the route table is the registry's: every public screen this package owns i
 
 test("the navigation names only routes of the public site, each once, in the order a buyer reads them, with a label in the catalogue", () => {
   const routes = new Set<string>(Object.values(ROUTE));
-  // the header and the footer never repeat a page; the narrow-screen menu is the header plus Help and Contact (Order 11 round 2)
+  // the footer is a short map of the site, so it repeats the header's pages; each list names a page once (Order 11 round 2)
   const items = [...HEADER_NAV, ...FOOTER_NAV];
-  assert.equal(new Set(items.map((item) => item.href)).size, items.length, "no route is listed twice");
+  for (const list of [HEADER_NAV, MAIN_NAV, FOOTER_NAV]) assert.equal(new Set(list.map((item) => item.href)).size, list.length, "no route is listed twice in one navigation");
+  assert.deepEqual([...new Set(FOOTER_NAV.map((item) => item.href))].sort(), Object.values(ROUTE).filter((route) => route !== ROUTE.home).sort(), "the footer reaches every page of the site");
   for (const item of items) {
     assert.ok(routes.has(item.href), item.href);
     assert.ok(item.label in PUBLIC_COPY, item.label);
@@ -103,7 +104,7 @@ test("the navigation names only routes of the public site, each once, in the ord
   }
   assert.deepEqual(HEADER_NAV.map((item) => item.href), ["/how-it-works", "/supported-services", "/pricing", "/sample-delivery", "/security"]);
   assert.deepEqual(MAIN_NAV.map((item) => item.href), [...HEADER_NAV.map((item) => item.href), "/help", "/contact"]);
-  assert.deepEqual(FOOTER_NAV.map((item) => item.href), ["/help", "/contact", "/status", "/legal/terms", "/legal/privacy", "/legal/data-processing"]);
+  assert.deepEqual(FOOTER_NAV.map((item) => item.href), ["/how-it-works", "/supported-services", "/pricing", "/sample-delivery", "/help", "/contact", "/status", "/security", "/legal/terms", "/legal/privacy", "/legal/data-processing"]);
 });
 
 test("each page's metadata is its own title and description, from the catalogue", () => {

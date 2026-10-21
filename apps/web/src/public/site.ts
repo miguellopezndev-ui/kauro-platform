@@ -63,14 +63,47 @@ export const HEADER_NAV: readonly NavItem[] = Object.freeze([
 /** The menu of a narrow screen: the header's pages, then Help and Contact, so a phone reaches every page from the top. */
 export const MAIN_NAV: readonly NavItem[] = Object.freeze([...HEADER_NAV, { href: ROUTE.help, label: "nav.help.label" }, { href: ROUTE.contact, label: "nav.contact.label" }]);
 
-export const FOOTER_NAV: readonly NavItem[] = Object.freeze([
-  { href: ROUTE.help, label: "nav.help.label" },
-  { href: ROUTE.contact, label: "nav.contact.label" },
-  { href: ROUTE.status, label: "nav.status.label" },
-  { href: ROUTE.terms, label: "nav.terms.label" },
-  { href: ROUTE.privacy, label: "nav.privacy.label" },
-  { href: ROUTE.processing, label: "nav.processing.label" },
+export interface NavGroup {
+  readonly heading: PublicCopyId;
+  readonly items: readonly NavItem[];
+}
+
+/**
+ * The footer as a short map of the site, in three labelled columns (Order 11 round 2): every one of the 20 B2B footers measured groups its
+ * links under headings, a status link is near-universal, and a site of a dozen pages can list them all. Help and Contact are here, where
+ * people look for them first.
+ */
+export const FOOTER_GROUPS: readonly NavGroup[] = Object.freeze([
+  {
+    heading: "site.footer.product.heading",
+    items: [
+      { href: ROUTE.how, label: "nav.how.label" },
+      { href: ROUTE.services, label: "nav.services.label" },
+      { href: ROUTE.pricing, label: "nav.pricing.label" },
+      { href: ROUTE.sample, label: "nav.sample.label" },
+    ],
+  },
+  {
+    heading: "site.footer.help.heading",
+    items: [
+      { href: ROUTE.help, label: "nav.help.label" },
+      { href: ROUTE.contact, label: "nav.contact.label" },
+      { href: ROUTE.status, label: "nav.status.label" },
+    ],
+  },
+  {
+    heading: "site.footer.trust.heading",
+    items: [
+      { href: ROUTE.security, label: "nav.security.label" },
+      { href: ROUTE.terms, label: "nav.terms.label" },
+      { href: ROUTE.privacy, label: "nav.privacy.label" },
+      { href: ROUTE.processing, label: "nav.processing.label" },
+    ],
+  },
 ]);
+
+/** Every footer link, in the columns' order. */
+export const FOOTER_NAV: readonly NavItem[] = Object.freeze(FOOTER_GROUPS.flatMap((group) => group.items));
 
 export interface PageMetadata {
   readonly title: string;

@@ -10,7 +10,7 @@
 // never share a selector. The main region's id is the one the application shell also uses for its skip link.
 import type { ReactElement, ReactNode } from "react";
 import { PUBLIC_COPY, type PublicCopyId } from "../copy/public.ts";
-import { FOOTER_NAV, ROUTE, type NavItem } from "./site.ts";
+import { FOOTER_GROUPS, ROUTE, type NavItem } from "./site.ts";
 
 export const MAIN_ID = "kauro-main";
 
@@ -34,6 +34,28 @@ export function NavList({ items, current, label }: NavListProps): ReactElement {
           </li>
         ))}
       </ul>
+    </nav>
+  );
+}
+
+/** The footer's links in their labelled columns: one named navigation, each column a list named by its heading. */
+export function FooterNav(): ReactElement {
+  return (
+    <nav className="kauro-site-footer-nav" aria-label={PUBLIC_COPY["site.nav.footer.label"]}>
+      {FOOTER_GROUPS.map((group) => (
+        <div key={group.heading} className="kauro-site-footer-group">
+          <p id={`footer-${group.heading}`} className="kauro-site-footer-heading">
+            {PUBLIC_COPY[group.heading]}
+          </p>
+          <ul className="kauro-site-nav-list" aria-labelledby={`footer-${group.heading}`}>
+            {group.items.map((item) => (
+              <li key={item.href}>
+                <a href={item.href}>{PUBLIC_COPY[item.label]}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </nav>
   );
 }
@@ -86,12 +108,10 @@ export function SiteFrame({ signInHref, nav, cta, menu, themeControl, footerNav,
             </p>
             <p className="kauro-site-footer-tagline">{PUBLIC_COPY["site.footer.tagline"]}</p>
           </div>
-          <div className="kauro-site-footer-meta">
-            {footerNav ?? <NavList items={FOOTER_NAV} current={null} label="site.nav.footer.label" />}
-            <div className="kauro-site-footer-row">
-              <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
-              {themeControl}
-            </div>
+          {footerNav ?? <FooterNav />}
+          <div className="kauro-site-footer-row">
+            <p className="kauro-site-footer-note">{PUBLIC_COPY["site.footer.note"]}</p>
+            {themeControl}
           </div>
         </div>
       </footer>

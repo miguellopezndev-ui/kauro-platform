@@ -10087,3 +10087,68 @@ body:has(> .kauro-site-header) {
     font-size: 0.9375rem;
   }
 }
+
+/* ==== Order 11 round 2: the footer =====================================================================================================
+   As the B2B footers measured compose it (20 of 20 group their links under headings): the name and its line on the left, three labelled
+   columns (Product, Help, Trust and legal) on the right, and a last row under a hairline with the one-line limit of what Kauro does and
+   the theme control. Headings in small capitals at the text colour, links muted until hovered. */
+.kauro-site-footer .kauro-site-footer-inner {
+  display: grid;
+  gap: var(--kauro-space-7) var(--kauro-space-7);
+  padding-block: clamp(3rem, 2rem + 3vw, 4.5rem) var(--kauro-space-5);
+}
+@media (min-width: 56rem) {
+  .kauro-site-footer .kauro-site-footer-inner {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    align-items: start;
+  }
+}
+.kauro-site-footer .kauro-site-footer-lead {
+  display: block;
+}
+.kauro-site-footer .kauro-site-footer-tagline {
+  max-inline-size: 26ch;
+  margin: var(--kauro-space-2) 0 0;
+  color: var(--kauro-color-text-muted);
+  font-size: 1rem;
+  text-align: start;
+}
+.kauro-site-footer-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kauro-space-6) var(--kauro-space-5);
+}
+@media (min-width: 40rem) {
+  .kauro-site-footer-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.kauro-site-footer-heading {
+  margin: 0 0 var(--kauro-space-2);
+  color: var(--kauro-color-text);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-site-footer .kauro-site-footer-group .kauro-site-nav-list {
+  display: grid;
+  gap: 0;
+}
+.kauro-site-footer .kauro-site-footer-group .kauro-site-nav-list a {
+  min-block-size: 2.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.9375rem;
+}
+.kauro-site-footer .kauro-site-footer-group .kauro-site-nav-list a:hover {
+  color: var(--kauro-color-text);
+}
+.kauro-site-footer .kauro-site-footer-row {
+  grid-column: 1 / -1;
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-footer .kauro-site-footer-row .kauro-site-footer-note {
+  justify-self: start;
+  text-align: start;
+}
