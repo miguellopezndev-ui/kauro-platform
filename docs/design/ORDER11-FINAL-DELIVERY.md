@@ -34,7 +34,7 @@ The ten questions for every page are answered in `ORDER11-PAGE-ANALYSIS.md`; who
 ## 3. Design decisions and their reasons
 
 `ORDER11-DESIGN-DECISIONS.md` (words, page structure, navigation, the journey, identity and recovery, the public site, visual identity),
-and `ORDER11-OVERNIGHT-DECISIONS.md` (N-01 to N-39, each with its reason and how to reverse it).
+and `ORDER11-OVERNIGHT-DECISIONS.md` (N-01 to N-53, each with its reason and how to reverse it).
 
 ## 4. New pages, sections and functions
 
@@ -83,8 +83,9 @@ errors, outside requests, overflow, text cut or squeezed, one h1, axe WCAG 2.2 A
 Motion and keyboard checks: none failing. The checks grew during the night (text squeezed letter by letter or poured into a strip, content
 hidden in an inner sideways scroll), each after a defect the eye found and the audit had missed; the figures above are with all of them.
 
-Human inspection: every page at 1280 and 375 px, light and dark, recorded with the corrections in the review log. Tests: web 336, design
-system 60, review inventory 2, review type-check clean.
+Human inspection: every page at 1280 and 375 px, light and dark, recorded with the corrections in the review log. Two independent reviews
+(the real screens; every claim in the prototypes and variants) found 24 items, all verified and fixed. Tests: web 337, design system 60,
+review inventory 2, review type-check clean.
 
 ## 9. Decisions for the owner
 
