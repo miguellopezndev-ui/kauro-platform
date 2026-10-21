@@ -50,6 +50,7 @@
 | UI28 Import results `/projects/{id}/import/receipt` | VISUAL PROTOTYPE — NOT FUNCTIONAL | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI29 Data lifecycle `/projects/{id}/retention` | VISUAL PROTOTYPE — NOT FUNCTIONAL | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI52 Support cases `/support` | IMPLEMENTED — REVIEW DATA | NOT_PRESENTED | — | — | — | — | — | Pending |
+| P-08 Activity `/projects/{id}/activity (proposed)` | PROPOSED | NOT_PRESENTED | — | — | — | — | — | Pending |
 
 ## Group C. Quote, payment and billing
 
@@ -58,6 +59,7 @@
 | UI23 Quote `/projects/{id}/purchase` | IMPLEMENTED — REVIEW DATA | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI24 Payment `/payments/{id}` | IMPLEMENTED — REVIEW DATA | NOT_PRESENTED | — | — | — | — | — | Pending |
 | UI30 Billing `/billing` | IMPLEMENTED — REVIEW DATA | NOT_PRESENTED | — | — | — | — | — | Pending |
+| P-09 Billing overview `/billing without an order (proposed)` | PROPOSED | NOT_PRESENTED | — | — | — | — | — | Pending |
 
 ## Group D. Sales and sellers
 
