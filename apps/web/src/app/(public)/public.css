@@ -5796,89 +5796,67 @@ body:has(> .kauro-site-header) {
   margin: 0;
 }
 
-/* Order 11, owner review: the three services as three upright cards side by side, none wider than another. Every card reads in the same
-   order and, on a wide screen, each part sits on a row shared by the three (subgrid): the names line up, the pieces of the product line up,
-   and the limits and versions close the cards on one line. */
-.kauro-site-trio {
+/* each service a spread: what it delivers beside the piece of the product that shows it, the side alternating */
+.kauro-site-spreads {
   display: grid;
-  gap: clamp(1rem, 2vw, 1.5rem);
+  gap: clamp(1.5rem, 3vw, 2.5rem);
 }
-.kauro-site-trio > .kauro-site-service {
+.kauro-site-spreads > .kauro-site-service {
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto auto;
   align-content: start;
-  row-gap: 0;
-  padding: clamp(1.5rem, 2.5vw, 2rem);
-  border: 1px solid var(--kauro-color-border);
-  scroll-margin-block-start: 6rem;
+  padding: clamp(1.75rem, 4vw, 3rem);
 }
-.kauro-site-trio > .kauro-site-service--lead.kauro-wine {
-  border-color: transparent;
+.kauro-site-spreads > .kauro-site-service:nth-child(2) {
+  border-block-start: 4px solid var(--kauro-color-primary);
 }
-.kauro-site-trio > .kauro-site-service--closed {
-  border-style: dashed;
+.kauro-site-spreads > .kauro-site-service:nth-child(3) {
+  border-block-start: 4px solid var(--kauro-color-text);
 }
-.kauro-site-trio .kauro-site-service-top {
-  grid-row: 1;
-  gap: var(--kauro-space-3);
-  margin: 0;
-  padding: 0 0 var(--kauro-space-5);
-  border: 0;
+.kauro-site-spreads > :is(.kauro-site-service--closed, .kauro-site-service--unread) {
+  border-block-start-color: var(--kauro-color-border);
 }
-.kauro-site-main .kauro-site-trio .kauro-site-service h3 {
-  font-size: clamp(1.75rem, 1.45rem + 0.8vw, 2.125rem);
+.kauro-site-spreads .kauro-site-service-top {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.kauro-site-main .kauro-site-spreads .kauro-site-service h3 {
+  font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
   letter-spacing: -0.035em;
 }
-.kauro-site-trio .kauro-site-service .kauro-site-frag {
-  grid-row: 2;
-  display: grid;
-  align-content: center;
+.kauro-site-main .kauro-site-spreads .kauro-site-service p {
+  max-inline-size: 58ch;
+}
+.kauro-site-spreads .kauro-site-service .kauro-site-frag {
   max-inline-size: none;
-  margin: 0 0 var(--kauro-space-5);
-  padding: 1.125rem 1.25rem;
+  margin-block: var(--kauro-space-4);
+  padding: 1.5rem 1.625rem;
   border-radius: 0.75rem;
-  font-size: 0.9375rem;
+  font-size: 1rem;
 }
-.kauro-site-trio .kauro-site-service-part {
-  display: grid;
-  align-content: start;
-  gap: var(--kauro-space-2);
-}
-.kauro-site-trio .kauro-site-service-part--for {
-  grid-row: 3;
-  padding-block-end: var(--kauro-space-4);
-}
-.kauro-site-trio .kauro-site-service-part--receive {
-  grid-row: 4;
-}
-.kauro-site-main .kauro-site-trio .kauro-site-service-part p {
-  margin: 0;
-}
-.kauro-site-main .kauro-site-trio p.kauro-site-service-label {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.kauro-site-main .kauro-site-trio .kauro-site-service .kauro-site-card-limit {
-  grid-row: 5;
-  margin: var(--kauro-space-5) 0 0;
-  font-size: 0.875rem;
-}
-.kauro-site-main .kauro-site-trio .kauro-site-service p.kauro-site-meta {
-  grid-row: 6;
-  margin: 0;
-  padding-block-start: var(--kauro-space-3);
-}
-@media (min-width: 62rem) {
-  .kauro-site-trio {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(6, auto);
+@media (min-width: 56rem) {
+  .kauro-site-spreads > .kauro-site-service {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
   }
-  .kauro-site-trio > .kauro-site-service {
-    grid-row: span 6;
-    grid-template-rows: subgrid;
+  .kauro-site-spreads > .kauro-site-service > * {
+    grid-column: 1;
+  }
+  .kauro-site-spreads > .kauro-site-service > .kauro-site-frag {
+    grid-column: 2;
+    grid-row: 1 / span 8;
+    align-self: center;
+    margin: 0;
+  }
+  .kauro-site-spreads > .kauro-site-service:nth-child(even) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+  .kauro-site-spreads > .kauro-site-service:nth-child(even) > * {
+    grid-column: 2;
+  }
+  .kauro-site-spreads > .kauro-site-service:nth-child(even) > .kauro-site-frag {
+    grid-column: 1;
   }
 }
 
@@ -5907,6 +5885,10 @@ body:has(> .kauro-site-header) {
   .kauro-choose-name::after {
     transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.25s ease;
   }
+}
+/* a row of the availability lands on its service below the header */
+.kauro-site-spreads > .kauro-site-service {
+  scroll-margin-block-start: 6rem;
 }
 
 /* ---- How it works on Home: one composition, held while the project moves through its six phases (Order 10, owner review) -------- */
