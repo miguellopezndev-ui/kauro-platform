@@ -1001,3 +1001,25 @@ ul.kauro-actions > li {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Order 11 round 2: on a wide screen the menu has a fixed head (the name and the workspace), a middle that scrolls (the navigation, which
+   grows with a project's areas) and a fixed foot (the person's own controls), so the account button never slides out of reach */
+@media (min-width: 62rem) {
+  .kauro-shell-side {
+    overflow: hidden;
+  }
+  .kauro-shell-side .kauro-shell-panel {
+    min-block-size: 0;
+  }
+  .kauro-shell-nav {
+    min-block-size: 0;
+    margin-inline: calc(var(--kauro-space-2) * -1);
+    padding-inline: var(--kauro-space-2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .kauro-account {
+    flex: none;
+  }
+}
