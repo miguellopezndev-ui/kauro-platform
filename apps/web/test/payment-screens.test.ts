@@ -151,7 +151,8 @@ const detailsProps = (over: Partial<Parameters<typeof PaymentDetails>[0]> = {}) 
   refreshing: false,
   hrefs: { CONTACT_SUPPORT: "/agencies/a/support", REQUEST_NEW_QUOTE: "/agencies/a/projects/p/purchase", REQUEST_NEW_REVIEW: "/agencies/a/projects/p/audit" },
   projectHref: "/agencies/a/projects/p",
-  preparationHref: "/agencies/a/projects/p/processing",
+  preparationHref: "/agencies/a/projects/p/processing?order=o",
+  billingHref: "/agencies/a/billing?order=o",
   ...over,
 });
 const renderPayment = (over: Partial<Parameters<typeof PaymentDetails>[0]> = {}): string => renderToStaticMarkup(createElement(PaymentDetails, detailsProps(over)));
@@ -223,4 +224,15 @@ test("UI24: the bank details are read for the order in the address under the act
   assert.equal(headers["X-Kauro-Agency"], AGENCY);
   assert.equal(headers["Idempotency-Key"], undefined);
   assert.equal(answer.kind, "REPLY");
+});
+
+test("UI23 (Order 11): the hint under a disabled pay button asks to accept the terms only when that is what is missing, and never invites a second payment", () => {
+  const hint = (html: string): string => /<p class="kauro-quote-hint">([^<]*)<\/p>/.exec(html)?.[1] ?? "";
+  assert.equal(hint(render()), "Accept the terms to continue.");
+  assert.equal(hint(render({ termsAccepted: true })), "", "open and accepted: no hint");
+  const paid = render({ quote: quote({ checkoutReady: false, checkoutBlockers: ["ALREADY_PAID"] }), termsAccepted: true });
+  assert.equal(hint(paid), "Payment is not available for this quote right now.");
+  assert.doesNotMatch(paid, /Resolve what is listed/);
+  const silent = render({ quote: quote({ checkoutReady: false, checkoutBlockers: [] }) });
+  assert.equal(hint(silent), "Payment is not available for this quote right now.", "a gate closed without a listed blocker does not ask for the terms");
 });

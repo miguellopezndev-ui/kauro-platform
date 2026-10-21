@@ -5,7 +5,8 @@
 // Order 11: the quote also says what it covers (the approved plan, the sealed files, the delivery) and what it does not (the import, and
 // for "Clean your data" any outside data), from ToS §3.5 and §9.2. Every discount the server sends is shown: a non-repeat discount used to
 // read "No discount"; it reads "Discount", since D-COPY-1 keeps the founding line hidden until B10. The tax line carries its treatment,
-// three steps say how payment works, and the hint under the button gives the reason it is disabled, not both.
+// three steps say how payment works, and the hint under the button asks to accept the terms only when that is what is missing; otherwise it
+// says payment is not available, never inviting a second payment.
 import { Banner, Button, Count, Deadline, Money } from "@kauro/ui";
 import type { ReactElement } from "react";
 import type { QuoteView as Quote } from "../../api/generated.ts";
@@ -135,7 +136,7 @@ export function QuoteDetails({ quote, nowMs, termsAccepted, onTermsChange, onCre
           <Button variant="primary" disabled={!enabled} aria-busy={creating ? true : undefined} onClick={() => (enabled ? onCreate() : undefined)}>
             {message("screen.quote.pay.cta")}
           </Button>
-          <p className="kauro-quote-hint">{creating ? message("screen.quote.pay.working.body") : enabled ? "" : gate.kind === "BLOCKED" && gate.blockers.length > 0 ? message("screen.quote.pay.blocked.hint") : message("screen.quote.pay.disabled.hint")}</p>
+          <p className="kauro-quote-hint">{creating ? message("screen.quote.pay.working.body") : enabled ? "" : gate.kind === "OPEN" && !termsAccepted ? message("screen.quote.pay.disabled.hint") : message("screen.quote.pay.blocked.hint")}</p>
         </section>
       ) : null}
     </div>

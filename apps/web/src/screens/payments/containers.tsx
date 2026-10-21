@@ -87,7 +87,8 @@ export function PaymentScreen({ agencyId, orderId }: { readonly agencyId: string
       refreshing={false}
       hrefs={{ CONTACT_SUPPORT: pathOf("UI52", { agencyId }), REQUEST_NEW_QUOTE: pathOf("UI23", { agencyId, id: order.projectId }), REQUEST_NEW_REVIEW: pathOf("UI18", { agencyId, id: order.projectId }) }}
       projectHref={pathOf("UI13", { agencyId, id: order.projectId })}
-      preparationHref={pathOf("UI25", { agencyId, id: order.projectId })}
+      preparationHref={`${pathOf("UI25", { agencyId, id: order.projectId })}?order=${encodeURIComponent(order.orderId)}`}
+      billingHref={`${pathOf("UI30", { agencyId })}?order=${encodeURIComponent(order.orderId)}`}
     />
   );
 }

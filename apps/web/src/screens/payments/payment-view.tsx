@@ -33,6 +33,8 @@ export interface PaymentViewProps {
   /** The project this order pays for, and its preparation. */
   readonly projectHref: string;
   readonly preparationHref: string;
+  /** This order's payments, fiscal documents and refunds (UI30). */
+  readonly billingHref: string;
 }
 
 /** The amount as a bank's form takes it: digits and a decimal point, no currency, no separators. */
@@ -90,7 +92,7 @@ function Details({ read, amountCents }: { readonly read: InstructionsRead; reado
   }
 }
 
-export function PaymentDetails({ order, instructions, onRefresh, refreshing, hrefs, projectHref, preparationHref }: PaymentViewProps): ReactElement {
+export function PaymentDetails({ order, instructions, onRefresh, refreshing, hrefs, projectHref, preparationHref, billingHref }: PaymentViewProps): ReactElement {
   const model = paymentModel(order);
   return (
     <div className="kauro-payment">
@@ -136,7 +138,7 @@ export function PaymentDetails({ order, instructions, onRefresh, refreshing, hre
         ))}
       </ul>
       <p className="kauro-payment-order">
-        {message("screen.payment.order.label")} <code>{order.orderId}</code>
+        {message("screen.payment.order.label")} <code>{order.orderId}</code> · <a href={billingHref}>{message("screen.payment.billing.link")}</a>
       </p>
     </div>
   );

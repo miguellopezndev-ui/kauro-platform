@@ -127,6 +127,7 @@
 | D-29 | prototypes/p05-sign-up.tsx, p06-reset.tsx | The email code was promised as six digits, a property of an identity provider not yet chosen. | "A code". |
 | D-30 | tools/review/private/prototypes/ui42-incidents.tsx | With no incident open, the page had nothing a keyboard could reach in its main area. | The closed incident links its affected jobs. |
 | D-31 | tools/review/private/prototypes/pages.css (UI19) | At 768 px the change column of Fields was squeezed into a strip; at 1024 px the Affects column sat out of sight in the table's frame. | Cards until 72rem; the table fits from 1152 px. |
+| D-32 | apps/web/src/screens/payments, billing, finance, support, shared (independent review) | Nine defects in the night's real-screen changes: a dead-end link to the preparation, a hint that invited a second payment, a "send by" rule worded against ToS §8.2.3, refund errors not announced and focus lost, two sticky states, a copy press not re-announced, support hours without holidays, a header step out of range. | All fixed (N-43 to N-48); a test covers the pay hint. |
 
 ## Findings for the owner (not changed here)
 

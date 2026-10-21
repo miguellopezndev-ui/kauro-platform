@@ -19,7 +19,7 @@ export const SUPPORT_COPY = {
   "screen.support.case.next.label": "Next response by",
   "screen.support.case.summary.label": "What you wrote",
   "screen.support.case.opened.label": "Opened",
-  "screen.support.case.commitment.body": "Kauro answers in writing, Monday to Friday, 09:00 to 17:00 Bogotá time (14:00 to 22:00 UTC); the next response time counts those hours only.",
+  "screen.support.case.commitment.body": "Kauro answers in writing, Monday to Friday except holidays, 09:00 to 17:00 Bogotá time (14:00 to 22:00 UTC); the next response time counts those hours only.",
   "screen.support.category.PRODUCT_DEFECT": "Something is not working",
   "screen.support.category.IMPORT_GUIDANCE": "Help with an import",
   "screen.support.category.BILLING": "Billing",

@@ -80,7 +80,9 @@ function RefundForm({ form }: { readonly form: RefundFormProps }): ReactElement 
         if (!form.submitting) form.onSubmit();
       }}
     >
-      <h3 id="billing-refund-form">{message("screen.billing.refund.form.heading")}</h3>
+      <h3 id="billing-refund-form" tabIndex={-1}>
+        {message("screen.billing.refund.form.heading")}
+      </h3>
       <p>{message("screen.billing.refund.case.body")}</p>
       <Field id="billing-refund-reason" label={message("screen.billing.refund.reason.field")} error={form.problems.includes("REASON") ? message("screen.billing.refund.reason.error") : undefined}>
         {(control) => <input {...control} type="text" name="reason" maxLength={200} value={form.reason} onChange={(event) => form.onReasonChange(event.target.value)} />}
@@ -184,7 +186,7 @@ export function BillingDetails({ agency, detail, refund, form, projectHref }: Bi
             {form.open ? (
               <RefundForm form={form} />
             ) : (
-              <Button aria-expanded={false} onClick={form.onOpen}>
+              <Button onClick={form.onOpen}>
                 {message("screen.billing.refund.open.cta")}
               </Button>
             )}

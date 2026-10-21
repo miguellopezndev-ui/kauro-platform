@@ -70,7 +70,7 @@ export const QUOTE_COPY = {
   "screen.quote.pay.cta": "Create payment order",
   "screen.quote.pay.bank.body": "You pay by bank transfer (ACH, USD).",
   "screen.quote.pay.disabled.hint": "Accept the terms to continue.",
-  "screen.quote.pay.blocked.hint": "Resolve what is listed under Before you can pay to continue.",
+  "screen.quote.pay.blocked.hint": "Payment is not available for this quote right now.",
   "screen.quote.pay.working.body": "Creating your payment order. Do not repeat this step.",
   "screen.quote.none.title": "No quote selected",
   "screen.quote.none.body": "A quote is issued from an approved plan. Open it from the project once it is issued.",

@@ -26,7 +26,9 @@ export function ProjectHeader({ current, area }: { readonly current: ProjectStep
   const project = useContext(ProjectContext);
   if (project === null) return null;
   const steps = project.mode === "CLEAN" ? STEPS.filter((step) => step.key !== "import") : STEPS;
-  const at = Math.max(0, steps.findIndex((step) => step.key === current));
+  // a step the service does not have ("Clean your data" has no import) stands for its last step
+  const index = steps.findIndex((step) => step.key === current);
+  const at = index >= 0 ? index : current === "import" ? steps.length - 1 : 0;
   return (
     <header className="kauro-project-header">
       <p className="kauro-project-header-context">

@@ -79,3 +79,17 @@ which cites ToS §8 to §11 and PV1 §5), and the api's own views (`apps/web/src
 | N-37 | Pricing variant: the approved page word for word, plus "What the price includes" (ToS §7.6, without branding while it is unavailable) and "Not included" (ToS §3.5), and ten questions answered only from existing rules. | The research found no FAQ on the page and buyers' top questions answered elsewhere or not at all; every answer is sourced (ToS §6.2, §7.1, §7.3, §7.5, §8.1, §10, §11; Annex A). "Do duplicates count?" says yes and gives no reason, because the reason is not a written rule. | Keep the approved page. |
 | N-38 | Contact variant: the required, unticked authorisation (Data Processing Policy §8.1, manual A-01) and "Email address" instead of "Work email". | A legal rule in force that the approved form misses (F-08); sign-up is open to any address. The Policy's page does not exist yet, so its link fails until it is published. | — |
 | N-39 | Inside the proposed site, links go to a page's variant where one exists (Supported services, Pricing, Contact) and to the approved page elsewhere. | So the proposed site can be walked as one site, beside the approved one. | — |
+
+## Independent review (02:10)
+
+A separate reviewer read the night's changes to the real screens (apps/web) and reported nine defects; each was checked against the code
+and the terms, and all nine were fixed.
+
+| # | Decision | Why | To reverse |
+| --- | --- | --- | --- |
+| N-43 | "Go to the preparation" carries the paid order (?order=), and the payment page links its own billing ("This order's billing"). | Without the order the preparation page said nothing was being processed; nothing linked an order's billing, so Billing's empty state promised a route that did not exist. | — |
+| N-44 | Under a disabled pay button: "Accept the terms to continue." only when that is what is missing; otherwise "Payment is not available for this quote right now." | "Resolve what is listed" invited a second payment when the blocker was a payment already made or in progress (ToS §8.2.7), and a closed gate with no listed blocker asked for a box that was disabled. | — |
+| N-45 | "Send by" says what counts is the credit in Kauro's account, not the sending (ToS §8.2.3). | The first wording ("when your bank books the transfer") could be read as the debit, which the terms say does not count. | — |
+| N-46 | Refund form: an invalid field takes focus; the opened form's heading takes focus; the toggle drops an aria-expanded it could never update; another order closes the form. | The design system's field errors are not live regions, and the button that opened the form disappeared under the keyboard. | — |
+| N-47 | Finance's refusal follows the read both ways and starts again with another route; a second copy press is announced and keeps its message. | Both states stuck after their first value. The copy counter numbers presses, since the project keeps the browser clock in one place (K0). | — |
+| N-48 | Support hours say "except holidays" (ToS §12.1); the project header maps a step a service does not have (import, for "Clean your data") to its last step. | The hours omitted the holiday exclusion; the header could claim "step 1 of 5" for a delivered CLEAN project. | — |

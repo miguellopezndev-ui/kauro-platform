@@ -2,7 +2,7 @@
 // The container of UI30 (design D-PRIV-1, D-OPS-1): reads the agency (what this member may do) and the order named in the address, runs the
 // refund request (CMD044 then CMD031) through the page's runner, and reads the refund back from the server. The form's two keys are minted
 // when the form opens and are renewed only after a completed answer, so a double activation and a lost answer replay the same keys.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pathOf } from "../../screens.ts";
 import type { ReactElement } from "react";
 import { useShell } from "../../shell/shell-context.ts";
@@ -23,6 +23,11 @@ export function BillingScreen({ agencyId, orderId }: { readonly agencyId: string
   const [problems, setProblems] = useState<readonly RefundInputProblem[]>([]);
   const [refundId, setRefundId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  // the form opens where the button was: focus moves to its heading, so a keyboard user carries on from there; another order closes it
+  useEffect(() => {
+    if (formOpen) document.getElementById("billing-refund-form")?.focus();
+  }, [formOpen]);
+  useEffect(() => setFormOpen(false), [orderId]);
   const forms = useRef<RefundForms | null>(null);
   const agency = agencyRead.state.kind === "ANSWERED" && agencyRead.state.answer.kind === "REPLY" ? agencyRead.state.answer.body.data : null;
   const detail = orderRead.state.kind === "ANSWERED" && orderRead.state.answer.kind === "REPLY" ? orderRead.state.answer.body.data : null;
@@ -48,7 +53,12 @@ export function BillingScreen({ agencyId, orderId }: { readonly agencyId: string
   const onSubmit = (): void => {
     const found = refundInputProblems({ reason, details });
     setProblems(found);
-    if (found.length === 0) command.run();
+    if (found.length === 0) {
+      command.run();
+      return;
+    }
+    // the first field with a problem takes focus, so its message is read with it
+    document.getElementById(found[0] === "REASON" ? "billing-refund-reason" : "billing-refund-details")?.focus();
   };
   return (
     <>

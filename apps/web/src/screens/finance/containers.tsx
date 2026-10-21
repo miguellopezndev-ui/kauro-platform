@@ -18,7 +18,7 @@ import { CreditQueue, RouteSection } from "./view.tsx";
 /** The shell's step-up (D-AUTH-4). Not wired in this build: no credential, so the command is not sent and the STEP_UP state is drawn. */
 const obtainStepUp = async (): Promise<IdentityCredential | null> => null;
 
-function RoutePanel({ routeId, onDenied }: { readonly routeId: string; readonly onDenied: () => void }): ReactElement {
+function RoutePanel({ routeId, onDenied }: { readonly routeId: string; readonly onDenied: (denied: boolean) => void }): ReactElement {
   const { client } = useShell();
   const { state, refresh } = useRead((signal) => client.call("getBankRoute", { path: { routeId }, signal }), routeId);
   const [busy, setBusy] = useState(false);
@@ -27,7 +27,7 @@ function RoutePanel({ routeId, onDenied }: { readonly routeId: string; readonly 
   // a refusal of access covers the whole page: the queue is not drawn beside it to say the same thing again
   const denied = state.kind !== "LOADING" && route === null && state.decision.state === "DENIED";
   useEffect(() => {
-    if (denied) onDenied();
+    onDenied(denied);
   }, [denied, onDenied]);
   if (state.kind === "LOADING") return <StatePanel decision={state.decision} />;
   if (route === null) return <StatePanel decision={state.decision} onNext={refresh} />;
@@ -97,7 +97,8 @@ function QueuePanel(): ReactElement {
 
 export function FinanceScreen({ routeId }: { readonly routeId: string | null }): ReactElement {
   const [denied, setDenied] = useState(false);
-  const onDenied = useCallback(() => setDenied(true), []);
+  const onDenied = useCallback((value: boolean) => setDenied(value), []);
+  useEffect(() => setDenied(false), [routeId]);
   return (
     <>
       {routeId === null ? (
