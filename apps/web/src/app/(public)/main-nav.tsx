@@ -20,7 +20,9 @@ export function MainNav() {
       element.open = false;
       element.querySelector("summary")?.focus();
     };
-    const onPress = (event: PointerEvent): void => {
+    // closed on click, after the press is released: closing a <details> inside a pointerdown handler crashed Chromium's renderer
+    // ("Aw, Snap", STATUS_BREAKPOINT) when the press landed outside the open menu (Order 11, owner's walk of 2026-10-21)
+    const onPress = (event: MouseEvent): void => {
       const element = menu.current;
       if (element === null || !element.open) return;
       const target = event.target;
@@ -28,10 +30,10 @@ export function MainNav() {
       if (onScrim || (target instanceof Node && !element.contains(target))) element.open = false;
     };
     window.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPress);
+    document.addEventListener("click", onPress);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPress);
+      document.removeEventListener("click", onPress);
     };
   }, []);
   return (
