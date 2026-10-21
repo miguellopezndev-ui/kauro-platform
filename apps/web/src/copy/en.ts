@@ -45,6 +45,12 @@ export const APPLICATION_COPY = {
   "shell.agency.state.RESTRICTED.label": "Restricted",
   "shell.agency.state.CLOSING.label": "Closing",
   "shell.agency.state.CLOSED.label": "Closed",
+  "shell.role.OWNER.label": "Owner",
+  "shell.role.ADMIN.label": "Admin",
+  "shell.role.OPERATOR.label": "Operator",
+  "shell.role.APPROVER.label": "Approver",
+  "shell.role.BILLING.label": "Billing",
+  "shell.role.VIEWER.label": "Viewer",
   // navigation entries of an agency (one per real screen; an entry appears only when its screen exists)
   "nav.projects.label": "Projects",
   "nav.clients.label": "Clients",

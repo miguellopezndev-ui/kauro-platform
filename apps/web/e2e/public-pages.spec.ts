@@ -24,7 +24,7 @@ const PAGES: readonly PageUnderTest[] = [
   { route: "/pricing", h1: "One scoped project, priced by source units.", reads: true },
   { route: "/sample-delivery", h1: "See a synthetic delivery package.", reads: false },
   { route: "/security", h1: "Know what is processed and when it is deleted.", reads: false },
-  { route: "/contact", h1: "Describe the task; keep CRM files out of this form.", reads: false },
+  { route: "/contact", h1: "Request a free data health check.", reads: false },
   { route: "/status", h1: "Current service availability.", reads: true },
   { route: "/help", h1: "Find the next step for your project.", reads: false },
   { route: "/unsubscribe/an-opaque-value-from-a-link", h1: "Stop optional messages.", reads: false },

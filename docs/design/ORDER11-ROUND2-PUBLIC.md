@@ -48,29 +48,39 @@ ORDER11-ROUND2-OPS.md and the customer workspace in ORDER11-ROUND2-WORKSPACE.md.
   removed (it animated with the scroll and rendered empty when still).
 - **Help.** Reference heading; the index beside the guides; the free check's two retention windows now both stated (guide version 1.4,
   digest recorded).
-- **Contact.** The label above the heading names the free check the call to action promised, and the lead starts with it; the form is one
-  column; "All fields are required except the last one" removed (the optional field says so); the size question says why it is asked.
+- **Contact.** Headed by the call to action that opens it (amendment R2-1 below); the lead says scope and data-handling questions come
+  through the same form and keeps the rule about files; the form is one column; "All fields are required except the last one" removed (the optional field says so); the size question says why it is asked.
 - **Service status.** Reference heading; services as rows of one table (Service, New projects); incidents and help as text; no bars or
   percentages (no history exists).
 
 ## Application shell
 
-- Account foot rebuilt as above. The person's name and role are not in the session reply (`getCurrentSession` has no display name), so
-  the button says "Your account" until the API offers them. **Gap G-SHELL-1:** a read of the signed-in person's name and their role in the
-  current workspace.
+- Account foot rebuilt as above. Under "Your account" the button names the person's **role** in the workspace (Owner, Admin, Operator,
+  Approver, Billing, Viewer), read with the existing ListAgencies beside GetAgency: only the person's own **active** membership of exactly
+  that agency names it; anything else shows no role, and the role never decides access (the api's permitted actions do). Owner's approval,
+  2026-10-21. **Gap G-SHELL-1:** no read in the api returns a person's name (not the session, not the team list), so the name cannot be
+  shown without a backend change to identity data; not done here.
 - The workspace block is one control (mark, name, up-down sign) leading to the workspaces page; its state shows only when it is not
   simply Active (Restricted, Closing), in the warning colour with its word.
 - App h1 fixed at 28 px (24 px on phones), h2 20 px, replacing a 30–44 px clamp.
 - "Support" renamed "Help and support".
 
-## Not done here, and why
+## Amendment R2-1: the Contact heading
 
-- **Contact heading.** The research suggested "Request a free data health check" as the h1. The h1 is the registry's primary copy in
-  `@kauro/contracts`, which this order may not change. Owner question Q-R2-1 below.
+| Field | Content |
+|---|---|
+| Change | UI07's rendered heading becomes "Request a free data health check." (was "Describe the task; keep CRM files out of this form.") |
+| Reason | The site's one call to action, on every page, opens this page; a heading that repeats the promise confirms the visitor arrived where they meant to (information scent). The rule about files stays in the lead and at the description field, where it governs (in the sample, a scope warning sat in body text, never in a heading). |
+| Approval | Owner, 2026-10-21: "sí a las dos siempre y cuando sea la mejor decisión". |
+| How | Like amendment A3 §1.4: `packages/contracts/registry/screens.json` is not edited (it is byte-identical to the authority and pinned by PROVENANCE.json and the evidence ledger). The amended text governs the rendered copy; the web's tests read it through `AMENDED_PRIMARY_COPY` in `apps/web/test/support/registry.ts`, which names this record. A later registry version may take the text in through a ChangeProposal (28 §How a change is made). |
+| Side effect | The review viewer's "Contract (registry)" panel still shows the registry's record for UI07, as it should: it is the registry. |
+
+## Not done here, and why
 - **New public pages** (For agencies, Check a file free). They need registry routes (contracts) and, for the free check, an amendment to
   A3 §3.2; they stay as proposals at /__variants with Contact's consent variant (F-08).
 
-## Questions for the owner (only what cannot be decided here)
+## Owner answers
 
-- **Q-R2-1.** May the Contact page's registry heading change to "Request a free data health check" (a contracts change)?
-- **Q-R2-2.** Should the account button show the person's name and role? It needs a small read in the API (G-SHELL-1).
+- Q-R2-1 (Contact heading) and Q-R2-2 (name and role in the account button): approved on 2026-10-21 "as long as it is the best decision".
+  Contact: done as amendment R2-1. Role: done with an existing read. Name: not done, because no read carries it; adding one is a backend
+  and identity-data change, larger than its benefit today (the workspace switch and the role already say whose workspace and what you may do).

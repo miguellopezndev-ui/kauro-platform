@@ -986,3 +986,18 @@ ul.kauro-actions > li {
     background: CanvasText;
   }
 }
+
+/* the account button's two lines: who it is for, and the role that decides what this person may press here */
+.kauro-account-text {
+  display: grid;
+  min-inline-size: 0;
+  line-height: 1.25;
+}
+.kauro-account-role {
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

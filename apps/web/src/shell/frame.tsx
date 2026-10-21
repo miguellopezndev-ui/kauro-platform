@@ -110,7 +110,7 @@ function initials(name: string): string {
  * The menu closes on Escape (focus returns to its button) and on a click anywhere outside it; a click, never a pointerdown, so the press
  * that lands outside is finished before anything closes.
  */
-function AccountMenu({ accountHref, Link, onSignOut }: { readonly accountHref: string | null; readonly Link: AnchorComponent; readonly onSignOut: () => void }): ReactElement {
+function AccountMenu({ accountHref, role, Link, onSignOut }: { readonly accountHref: string | null; readonly role: string | null; readonly Link: AnchorComponent; readonly onSignOut: () => void }): ReactElement {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -157,7 +157,10 @@ function AccountMenu({ accountHref, Link, onSignOut }: { readonly accountHref: s
       </div>
       <button type="button" ref={button} className="kauro-account-button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
         <span className="kauro-account-mark" aria-hidden="true" />
-        <span className="kauro-account-name">{message("shell.account.label")}</span>
+        <span className="kauro-account-text">
+          <span className="kauro-account-name">{message("shell.account.label")}</span>
+          {role === null ? null : <span className="kauro-account-role">{role}</span>}
+        </span>
         <span className="kauro-chevron" aria-hidden="true" />
       </button>
     </div>
@@ -305,7 +308,7 @@ export function ShellFrame({ view, Anchor, actions, children }: { readonly view:
               )}
             </nav>
           )}
-          {view.signOut ? <AccountMenu accountHref={view.accountHref} Link={Link} onSignOut={actions.signOut} /> : null}
+          {view.signOut ? <AccountMenu accountHref={view.accountHref} role={view.agency?.role === null || view.agency?.role === undefined ? null : message(view.agency.role)} Link={Link} onSignOut={actions.signOut} /> : null}
         </div>
       </header>
       {main}

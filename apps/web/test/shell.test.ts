@@ -25,7 +25,7 @@ const OTHER = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb2";
 const PROJECTS = `/agencies/${AGENCY}/projects`;
 const SESSION = { userId: "user-1", emailVerified: true, mfaEnrolled: true, mfaAt: null, stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z" } as const;
 const SIGNED_IN: SessionPhase = { kind: "SIGNED_IN", session: SESSION };
-const READY: AgencyContext = { kind: "READY", agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE" };
+const READY: AgencyContext = { kind: "READY", agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE", role: null };
 const ALL = new Set(["UI10", ...AGENCY_NAVIGATION.map((entry) => entry.screen)]);
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -137,7 +137,7 @@ test("11: the navigation lists only screens whose page exists, marks the current
   // the order is the reference's, and the six entries are the six agency-level screens
   assert.deepEqual(viewOf(input()).navigation.map((item) => item.screen), ["UI11", "UI12", "UI31", "UI30", "UI32", "UI52"]);
   const shown = viewOf(input());
-  assert.deepEqual(shown.agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label" });
+  assert.deepEqual(shown.agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label", role: null });
 });
 
 // ---- what is rendered ----
@@ -167,7 +167,7 @@ test("D-A11Y-1, D-PRIV-1: the frame is a skip link first, one banner, one naviga
 
 test("D-DS-3, D-SEC-1: an agency's name is a text node in <bdi>, never markup, and no frame carries an inline style, a script or raw HTML", () => {
   const hostile = '<img src=x onerror="alert(1)"> & "quotes" </bdi><script>1</script>';
-  const html = render(viewOf(input({ agency: { kind: "READY", agencyId: AGENCY, displayName: hostile, state: "RESTRICTED" } })));
+  const html = render(viewOf(input({ agency: { kind: "READY", agencyId: AGENCY, displayName: hostile, state: "RESTRICTED", role: null } })));
   assert.ok(html.includes('<bdi class="kauro-agency-name">&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &quot;quotes&quot; &lt;/bdi&gt;&lt;script&gt;1&lt;/script&gt;</bdi>'), "escaped, inside the bdi");
   assert.ok(html.includes('<span class="kauro-agency-state">Restricted</span>'));
   assert.ok(html.includes('<span class="kauro-agency-label">Workspace</span>'));
@@ -277,6 +277,9 @@ test("D-PRIV-1, D-STATE-1: the composed shell reads the session, then asks for t
     await agencyReply;
     return world.json(200, AGENCY_BODY);
   });
+  // the person's own memberships, read beside the agency for the role the account button names (Order 11 round 2)
+  const membership = { agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE", version: 3, membershipId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f10", role: "APPROVER", membershipState: "ACTIVE", permittedActions: ["VIEW", "APPROVE_PLANS"] };
+  world.answers.set("GET /api/v1/agencies?limit=100", async () => world.json(200, { kind: "READ", data: { items: [membership] } }));
   const shell = createShell(world.page);
   const drawn = (): ShellView => viewOf({ phase: shell.session.snapshot(), agency: shell.agency.snapshot(), pathname: PROJECTS, activeAgency: shell.session.activeAgency(), implemented: ALL });
   assert.deepEqual(drawn().gate, { kind: "WAIT", message: "shell.session.checking.body" }, "before anything is read");
@@ -288,7 +291,7 @@ test("D-PRIV-1, D-STATE-1: the composed shell reads the session, then asks for t
   assert.equal(drawn().agency, null, "no name before the agency answers");
   assert.deepEqual(
     world.sent.map((request) => `${request.method} ${request.url}`),
-    ["GET /api/v1/sessions/current", `GET /api/v1/agencies/${AGENCY}`],
+    ["GET /api/v1/sessions/current", `GET /api/v1/agencies/${AGENCY}`, "GET /api/v1/agencies?limit=100"],
   );
   const asked = world.sent[1];
   assert.ok(asked);
@@ -298,7 +301,7 @@ test("D-PRIV-1, D-STATE-1: the composed shell reads the session, then asks for t
   releaseAgency();
   await settled(shell, () => shell.agency.snapshot().kind === "READY");
   assert.deepEqual(drawn().gate, { kind: "OPEN" });
-  assert.deepEqual(drawn().agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label" });
+  assert.deepEqual(drawn().agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label", role: "shell.role.APPROVER.label" }, "the role comes from the person's own active membership");
 
   // leaving the page clears what the page knew: nothing of the agency is drawn from a restored page
   world.win.dispatchEvent(new Event("pagehide"));

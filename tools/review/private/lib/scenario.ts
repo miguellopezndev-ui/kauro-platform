@@ -25,6 +25,9 @@ export const UNAVAILABLE: Reply = { status: 503, problem: "INTERNAL_ERROR", retr
 export const DENIED: Reply = { status: 403, problem: "NOT_AUTHORIZED", reason: "ROLE_INSUFFICIENT" };
 export const NOT_MEMBER: Reply = { status: 403, problem: "NOT_AUTHORIZED", reason: "NOT_A_MEMBER" };
 
+/** The role each synthetic person holds in their workspace (contexts.ts describes them). */
+const ROLE_OF: Partial<Record<ContextKey, "OWNER" | "ADMIN" | "OPERATOR">> = { agency: "OWNER", company: "OWNER", admin: "ADMIN", operator: "OPERATOR" };
+
 /** The answers the shell needs before any screen draws: the session, and the agency the address names. */
 export function baseScript(ctx: ReviewContext, base: StateDef["base"] = "SIGNED_IN"): Script {
   const now = Date.now();
@@ -36,6 +39,13 @@ export function baseScript(ctx: ReviewContext, base: StateDef["base"] = "SIGNED_
     if (base === "AGENCY_REFUSED") return NOT_MEMBER;
     const agency = agencyFor(ctx.key, call.params["agencyId"] ?? "");
     return agency === null ? NOT_MEMBER : READ(agency);
+  };
+  // the person's own memberships: the shell reads them beside the agency for the role its account button names (Order 11 round 2)
+  script.ListAgencies = () => {
+    const role = ROLE_OF[ctx.key];
+    if (ctx.agency === null || ctx.refused || role === undefined) return READ({ items: [] });
+    const { agencyId, displayName, state, version, permittedActions } = ctx.agency;
+    return READ({ items: [{ agencyId, displayName, state, version, membershipId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7b01", role, membershipState: "ACTIVE", permittedActions }] });
   };
   script.GetBuyerType = (call) => {
     const workspace = workspaceOf(call.params["agencyId"] ?? "");

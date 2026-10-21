@@ -553,8 +553,8 @@ export const PUBLIC_COPY = {
   // ---- UI07 Contact -------------------------------------------------------------------------------------------------------------------
   "contact.meta.title": "Contact",
   "contact.meta.description": "Describe the task in writing. Business details, buyer type, destination, size and timing help Kauro tell you whether it fits.",
-  "contact.title": "Describe the task; keep CRM files out of this form.",
-  "contact.lead": "Request the free data health check here: tell us about the job and we will answer in writing. A call is optional. Do not attach CRM exports, and do not paste records, passwords or keys into any field. Files go through the secure upload once you have an account.",
+  "contact.title": "Request a free data health check.",
+  "contact.lead": "Tell us about the job in writing and we will answer, with any question that decides whether the project fits. Questions about scope or data handling come through this form too. A call is optional. Do not attach CRM exports, and do not paste records, passwords or keys into any field. Files go through the secure upload once you have an account.",
   "contact.form.label": "Fit inquiry",
   "contact.next.heading": "What happens next",
   "contact.next.describe": "You describe the task: the data, the destination and the timing. No files, no records.",

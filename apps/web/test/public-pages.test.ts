@@ -526,8 +526,8 @@ test("Data handling: the answers first, then what is processed, isolation, what 
 test("Contact: it names the free check the call to action promised, and holds a labelled fit form with the buyer-type question, the api's vocabularies, no file field, and no way to submit without a script", () => {
   const html = page("contact").html(ALL);
   const text = textOf(html);
-  assert.ok(text.indexOf(HEALTH_CHECK_CTA) < text.indexOf(PUBLIC_COPY["contact.title"]), "the label above the heading names the check");
-  assert.match(text, /Request the free data health check here/);
+  assert.equal(headings(html)[0]?.text, `${HEALTH_CHECK_CTA}.`, "the page the call to action opens is headed by that call to action");
+  assert.match(text, /Questions about scope or data handling come through this form too./);
   assert.match(html, /<form[^>]*\smethod="post"/, "an unscripted submit is a POST, never a GET that would put an address in a link");
   assert.doesNotMatch(html, /<form[^>]*\saction=/);
   assert.match(html, /<form[^>]*\snovalidate/i);

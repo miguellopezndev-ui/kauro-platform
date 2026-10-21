@@ -8,7 +8,7 @@ import { test } from "node:test";
 import type { AgencyView, GetAgencyReply, Problem } from "../src/api/generated.ts";
 import type { ApiAnswer } from "../src/client/answer.ts";
 import type { SessionPhase } from "../src/client/session.ts";
-import { type AgencyContext, AgencyContextRuntime, agencyContextOf } from "../src/shell/agency-context.ts";
+import { type AgencyContext, AgencyContextRuntime, agencyContextOf, roleOf } from "../src/shell/agency-context.ts";
 
 const AGENCY_A = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1";
 const AGENCY_B = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb2";
@@ -94,7 +94,7 @@ function world(agencyId: string | null = AGENCY_A) {
 
 test("D-PRIV-1: a reply is trusted only when it names the agency the URL names; a refusal, a lost answer, a skewed answer or another agency is one message and never a name", () => {
   const cases: ReadonlyArray<readonly [string, ApiAnswer<GetAgencyReply>, AgencyContext]> = [
-    ["the agency of the URL", replied(agency(AGENCY_A, "Northwind Data", "RESTRICTED")), { kind: "READY", agencyId: AGENCY_A, displayName: "Northwind Data", state: "RESTRICTED" }],
+    ["the agency of the URL", replied(agency(AGENCY_A, "Northwind Data", "RESTRICTED")), { kind: "READY", agencyId: AGENCY_A, displayName: "Northwind Data", state: "RESTRICTED", role: null }],
     ["another agency's reply", replied(agency(AGENCY_B, "Someone Else")), { kind: "UNAVAILABLE" }],
     ["not authorized", refused(403, "NOT_AUTHORIZED"), { kind: "UNAVAILABLE" }],
     ["not found", refused(404, "NOT_FOUND"), { kind: "UNAVAILABLE" }],
@@ -123,7 +123,7 @@ test("D-PRIV-1: outside an agency there is no context and nothing is asked; insi
   assert.equal(inside.asked.length, 1);
   assert.equal(inside.asked[0]?.agencyId, AGENCY_A, "the read names the agency of the URL");
   await inside.answerNext(replied(agency(AGENCY_A)));
-  assert.deepEqual(inside.context.snapshot(), { kind: "READY", agencyId: AGENCY_A, displayName: "Northwind Data", state: "ACTIVE" });
+  assert.deepEqual(inside.context.snapshot(), { kind: "READY", agencyId: AGENCY_A, displayName: "Northwind Data", state: "ACTIVE", role: null });
 });
 
 test("D-PRIV-1: the name is dropped the moment the session is no longer confirmed, and a read that was still on its way is aborted and its answer ignored", async () => {
@@ -170,7 +170,7 @@ test("D-PRIV-1: a background re-confirmation refreshes the agency in place; a re
   assert.equal(w.asked.length, 1, "refreshed");
   assert.equal(w.context.snapshot().kind, "READY", "the name stays while the refresh is on its way");
   await w.answerNext(replied(agency(AGENCY_A, "Northwind Data", "RESTRICTED")));
-  assert.deepEqual(w.context.snapshot(), { kind: "READY", agencyId: AGENCY_A, displayName: "Northwind Data", state: "RESTRICTED" });
+  assert.deepEqual(w.context.snapshot(), { kind: "READY", agencyId: AGENCY_A, displayName: "Northwind Data", state: "RESTRICTED", role: null });
 
   w.session.enter({ ...SIGNED_IN });
   await w.answerNext(lost());
@@ -194,4 +194,15 @@ test("D-PRIV-1: a listener hears only real changes, and stopping the follower de
   w.stop();
   assert.equal(w.session.listening(), 0);
   assert.equal(refresh.signal.aborted, true);
+});
+
+test("Order 11 round 2: the role the account button names is the person's own active membership of exactly this agency, and unknown otherwise", () => {
+  const member = (agencyId: string, role: "OWNER" | "APPROVER", membershipState: "ACTIVE" | "SUSPENDED") => ({ agencyId, displayName: "x", state: "ACTIVE" as const, version: 1, membershipId: CORRELATION, role, membershipState, permittedActions: ["VIEW" as const] });
+  const list = (...items: ReturnType<typeof member>[]) => ({ kind: "REPLY" as const, status: 200, correlationId: CORRELATION, body: { kind: "READ" as const, data: { items } } });
+  assert.equal(roleOf(AGENCY_A, list(member(AGENCY_B, "OWNER", "ACTIVE"), member(AGENCY_A, "APPROVER", "ACTIVE"))), "APPROVER");
+  assert.equal(roleOf(AGENCY_A, list(member(AGENCY_A, "OWNER", "SUSPENDED"))), null, "a suspended membership names no role");
+  assert.equal(roleOf(AGENCY_A, list(member(AGENCY_B, "OWNER", "ACTIVE"))), null, "another agency's role is never borrowed");
+  assert.equal(roleOf(AGENCY_A, lost()), null);
+  assert.equal(roleOf(AGENCY_A, refused(403, "NOT_AUTHORIZED")), null);
+  assert.equal(roleOf(AGENCY_A, null), null, "no read, no role");
 });

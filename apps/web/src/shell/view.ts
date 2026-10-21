@@ -38,7 +38,7 @@ export interface ProjectInView {
 export interface ShellView {
   readonly gate: Gate;
   /** The agency indicator: its name (a customer string, drawn as a text node) and the message id of its state. */
-  readonly agency: { readonly name: string; readonly state: MessageId } | null;
+  readonly agency: { readonly name: string; readonly state: MessageId; readonly role?: MessageId | null } | null;
   readonly navigation: readonly NavigationItem[];
   /** The agency switcher, when its screen exists. */
   readonly switchHref: string | null;
@@ -133,7 +133,8 @@ function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellVie
         inside !== null && input.project !== undefined && input.project.projectId === inside.projectId
           ? { name: input.project.name, clientLabel: input.project.clientLabel, mode: input.project.mode, areas: projectAreasFor(input.pathname, input.project.mode, implemented) }
           : null;
-      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state) }, navigation, switchHref, signOut: true, ops: false, accountHref: null, project };
+      const role = input.agency.role === null ? null : (`shell.role.${input.agency.role}.label` as const);
+      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state), role }, navigation, switchHref, signOut: true, ops: false, accountHref: null, project };
     }
   }
 }
