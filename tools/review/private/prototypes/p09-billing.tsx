@@ -1,151 +1,230 @@
 "use client";
-// P-09 Billing overview (proposed, beside UI30). The menu's Billing opens UI30 without an order, which today can only say "choose an order":
-// the api reads one order at a time (GetPaymentOrder) and lists none. A workspace needs the opposite view first: every quote and order of
-// its projects, what is due and by when, what is paid and its fiscal document, and any refund (research: app-ui-patterns.md §7.4, an
-// invoices list with a summary above it, after Mercury; Stripe's statuses kept apart: issued, waiting, paid, refunded). Each row opens the
-// page that already exists for it: the quote (UI23), the payment (UI24) or the order's billing (UI30). Needs a list read (F-10).
+// P-09 Billing overview (proposed, beside UI30), rebuilt in Order 11 round 2 (research agency-workspace.md §5.19, §3.5; principles-craft.md
+// V14, V20). The round-1 page opened on three stat plates that mixed an obligation, an offer and a history in identical boxes. It now opens
+// on what needs action, in one sentence with its amount and date, and its one action; then every quote, order and refund in a table (most
+// urgent first) whose foot carries what was paid this year; then the repeat discount as reachable progress (moved here from the projects
+// board); then the billing details a first quote needs.
 //
-// Every figure agrees with the page its row opens: the prices come from the price list in force (pricing-bands) at the review's unit
-// count, the paid HubSpot order is the one UI24 and UI30 show, and no row carries a discount the quote it opens does not show. A refunded
-// line (state REFUNDED, with its credit note) is drawn by the same row; this world has none.
-import { formatMoney, StatusBadge, type Tone } from "@kauro/ui";
-import { type ReactElement } from "react";
-import { bandIndexOf, priceOf } from "@web/public/pricing-bands.ts";
-import type { ServiceMode } from "@web/screens.ts";
+// Every figure agrees with the page it opens: the main project's order is the one the payment page draws (timeline.ts send-by date, the
+// HubSpot band's price at the example's units), and each paid line carries the repeat discount its place in the workspace's history earns
+// (policy repeatTiers: the first at the list price, later ones 5%). Every member reads this page; only owners and billing members request
+// quotes, pay or ask for refunds (CMD027-CMD031), and the others read one line naming them. Needs a list read (F-10) and a billing-profile
+// read.
+import { StatusBadge, type Tone } from "@kauro/ui";
+import { type ReactElement, useState } from "react";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { WORLD_PROJECTS } from "../lib/world-projects.ts";
-import { EXAMPLE } from "./example.ts";
-import { PageHead, ScreenLink } from "./kit.tsx";
+import { day, moment, NextStep, Only, ScreenButton, ScreenLink } from "./kit.tsx";
+import { can, onlyLine } from "./people.ts";
+import { AGENCY_BOARD, AGENCY_MONEY, COMPANY_BOARD, COMPANY_MONEY, type MoneyKind, type MoneyLine, PAID_PROJECTS, repeatProgress, usd } from "./projects-data.ts";
 import { SERVICE } from "./service.ts";
 
 export const P09_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Orders and quotes", note: "Every quote and order of the workspace: one waiting for a transfer, one quote to accept, one paid with its invoice." },
-  { key: "empty", label: "Nothing yet", note: "A new workspace: the page says when the first quote will appear." },
+  { key: "normal", label: "Orders and quotes", note: "One sentence of what needs action (a transfer to send, with its amount and date), then every quote, order and refund, the year's total in the table foot, the repeat discount and the billing details." },
+  { key: "empty", label: "Nothing yet", note: "A new workspace: one heading, one sentence; the free check never appears here." },
 ];
 
-type Kind = "QUOTE" | "WAITING" | "PAID" | "REFUNDED";
-interface Line {
-  readonly project: number;
-  readonly kind: Kind;
-  readonly document: string | null;
-  readonly when: string;
-  readonly whenLabel: string;
-}
-const KIND: Readonly<Record<Kind, { readonly label: string; readonly tone: Tone; readonly screen: string; }>> = {
-  QUOTE: { label: "Quote issued", tone: "info", screen: "UI23" },
-  WAITING: { label: "Waiting for your transfer", tone: "warning", screen: "UI24" },
-  PAID: { label: "Paid", tone: "success", screen: "UI30" },
-  REFUNDED: { label: "Refunded in full", tone: "neutral", screen: "UI30" },
+const KIND: Readonly<Record<MoneyKind, { readonly label: string; readonly tone: Tone }>> = {
+  WAITING: { label: "Waiting for your transfer", tone: "warning" },
+  QUOTE: { label: "Quote issued", tone: "info" },
+  PAID: { label: "Paid", tone: "success" },
+  REFUNDED: { label: "Refunded", tone: "neutral" },
 };
-// index into the agency's world projects; the company's lines name its own two projects
-const AGENCY_LINES: readonly Line[] = [
-  { project: 2, kind: "WAITING", document: null, when: "Oct 30, 2026", whenLabel: "Send by" },
-  { project: 1, kind: "QUOTE", document: null, when: "Nov 3, 2026", whenLabel: "Valid until" },
-  { project: 0, kind: "PAID", document: "Invoice KAU-2026-000123", when: "Oct 21, 2026", whenLabel: "Paid" },
-];
-const COMPANY_LINES: readonly Line[] = [
-  { project: 1, kind: "QUOTE", document: null, when: "Nov 3, 2026", whenLabel: "Valid until" },
-  { project: 0, kind: "PAID", document: "Invoice KAU-2026-000123", when: "Oct 21, 2026", whenLabel: "Paid" },
-];
 
-/** USD as the application writes it everywhere (the design system: "USD 1,295.00"). */
-const usd = (cents: number): string => formatMoney(String(cents), "USD");
-
-/** The amount in cents for a project of this service at the review's unit count, at the price list in force. */
-const amountOf = (mode: ServiceMode): number => priceOf(bandIndexOf(EXAMPLE.units) ?? 0, mode);
+type View = "action" | "all" | "refunds";
 
 export function BillingOverview({ ctx, state }: PrototypeProps): ReactElement {
-  const company = ctx.key === "company";
-  const agencyId = ctx.agency?.agencyId ?? "";
-  const projects = WORLD_PROJECTS[agencyId] ?? [];
-  const lines = (company ? COMPANY_LINES : AGENCY_LINES).flatMap((line) => {
-    const project = projects[line.project];
-    return project === undefined ? [] : [{ ...line, name: project.name, client: project.clientLabel, projectId: project.projectId, mode: project.mode, cents: amountOf(project.mode) }];
-  });
-  const total = (kind: Kind): { readonly count: number; readonly cents: number } => {
-    const of = lines.filter((line) => line.kind === kind);
-    return { count: of.length, cents: of.reduce((sum, line) => sum + line.cents, 0) };
+  const company = ctx.buyerType === "in-house";
+  const board = company ? COMPANY_BOARD : AGENCY_BOARD;
+  const lines = state === "empty" ? [] : company ? COMPANY_MONEY : AGENCY_MONEY;
+  const payer = can(ctx, "pay");
+  const action = lines.filter((line) => line.kind === "WAITING" || line.kind === "QUOTE");
+  const [view, setView] = useState<View>(action.length > 0 ? "action" : "all");
+  const shown = view === "action" ? action : view === "refunds" ? lines.filter((line) => line.kind === "REFUNDED") : lines;
+  const paid = lines.filter((line) => line.kind === "PAID");
+  const paidCents = paid.reduce((sum, line) => sum + line.cents, 0);
+  const nameOf = (line: MoneyLine): { readonly name: string; readonly sub: string } => {
+    const project = board.find((one) => one.item.projectId === line.projectId);
+    return { name: project?.name ?? "A project", sub: project === undefined ? "" : `${company ? "" : `${project.item.clientLabel} · `}${SERVICE[project.item.mode].name}` };
   };
-  const figures: readonly { readonly key: Kind; readonly label: string; readonly fact: string }[] = [
-    { key: "WAITING", label: "Waiting for a transfer", fact: "Send each by its date, with its reference" },
-    { key: "QUOTE", label: "Quotes to accept", fact: "Nothing is due until a payment order exists" },
-    { key: "PAID", label: "Paid in 2026", fact: "Each with its invoice" },
-    { key: "REFUNDED", label: "Refunded", fact: "Each with its credit note" },
-  ];
+  const repeat = repeatProgress(company ? PAID_PROJECTS.company : PAID_PROJECTS.agency);
+  const count = company ? PAID_PROJECTS.company : PAID_PROJECTS.agency;
+  const transfers = action.filter((line) => line.kind === "WAITING");
+  const quotes = action.filter((line) => line.kind === "QUOTE");
+  const first = transfers[0] ?? quotes[0];
+
   return (
     <>
-      <PageHead title="Billing" lead="Track quotes, payments, fiscal documents and refunds." />
-      <p className="kauro-proposed kauro-proposed--page">Proposed — the list needs a read of the workspace&apos;s quotes and orders the API does not have yet (F-10)</p>
-      {state === "empty" ? (
-        <section className="kauro-screen-section" aria-labelledby="none-h">
-          <h2 id="none-h">No quote or order yet</h2>
-          <p className="kauro-muted">A project&apos;s quote appears here once its plan is approved; its payment, invoice and any refund follow on the same line. The free check never appears here: it costs nothing.</p>
-          <ScreenLink to="UI11" ctx={ctx}>
-            Go to projects
-          </ScreenLink>
+      <ProjectHeader stage="purchase" title="Billing" lead="Track quotes, payments, fiscal documents and refunds." />
+      <p className="kauro-proposed kauro-b-proposed kauro-b-proposed--page">Proposed: the list needs a read of the workspace&apos;s quotes and orders the API does not have yet (F-10)</p>
+      {lines.length === 0 ? (
+        <section className="kauro-empty" aria-labelledby="billing-none-h">
+          <h2 id="billing-none-h">No quotes or payments yet</h2>
+          <p>A project&apos;s quote appears here once its plan is approved; its payment, invoice and any refund follow on the same line. The free check never appears here: it costs nothing.</p>
         </section>
       ) : (
         <>
-          <dl className="kauro-identity-counts kauro-billing-figures">
-            {figures
-              .filter((figure) => total(figure.key).count > 0)
-              .map((figure) => (
-                <div key={figure.key} className={figure.key === "WAITING" ? "is-bad" : undefined}>
-                  <dt>{figure.label}</dt>
-                  <dd>{usd(total(figure.key).cents)}</dd>
-                  <dd>
-                    {total(figure.key).count} {total(figure.key).count === 1 ? "project" : "projects"} · {figure.fact}
-                  </dd>
-                </div>
+          {first === undefined ? (
+            <p className="kauro-b-verdict">Nothing needs action. A quote appears here once a plan is approved.</p>
+          ) : (
+            <NextStep
+              id="billing-next"
+              label="Needs action"
+              heading={[transfers.length > 0 ? `${transfers.length} ${transfers.length === 1 ? "transfer" : "transfers"} to send` : "", quotes.length > 0 ? `${quotes.length} ${quotes.length === 1 ? "quote" : "quotes"} to accept` : ""].filter((part) => part !== "").join(" · ")}
+              action={
+                payer ? (
+                  <ScreenButton to={first.kind === "WAITING" ? "UI24" : "UI23"} ctx={ctx} project={first.projectId} variant="primary">
+                    {first.kind === "WAITING" ? "Open the payment details" : "Open the quote"}
+                  </ScreenButton>
+                ) : (
+                  <Only>Every member can read this page. {onlyLine(ctx, "pay", "pay, request quotes or ask for refunds")}</Only>
+                )
+              }
+            >
+              {action.map((line) => (
+                <p key={line.projectId}>
+                  {line.kind === "WAITING" ? "Send " : "Accept "}
+                  <strong>{usd(line.cents)}</strong> for <bdi>{nameOf(line).name}</bdi> {line.kind === "WAITING" ? `by ${moment(line.at)}, with its reference` : `before ${moment(line.at)}`}.
+                </p>
               ))}
-          </dl>
-          <div className="kauro-table-region">
-            <table className="kauro-table kauro-orders">
-              <caption className="kauro-visually-hidden">Quotes and orders of {company ? "this company" : "this agency"}, the most urgent first</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Project</th>
-                  <th scope="col">State</th>
-                  <th scope="col" className="kauro-table-end">
-                    Amount
-                  </th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Fiscal document</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => (
-                  <tr key={`${line.projectId}-${line.kind}`}>
-                    <th scope="row">
-                      <ScreenLink to={KIND[line.kind].screen} ctx={ctx} project={line.projectId}>
-                        {line.name}
-                      </ScreenLink>
-                      <span className="kauro-orders-sub">
-                        {company ? "" : `${line.client} · `}
-                        {SERVICE[line.mode].name}
-                      </span>
+            </NextStep>
+          )}
+          {payer || first !== undefined ? null : <Only>Every member can read this page. {onlyLine(ctx, "pay", "request quotes, pay or ask for refunds")}</Only>}
+          <section className="kauro-b-section" aria-labelledby="billing-lines-h">
+            <h2 id="billing-lines-h">Quotes, orders and refunds</h2>
+            <div className="kauro-b-switch" role="group" aria-label="Which lines">
+              {action.length === 0 ? null : (
+                <button type="button" aria-pressed={view === "action"} onClick={() => setView("action")}>
+                  Needs action ({action.length})
+                </button>
+              )}
+              <button type="button" aria-pressed={view === "all"} onClick={() => setView("all")}>
+                All ({lines.length})
+              </button>
+              <button type="button" aria-pressed={view === "refunds"} onClick={() => setView("refunds")}>
+                Refunds
+              </button>
+            </div>
+            {shown.length === 0 ? (
+              <div className="kauro-empty">
+                <h3>No refunds</h3>
+                <p>A refund appears here with its credit note. It is asked for from the order&apos;s billing page, after the refund terms.</p>
+              </div>
+            ) : (
+              <table className="kauro-rtable kauro-b-money">
+                <caption className="kauro-visually-hidden">Quotes, orders and refunds, the most urgent first</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Project</th>
+                    <th scope="col">State</th>
+                    <th scope="col" className="kauro-num">
+                      Amount (USD)
                     </th>
-                    <td data-label="State">
-                      <StatusBadge tone={KIND[line.kind].tone}>{KIND[line.kind].label}</StatusBadge>
-                    </td>
-                    <td data-label="Amount" className="kauro-table-end">
-                      {usd(line.cents)}
-                    </td>
-                    <td data-label={line.whenLabel}>
-                      <span className="kauro-orders-when">{line.whenLabel}</span> {line.when}
-                    </td>
-                    <td data-label="Fiscal document">{line.document ?? <span className="kauro-muted-text">None yet</span>}</td>
+                    <th scope="col">Date</th>
+                    <th scope="col">Document</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="kauro-muted">
-            Amounts in USD. A quote is not a charge and an order is not an invoice: a fiscal document exists only where this list shows its number. {agencyId === "" ? "" : "Every member sees this page; only owners and billing members request quotes, pay or ask for refunds."}
-          </p>
+                </thead>
+                <tbody>
+                  {shown.map((line) => {
+                    const named = nameOf(line);
+                    return (
+                      <tr key={`${line.projectId}-${line.kind}`}>
+                        <td data-label="">
+                          <ScreenLink to="UI13" ctx={ctx} project={line.projectId}>
+                            <bdi>{named.name}</bdi>
+                          </ScreenLink>
+                          <span className="kauro-sub">{named.sub}</span>
+                        </td>
+                        <td data-label="State" className="kauro-b-nowrap">
+                          <StatusBadge tone={KIND[line.kind].tone}>{KIND[line.kind].label}</StatusBadge>
+                        </td>
+                        <td data-label="Amount (USD)" className="kauro-num">
+                          <span className="kauro-b-cell">
+                            {usd(line.cents).replace(/^USD\s*/, "")}
+                            {line.discount > 0 ? <span className="kauro-sub">{line.discount}% repeat discount</span> : null}
+                          </span>
+                        </td>
+                        <td data-label="Date">
+                          <span className="kauro-b-cell">
+                            {line.dateLabel} {day(line.at)}
+                            {line.kind === "WAITING" ? <span className="kauro-sub">{moment(line.at).replace(/^.*, (\d{1,2}:\d{2} [AP]M UTC)$/, "$1")}</span> : null}
+                          </span>
+                        </td>
+                        <td data-label="Document" className="kauro-b-nowrap">
+                          {line.kind === "WAITING" ? (
+                            <ScreenLink to="UI24" ctx={ctx} project={line.projectId}>
+                              Payment details
+                            </ScreenLink>
+                          ) : line.document === null ? (
+                            "None yet"
+                          ) : (
+                            <ScreenLink to="UI30" ctx={ctx} project={line.projectId}>
+                              {line.document}
+                            </ScreenLink>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {view === "all" && paid.length > 0 ? (
+                  <tfoot>
+                    <tr>
+                      <th scope="row" colSpan={2}>
+                        Paid in 2026
+                      </th>
+                      <td className="kauro-num" data-label="Paid in 2026">
+                        {usd(paidCents).replace(/^USD\s*/, "")}
+                      </td>
+                      <td colSpan={2} data-label="">
+                        {paid.length} {paid.length === 1 ? "project" : "projects"}, each with its invoice
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+            )}
+            <p className="kauro-muted kauro-b-tablenote">A quote is not a charge and an order is not an invoice: a fiscal document exists only where this list names one.</p>
+          </section>
+          <section className="kauro-b-section" aria-labelledby="billing-repeat-h">
+            <h2 id="billing-repeat-h">Repeat discount</h2>
+            <p>
+              {count} paid {count === 1 ? "project" : "projects"} in the last 365 days: {repeat.percent > 0 ? <>your next quote gets the <strong>{repeat.percent}% repeat discount</strong>.</> : "your second project gets the repeat discount."}
+              {repeat.nextPercent === null ? null : ` ${repeat.toNext} more paid ${repeat.toNext === 1 ? "project reaches" : "projects reach"} ${repeat.nextPercent}%.`} Discounts do not stack; the larger one applies.
+            </p>
+          </section>
         </>
       )}
+      <section className="kauro-b-section" aria-labelledby="billing-profile-h">
+        <h2 id="billing-profile-h">Billing details</h2>
+        <p className="kauro-muted">
+          On every quote and invoice. Asked for before your first quote is issued; changes go through support. <span className="kauro-proposed kauro-b-proposed">Proposed: needs a billing-profile read</span>
+        </p>
+        <dl className="kauro-b-facts">
+          <div>
+            <dt>Legal name</dt>
+            <dd>{company ? "Halden Outdoor Inc. (synthetic)" : "Northwind Data LLC (synthetic)"}</dd>
+          </div>
+          <div>
+            <dt>Tax ID</dt>
+            <dd>{company ? "EIN 98-7654321 (synthetic)" : "EIN 12-3456789 (synthetic)"}</dd>
+          </div>
+          <div>
+            <dt>Address</dt>
+            <dd>{company ? "200 Example Avenue, Denver, CO 80202, United States" : "100 Example Street, Portland, OR 97201, United States"}</dd>
+          </div>
+          <div>
+            <dt>Billing contact</dt>
+            <dd>{company ? "Tomas Reyes, tomas.reyes@halden.example" : "Ines Duarte, ines.duarte@northwind.example"}</dd>
+          </div>
+        </dl>
+        {payer ? (
+          <ScreenLink to="UI52" ctx={ctx}>
+            Ask support to change the billing details
+          </ScreenLink>
+        ) : null}
+      </section>
     </>
   );
 }

@@ -13,8 +13,7 @@ export default async function Page({ params }: { readonly params: Promise<{ agen
   if (agency === null || project === null) notFound();
   return (
     <>
-      <ProjectHeader current="files" />
-      <h1>{message("screen.sources.intake.title")}</h1>
+      <ProjectHeader stage="files" title={message("screen.sources.intake.title")} lead={message("screen.sources.intake.lead.body")} />
       <SourcesScreen agencyId={agency} projectId={project} uploadOrigin={uploadOrigin()} />
     </>
   );

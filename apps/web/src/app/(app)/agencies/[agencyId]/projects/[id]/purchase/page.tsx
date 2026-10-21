@@ -13,8 +13,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
   if (agency === null || project === null || (quote !== undefined && idOrNull(quote) === null)) notFound();
   return (
     <>
-      <ProjectHeader current="purchase" />
-      <h1>{message("screen.quote.title")}</h1>
+      <ProjectHeader stage="purchase" title={message("screen.quote.title")} lead={message("screen.quote.lead.body")} />
       <QuoteScreen agencyId={agency} projectId={project} quoteId={idOrNull(quote)} />
     </>
   );

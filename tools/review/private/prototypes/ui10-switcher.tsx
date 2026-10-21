@@ -4,8 +4,11 @@
 // create an organisation when the person may (one draft at a time, CMD001). Switching is a full navigation: the page first clears what it
 // showed of the previous agency and says it is switching, so nothing of the old tenant can be seen on the way (registry exceptions).
 //
-// It is the first page after sign-in for someone who works in several agencies: each workspace is one quiet row with its mark, the
-// person's role and the workspace's state, and one way in. Where the person is now is said in words, not only by a colour.
+// It is the first page after sign-in for someone who works in several agencies: each workspace is one quiet row with its mark, its type
+// and the person's role ("Agency · Owner"), and one way in, the last used first (research app-shell-settings.md §9.6, §11.1: a person in
+// several workspaces actively chooses, ToS §4.4, so the chooser orders by recency instead of resuming silently). A state is shown only when
+// it is not the ordinary one (in setup, restricted, suspended): an "Active" badge on every row said nothing. Opening a workspace lands on
+// its Projects page, never a deep page.
 import { Button } from "@kauro/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,7 +19,8 @@ import { appPathOf, type PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { EXAMPLE_ID, MEMBERSHIPS, workspaceOf } from "../lib/world.ts";
 import { EXAMPLE, EXAMPLE_STAGES, UNPAID_RETENTION } from "./example.ts";
-import { Badge, Monogram, Note, PageHead, ROLE_NAME, type Role, Rings, ScreenButton, ScreenLink, Window } from "./kit.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
+import { Badge, day, Monogram, Note, ROLE_NAME, type Role, Rings, ScreenButton, ScreenLink, Window } from "./kit.tsx";
 
 export const UI10_STATES: readonly StateDef[] = [
   { key: "normal", label: "Several agencies", note: "Every membership with its role and state; where the person works now is said first." },
@@ -28,18 +32,22 @@ export const UI10_STATES: readonly StateDef[] = [
 
 const STATE_LABEL = { DRAFT: "In setup", ACTIVE: "Active", RESTRICTED: "Restricted", CLOSING: "Closing", CLOSED: "Closed" } as const;
 const STATE_TONE = { DRAFT: "neutral", ACTIVE: "success", RESTRICTED: "warning", CLOSING: "warning", CLOSED: "neutral" } as const;
-const ROLE_LINE: Readonly<Record<Role, string>> = {
-  OWNER: "You own it",
-  ADMIN: "You run its team and clients",
-  OPERATOR: "You work on its projects",
-  APPROVER: "You approve its plans",
-  BILLING: "You handle its billing",
-  VIEWER: "You can read it",
+const TYPE_LABEL = { agency: "Agency", "in-house": "Company" } as const;
+/** When this person last opened each workspace (synthetic; needs a read: the membership's last use). */
+const LAST_USED: Readonly<Record<string, string>> = {
+  "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1": "2026-10-21T14:02:00Z",
+  "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc4": "2026-10-18T16:40:00Z",
+  "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc1": "2026-10-15T09:20:00Z",
+  "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc2": "2026-09-30T11:05:00Z",
+  "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc3": "2026-09-12T08:10:00Z",
+  "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb9": "2026-10-21T13:40:00Z",
 };
 
 interface Row {
   readonly agencyId: string;
   readonly name: string;
+  readonly kind: "agency" | "in-house";
+  readonly lastUsed: string;
   readonly role: Role;
   readonly state: keyof typeof STATE_LABEL;
   readonly suspended: boolean;
@@ -53,8 +61,9 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
       ? []
       : (MEMBERSHIPS[ctx.key] ?? []).flatMap((membership) => {
           const workspace = workspaceOf(membership.agencyId);
-          return workspace === undefined ? [] : [{ agencyId: workspace.agencyId, name: workspace.name, role: membership.role, state: workspace.state, suspended: membership.state === "SUSPENDED" }];
-        });
+          return workspace === undefined ? [] : [{ agencyId: workspace.agencyId, name: workspace.name, kind: workspace.kind, lastUsed: LAST_USED[workspace.agencyId] ?? workspace.createdAt, role: membership.role, state: workspace.state, suspended: membership.state === "SUSPENDED" }];
+        })
+        .sort((a, b) => Date.parse(b.lastUsed) - Date.parse(a.lastUsed));
   const current = rows[0] ?? null;
   const hasDraft = rows.some((row) => row.state === "DRAFT" && row.role === "OWNER");
   const open = (row: Row): void => {
@@ -62,7 +71,7 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
     // the real switch is a full navigation after the old agency's content is cleared; the review shows the same pause
     window.setTimeout(() => router.push(`/agencies/${row.agencyId}/projects`), 900);
   };
-  const target = state === "switching" ? (rows[1] ?? null) : switching;
+  const target = state === "switching" ? (rows.find((row, index) => index > 0 && row.state === "ACTIVE" && !row.suspended) ?? null) : switching;
 
   if (target !== null)
     return (
@@ -72,7 +81,7 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
         <p>
           Opening <bdi>{target.name}</bdi>…
         </p>
-        <p className="kauro-muted">What you had open from another agency has been cleared.</p>
+        <p className="kauro-muted">What you had open from another workspace has been cleared.</p>
       </div>
     );
 
@@ -80,7 +89,7 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
 
   return (
     <>
-      <PageHead title="Your workspaces" lead="Choose the workspace you are working in." />
+      <ProjectHeader stage="files" title="Your workspaces" lead="Choose the workspace you are working in. The one you used last is first." />
       {state === "loading" ? (
         <div className="kauro-state" role="status">
           <p>Loading your workspaces…</p>
@@ -102,12 +111,11 @@ export function AgencySwitcher({ ctx, state }: PrototypeProps): ReactElement {
                   <span className="kauro-workspace-main">
                     <bdi className="kauro-workspace-name">{row.name}</bdi>
                     <span className="kauro-workspace-role">
-                      {ROLE_NAME[row.role]} · {ROLE_LINE[row.role]}
+                      {TYPE_LABEL[row.kind]} · {ROLE_NAME[row.role]} · {here ? "last used" : "opened"} {day(row.lastUsed)}
                     </span>
                   </span>
                   <span className="kauro-workspace-state">
-                    {here ? <span className="kauro-here">Where you are</span> : null}
-                    {row.suspended ? <Badge tone="danger">Your access is suspended</Badge> : <Badge tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Badge>}
+                    {row.suspended ? <Badge tone="danger">Your access is suspended</Badge> : row.state === "ACTIVE" ? null : <Badge tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Badge>}
                   </span>
                   <span className="kauro-workspace-go">{row.suspended ? "An owner can restore it" : row.state === "DRAFT" ? "Continue setup" : "Open"}</span>
                 </>
@@ -164,7 +172,7 @@ function Welcome({ ctx }: { readonly ctx: ReviewContext }): ReactElement {
   const example: ReviewContext = { ...ctx, agency: { agencyId: EXAMPLE_ID, version: 1, displayName: "Example workspace", state: "ACTIVE", createdAt: "2026-10-01T00:00:00Z", permittedActions: ["VIEW"] } };
   return (
     <>
-      <PageHead title="Welcome to Kauro" lead="See exactly what you would receive, then check your own files for free when you are ready." />
+      <ProjectHeader stage="files" title="Welcome to Kauro" lead="See exactly what you would receive, then check your own files for free when you are ready." />
       <div className="kauro-welcome">
         <section className="kauro-welcome-start" aria-labelledby="welcome-start-h">
           <h2 id="welcome-start-h">Check your own files</h2>

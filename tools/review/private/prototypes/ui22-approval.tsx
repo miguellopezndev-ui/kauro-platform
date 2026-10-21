@@ -1,184 +1,298 @@
 "use client";
-// UI22 Approval (registry: "Approve these exact preparation decisions."). A check-your-answers page (research: app-ui-patterns.md 3,
-// GOV.UK): the sealed set (and, for a CRM, the destination), then every effect of the plan, part by part, each with its way back to change
-// it; what is not included; the validation's result. Approving names this exact revision of the plan ("Approve revision 6"), asks for
-// Kauro's code again with its reason said (research: app-operations-ux.md §2.3: re-asking at approval is rare, so the dialog says why), and is
-// its own button outside any form, so the Enter key cannot approve a default nobody saw. The approver may instead request changes, with a
-// reason; the plan stays open and no quote is issued. A newer revision voids the approval in progress. Only an approver or an owner approves.
+// UI22 Approval (registry: "Approve these exact preparation decisions."; Order 11 round 2, research agency-workspace.md §5.11 and
+// signed-in-notes.md). A check-your-answers page in one focused column (GOV.UK; HubSpot's import and Wise's flows hide the menu's pull for a
+// consequential step): who approves is named before anything else, then the plan read back part by part (Files, Destination, Fields,
+// Duplicates, Links, Not included), each with its way back to change it and with the very numbers its own page shows (C-3, C-4). At the foot:
+// the declaration, the reason Kauro asks for the code again, the code field (one field, pasted or typed: WCAG 3.3.8), and the one button,
+// named by its outcome, "Approve revision 6". Back is on the left, the action on the right; "Request changes" is a quiet link and asks for
+// a reason. There is no intermediate "Continue to approve": the code is on the page (one step fewer). Pressing Enter never approves.
 //
-// Adapted to the service: "Clean your data" has no destination and no links between records, and its "not included" says what cleaning
-// never does (no enrichment from outside sources, nothing deleted without a trace, no promise about a CRM). Proposed (F-02): approving could
-// issue the quote at once, so the person who pays finds it waiting.
-import { Banner, Button, Field } from "@kauro/ui";
+// Only an approver or an owner approves (roles.ts: an admin does not). Anyone else reads the whole plan, one line naming who can, and a way
+// to send them the page; no dead button. The end is a confirmation page that says what happens next and who does it: the billing person
+// requests the quote, or, when the approver is an owner, the button to request it.
+import { Banner, Button, Field, type Tone } from "@kauro/ui";
 import { type ReactElement, useState } from "react";
 import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { CodeField } from "./auth.tsx";
 import { EXAMPLE } from "./example.ts";
-import { PageHead, ScreenButton, ScreenLink, Stamp } from "./kit.tsx";
-import { n, PLAN, PlanTasks } from "./plan.tsx";
+import { moment, Only, ScreenButton, ScreenLink } from "./kit.tsx";
+import { can, onlyLine, soloWorkspace, whoCan } from "./people.ts";
+import { n, PLAN } from "./plan.tsx";
 import { SERVICE } from "./service.ts";
+import { TIMELINE } from "./timeline.ts";
+import { CONFIRMED_AT } from "./ui17-target.tsx";
 
 export const UI22_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Ready to approve", note: "Every part reviewed and validated: the whole plan, part by part, with what it does not include." },
-  { key: "stepup", label: "Confirm it's you", note: "Approving revision 6 asks for Kauro's code, and says why." },
-  { key: "approved", label: "Approved", note: "Approved: the approval names revision 6, the set and the destination. The next step is the quote." },
-  { key: "changes", label: "Request changes", note: "The approver writes what should change and why: the plan stays open, no quote is issued, the operator is told." },
-  { key: "sent", label: "Changes requested", note: "Sent back: the plan stays open and no quote exists until a revision is approved." },
-  { key: "stale", label: "A newer revision", note: "The plan changed after this page was opened: approval is blocked until the new revision is reviewed." },
-  { key: "viewer", label: "Not an approver", note: "Seen by an operator: everything is visible, and an approver or an owner approves." },
+  { key: "normal", label: "Ready to approve", note: "Every part reviewed and checked: who approves, the plan read back part by part, then the declaration, the code and Approve revision 6. A person who cannot approve reads it all and who can." },
+  { key: "approved", label: "Approved", note: "The confirmation: revision 6 approved at 12:40 PM UTC, what happens next and who does it (the billing person requests the quote; an owner can request it here)." },
+  { key: "changes", label: "Request changes", note: "The approver writes what should change and why: the plan stays open, no quote is issued." },
+  { key: "sent", label: "Changes requested", note: "Sent back to the operator with the reason: the plan stays open and no quote exists until a revision is approved." },
+  { key: "stale", label: "A newer revision", note: "The plan changed after the page was opened: revision 6 can no longer be approved; the new revision is reviewed first." },
 ];
 
-const STATES = { mapping: "done", identity: "done", relationships: "done", approval: "review" } as const;
+/** When the plan was last checked against the sealed files and the destination (a review value, between proposal and approval). */
+const CHECKED_AT = "2026-10-20T12:20:00Z";
 
-function Part({ title, rows, change, ctx, project }: { readonly title: string; readonly rows: readonly string[]; readonly change: string; readonly ctx: PrototypeProps["ctx"]; readonly project: PrototypeProps["project"] }): ReactElement {
+function Answer({ term, change, ctx, project, children }: { readonly term: string; readonly change?: string; readonly ctx: PrototypeProps["ctx"]; readonly project: PrototypeProps["project"]; readonly children: ReactElement }): ReactElement {
   return (
-    <div className="kauro-answers-part">
-      <h3>{title}</h3>
-      <ul>
-        {rows.map((row) => (
-          <li key={row}>{row}</li>
-        ))}
-      </ul>
-      <ScreenLink to={change} ctx={ctx} project={project.projectId}>
-        Change<span className="kauro-visually-hidden"> {title.toLowerCase()}</span>
-      </ScreenLink>
+    <div>
+      <dt>{term}</dt>
+      <dd>{children}</dd>
+      {change === undefined ? (
+        <dd className="kauro-answers-change" />
+      ) : (
+        <dd className="kauro-answers-change">
+          <ScreenLink to={change} ctx={ctx} project={project.projectId}>
+            Change<span className="kauro-visually-hidden"> {term.toLowerCase()}</span>
+          </ScreenLink>
+        </dd>
+      )}
     </div>
   );
 }
 
 export function Approval({ ctx, state, project }: PrototypeProps): ReactElement {
-  const approver = (ctx.agency?.permittedActions ?? []).includes("APPROVE_PLANS") && state !== "viewer";
+  const approver = can(ctx, "approve");
+  const payer = can(ctx, "pay");
+  const solo = soloWorkspace(ctx);
   const [step, setStep] = useState(state);
-  const [agreed, setAgreed] = useState(state === "stepup");
-  const approved = step === "approved";
+  const [agreed, setAgreed] = useState(false);
+  const [code, setCode] = useState("");
+  const [tried, setTried] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [reason, setReason] = useState("Keep the group of rows 2,207 and 10,861 apart: two people at Larch Studio share that phone line.");
   const workspace = ctx.agency?.displayName ?? "Northwind Data";
   const clean = project.mode === "CLEAN";
   const words = SERVICE[project.mode];
+  const crm = words.destination ?? "";
   const stale = state === "stale";
+  const approved = step === "approved";
+  const me = ctx.who.split(",")[0] ?? "You";
+  const status: { readonly tone: Tone; readonly text: string } = approved
+    ? { tone: "success", text: "Plan approved" }
+    : step === "sent"
+      ? { tone: "warning", text: "Changes requested" }
+      : stale
+        ? { tone: "warning", text: "A newer revision to review" }
+        : { tone: "info", text: "Ready for approval" };
+
+  if (approved)
+    return (
+      <>
+        <ProjectHeader stage="purchase" title={`Revision ${PLAN.revision} is approved`} status={status} />
+        <div className="kauro-focused">
+          <section className="kauro-pl-done" aria-labelledby="done-h">
+            <h2 id="done-h">
+              Approved by {solo ? "you" : approver ? me : "Samuel Osei (Approver)"} on {moment(TIMELINE.approvedAt)}
+            </h2>
+            <p>
+              The approval names revision {PLAN.revision}, the sealed files{clean ? "" : `, and the ${crm} settings it was checked against`}. Kauro prepares exactly this, once the quote is paid.
+            </p>
+          </section>
+          <section className="kauro-pl-section" aria-labelledby="next-h">
+            <h2 id="next-h">What happens next</h2>
+            {payer ? (
+              <p>Request the quote. It is issued from this revision, with the repeat discount your workspace has earned, and is valid 14 days, or until the files are deleted if that comes first.</p>
+            ) : (
+              <p>
+                {whoCan(ctx, "pay")} can now request the quote. It is issued from this revision and is valid 14 days, or until the files are deleted on {moment(TIMELINE.filesKeptUntil)} if that comes first.
+              </p>
+            )}
+          </section>
+          <div className="kauro-focused-foot">
+            <ScreenLink to="UI13" ctx={ctx} project={project.projectId}>
+              Back to the project
+            </ScreenLink>
+            {payer ? (
+              <ScreenButton to="UI23" ctx={ctx} project={project.projectId} variant="primary">
+                Request the quote
+              </ScreenButton>
+            ) : null}
+          </div>
+        </div>
+      </>
+    );
+
+  const codeError = tried && !/^\d{6}$/.test(code.replace(/\s/g, "")) ? "Enter the 6 digits your authenticator app shows" : undefined;
+  const agreeError = tried && !agreed ? "Tick the box to approve this exact revision" : undefined;
+  const approve = (): void => {
+    setTried(true);
+    if (agreed && /^\d{6}$/.test(code.replace(/\s/g, ""))) setStep("approved");
+  };
+  const back = clean ? { to: "UI20", label: "Back to duplicates" } : { to: "UI21", label: "Back to links between records" };
+
   return (
     <>
-      <ProjectHeader current="plan" />
-      <PageHead title="Approval" lead="Approve these exact preparation decisions." />
-      <PlanTasks ctx={ctx} project={project} current="approval" states={approved ? { ...STATES, approval: "done" } : stale ? { ...STATES, identity: "review", approval: "blocked" } : STATES} />
-      {stale ? (
-        <Banner tone="warning" title="The plan changed after you opened this page" announce="alert">
-          <p>Revision 7 replaced revision 6 at 12:31 PM UTC: 3 groups of duplicates were decided again. Review the new revision before it can be approved.</p>
-          <p>
-            <ScreenLink to="UI20" ctx={ctx} project={project.projectId}>
-              Review the duplicates again
-            </ScreenLink>
-          </p>
-        </Banner>
-      ) : null}
-      {step === "sent" ? (
-        <Banner tone="info" title="Changes requested" announce="status">
-          <p>Revision 6 goes back to Priya Nair with your reason. The plan stays open; no quote is issued until a revision is approved.</p>
-        </Banner>
-      ) : null}
-      <section className="kauro-answers" aria-labelledby="answers-h">
-        <div className="kauro-answers-head">
-          <h2 id="answers-h">{stale ? "The plan, revision 6, replaced" : "The plan, revision 6"}</h2>
-          <span className="kauro-muted-text">{stale ? "Revision 7 is not validated yet" : "Validated Oct 20, 2026, 12:20 PM UTC · no blocker"}</span>
-        </div>
-        <Part title="Files" ctx={ctx} project={project} change="UI16" rows={[`${EXAMPLE.sources.join(" and ")}, sealed`, `${EXAMPLE.unitsText} billable source units`]} />
-        {clean ? null : (
-          <Part title="Destination" ctx={ctx} project={project} change="UI17" rows={[`${words.destination ?? ""} ${project.mode === "SALESFORCE" ? "org" : "account"} 24816309, through ${words.importer ?? ""}`, "Its settings confirmed on Oct 20, 2026"]} />
-        )}
-        <Part
-          title="Fields"
-          ctx={ctx}
-          project={project}
-          change="UI19"
-          rows={[clean ? "9 columns kept, 1 left out (a second e-mail column)" : "9 columns mapped, 1 left out (a second e-mail column)", `Capitals made consistent in ${n(PLAN.namesCapitalised)} names; ${n(PLAN.emailsLowercased)} addresses made lower case`, `${n(PLAN.emailsInvalid)} invalid addresses left empty, each listed in the report`]}
-        />
-        <Part
-          title="Duplicates"
-          ctx={ctx}
-          project={project}
-          change="UI20"
-          rows={[`${n(PLAN.unifyGroups)} groups unified, ${n(PLAN.keptApart)} kept apart`, `${n(PLAN.unifiedRows)} contact rows and 253 company rows join another record; each is listed with the row it joined`, "Marketing consent: the most restrictive choice is kept"]}
-        />
-        {clean ? null : <Part title="Links between records" ctx={ctx} project={project} change="UI21" rows={[`${n(PLAN.links)} contacts linked to their company`, `${n(PLAN.noCompany)} contacts imported without a company, on purpose`]} />}
-        <div className="kauro-answers-part kauro-answers-part--out">
-          <h3>Not included</h3>
-          <ul>
-            {clean ? (
-              <>
-                <li>No data from outside sources is added: Kauro cleans what is in your files.</li>
-                <li>No record is deleted without a trace: every row unified or left out is listed with its reason.</li>
-                <li>No promise that the files fit a particular CRM: they are clean, standard files.</li>
-              </>
-            ) : (
-              <>
-                <li>No field, rule or automation is created in {words.destination}: your team imports the files with its own account.</li>
-                <li>Deal owners, while it is not known whether an import may set them.</li>
-                <li>Activities, notes and attachments are outside this service.</li>
-              </>
-            )}
-          </ul>
-        </div>
-      </section>
-      {approved ? (
-        <section className="kauro-approved" aria-labelledby="approved-h">
-          <h2 id="approved-h">Revision 6 is approved</h2>
-          <p>
-            Approved by {ctx.who.split(",")[0]} on Oct 20, 2026 at 12:40 PM UTC. The approval names revision 6 and the sealed set{clean ? "" : `, and the ${words.destination ?? ""} settings it was checked against`}. The quote is next.
-          </p>
-          <ScreenButton to="UI23" ctx={ctx} project={project.projectId} variant="primary">
-            <span className="kauro-go">See the quote</span>
-          </ScreenButton>
-          <p className="kauro-proposed">Proposed — the quote issued at approval, waiting for whoever pays (F-02)</p>
-          <Stamp>Approved</Stamp>
-        </section>
-      ) : !approver ? (
-        <section className="kauro-next" aria-labelledby="approver-h">
-          <p className="kauro-next-label">Who approves</p>
-          <h2 id="approver-h">An approver or an owner approves this plan</h2>
-          <p>Your role reviews the plan but does not approve it. In {workspace}, the people with the approver or owner role can; Team lists them.</p>
-        </section>
-      ) : stale || step === "sent" ? null : step === "changes" ? (
-        <section className="kauro-approve" aria-labelledby="changes-h">
-          <h2 id="changes-h">Request changes</h2>
-          <Field id="changes-reason" label="What should change, and why" hint="Priya Nair, who prepared the plan, reads this beside it.">
-            {(control) => <textarea {...control} rows={3} defaultValue="Keep group 112 apart: these are two people at the same company, sharing a team inbox." />}
-          </Field>
-          <div className="kauro-actions">
-            <Button variant="primary" onClick={() => setStep("sent")}>
-              Send back for changes
-            </Button>
-            <Button onClick={() => setStep("normal")}>Cancel</Button>
+      <ProjectHeader
+        stage="plan"
+        title={`Approve revision ${PLAN.revision} of the plan`}
+        lead="Read the plan as it will be prepared. Approving it lets the quote be issued; nothing is prepared or charged before the quote is paid."
+        status={status}
+      />
+      <div className="kauro-focused">
+        {approver ? (
+          <p className="kauro-pl-who">{solo ? "You approve this plan as the workspace's owner." : `Approved by an approver or an owner: ${whoCan(ctx, "approve")}.`}</p>
+        ) : (
+          <div className="kauro-pl-who-not">
+            <Only>{onlyLine(ctx, "approve", "approve this plan")} The plan stays readable here for everyone.</Only>
+            <p className="kauro-pl-copy">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
+                  setCopied(true);
+                }}
+              >
+                Copy the link for Samuel Osei
+              </Button>
+              <span role="status" className="kauro-pl-meta">
+                {copied ? "Link copied. It opens this page after Samuel signs in." : ""}
+              </span>
+            </p>
           </div>
-        </section>
-      ) : (
-        <section className="kauro-approve" aria-labelledby="approve-h">
-          <h2 id="approve-h">Approve</h2>
-          <label className="kauro-confirm">
-            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
-            <span>
-              I approve revision 6 of this plan, exactly as listed above, for <bdi>{workspace}</bdi>.
-            </span>
-          </label>
-          {step === "stepup" ? (
-            <div className="kauro-approve-code">
-              <CodeField id="approve-code" label="Your Kauro code" hint="Approving decides what is prepared from these records, so Kauro asks who you are again." />
-              <Button variant="primary" onClick={() => setStep("approved")}>
-                Approve revision 6
-              </Button>
-            </div>
-          ) : (
-            <div className="kauro-actions">
-              <Button variant="primary" disabled={!agreed} onClick={() => setStep("stepup")}>
-                Continue to approve
-              </Button>
-              <Button onClick={() => setStep("changes")}>Request changes</Button>
-            </div>
+        )}
+        {stale ? (
+          <Banner tone="warning" title="The plan changed after you opened this page" announce="alert">
+            <p>Revision 7 replaced revision 6 at 12:31 PM UTC: three groups of duplicates were decided again. Review the new revision before it can be approved.</p>
+            <p>
+              <ScreenLink to="UI20" ctx={ctx} project={project.projectId}>
+                Review the duplicates again
+              </ScreenLink>
+            </p>
+          </Banner>
+        ) : null}
+        {step === "sent" ? (
+          <Banner tone="info" title="Changes requested" announce="status">
+            <p>Revision {PLAN.revision} goes back to Priya Nair (Operator) with your reason. The plan stays open; no quote is issued until a revision is approved.</p>
+          </Banner>
+        ) : null}
+        <p className="kauro-pl-meta">
+          {stale ? "Revision 7 is not checked yet." : `Checked against the sealed files${clean ? "" : ` and the ${crm} settings`} on ${moment(CHECKED_AT)}: nothing blocks it.`}
+        </p>
+        <dl className="kauro-answers kauro-pl-answers">
+          <Answer term="Files" change="UI16" ctx={ctx} project={project}>
+            <p>
+              {EXAMPLE.sources.join(" and ")}, sealed {moment(TIMELINE.sealedAt)} · {EXAMPLE.unitsText} billable source units
+            </p>
+          </Answer>
+          {clean ? null : (
+            <Answer term="Destination" change="UI17" ctx={ctx} project={project}>
+              <p>
+                {project.mode === "SALESFORCE" ? "Salesforce org 00D5g000004XkL2, through Data Loader" : "HubSpot account 24816309, through HubSpot's importer"} · settings confirmed {moment(CONFIRMED_AT)}
+              </p>
+            </Answer>
           )}
-          {agreed ? null : <p className="kauro-muted">Tick the box to approve this exact revision.</p>}
-          <p className="kauro-muted">Nothing is prepared, and nothing is charged, until the plan is approved and its quote is paid.</p>
-        </section>
-      )}
+          <Answer term="Fields" change="UI19" ctx={ctx} project={project}>
+            <ul>
+              <li>{clean ? "Contacts: 5 columns kept, 1 left out (a second E-mail column); companies: 4 kept" : "Contacts: 5 columns mapped, 1 left out (a second E-mail column); companies: 4 mapped"}</li>
+              <li>
+                Capitals made consistent in {n(PLAN.namesCapitalised)} names; {n(PLAN.emailsLowercased)} addresses made lower case; {n(PLAN.emailsInvalid)} invalid addresses left empty and listed
+              </li>
+            </ul>
+          </Answer>
+          <Answer term="Duplicates" change="UI20" ctx={ctx} project={project}>
+            <ul>
+              <li>
+                Contacts: {n(PLAN.unifyGroups)} groups unified and {n(PLAN.keptApart)} kept apart, of {n(PLAN.groups)}; {n(PLAN.unifiedRows)} rows join another record
+              </li>
+              <li>Companies: {n(PLAN.companiesUnified)} rows join another company with the same domain and name</li>
+              <li>Marketing consent: where records disagree, the most restrictive choice is kept</li>
+            </ul>
+          </Answer>
+          {clean ? null : (
+            <Answer term="Links" change="UI21" ctx={ctx} project={project}>
+              <ul>
+                <li>
+                  {n(PLAN.links)} of {n(PLAN.output)} contacts linked to their {project.mode === "SALESFORCE" ? "account" : "company"}
+                </li>
+                <li>
+                  {n(PLAN.noCompany)} prepared without one, on purpose: {n(PLAN.emptyCompany)} name none and {n(PLAN.notFound)} name one that is not in companies.xlsx
+                </li>
+              </ul>
+            </Answer>
+          )}
+          <Answer term="Not included" ctx={ctx} project={project}>
+            <ul>
+              {clean ? (
+                <>
+                  <li>No data from outside sources is added: Kauro cleans what is in your files.</li>
+                  <li>No record is deleted without a trace: every row unified or left out is listed with its reason.</li>
+                  <li>No promise that the files fit a particular CRM.</li>
+                </>
+              ) : (
+                <>
+                  <li>No field, rule or automation is created in {crm}: your team imports the files with its own {project.mode === "SALESFORCE" ? "org" : "account"}.</li>
+                  <li>{project.mode === "SALESFORCE" ? "Contacts that share an email stay apart while the org's duplicate rules are unknown." : "Deal owners, while it is unknown whether an import may set them."}</li>
+                  <li>Activities, notes and attachments are outside this service.</li>
+                </>
+              )}
+            </ul>
+          </Answer>
+        </dl>
+
+        {!approver || stale || step === "sent" ? (
+          <div className="kauro-focused-foot">
+            <ScreenLink to={back.to} ctx={ctx} project={project.projectId}>
+              {back.label}
+            </ScreenLink>
+          </div>
+        ) : step === "changes" ? (
+          <section className="kauro-pl-section" aria-labelledby="changes-h">
+            <h2 id="changes-h">Request changes</h2>
+            <Field id="changes-reason" label="What should change, and why" hint="Priya Nair (Operator), who prepared the plan, reads this beside it." error={tried && reason.trim() === "" ? "Write what should change, so the plan can be revised" : undefined}>
+              {(control) => <textarea {...control} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />}
+            </Field>
+            <div className="kauro-focused-foot">
+              <button type="button" className="kauro-pl-link" onClick={() => setStep("normal")}>
+                Cancel
+              </button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setTried(true);
+                  if (reason.trim() !== "") setStep("sent");
+                }}
+              >
+                Send back for changes
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <section className="kauro-pl-section kauro-pl-approve" aria-labelledby="approve-h">
+            <h2 id="approve-h">Approve</h2>
+            <div className={agreeError === undefined ? "kauro-pl-declare" : "kauro-pl-declare is-error"}>
+              {agreeError === undefined ? null : (
+                <p className="kauro-pl-error" id="declare-error">
+                  {agreeError}
+                </p>
+              )}
+              <label>
+                <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} aria-describedby={agreeError === undefined ? undefined : "declare-error"} />
+                <span>
+                  I approve revision {PLAN.revision} of this plan, exactly as listed above, for <bdi>{workspace}</bdi>.
+                </span>
+              </label>
+            </div>
+            <Field id="approve-code" label="Your Kauro code" hint="Approving decides what is prepared from these records, so Kauro asks who you are again." error={codeError}>
+              {(control) => <input {...control} name="code" inputMode="numeric" autoComplete="one-time-code" spellCheck={false} autoCapitalize="off" className="kauro-pl-code" value={code} onChange={(event) => setCode(event.target.value)} />}
+            </Field>
+            <div className="kauro-focused-foot">
+              <ScreenLink to={back.to} ctx={ctx} project={project.projectId}>
+                {back.label}
+              </ScreenLink>
+              <span className="kauro-pl-foot-actions">
+                <button type="button" className="kauro-pl-link" onClick={() => setStep("changes")}>
+                  Request changes
+                </button>
+                <Button variant="primary" onClick={approve}>
+                  Approve revision {PLAN.revision}
+                </Button>
+              </span>
+            </div>
+          </section>
+        )}
+      </div>
     </>
   );
 }

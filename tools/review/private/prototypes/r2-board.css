@@ -1,0 +1,442 @@
+/* Round 2 (2026-10-21): the board pages (Projects, Clients, Overview, Activity, Data and deletion, Billing overview). Tokens only, no
+   inline style, reflow at 320 px, both themes. Sizes: section h2 20 px, group counts 20 px regular, body 16 px, meta 14 px, labels 13 px. */
+
+/* ---- the proposed marker at the 13 px floor (foundation's is 11 px) ---- */
+.kauro-main .kauro-b-proposed {
+  padding: 0.0625rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+}
+.kauro-main .kauro-b-proposed--page {
+  margin: calc(var(--kauro-space-3) * -1) 0 var(--kauro-space-6);
+}
+
+/* ---- filters: one row of labelled controls, wrapping on a phone ---- */
+.kauro-main .kauro-b-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-b-filter {
+  display: grid;
+  gap: var(--kauro-space-1);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-b-filter select {
+  min-block-size: 2.75rem;
+  min-inline-size: 12rem;
+  max-inline-size: 100%;
+  font: inherit;
+  font-size: var(--kauro-font-size-body);
+  font-weight: 400;
+}
+.kauro-main .kauro-b-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  min-block-size: 2.75rem;
+  font-size: var(--kauro-font-size-body);
+}
+.kauro-main .kauro-b-check input {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0;
+  accent-color: var(--kauro-color-primary);
+}
+.kauro-main .kauro-b-clear {
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- a group of the board: heading with its count, one note, its table ---- */
+.kauro-main .kauro-b-group {
+  margin: 0 0 var(--kauro-space-7);
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-b-group + .kauro-b-group {
+  margin-block-start: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+.kauro-main .kauro-b-group > h2 {
+  margin: 0 0 var(--kauro-space-1);
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-b-count {
+  margin-inline-start: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+}
+.kauro-main .kauro-b-note {
+  margin: 0 0 var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-b-name {
+  font-weight: 600;
+}
+.kauro-main .kauro-b-name-text {
+  display: block;
+  font-weight: 600;
+}
+.kauro-main a.kauro-b-name {
+  color: var(--kauro-color-text);
+}
+.kauro-main button.kauro-b-name {
+  min-block-size: 0;
+  color: var(--kauro-color-text);
+  text-align: start;
+}
+.kauro-main .kauro-b-verb {
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+}
+.kauro-main .kauro-b-when-label {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-b-when {
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-b-table th:nth-child(1) {
+    inline-size: 28%;
+  }
+  .kauro-main .kauro-b-table th:nth-child(2) {
+    inline-size: 22%;
+  }
+  .kauro-main .kauro-b-table th:nth-child(3) {
+    inline-size: 24%;
+  }
+}
+.kauro-main .kauro-b-example {
+  margin-block-start: var(--kauro-space-2);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- a two-way switch over a list (Clients: active and archived; Billing: needs action, all, refunds) ---- */
+.kauro-main .kauro-b-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-1);
+  margin: 0 0 var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-b-switch button {
+  min-block-size: 2.75rem;
+  margin-block-end: -1px;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border: 0;
+  border-block-end: 3px solid transparent;
+  background: none;
+  color: var(--kauro-color-text-muted);
+  font: inherit;
+  font-size: var(--kauro-font-size-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-b-switch button[aria-pressed="true"] {
+  border-block-end-color: var(--kauro-color-primary);
+  color: var(--kauro-color-text);
+}
+.kauro-main .kauro-b-switch button:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+
+/* ---- Clients: the details of one client ---- */
+.kauro-main .kauro-b-back {
+  margin: 0 0 var(--kauro-space-2);
+}
+.kauro-main .kauro-b-facts {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-b-facts dd .kauro-sub {
+  display: block;
+  margin-block-start: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-b-impact {
+  margin: 0 0 var(--kauro-space-4);
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-b-confirm {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+}
+.kauro-main .kauro-b-confirm > * {
+  margin: 0;
+}
+
+/* ---- Overview: the facts and the last events side by side from 62 rem; what blocks; the status line for a client ---- */
+.kauro-main .kauro-b-blocker {
+  margin: 0 0 var(--kauro-space-7);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-main .kauro-b-blocker h2 {
+  margin: 0 0 var(--kauro-space-1);
+  color: inherit;
+  font-size: 1.0625rem;
+}
+.kauro-main .kauro-b-blocker p {
+  margin: 0;
+}
+.kauro-main .kauro-b-overview {
+  display: grid;
+  gap: var(--kauro-space-7);
+}
+.kauro-main .kauro-b-overview > section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-b-overview h2 {
+  margin: 0 0 var(--kauro-space-3);
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-b-overview dl {
+  margin-block-start: 0;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-b-overview {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+.kauro-main .kauro-b-recent {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-4);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-b-recent li {
+  display: grid;
+  gap: var(--kauro-space-1);
+  max-inline-size: none;
+  padding-block-end: var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-b-recent-when {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-b-statusline {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-2);
+  margin-block-start: var(--kauro-space-5);
+  padding: var(--kauro-space-4);
+  border: 1px dashed var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+}
+.kauro-main .kauro-b-statusline > * {
+  margin: 0;
+}
+.kauro-main .kauro-b-statusline-head {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-b-statusline-text {
+  font-family: var(--kauro-note-family);
+  font-style: italic;
+}
+
+/* ---- Activity: a day, then its events; the time in its own column ---- */
+.kauro-main .kauro-b-day {
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-b-day + .kauro-b-day {
+  margin-block-start: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+.kauro-main .kauro-b-day > h2 {
+  margin: 0 0 var(--kauro-space-2);
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-b-events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-b-events li {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: var(--kauro-space-4);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-b-event-time {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+.kauro-main .kauro-b-event-main {
+  display: grid;
+  gap: var(--kauro-space-1);
+}
+.kauro-main .kauro-b-event-meta {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-b-event-meta code {
+  font-size: 0.8125rem;
+  word-break: normal;
+}
+@media (max-width: 30rem) {
+  .kauro-main .kauro-b-events li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--kauro-space-1);
+  }
+}
+
+/* ---- Data and deletion: the verdict, then two equal panels ---- */
+.kauro-main .kauro-b-verdict {
+  margin: 0 0 var(--kauro-space-6);
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.kauro-main .kauro-b-panels {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin-block-start: var(--kauro-space-4);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-b-panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-main .kauro-b-panel {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  align-content: start;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-b-panel > * {
+  margin: 0;
+}
+.kauro-main .kauro-b-panel h3 {
+  font-size: 1.0625rem;
+}
+.kauro-main .kauro-b-panel-fact > div {
+  grid-template-columns: none;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-b-delete {
+  display: grid;
+  gap: var(--kauro-space-3);
+  inline-size: 100%;
+}
+
+/* ---- Billing: the amount column and its foot ---- */
+.kauro-main .kauro-b-money tfoot th,
+.kauro-main .kauro-b-money tfoot td {
+  padding-block: var(--kauro-space-3);
+  border-block-end: 0;
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-body);
+  font-weight: 600;
+}
+.kauro-main .kauro-b-money tfoot td:last-child {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-b-money tfoot,
+  .kauro-main .kauro-b-money tfoot tr {
+    display: block;
+  }
+  .kauro-main .kauro-b-money tfoot th,
+  .kauro-main .kauro-b-money tfoot td {
+    display: block;
+    padding: var(--kauro-space-1) 0;
+  }
+  .kauro-main .kauro-b-money tfoot td::before {
+    content: none;
+  }
+}
+
+/* ---- review of 2026-10-21: one cell's parts stay one grid item on a phone card; one section size per page; nothing squeezed ---- */
+.kauro-main .kauro-b-cell {
+  display: block;
+  min-inline-size: 0;
+}
+.kauro-main .kauro-b-cell .kauro-sub {
+  display: block;
+}
+.kauro-main .kauro-b-nowrap {
+  white-space: nowrap;
+}
+.kauro-main .kauro-b-section > h2 {
+  margin-block-start: 0;
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-b-tablenote {
+  margin-block-start: var(--kauro-space-3);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-b-schedule td:last-child,
+  .kauro-main .kauro-b-schedule th:last-child {
+    inline-size: 1%;
+  }
+}
+@media (max-width: 47.99rem) {
+  /* on a phone a state keeps whole words (never letter by letter) yet may wrap between them, so it never widens the page at 320 px */
+  .kauro-main .kauro-rtable td.kauro-b-nowrap > * {
+    justify-self: start;
+    max-inline-size: 100%;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-b-clients--active th:first-child {
+    inline-size: 18%;
+  }
+  .kauro-main .kauro-b-clients--active .kauro-b-when {
+    white-space: nowrap;
+  }
+  .kauro-main .kauro-b-clients--active th:nth-child(2),
+  .kauro-main .kauro-b-clients--active th:last-child {
+    inline-size: 9%;
+  }
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-b-nowrap {
+    white-space: normal;
+  }
+}
+.kauro-main .kauro-b-thsub {
+  display: block;
+  font-weight: 400;
+}

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { message } from "../../../../../copy/en.ts";
+import { PageHeader } from "../../../../../screens/shared/project-header.tsx";
 import { idOrNull } from "../../../../../screens/shared/params.ts";
 import { SupportScreen } from "../../../../../screens/support/container.tsx";
 
@@ -11,7 +12,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
   if (agency === null || (project !== undefined && idOrNull(project) === null) || (caseParam !== undefined && idOrNull(caseParam) === null)) notFound();
   return (
     <>
-      <h1>{message("screen.support.title")}</h1>
+      <PageHeader title={message("screen.support.title")} lead={message("screen.support.lead.body")} />
       <SupportScreen agencyId={agency} projectId={idOrNull(project)} caseId={idOrNull(caseParam)} />
     </>
   );

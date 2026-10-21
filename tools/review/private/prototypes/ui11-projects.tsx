@@ -1,224 +1,171 @@
 "use client";
-// UI11 Projects (registry: "Your client preparation projects."): the board every member opens first. Drawn from the api's own board read
-// (ListProjects → ProjectDashboardItem: client, service, phase, the team's required action, deadline, last activity), grouped by who must
-// act, in a fixed order (research: app-ui-patterns.md 1, Linear's My Issues): what needs your team, what Kauro is doing, what waits on
-// someone else in your team, what was delivered. Each project is one row with its one next verb; an empty group is not drawn.
+// UI11 Projects (registry: "Your client preparation projects."), rebuilt in Order 11 round 2 (research agency-workspace.md §5.1,
+// app-shell-settings.md §9.2, §9.8, §9.13). The page answers "what needs me, what waits on someone else, what is Kauro doing, what is
+// finished?" every day, so its groups are named for the person reading it, in that order:
+//   - Needs you: the projects whose next step this person's role takes (an owner holds every role);
+//   - Waiting on someone in your team: the next step is another role's, and the row names the person ("Samuel Osei (Approver)");
+//   - Kauro is working: nothing is needed; we email when it is done;
+//   - Completed.
+// Each group is a table (NN/g: tables compare, cards make readers reorient): the project with its client and service, the stage in words
+// ("4 of 6 · Quote and payment", no segmented bar: colour-only progress), the date that matters (one rule, labelled with what ends), and
+// the next step as a verb link with who takes it. An empty group is not drawn; no zero counts. "Imported" never appears (a download is not
+// an import, kauro-baseline.md §6.1 rule 12). The repeat-discount line left this work page: it lives in Billing and on a completed
+// project's Overview (round 2 decision; research §5.1 "marketing on a work page").
 //
-// A person sees an action as theirs only when their role allows it (B06): an operator does not approve or pay, so a plan to approve or a
-// quote to pay waits on someone else in their team. A new workspace never opens on an empty page: it offers its first project beside the
-// synthetic example, labelled as one (registry: "Empty state uses synthetic examples"). A restricted agency keeps its support, refund and
-// deletion routes (registry exceptions).
-//
-// Revision of 2026-10-20: a row names the project, its client and its service ("Clean your data", "Prepare for HubSpot", "Prepare for
-// Salesforce"), and says the step in the words of the project's header; a step waiting on someone else names who (research:
-// app-operations-ux.md §1.3 proposal 1.1). Starting a CRM project asks for the destination's account or org identifier, because creating
-// the project needs it (packages/domain/src/model/project.ts:73-79); "Clean your data" needs none.
-//
-// PROPOSED (D-UI11-1): the repeat-discount line. The policy's ladder is public (Pricing), but no read tells a workspace how many paid
-// projects it has; shown as reachable progress, never as the far tier (research: onboarding-vs-discounts.md 6).
-import type { ProjectDashboardItem } from "@web/api/generated.ts";
-import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
+// Starting a project is offered only to owners, admins and operators (CMD011); the other roles see no button. A new workspace opens on an
+// empty state that depends on the role (app-shell-settings.md §9.13). "Only mine" is proposed (no saved views in the contract).
 import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactElement, useState } from "react";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
+import type { ServiceMode } from "@web/screens.ts";
 import { appPathOf, type PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
 import { EXAMPLE_ID } from "../lib/world.ts";
-import { day, PageHead, ScreenButton, ScreenLink } from "./kit.tsx";
-import { SERVICE } from "./service.ts";
-import { worldProject } from "../lib/world-projects.ts";
-import { AGENCY_PROJECTS, COMPANY_PROJECTS, PAID_PROJECTS } from "./projects-data.ts";
+import { stageText, waitingOn } from "./board.ts";
+import { moment, ScreenLink } from "./kit.tsx";
+import { can } from "./people.ts";
+import { AGENCY_BOARD, type BoardProject, COMPANY_BOARD, ENDING_LABEL } from "./projects-data.ts";
+import { SERVICE, SERVICE_ORDER } from "./service.ts";
 
 export const UI11_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Projects", note: "Every project grouped by who must act; each row says its one next step. Seen as an operator, approving and paying wait on others." },
-  { key: "new", label: "Starting a project", note: "The start of a project, on the board itself: the client, the service and a purpose the team will recognise. The destination comes later." },
-  { key: "first", label: "First visit", note: "A workspace with no project yet: its first project offered beside the synthetic example." },
-  { key: "restricted", label: "Restricted agency", note: "New work is paused; support, refunds and deletion stay open." },
+  { key: "normal", label: "Projects", note: "Grouped for the person reading: what needs you, what waits on someone else in your team (named), what Kauro is doing, what is completed. Each row: stage in words, the date that matters, the next step and who takes it." },
+  { key: "new", label: "Starting a project", note: "The start of a project on the board: the client, the service and a purpose the team will recognise. Owners, admins and operators only." },
+  { key: "first", label: "No projects yet", note: "A new workspace. Owners, admins and operators are offered their first project and the example; approvers, billing members and viewers read that projects will appear here." },
+  { key: "restricted", label: "Restricted workspace", note: "New work is paused; support, refunds and deletion stay open. No project can be started." },
 ];
 
-type Group = "yours" | "kauro" | "others" | "delivered" | "stopped";
-const GROUPS: readonly { readonly key: Group; readonly title: string; readonly note: string }[] = [
-  { key: "yours", title: "Needs your team", note: "Each waits for one step from you." },
-  { key: "kauro", title: "Kauro is working", note: "Nothing to do until Kauro is done." },
-  { key: "others", title: "Waiting on someone else in your team", note: "A step your role does not take: an approver or the billing person takes it." },
-  { key: "delivered", title: "Delivered", note: "Ready to import, or imported." },
-  { key: "stopped", title: "Stopped", note: "Something ended the project's run: open it to see why and what is safe." },
-];
-
-const STAGE_OF: Readonly<Record<ProjectDashboardItem["phase"], number>> = { SOURCES: 0, HEALTH_CHECK: 1, PLAN: 2, PURCHASE: 3, PROCESSING: 4, DELIVERED: 5, FAILED: -1, ARCHIVED: -1 };
-const STAGE_NAME = ["Files", "Health check", "Plan", "Purchase", "Delivery", "Import"] as const;
-
-const ACTION: Readonly<Record<Exclude<ProjectDashboardItem["requiredAction"], "NONE">, { readonly label: string; readonly screen: string; readonly needs?: "APPROVE_PLANS" | "MANAGE_BILLING" }>> = {
-  UPLOAD_SOURCES: { label: "Upload the files", screen: "UI14" },
-  START_HEALTH_CHECK: { label: "Start the free check", screen: "UI17" },
-  VALIDATE_PLAN: { label: "Check the plan", screen: "UI19" },
-  APPROVE_PLAN: { label: "Approve the plan", screen: "UI22", needs: "APPROVE_PLANS" },
-  REQUEST_QUOTE: { label: "Ask for the quote", screen: "UI23" },
-  PAY_QUOTE: { label: "Pay the quote", screen: "UI23", needs: "MANAGE_BILLING" },
-  START_PROCESSING: { label: "Start the preparation", screen: "UI25" },
+type Group = "yours" | "others" | "kauro" | "completed";
+const GROUP_HEAD: Readonly<Record<Group, { readonly title: string; readonly note: string }>> = {
+  yours: { title: "Needs you", note: "Each project waits for one step you can take." },
+  others: { title: "Waiting on someone in your team", note: "The next step belongs to another role; each row names who takes it." },
+  kauro: { title: "Kauro is working", note: "Nothing is needed from you. We email you when each is done, or if anything fails." },
+  completed: { title: "Completed", note: "Delivered and finished. Their files follow their deletion dates." },
 };
-const WAITING: Readonly<Record<"APPROVE_PLANS" | "MANAGE_BILLING", string>> = { APPROVE_PLANS: "Waiting for Samuel Osei (approver)", MANAGE_BILLING: "Waiting for Ines Duarte (billing)" };
-const AT_KAURO: Readonly<Partial<Record<ProjectDashboardItem["phase"], { readonly label: string; readonly screen: string }>>> = {
-  HEALTH_CHECK: { label: "Kauro is checking the files", screen: "UI18" },
-  PROCESSING: { label: "Kauro is preparing the package", screen: "UI25" },
-  DELIVERED: { label: "Open the delivery", screen: "UI26" },
-  FAILED: { label: "See what happened", screen: "UI13" },
-};
+const ORDER: readonly Group[] = ["yours", "others", "kauro", "completed"];
 
-interface Row {
-  readonly item: ProjectDashboardItem;
-  readonly group: Group;
-  readonly label: string;
-  readonly screen: string;
+function groupOf(project: BoardProject, ctx: PrototypeProps["ctx"]): Group {
+  if (project.group === "kauro") return "kauro";
+  if (project.group === "completed") return "completed";
+  return project.next !== null && can(ctx, project.next.duty) ? "yours" : "others";
 }
 
-function rowOf(item: ProjectDashboardItem, actions: readonly string[]): Row {
-  if (item.phase === "FAILED") return { item, group: "stopped", label: "See what happened", screen: "UI13" };
-  if (item.requiredAction !== "NONE") {
-    const action = ACTION[item.requiredAction];
-    if (action.needs !== undefined && !actions.includes(action.needs)) return { item, group: "others", label: WAITING[action.needs], screen: "UI13" };
-    return { item, group: "yours", label: action.label, screen: action.screen };
-  }
-  const kauro = AT_KAURO[item.phase] ?? { label: "Open the project", screen: "UI13" };
-  return { item, group: item.phase === "DELIVERED" ? "delivered" : "kauro", label: kauro.label, screen: kauro.screen };
-}
-
-/** Six marks, one a stage, filled up to the project's stage: where it is, at a glance, and said in words beside. */
-function StageMarks({ stage }: { readonly stage: number }): ReactElement {
+function Row({ project, group, ctx, company }: { readonly project: BoardProject; readonly group: Group; readonly ctx: PrototypeProps["ctx"]; readonly company: boolean }): ReactElement {
+  const { item } = project;
   return (
-    <span className="kauro-stage-marks" aria-hidden="true">
-      {STAGE_NAME.map((name, index) => (
-        <span key={name} className={index < stage ? "is-done" : index === stage ? "is-current" : undefined} />
-      ))}
-    </span>
-  );
-}
-
-function ProjectRow({ row, ctx }: { readonly row: Row; readonly ctx: PrototypeProps["ctx"] }): ReactElement {
-  const { item } = row;
-  const stage = STAGE_OF[item.phase];
-  const href = appPathOf(row.screen, ctx, item.projectId);
-  const name = worldProject(ctx.agency?.agencyId ?? "", item.projectId)?.name ?? item.clientLabel;
-  return (
-    <li className={`kauro-board-row kauro-board-row--${row.group}`}>
-      <Link className="kauro-board-link" href={href} prefetch={false}>
-        <span className="kauro-board-client">
-          <bdi className="kauro-board-name">{name}</bdi>
-          <span className="kauro-board-mode">
-            <bdi>{item.clientLabel}</bdi> · {SERVICE[item.mode].name}
-          </span>
+    <tr>
+      <td data-label="">
+        <Link className="kauro-b-name" href={appPathOf("UI13", ctx, item.projectId)} prefetch={false}>
+          <bdi>{project.name}</bdi>
+        </Link>
+        <span className="kauro-sub">
+          {company ? null : (
+            <>
+              <bdi>{item.clientLabel}</bdi> ·{" "}
+            </>
+          )}
+          {SERVICE[item.mode].name}
         </span>
-        <span className="kauro-board-stage">
-          {stage < 0 ? <span className="kauro-board-stopped">Stopped</span> : <StageMarks stage={stage} />}
-          <span className="kauro-board-stage-name">{stage < 0 ? "The run ended" : STAGE_NAME[stage]}</span>
+      </td>
+      <td data-label="Stage">{stageText(project.stage, item.mode)}</td>
+      <td data-label="Date that matters">
+        <span className="kauro-b-cell">
+        {project.matters === null ? (
+          <>
+            <span className="kauro-b-when" aria-hidden="true">—</span>
+            <span className="kauro-sub">{project.noDate ?? "No date yet"}</span>
+          </>
+        ) : (
+          <>
+            <span className="kauro-b-when-label">{ENDING_LABEL[project.matters.ending]}</span>
+            <span className="kauro-b-when">{moment(project.matters.at)}</span>
+          </>
+        )}
         </span>
-        <span className="kauro-board-when">
-          {item.deadline === null ? <>Updated {day(item.lastActivityAt)}</> : row.group === "yours" ? <>Due {day(item.deadline)}</> : <>Deadline {day(item.deadline)}</>}
+      </td>
+      <td data-label="Next step">
+        <span className="kauro-b-cell">
+        {group === "yours" && project.next !== null ? (
+          <Link className="kauro-b-verb" href={appPathOf(project.next.screen, ctx, item.projectId)} prefetch={false}>
+            <span className="kauro-go">{project.next.label}</span>
+          </Link>
+        ) : group === "others" && project.next !== null ? (
+          <>
+            <span>{project.next.label}</span>
+            <span className="kauro-sub">Waiting on {waitingOn(ctx, project.next.duty)}</span>
+          </>
+        ) : project.kauro !== null ? (
+          <>
+            <span>{project.kauro.label}</span>
+            <span className="kauro-sub">
+              <ScreenLink to={project.kauro.screen} ctx={ctx} project={item.projectId}>
+                See where it is
+              </ScreenLink>
+            </span>
+          </>
+        ) : (
+          <ScreenLink to="UI13" ctx={ctx} project={item.projectId}>
+            Open the project
+          </ScreenLink>
+        )}
         </span>
-        <span className="kauro-board-next">
-          <span className="kauro-go">{row.label}</span>
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-/** The repeat discount as reachable progress: the next project's discount, and how far the next step of the ladder is. */
-function RepeatLine({ paid }: { readonly paid: number }): ReactElement | null {
-  const tiers = POLICY_SNAPSHOT.repeatTiers.filter((tier) => tier.percent > 0);
-  const current = [...tiers].reverse().find((tier) => paid >= tier.minimum);
-  const next = tiers.find((tier) => paid < tier.minimum);
-  if (current === undefined && next === undefined) return null;
-  return (
-    <p className="kauro-board-repeat">
-      <span className="kauro-proposed">Proposed — D-UI11-1</span>{" "}
-      {current === undefined ? (
-        <>Your second project gets the repeat discount.</>
-      ) : (
-        <>
-          Your next project gets the <strong>{current.percent}% repeat discount</strong>.
-        </>
-      )}
-      {next === undefined ? null : (
-        <>
-          {" "}
-          {next.minimum - paid} more paid {next.minimum - paid === 1 ? "project" : "projects"} to reach {next.percent}%.
-        </>
-      )}
-    </p>
+      </td>
+    </tr>
   );
 }
 
 export function Projects({ ctx, state }: PrototypeProps): ReactElement {
   const company = ctx.buyerType === "in-house";
-  const actions = ctx.agency?.permittedActions ?? [];
-  const all = state === "first" ? [] : company ? COMPANY_PROJECTS : AGENCY_PROJECTS;
-  const clients = [...new Set(all.map((item) => item.clientLabel))];
-  const [client, setClient] = useState<string>("");
-  const rows = all.filter((item) => client === "" || item.clientLabel === client).map((item) => rowOf(item, actions));
-  const workspace = ctx.agency?.displayName ?? "";
-  const canStart = actions.includes("OPERATE_PROJECTS") && state !== "restricted";
-  const [starting, setStarting] = useState(state === "new");
+  const params = useSearchParams();
+  const all = state === "first" ? [] : company ? COMPANY_BOARD : AGENCY_BOARD;
+  const clients = [...new Set(all.map((one) => one.item.clientLabel))];
+  const asked = params.get("client") ?? "";
+  const [client, setClient] = useState<string>(clients.includes(asked) ? asked : "");
+  const [service, setService] = useState<ServiceMode | "">("");
+  const [mine, setMine] = useState(false);
+  const canStart = can(ctx, "operate") && state !== "restricted";
+  const [starting, setStarting] = useState(state === "new" && can(ctx, "operate"));
+  const filtered = all
+    .map((project) => ({ project, group: groupOf(project, ctx) }))
+    .filter(({ project, group }) => (client === "" || project.item.clientLabel === client) && (service === "" || project.item.mode === service) && (!mine || group === "yours"));
+  const filtering = client !== "" || service !== "" || mine;
+  const clear = (): void => {
+    setClient("");
+    setService("");
+    setMine(false);
+  };
 
   return (
     <>
-      <PageHead
-        title="Your projects"
+      <ProjectHeader
+        stage="files"
+        title="Projects"
         lead={company ? "Your preparation projects." : "Your client preparation projects."}
-        aside={
+        action={
           canStart && !starting && all.length > 0 ? (
             <Button variant="primary" onClick={() => setStarting(true)}>
-              <span className="kauro-go">Start a project</span>
+              Start a project
             </Button>
           ) : undefined
         }
       />
-      {starting ? <StartProject ctx={ctx} clients={company ? [] : clients} onCancel={() => setStarting(false)} /> : null}
       {state === "restricted" ? (
-        <Banner tone="warning" title="New work is paused for this agency" announce="status">
+        <Banner tone="warning" title="New work is paused for this workspace" announce="status">
           <p>
-            Kauro restricted this agency, so no new project, check or payment can start. Support, refunds and data deletion stay open. <ScreenLink to="UI52" ctx={ctx}>Open a support case</ScreenLink>
+            Kauro restricted this workspace, so no new project, check or payment can start. Support, refunds and data deletion stay open. <ScreenLink to="UI52" ctx={ctx}>Open a support case</ScreenLink>
           </p>
         </Banner>
       ) : null}
+      {starting ? <StartProject ctx={ctx} clients={company ? [] : clients} onCancel={() => setStarting(false)} /> : null}
       {all.length === 0 ? (
-        <section className="kauro-board-first" aria-labelledby="board-first-h">
-          <div className="kauro-board-first-start">
-            <h2 id="board-first-h">Your first project</h2>
-            <p>Upload the exports you want prepared. The free data health check shows what Kauro finds in every row, then an estimate; you pay only after approving a plan and its quote.</p>
-            {canStart && !starting ? (
-              <Button variant="primary" onClick={() => setStarting(true)}>
-                <span className="kauro-go">Start your first project</span>
-              </Button>
-            ) : null}
-          </div>
-          <ul className="kauro-board-list" aria-label="The example project">
-            <li className="kauro-board-row kauro-board-row--example">
-              <Link className="kauro-board-link" href={`/agencies/${EXAMPLE_ID}/projects/${AGENCY_PROJECTS[0]?.projectId ?? ""}`} prefetch={false}>
-                <span className="kauro-board-client">
-                  <bdi className="kauro-board-name">Example project</bdi>
-                  <span className="kauro-board-mode">Larch Studio (synthetic) · Prepare for HubSpot</span>
-                  <span className="kauro-board-example">Example · synthetic</span>
-                </span>
-                <span className="kauro-board-stage">
-                  <StageMarks stage={6} />
-                  <span className="kauro-board-stage-name">Every step, from the files to the import</span>
-                </span>
-                <span className="kauro-board-when">Synthetic data</span>
-                <span className="kauro-board-next">
-                  <span className="kauro-go">Explore the example</span>
-                </span>
-              </Link>
-            </li>
-          </ul>
-        </section>
+        <FirstVisit ctx={ctx} canStart={canStart} starting={starting} onStart={() => setStarting(true)} />
       ) : (
         <>
-          <div className="kauro-board-tools">
+          <div className="kauro-b-filters" role="group" aria-label="Filter the projects">
             {company || clients.length < 2 ? null : (
-              <label className="kauro-filter">
-                Client
+              <label className="kauro-b-filter">
+                <span>Client</span>
                 <select value={client} onChange={(event) => setClient(event.target.value)}>
                   <option value="">All clients</option>
                   {clients.map((name) => (
@@ -229,35 +176,95 @@ export function Projects({ ctx, state }: PrototypeProps): ReactElement {
                 </select>
               </label>
             )}
-            {client === "" ? null : (
-              <button type="button" className="kauro-filter-chip" onClick={() => setClient("")}>
-                Showing {client} only · Show all
+            <label className="kauro-b-filter">
+              <span>Service</span>
+              <select value={service} onChange={(event) => setService(event.target.value as ServiceMode | "")}>
+                <option value="">All services</option>
+                {SERVICE_ORDER.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {SERVICE[mode].name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="kauro-b-check">
+              <input type="checkbox" checked={mine} onChange={(event) => setMine(event.target.checked)} />
+              <span>Only mine</span>
+              <span className="kauro-proposed kauro-b-proposed">Proposed</span>
+            </label>
+            {filtering ? (
+              <button type="button" className="kauro-text-button kauro-b-clear" onClick={clear}>
+                Clear the filters
               </button>
-            )}
-            <RepeatLine paid={PAID_PROJECTS[ctx.key] ?? 0} />
+            ) : null}
           </div>
-          {GROUPS.map((group) => {
-            const inGroup = rows.filter((row) => row.group === group.key);
-            if (inGroup.length === 0) return null;
-            return (
-              <section key={group.key} className="kauro-board-group" aria-labelledby={`board-${group.key}`}>
-                <div className="kauro-board-group-head">
-                  <h2 id={`board-${group.key}`}>
-                    {group.title} <span className="kauro-board-count">{inGroup.length}</span>
+          {filtered.length === 0 ? (
+            <section className="kauro-empty" aria-labelledby="board-none-h">
+              <h2 id="board-none-h">No project matches these filters</h2>
+              <p>{mine ? "Nothing waits on you right now." : "Change or clear the filters to see the other projects."}</p>
+            </section>
+          ) : (
+            ORDER.map((group) => {
+              const rows = filtered.filter((one) => one.group === group);
+              if (rows.length === 0) return null;
+              return (
+                <section key={group} className="kauro-b-group" aria-labelledby={`board-${group}`}>
+                  <h2 id={`board-${group}`}>
+                    {GROUP_HEAD[group].title} <span className="kauro-b-count">{rows.length}</span>
                   </h2>
-                  <p>{group.note}</p>
-                </div>
-                <ul className="kauro-board-list">
-                  {inGroup.map((row) => (
-                    <ProjectRow key={row.item.projectId} row={row} ctx={ctx} />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
+                  <p className="kauro-b-note">{GROUP_HEAD[group].note}</p>
+                  <table className="kauro-rtable kauro-b-table">
+                    <caption className="kauro-visually-hidden">{GROUP_HEAD[group].title}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Project</th>
+                        <th scope="col">Stage</th>
+                        <th scope="col">Date that matters</th>
+                        <th scope="col">Next step</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(({ project }) => (
+                        <Row key={project.item.projectId} project={project} group={group} ctx={ctx} company={company} />
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              );
+            })
+          )}
         </>
       )}
     </>
+  );
+}
+
+/** A workspace with no project: the empty state for the role (app-shell-settings.md §9.13): a heading, one sentence, at most one action. */
+function FirstVisit({ ctx, canStart, starting, onStart }: { readonly ctx: PrototypeProps["ctx"]; readonly canStart: boolean; readonly starting: boolean; readonly onStart: () => void }): ReactElement {
+  if (!can(ctx, "operate"))
+    return (
+      <section className="kauro-empty" aria-labelledby="board-first-h">
+        <h2 id="board-first-h">No projects yet</h2>
+        <p>When someone starts a project, it appears here. You will be asked when a step needs you.</p>
+      </section>
+    );
+  return (
+    <section className="kauro-empty" aria-labelledby="board-first-h">
+      <h2 id="board-first-h">Start your first project</h2>
+      <p>Upload your exported files. Kauro runs a free data health check on everything you seal; you pay only after approving a plan and its quote.</p>
+      {canStart && !starting ? (
+        <Button variant="primary" onClick={onStart}>
+          Start a project
+        </Button>
+      ) : null}
+      <p className="kauro-b-example">
+        Not ready yet?{" "}
+        <Link href={`/agencies/${EXAMPLE_ID}/projects/${AGENCY_BOARD[0]?.item.projectId ?? ""}`} prefetch={false}>
+          Explore the example project
+        </Link>{" "}
+        (synthetic data, every stage from the files to the import).
+      </p>
+    </section>
   );
 }
 
@@ -299,12 +306,12 @@ function StartProject({ ctx, clients, onCancel }: { readonly ctx: PrototypeProps
         )}
         <fieldset className="kauro-choice kauro-choice--row">
           <legend>Service</legend>
-          {SERVICES.map((service, index) => (
-            <label key={service.mode}>
-              <input type="radio" name="mode" value={service.mode} checked={mode === service.mode} onChange={() => setMode(service.mode)} />
+          {SERVICES.map((one) => (
+            <label key={one.mode}>
+              <input type="radio" name="mode" value={one.mode} checked={mode === one.mode} onChange={() => setMode(one.mode)} />
               <span>
-                <strong>{service.name}</strong>
-                <small>{service.body}</small>
+                <strong>{one.name}</strong>
+                <small>{one.body}</small>
               </span>
             </label>
           ))}
@@ -325,7 +332,7 @@ function StartProject({ ctx, clients, onCancel }: { readonly ctx: PrototypeProps
         <p className="kauro-muted">{mode === "CLEAN" ? "No destination is needed. Nothing is charged to start a project." : "The destination's settings are confirmed later, before the free check. Nothing is charged to start a project."}</p>
         <div className="kauro-actions">
           <Button type="submit" variant="primary">
-            <span className="kauro-go">Create the project</span>
+            Create the project
           </Button>
           <Button onClick={onCancel}>Cancel</Button>
         </div>

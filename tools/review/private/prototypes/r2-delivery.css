@@ -1,0 +1,466 @@
+/* Round 2 (2026-10-21): the delivery pages (Delivery, and the import with its results). Tokens only, no inline style, reflow at 320 px,
+   both themes. Sizes: section h2 20 px, a stage's h3 17 px, sub-headings 15 px, body 16 px, meta 14 px, labels 13 px; never below 13 px.
+   The one date that matters (download by) is the only larger line on the Delivery page. */
+
+/* ---- one heading size a page ---- */
+.kauro-main :is(.kauro-dl-package, .kauro-dl-files, .kauro-dl-next, .kauro-im-before, .kauro-im-stages-wrap) > h2,
+.kauro-main .kauro-dl-title h2 {
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Delivery: the package, its date, its proof, its one action ---- */
+.kauro-main .kauro-dl-package {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 48rem;
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-dl-package > * {
+  margin: 0;
+}
+/* inside the card the lines take the card's width: no empty strip beside them */
+.kauro-main .kauro-dl-package :is(p, li) {
+  max-inline-size: none;
+}
+.kauro-main .kauro-dl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+}
+.kauro-main .kauro-dl-title {
+  display: grid;
+  gap: var(--kauro-space-1);
+}
+.kauro-main .kauro-dl-title > * {
+  margin: 0;
+}
+.kauro-main .kauro-dl-meta {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-dl-package .kauro-stamp {
+  font-size: 0.8125rem;
+}
+.kauro-main .kauro-dl-when {
+  display: grid;
+  gap: var(--kauro-space-1);
+  padding-block: var(--kauro-space-3);
+  border-block: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-dl-when strong {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-dl-when span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-dl-checks {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-dl-checks li {
+  margin: 0;
+}
+.kauro-main .kauro-dl-action {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-dl-action > p,
+.kauro-main .kauro-dl-code > p,
+.kauro-main .kauro-dl-links > * {
+  margin: 0;
+}
+.kauro-main .kauro-dl-hint {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-dl-code {
+  display: grid;
+  gap: var(--kauro-space-3);
+  inline-size: 100%;
+  max-inline-size: 26rem;
+}
+.kauro-main .kauro-dl-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+}
+.kauro-main .kauro-dl-links {
+  display: grid;
+  gap: var(--kauro-space-2);
+  inline-size: 100%;
+}
+.kauro-main .kauro-dl-links h3 {
+  font-size: 1.0625rem;
+}
+.kauro-main .kauro-dl-links ul {
+  display: grid;
+  gap: var(--kauro-space-1);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-dl-links li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  max-inline-size: 30rem;
+  margin: 0;
+  padding-block: var(--kauro-space-2);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-dl-links li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Delivery: the files ---- */
+/* the fingerprint's copy is a quiet text action, so seven bordered buttons do not compete with the one primary */
+.kauro-main .kauro-dl-sha .kauro-copy-button {
+  min-block-size: var(--kauro-target-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-primary);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.kauro-main .kauro-dl-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-dl-sha {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-1) var(--kauro-space-3);
+}
+.kauro-main .kauro-dl-sha code {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  word-break: normal;
+}
+.kauro-main .kauro-dl-table td:last-child .kauro-text-button {
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-dl-note {
+  max-inline-size: 72ch;
+  margin: var(--kauro-space-4) 0 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-dl-intact {
+  max-inline-size: 48rem;
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-dl-intact summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  min-block-size: var(--kauro-target-size);
+  color: var(--kauro-color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  list-style: none;
+}
+.kauro-main .kauro-dl-intact summary::-webkit-details-marker {
+  display: none;
+}
+.kauro-main .kauro-dl-intact summary::before {
+  content: "";
+  inline-size: 0.45rem;
+  block-size: 0.45rem;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.kauro-main .kauro-dl-intact[open] summary::before {
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kauro-main .kauro-dl-intact summary::before {
+    transition: none;
+  }
+}
+.kauro-main .kauro-dl-intact summary:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-main .kauro-dl-intact dl {
+  margin-block: var(--kauro-space-2) 0;
+}
+.kauro-main .kauro-dl-next p:last-child {
+  margin-block-end: 0;
+}
+
+/* ---- Import: before the first stage ---- */
+.kauro-main .kauro-im-before ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-5);
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-im-before li {
+  margin: 0;
+}
+.kauro-main .kauro-im-ack {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-confirm {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  max-inline-size: 44rem;
+}
+.kauro-main .kauro-im-confirm .kauro-confirm {
+  margin: 0;
+}
+.kauro-main .kauro-im-hint {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- Import: the stages, one row each; the open one holds its steps, its result and its check ---- */
+.kauro-main .kauro-im-stages {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-im-stage {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 52rem;
+  margin: 0;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-im-stage--now,
+.kauro-main .kauro-im-stage--attention {
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-im-stage--attention {
+  border-inline-start-color: var(--kauro-color-warning-text);
+}
+.kauro-main .kauro-im-stage > * {
+  margin: 0;
+}
+.kauro-main .kauro-im-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+}
+/* on a phone the state sits under the stage's name on every stage, never beside one and under the next */
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-im-stage-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .kauro-main .kauro-im-stage {
+    padding: var(--kauro-space-4);
+  }
+}
+.kauro-main .kauro-im-stage-head h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+.kauro-main .kauro-im-stage-number {
+  margin-inline-end: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-weight: 600;
+}
+.kauro-main .kauro-im-state {
+  padding: 0.125rem var(--kauro-space-2);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.kauro-main .kauro-im-stage--done .kauro-im-state {
+  border-color: transparent;
+  background: var(--kauro-color-success-surface);
+  color: var(--kauro-color-success-text);
+}
+.kauro-main .kauro-im-stage--attention .kauro-im-state {
+  border-color: transparent;
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-main .kauro-im-stage--later .kauro-im-state {
+  color: var(--kauro-color-text-muted);
+  font-weight: 400;
+}
+.kauro-main .kauro-im-stage-meta,
+.kauro-main .kauro-im-closed {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-stage-meta code {
+  color: var(--kauro-color-text);
+  word-break: normal;
+}
+.kauro-main .kauro-im-body {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin-block-start: var(--kauro-space-3);
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-im-body > *,
+.kauro-main .kauro-im-return > * {
+  margin: 0;
+}
+.kauro-main .kauro-im-body h4 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+/* the importer's own steps: the step's name in its column, what to choose beside it, Kauro's file under that */
+.kauro-main .kauro-im-steps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+.kauro-main .kauro-im-steps li {
+  display: grid;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  max-inline-size: none;
+  margin: 0;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-im-steps li:first-child {
+  padding-block-start: 0;
+}
+@media (min-width: 40rem) {
+  .kauro-main .kauro-im-steps li {
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+  }
+}
+.kauro-main .kauro-im-step-name {
+  font-weight: 650;
+}
+.kauro-main .kauro-im-step-what {
+  display: grid;
+  gap: var(--kauro-space-1);
+}
+.kauro-main .kauro-im-step-file {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-step-file code {
+  color: var(--kauro-color-text);
+  font-weight: 600;
+  word-break: normal;
+}
+.kauro-main .kauro-im-after,
+.kauro-main .kauro-im-kept {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* returning a result: the CRM's own way to get it, then one control */
+.kauro-main .kauro-im-return {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-im-order {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-im-order li {
+  margin: 0;
+}
+.kauro-main .kauro-im-upload {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-2);
+  cursor: pointer;
+}
+.kauro-main .kauro-im-upload:focus-within .kauro-button {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-main .kauro-im-upload-hint {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-problem {
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+
+/* the check of a result: five counts in one row, the same size, right-aligned (a phone reads them as a labelled card) */
+.kauro-main .kauro-im-recon {
+  max-inline-size: 40rem;
+}
+/* the table's title sits above it as a paragraph: a caption inside a table drawn as cards on a phone is squeezed into a strip */
+.kauro-main .kauro-im-recon-title {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-im-continue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3) var(--kauro-space-4);
+}
+.kauro-main .kauro-im-continue span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-im-choice {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 44rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-im-choice .kauro-button {
+  justify-self: start;
+}
+.kauro-main .kauro-im-foot {
+  max-inline-size: 72ch;
+  margin-block-start: var(--kauro-space-6);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}

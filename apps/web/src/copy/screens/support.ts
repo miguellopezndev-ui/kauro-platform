@@ -1,7 +1,7 @@
 // The copy of the support screen (design D-COPY-1): UI52, registry primaryCopy "Track your questions and next actions." word for word.
 // Keys are screen.support.*; the lane that builds the area adds its keys here only.
 export const SUPPORT_COPY = {
-  "screen.support.title": "Support cases",
+  "screen.support.title": "Support",
   "screen.support.lead.body": "Track your questions and next actions.",
   "screen.support.noproject.title": "Choose a project",
   "screen.support.noproject.body": "Support cases belong to a project. Open support from the project you have a question about.",

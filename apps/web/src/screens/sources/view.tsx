@@ -131,6 +131,10 @@ function FileInput({ label, onFile, zone = false }: { readonly label: string; re
   );
 }
 
+// Round 2 (research agency-workspace.md section 5.4): a file row says its name and its state in words; the separate facts behind that
+// state (size, upload, receipt, scan, structure) stay one click away in "File details", opened by itself when the file was refused or not
+// fully checked, so the row is read, not decoded. The facts are named for the person ("Upload from this page", "Received by Kauro"), not
+// for the transport.
 export function UploadFacts({ upload, progress }: { readonly upload: UploadView; readonly progress: UploadProgress | null }): ReactElement {
   const facts = uploadFacts(upload, progress);
   const scanner = facts.scanner;
@@ -220,9 +224,13 @@ function UploadRow({ upload, revision, props }: { readonly upload: UploadView; r
           {upload.declaredFormat}
         </span>
         <h3>{safe(upload.displayName)}</h3>
+        <span className="kauro-file-size">{formatBytes(upload.reservedBytes)}</span>
         <StatusBadge tone={UPLOAD_TONE[upload.state]}>{message(`screen.sources.upload.state.${upload.state}`)}</StatusBadge>
       </div>
-      <UploadFacts upload={upload} progress={sending} />
+      <details className="kauro-file-details" open={upload.state === "REJECTED" || upload.inspection?.scanState === "NOT_SCANNED" ? true : undefined}>
+        <summary>{message("screen.sources.fact.details.summary")}</summary>
+        <UploadFacts upload={upload} progress={sending} />
+      </details>
       {upload.state === "RESERVED" || upload.state === "UPLOADING" ? (
         <p className="kauro-file-note">
           {message("screen.sources.expiry.label")}: <Deadline at={upload.applicationExpiresAt} timeZone="UTC" />
@@ -260,7 +268,6 @@ export function SourcesView(props: SourcesViewProps): ReactElement {
   const model = sourcesModel(revision, props.uploadOrigin);
   return (
     <div className="kauro-sources">
-      <p className="kauro-screen-lead">{message("screen.sources.intake.lead.body")}</p>
       <RevisionStatus revision={revision} />
       <section className="kauro-screen-section" aria-labelledby="sources-add">
         <h2 id="sources-add">{message("screen.sources.upload.heading")}</h2>
@@ -408,7 +415,6 @@ export function SelectionView(props: SelectionViewProps): ReactElement {
   const names = new Map(inspection.uploads.map((upload) => [upload.fileId ?? "", upload.displayName] as const));
   return (
     <div className="kauro-selection">
-      <p className="kauro-screen-lead">{message("screen.sources.selection.lead.body")}</p>
       <RevisionStatus revision={revision} />
       {inspection.files.length === 0 ? <p>{message("screen.sources.selection.none.body")}</p> : null}
       {inspection.files.map((file) => (
@@ -509,7 +515,6 @@ export function SealView({ revision, inspection, busy, hrefs, onSeal, onRefresh 
   const selected = selectedTables(inspection);
   return (
     <div className="kauro-seal">
-      <p className="kauro-screen-lead">{message("screen.sources.seal.lead.body")}</p>
       <RevisionStatus revision={revision} />
       <section className="kauro-screen-section" aria-labelledby="seal-measures">
         <h2 id="seal-measures">{message("screen.sources.seal.measures.heading")}</h2>

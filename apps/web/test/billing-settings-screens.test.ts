@@ -49,7 +49,7 @@ test("fixtures: the billing and settings DTOs are valid against the generated sc
 
 test("UI30: the order shows captures, tax documents and refunds from the server only; a local summary is never called an invoice; a member without MANAGE_BILLING gets the request-to-owner text", () => {
   const html = billing();
-  assert.ok(html.includes("Track quotes, payments, fiscal documents and refunds."), "the registry sentence, word for word");
+  assert.equal(EN["screen.billing.lead.body"], "Track quotes, payments, fiscal documents and refunds.", "the registry sentence, word for word (round 2: drawn by the page header)");
   // money is the server's integer cents, formatted without arithmetic
   for (const text of ["USD 1,500.00", "USD 1,400.00", "USD 100.00", "USD 0.00"]) assert.ok(html.includes(text), text);
   assert.ok(html.includes("Payment confirmed") && html.includes("SETT-000123"), "the capture and the issued document come from the order read");
@@ -155,7 +155,7 @@ test("UI30/CMD031: a refund request first opens a BILLING support case and sends
 
 test("UI32/CMD043: closure is separated from display edits, needs a fresh step-up, states its obligations, and an expired proof is the STEP_UP state that keeps the page", async () => {
   const html = settings();
-  assert.ok(html.includes("Manage agency details and safe branding."), "the registry sentence, word for word");
+  assert.equal(EN["screen.settings.lead.body"], "Manage agency details and safe branding.", "the registry sentence, word for word (round 2: drawn by the page header)");
   const display = html.slice(html.indexOf('id="settings-display"'), html.indexOf('id="settings-legal"'));
   const closing = html.slice(html.indexOf('data-section="closure"'));
   assert.ok(display.includes("Acme Growth Partners") && display.includes("Renaming does not reset discounts, attribution or client identity."));
@@ -171,7 +171,7 @@ test("UI32/CMD043: closure is separated from display edits, needs a fresh step-u
   // an admin holds REQUEST_DELETION but closure (CMD043) is the owner's: it is not offered, and the page says who can
   assert.deepEqual(settingsModel(agency({ permittedActions: [...admin] })), { canClose: false, closing: false, mustAskOwner: true });
   const manager = settings({ agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING"] }) });
-  assert.ok(manager.includes("Only an owner of the agency can request closure.") && !manager.includes("Request closure"));
+  assert.ok(manager.includes("Only an owner of this workspace can request its closure.") && !manager.includes("Request closure"));
   const already = settings({ agency: agency({ state: "CLOSING" }) });
   assert.ok(already.includes("It cannot be requested again.") && !already.includes("Request closure"));
 

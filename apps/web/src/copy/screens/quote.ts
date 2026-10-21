@@ -71,6 +71,8 @@ export const QUOTE_COPY = {
   "screen.quote.pay.bank.body": "You pay by bank transfer (ACH, USD).",
   "screen.quote.pay.disabled.hint": "Accept the terms to continue.",
   "screen.quote.pay.blocked.hint": "Payment is not available for this quote right now.",
+  "screen.quote.pay.not-permitted.body": "Only an owner or a billing member of this workspace can accept the terms and create the payment order.",
+  "screen.quote.files-first.body": "Pay before {date}. The files are deleted then, before the price expires, and the quote cannot be paid without them. An owner or admin can extend them once, by up to 3 days, in Data and deletion.",
   "screen.quote.pay.working.body": "Creating your payment order. Do not repeat this step.",
   "screen.quote.none.title": "No quote selected",
   "screen.quote.none.body": "A quote is issued from an approved plan. Open it from the project once it is issued.",

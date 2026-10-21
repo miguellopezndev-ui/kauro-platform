@@ -4,7 +4,7 @@
 import type { SupportCaseView } from "@web/api/generated.ts";
 import { order } from "@web-test/fixtures.ts";
 import { capture, refund, supportCase, taxDocument } from "@web-test/fixtures-billing.ts";
-import { EXAMPLE } from "../../prototypes/example.ts";
+import { QUOTE_CENTS } from "../../prototypes/money.ts";
 import { AGENCY_ID, type ReviewContext } from "../contexts.ts";
 import type { Script } from "../fixture-fetch.ts";
 import { PENDING, READ, type StateDef, UNAVAILABLE } from "../scenario.ts";
@@ -12,7 +12,7 @@ import { agencyFor } from "../world.ts";
 
 const agencyOf = (ctx: ReviewContext): string => ctx.agency?.agencyId ?? AGENCY_ID;
 const cents = (value: number): string => String(value);
-const total = EXAMPLE.priceCents;
+const total = QUOTE_CENTS;
 
 const ending = (op: string, label: string): readonly StateDef[] => [
   { key: "loading", label: "Loading", note: `The ${label} has not been read yet: the screen holds its place and says so.`, script: () => ({ [op]: PENDING }) },

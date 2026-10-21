@@ -3,7 +3,7 @@
 // api's. Every name is invented and every address uses a reserved domain.
 import type { AgencyView, getCurrentSessionResponse200 } from "@web/api/generated.ts";
 
-export type ContextKey = "newcomer" | "agency" | "company" | "admin" | "operator" | "seller" | "owner" | "outsider";
+export type ContextKey = "newcomer" | "agency" | "company" | "admin" | "operator" | "approver" | "billing" | "viewer" | "seller" | "owner" | "outsider";
 
 export interface ReviewContext {
   readonly key: ContextKey;
@@ -49,6 +49,9 @@ export const CONTEXTS: Readonly<Record<ContextKey, ReviewContext>> = {
   company: { key: "company", label: "Direct company", who: "Tomas Reyes, owner of Halden Outdoor (a company buying for its own data)", agency: agency(COMPANY_ID, "Halden Outdoor", ALL_ACTIONS), buyerType: "in-house", refused: false },
   admin: { key: "admin", label: "Agency admin", who: "Marco Bianchi, admin at Northwind Data (team, clients and projects; never approval, billing or closure)", agency: agency(AGENCY_ID, "Northwind Data", ["MANAGE_TEAM", "MANAGE_CLIENTS", "CREATE_CLIENTS", "OPERATE_PROJECTS", "REQUEST_DELETION", "MANAGE_BRANDING", "VIEW"]), buyerType: "agency", refused: false },
   operator: { key: "operator", label: "Agency operator", who: "Priya Nair, operator at Northwind Data (runs projects; cannot manage the team, billing or the agency)", agency: agency(AGENCY_ID, "Northwind Data", ["OPERATE_PROJECTS", "CREATE_CLIENTS", "VIEW"]), buyerType: "agency", refused: false },
+  approver: { key: "approver", label: "Agency approver", who: "Samuel Osei, approver at Northwind Data (approves plans and continues staged imports; nothing else)", agency: agency(AGENCY_ID, "Northwind Data", ["APPROVE_PLANS", "VIEW"]), buyerType: "agency", refused: false },
+  billing: { key: "billing", label: "Agency billing", who: "Ines Duarte, billing member at Northwind Data (quotes, payments and refunds; nothing else)", agency: agency(AGENCY_ID, "Northwind Data", ["MANAGE_BILLING", "VIEW"]), buyerType: "agency", refused: false },
+  viewer: { key: "viewer", label: "Agency viewer", who: "Ruth Okafor, viewer at Northwind Data (reads everything, downloads delivered packages, opens support cases)", agency: agency(AGENCY_ID, "Northwind Data", ["VIEW"]), buyerType: "agency", refused: false },
   seller: { key: "seller", label: "Seller", who: "Daniel Kim, an independent seller (sales screens only; no client data)", agency: null, buyerType: null, refused: false },
   owner: { key: "owner", label: "Kauro owner", who: "The Kauro owner on the operations origin (no customer CRM data)", agency: null, buyerType: null, refused: false },
   outsider: { key: "outsider", label: "No access", who: "A signed-in person who is not a member of this agency", agency: agency(AGENCY_ID, "Northwind Data", ["VIEW"]), buyerType: "agency", refused: true },
@@ -56,7 +59,7 @@ export const CONTEXTS: Readonly<Record<ContextKey, ReviewContext>> = {
 
 /** The contexts that make sense for a screen of each origin (the others are offered as "no access"). */
 export const CONTEXTS_FOR = {
-  APP: ["agency", "company", "admin", "operator", "newcomer", "outsider"],
+  APP: ["agency", "company", "admin", "operator", "approver", "billing", "viewer", "newcomer", "outsider"],
   OPS: ["owner", "seller", "outsider"],
 } as const satisfies Readonly<Record<"APP" | "OPS", readonly ContextKey[]>>;
 

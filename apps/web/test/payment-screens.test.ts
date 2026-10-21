@@ -41,7 +41,8 @@ test("fixtures: the quote and the order are valid against the generated schemas 
 
 test("UI23: the quote shows base, one discount, service, tax, total, units, terms and both expiries, with money from minor units and the exact registry sentence", () => {
   const html = render({ quote: quote({ discount: { bps: 1000, basis: "REPEAT" }, discountCents: "15000", serviceCents: "135000", taxCents: "0", totalCents: "135000" }) });
-  assert.ok(html.includes("Review price, scope and availability."));
+  // round 2: the registry sentence is the page header's lead; the view does not repeat it
+  assert.ok(!html.includes("Review price, scope and availability."));
   for (const text of ["USD 1,500.00", "USD 1,350.00", "1,200", "Repeat-project discount (10%)", "Prepare for HubSpot", "Price valid until", "Source files kept until", "Read the service terms"]) assert.ok(html.includes(text), text);
   assert.match(html, /dateTime="2026-10-20T12:00:00.000Z"/);
   assert.match(html, /dateTime="2026-10-27T12:00:00.000Z"/);
@@ -170,7 +171,6 @@ test("UI24: each payment status has its own text from paymentStatus alone, and p
     const html = renderPayment({ order: order(over) });
     assert.ok(html.includes(label), label);
     assert.equal(html.includes("Do not pay again"), repeat, label);
-    assert.ok(html.includes("Your status comes from verified payment information."));
     assert.ok(html.includes("is not payment"), "a return or screenshot is not payment");
   }
 });

@@ -7,6 +7,8 @@ import type { WorldProject } from "../world-projects.ts";
 import { audit, order, quote } from "@web-test/fixtures.ts";
 import { authorization, job } from "@web-test/fixtures-processing.ts";
 import { EXAMPLE } from "../../prototypes/example.ts";
+import { TIMELINE } from "../../prototypes/timeline.ts";
+import { QUOTE_CENTS, REPEAT_BPS } from "../../prototypes/money.ts";
 import { AGENCY_ID, type ReviewContext } from "../contexts.ts";
 import type { Script } from "../fixture-fetch.ts";
 import { PENDING, READ, type StateDef, UNAVAILABLE } from "../scenario.ts";
@@ -21,7 +23,7 @@ const ending: (op: string, label: string) => readonly StateDef[] = (op, label) =
 // ---------------------------------------------------------------- UI18 the free data health check
 
 const check = (overrides: Partial<AuditView>) => (): Script => ({
-  GetAudit: () => READ(audit({ startedAt: "2026-10-20T10:02:00Z", interpretationDeadlineAt: "2026-10-20T11:02:00Z", absoluteDeadline: "2026-10-20T12:02:00Z", ...overrides })),
+  GetAudit: () => READ(audit({ startedAt: TIMELINE.checkStartedAt, interpretationDeadlineAt: "2026-10-20T11:02:00Z", absoluteDeadline: TIMELINE.checkDeadline, ...overrides })),
 });
 
 export const UI18_STATES: readonly StateDef[] = [
@@ -42,9 +44,12 @@ const TERMS_HASH = "61bd222c8dee08741f6215b10aa467fb03fba3781b6033466593e3f24094
 const cents = (value: number): string => String(value);
 const units = EXAMPLE.units;
 const base = EXAMPLE.priceCents;
+/** The amount the main project's order asks for: its quote's total, after the repeat discount (prototypes/money.ts). */
+const due = QUOTE_CENTS;
+const repeat = (price: number): Partial<QuoteView> => { const off = Math.round((price * REPEAT_BPS) / 10_000); return { discountCents: cents(off), serviceCents: cents(price - off), totalCents: cents(price - off), discount: { bps: REPEAT_BPS, basis: "REPEAT" } }; };
 
 function quoteOf(agency: string, overrides: Partial<QuoteView> = {}): QuoteView {
-  return quote({ agencyId: agency, billableUnits: units, baseServiceCents: cents(base), serviceCents: cents(base), totalCents: cents(base), issuedAt: "2026-10-20T13:00:00Z", expiresAt: "2026-11-03T13:00:00Z", sourceAvailableUntil: "2026-11-03T09:00:00Z", termsHash: TERMS_HASH, ...overrides });
+  return quote({ agencyId: agency, billableUnits: units, baseServiceCents: cents(base), serviceCents: cents(base), totalCents: cents(base), issuedAt: TIMELINE.quoteIssuedAt, expiresAt: TIMELINE.quoteExpiresAt, sourceAvailableUntil: TIMELINE.filesKeptUntil, termsHash: TERMS_HASH, ...overrides });
 }
 
 // the quote of the project the page names: its service and that service's price for the same units (a quote is read by its own id)
@@ -52,12 +57,14 @@ const priceFor = (mode: QuoteView["mode"]): number => { const band = bandIndexOf
 const quoteState = (overrides: (price: number) => Partial<QuoteView>) => (ctx: ReviewContext, project?: WorldProject): Script => {
   const mode = project?.mode ?? "HUBSPOT";
   const price = priceFor(mode);
-  return { GetQuote: () => READ(quoteOf(agencyOf(ctx), { mode, baseServiceCents: cents(price), serviceCents: cents(price), totalCents: cents(price), ...overrides(price) })) };
+  // the server permits the payment commands only to an owner or a billing member (AGENCY_BILLING): anyone else reads who can
+  const pays = ctx.agency?.permittedActions.includes("MANAGE_BILLING") === true;
+  return { GetQuote: () => READ(quoteOf(agencyOf(ctx), { mode, baseServiceCents: cents(price), serviceCents: cents(price), totalCents: cents(price), pricePolicyVersion: "R2-INITIAL", ...(pays ? {} : { permittedActions: [] }), ...overrides(price) })) };
 };
 
 export const UI23_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Ready to pay", note: "The first project's quote: the base price for 15,684 units in the HubSpot band, no discount, the tax treatment, the total and when it expires.", script: quoteState(() => ({})) },
-  { key: "repeat", label: "With the repeat discount", note: "A later project: the repeat discount on its own line, one discount only.", script: quoteState((price) => ({ discountCents: cents(Math.round(price * 0.05)), serviceCents: cents(price - Math.round(price * 0.05)), totalCents: cents(price - Math.round(price * 0.05)), discount: { bps: 500, basis: "REPEAT" } })) },
+  { key: "normal", label: "Ready to pay", note: "Northwind Data's quote: the band's list price for 15,684 units, the 5% repeat discount it earned with its earlier paid projects, the tax treatment, the total, and the two dates side by side (the files end before the price).", script: quoteState((price) => repeat(price)) },
+  { key: "first", label: "A first project", note: "A workspace's first paid project: the list price, and the line says no discount applies.", script: quoteState(() => ({})) },
   { key: "expired", label: "Expired", note: "The quote's time has passed: no Pay now, a new quote instead.", script: quoteState(() => ({ state: "EXPIRED", checkoutReady: false, checkoutBlockers: ["QUOTE_EXPIRED"], permittedActions: [] })) },
   { key: "source-expired", label: "Files no longer kept", note: "The sealed files are past their date: the page offers to upload and check again, never to pay.", script: quoteState(() => ({ checkoutReady: false, checkoutBlockers: ["SOURCE_EXPIRED"], permittedActions: [] })) },
   ...ending("GetQuote", "quote"),
@@ -66,7 +73,7 @@ export const UI23_STATES: readonly StateDef[] = [
 // ---------------------------------------------------------------- UI24 the payment, by bank transfer
 
 function orderOf(overrides: Partial<PaymentOrderView>): PaymentOrderView {
-  return order({ expectedAmountCents: cents(base), createdAt: "2026-10-20T13:10:00Z", updatedAt: "2026-10-20T13:10:00Z", ...overrides });
+  return order({ expectedAmountCents: cents(due), createdAt: TIMELINE.orderCreatedAt, updatedAt: TIMELINE.orderCreatedAt, ...overrides });
 }
 const detail = (orderView: PaymentOrderView, extra: Partial<PaymentOrderDetailView> = {}): PaymentOrderDetailView => ({ order: orderView, captures: [], taxDocuments: [], ...extra });
 const instructions = {
@@ -76,11 +83,11 @@ const instructions = {
     routingNumber: "123456789",
     accountNumber: "000012345678",
     accountType: "CHECKING",
-    amountCents: cents(base),
+    amountCents: cents(due),
     currency: "USD",
     reference: "K0123456789ABCDEFGHJKMN",
-    sendBy: "2026-10-30T23:59:59.000Z",
-    transferExpiresAt: "2026-11-03T13:00:00.000Z",
+    sendBy: TIMELINE.sendBy.replace(/Z$/, ".000Z"),
+    transferExpiresAt: TIMELINE.orderClosesAt.replace(/Z$/, ".000Z"),
     routeVersion: 1,
   },
 };
@@ -103,7 +110,7 @@ export const UI24_STATES: readonly StateDef[] = [
 const paid = (): PaymentOrderDetailView => detail(orderOf({ state: "CAPTURED", paymentStatus: "CONFIRMED" }), { commercialAuthorization: authorization({ mode: "HUBSPOT", billableUnits: units }) });
 const processing = (state: "QUEUED" | "RUNNING" | "VERIFYING" | "READY" | "FAILED") => (): Script => ({
   GetPaymentOrder: () => READ(paid()),
-  GetJob: () => READ(job({ state, queuedAt: "2026-10-20T14:00:00Z", deliveryDeadlineAt: "2026-10-22T14:00:00Z", permittedActions: state === "QUEUED" ? ["CancelJob"] : [], ...(state === "READY" ? { publishedPackageId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6301" } : {}) })),
+  GetJob: () => READ(job({ state, queuedAt: TIMELINE.preparationStartedAt, deliveryDeadlineAt: "2026-10-23T10:00:00Z", permittedActions: state === "QUEUED" ? ["CancelJob"] : [], ...(state === "READY" ? { publishedPackageId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e6301" } : {}) })),
 });
 
 export const UI25_STATES: readonly StateDef[] = [

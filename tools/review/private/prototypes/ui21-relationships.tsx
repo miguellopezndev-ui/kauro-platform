@@ -1,20 +1,25 @@
 "use client";
-// UI21 Relationships (registry: "Confirm how records stay connected."). Contacts linked to their company by the Company column: how many
-// link, how many cannot and why, and the order the import takes (companies first, then contacts with their company). A contact whose
-// company is not in companies.xlsx stays explicitly without a link: Kauro never creates the missing company and never shows a link it will
-// not prepare as made (registry exceptions). The team approves the links that can be made and says what happens to the rest.
+// UI21 Relationships, shown as "Links between records" (registry: "Confirm how records stay connected."; Order 11 round 2, research
+// agency-workspace.md §5.10). One sentence first: how many contacts link to their company. Then the link rule as a short table of what it
+// does to every contact prepared (linked, held back because the company named is not in the companies file, no company named), adding up
+// to the contacts prepared after duplicates; the held-back names with the closest company as a hint, never a link; what happens to the
+// contacts without a company; and the order the import takes. Kauro never creates a missing company and never shows a link it will not
+// prepare (registry exceptions). The team accepts the rule; a person whose role cannot change the plan reads it and one line saying who can.
+//
+// "Clean your data" prepares no links: the Company column stays a column of the cleaned file, and the page says so.
 import { Banner, Button } from "@kauro/ui";
-import { type ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
-import { IDS } from "../lib/ids.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { PageHead, ScreenButton } from "./kit.tsx";
-import { n, PLAN, PlanTasks } from "./plan.tsx";
+import { Only, ScreenButton } from "./kit.tsx";
+import { can, onlyLine } from "./people.ts";
+import { n, PLAN, PlanTasks, tasksFor } from "./plan.tsx";
+import { SERVICE } from "./service.ts";
 
 export const UI21_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Links to confirm", note: "Most contacts link to their company; the rest cannot, each reason counted, and the missing names listed." },
-  { key: "confirmed", label: "Confirmed", note: "The links are approved for the plan, and the contacts without a company are imported without one, on purpose." },
+  { key: "normal", label: "Links to accept", note: "11,045 of 12,266 contacts link to their company; 163 name a company that is not in the companies file and 1,058 name none, each listed. The team accepts the rule." },
+  { key: "confirmed", label: "Accepted", note: "The rule is accepted: the contacts without a company are prepared without one, on purpose. Links is completed; approval can start." },
 ];
 
 const NOT_FOUND = [
@@ -26,122 +31,153 @@ const NOT_FOUND = [
 ] as const;
 if (NOT_FOUND.reduce((sum, row) => sum + row.rows, 0) !== PLAN.notFound) throw new Error("the names not found do not add up");
 
-const STATES = { mapping: "done", identity: "done", relationships: "review", approval: "waiting" } as const;
-
 export function Relationships({ ctx, state, project }: PrototypeProps): ReactElement {
-  // "Clean your data" prepares no links: the Company column stays a column of the cleaned file
+  const words = SERVICE[project.mode];
+  const [accepted, setAccepted] = useState(state === "confirmed");
   if (project.mode === "CLEAN")
     return (
       <>
-        <ProjectHeader current="plan" />
-        <PageHead title="Links between records" lead="Not part of this project." />
-        <Banner tone="info" title="Clean your data keeps the Company column as a column" announce="status">
-          <p>No link between contacts and companies is prepared: the cleaned files keep the company name beside each contact, made consistent where the plan says so.</p>
-        </Banner>
+        <ProjectHeader stage="plan" title="Links between records" lead="Clean your data prepares no links between records." status={{ tone: "info", text: "Plan in review" }} />
+        <PlanTasks ctx={ctx} project={project} current="relationships" states={tasksFor("identity", true, project.mode)} />
+        <section className="kauro-pl-section" aria-labelledby="clean-links-h">
+          <h2 id="clean-links-h">The Company column stays a column</h2>
+          <p>The cleaned files keep the company name beside each contact, with spellings of the same company made consistent where the plan says so. No link is prepared for any tool.</p>
+        </section>
         <div className="kauro-actions">
           <ScreenButton to="UI22" ctx={ctx} project={project.projectId} variant="primary">
-            <span className="kauro-go">Go to approval</span>
+            Continue to approval
           </ScreenButton>
         </div>
       </>
     );
-  const agencyId = ctx.agency?.agencyId ?? "";
-  const confirmed = state === "confirmed";
-  const output = PLAN.output;
+  const editor = can(ctx, "operate");
+  const company = project.mode === "SALESFORCE" ? "account" : "company";
+  const companies = words.companies.toLowerCase();
+  const file = project.mode === "SALESFORCE" ? "accounts" : "companies";
   return (
     <>
-      <ProjectHeader current="plan" />
-      <PageHead title="Links between records" lead="Confirm how records stay connected." />
-      <PlanTasks ctx={ctx} project={project} current="relationships" states={confirmed ? { ...STATES, relationships: "done" } : STATES} />
-      <section className="kauro-links" aria-labelledby="links-h">
-        <h2 id="links-h">Contacts and their companies</h2>
-        <div className="kauro-links-map" aria-hidden="true">
-          <span className="kauro-links-node">
-            Companies <strong>{n(PLAN.companies - 253)}</strong>
-          </span>
-          <span className="kauro-links-edge">
-            <span>{n(PLAN.links)} links</span>
-          </span>
-          <span className="kauro-links-node">
-            Contacts <strong>{n(output)}</strong>
-          </span>
-        </div>
-        <dl className="kauro-identity-counts">
-          <div>
-            <dt>Linked to their company</dt>
-            <dd>{n(PLAN.links)}</dd>
-            <dd>The company named in the Company column is in companies.xlsx</dd>
-          </div>
-          <div>
-            <dt>Company not found</dt>
-            <dd>{n(PLAN.notFound)}</dd>
-            <dd>Listed below, with the closest company when there is one</dd>
-          </div>
-          <div>
-            <dt>No company named</dt>
-            <dd>{n(PLAN.emptyCompany)}</dd>
-            <dd>
-              The Company column is empty: {n(PLAN.emptySource)} in the file, less {n(PLAN.emptyUnified)} unified into a record and {n(PLAN.emptyFilled)} that took the company of a row unified into them
-            </dd>
-          </div>
-        </dl>
-        <p className="kauro-muted">
-          {n(output)} contacts in all, after {n(PLAN.unifiedRows)} rows were unified: {n(PLAN.links)} linked, {n(PLAN.noCompany)} without a company.
-        </p>
+      <ProjectHeader
+        stage="plan"
+        title="Links between records"
+        lead={`Confirm how contacts stay connected to their ${companies} in ${words.destination ?? ""}.`}
+        status={accepted ? { tone: "success", text: "Links accepted" } : { tone: "info", text: "Plan in review" }}
+      />
+      <PlanTasks ctx={ctx} project={project} current="relationships" states={tasksFor("relationships", accepted, project.mode)} />
+      <p className="kauro-pl-verdict">
+        {n(PLAN.links)} of {n(PLAN.output)} contacts link to their {company}.
+      </p>
+      <section className="kauro-pl-section" aria-labelledby="rule-h">
+        <h2 id="rule-h">The link rule: contact to {company}, by the name in the Company column</h2>
+        <table className="kauro-rtable kauro-pl-rtable kauro-pl-outcomes">
+          <caption className="kauro-visually-hidden">What the rule does to each contact prepared</caption>
+          <thead>
+            <tr>
+              <th scope="col">Outcome</th>
+              <th scope="col" className="kauro-num">
+                Contacts
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">
+                Linked
+                <span className="kauro-sub">The {company} named is in companies.xlsx</span>
+              </th>
+              <td data-label="Contacts" className="kauro-num">
+                {n(PLAN.links)}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">
+                Held back: {company} not found
+                <span className="kauro-sub">The name is not in companies.xlsx; listed below with the closest name</span>
+              </th>
+              <td data-label="Contacts" className="kauro-num">
+                {n(PLAN.notFound)}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">
+                No {company} named
+                <span className="kauro-sub">
+                  The Company column is empty: {n(PLAN.emptySource)} in the file, less {n(PLAN.emptyUnified)} unified into another record and {n(PLAN.emptyFilled)} that took a duplicate&apos;s company
+                </span>
+              </th>
+              <td data-label="Contacts" className="kauro-num">
+                {n(PLAN.emptyCompany)}
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Contacts prepared, after {n(PLAN.unifiedRows)} rows were unified</th>
+              <td data-label="Contacts" className="kauro-num">
+                {n(PLAN.output)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </section>
-      <section className="kauro-screen-section" aria-labelledby="notfound-h">
-        <h2 id="notfound-h">Companies named but not found</h2>
-        <div className="kauro-table-region">
-          <table className="kauro-table">
-            <caption className="kauro-visually-hidden">Company names in contacts.csv that are not in companies.xlsx</caption>
-            <thead>
-              <tr>
-                <th scope="col">Name in contacts.csv</th>
-                <th scope="col" className="kauro-table-end">
-                  Contacts
+      <section className="kauro-pl-section" aria-labelledby="notfound-h">
+        <h2 id="notfound-h">{project.mode === "SALESFORCE" ? "Accounts" : "Companies"} named but not found</h2>
+        <table className="kauro-rtable kauro-pl-rtable">
+          <caption className="kauro-visually-hidden">Names in contacts.csv that are not in companies.xlsx, with the closest name</caption>
+          <thead>
+            <tr>
+              <th scope="col">Name in contacts.csv</th>
+              <th scope="col" className="kauro-num">
+                Contacts
+              </th>
+              <th scope="col">Closest name in companies.xlsx</th>
+            </tr>
+          </thead>
+          <tbody>
+            {NOT_FOUND.map((row) => (
+              <tr key={row.name}>
+                <th scope="row">
+                  <bdi>{row.name}</bdi>
                 </th>
-                <th scope="col">Closest company in companies.xlsx</th>
+                <td data-label="Contacts" className="kauro-num">
+                  {n(row.rows)}
+                </td>
+                <td data-label="Closest name">{row.near === null ? "None close" : <bdi>{row.near}</bdi>}</td>
               </tr>
-            </thead>
-            <tbody>
-              {NOT_FOUND.map((row) => (
-                <tr key={row.name}>
-                  <th scope="row">
-                    <bdi>{row.name}</bdi>
-                  </th>
-                  <td className="kauro-table-end">{n(row.rows)}</td>
-                  <td>{row.near === null ? <span className="kauro-muted-text">None close</span> : <bdi>{row.near}</bdi>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="kauro-muted">A close name is a hint, not a link: to link these contacts, correct the names in the file and upload it again. The plan never links them on a guess.</p>
+            ))}
+          </tbody>
+        </table>
+        <p className="kauro-pl-meta">A close name is a hint, not a link. To link these contacts, correct the names in the file and upload it again: the plan never links on a guess.</p>
       </section>
-      <section className="kauro-screen-section" aria-labelledby="order-h">
+      <section className="kauro-pl-section" aria-labelledby="order-h">
         <h2 id="order-h">The order of the import</h2>
-        <ol className="kauro-import-order">
+        <ol className="kauro-pl-order">
           <li>
-            <strong>Companies</strong> — {n(PLAN.companies - 253)} records, from companies.xlsx
+            <strong>{words.companies}</strong> · {n(PLAN.companiesOutput)} records, from {file}-clean.csv
           </li>
           <li>
-            <strong>Contacts with their company</strong> — {n(output)} records; {n(PLAN.links)} carry their company
+            <strong>Contacts</strong> · {n(PLAN.output)} records
           </li>
+          {project.mode === "HUBSPOT" ? (
+            <li>
+              <strong>Links between them</strong> · {n(PLAN.links)} associations
+            </li>
+          ) : null}
         </ol>
+        {project.mode === "SALESFORCE" ? <p className="kauro-pl-meta">Each contact carries its account&apos;s Salesforce ID, taken from the first stage&apos;s success file.</p> : null}
       </section>
-      {confirmed ? (
-        <Banner tone="success" title="The links are confirmed" announce="status">
+      {accepted ? (
+        <Banner tone="success" title="The link rule is accepted" announce="status">
           <p>
-            {n(PLAN.links)} links go into the plan. {n(PLAN.noCompany)} contacts are imported without a company, on purpose; the report lists each.
+            {n(PLAN.links)} links go into the plan. {n(PLAN.noCompany)} contacts are prepared without a {company}, on purpose, and the report lists each with the name it carried.
           </p>
         </Banner>
-      ) : (
-        <fieldset className="kauro-choice kauro-screen-choice">
-          <legend>Contacts without a company ({n(PLAN.noCompany)})</legend>
+      ) : editor ? (
+        <fieldset className="kauro-pl-choice">
+          <legend>The {n(PLAN.noCompany)} contacts without a {company}</legend>
           <label>
             <input type="radio" name="unlinked" defaultChecked />
             <span>
-              <strong>Import them without a company</strong>
+              <strong>Prepare them without a {company}</strong>
               <small>Each is listed in the report, with the name it carried.</small>
             </span>
           </label>
@@ -153,16 +189,22 @@ export function Relationships({ ctx, state, project }: PrototypeProps): ReactEle
             </span>
           </label>
         </fieldset>
-      )}
-      <div className="kauro-actions">
-        {confirmed ? (
+      ) : null}
+      {!editor ? (
+        <Only>{onlyLine(ctx, "operate", "accept the link rule")}</Only>
+      ) : accepted ? (
+        <div className="kauro-actions">
           <ScreenButton to="UI22" ctx={ctx} project={project.projectId} variant="primary">
-            <span className="kauro-go">Continue to approval</span>
+            Continue to approval
           </ScreenButton>
-        ) : (
-          <Button variant="primary">Confirm the links</Button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="kauro-actions">
+          <Button variant="primary" onClick={() => setAccepted(true)}>
+            Accept the link rule
+          </Button>
+        </div>
+      )}
     </>
   );
 }

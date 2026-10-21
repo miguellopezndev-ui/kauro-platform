@@ -1,24 +1,41 @@
 "use client";
-// UI29 Data lifecycle (registry: "See what remains and what will be deleted."). One row a class of data the project holds (RetentionView:
-// class, soft and hard deadlines, state), in the words of Data handling's schedule, with the date each goes. The one soft extension a
-// project may have (policy: one, at most 3 days) is offered only before the soft deadline, and the page shows where it would end; it never
-// crosses the hard deadline and never revives expired data (registry exceptions). Deleting early is a request with its own confirmation.
-// What deletion does not reach is said plainly: copies already downloaded, and financial and legal records kept apart from CRM content.
-import { Banner, Button } from "@kauro/ui";
-import { type ReactElement, useState } from "react";
+// UI29 Data and deletion (registry: "See what remains and what will be deleted."), rebuilt in Order 11 round 2 (research
+// agency-workspace.md §5.18; principles-craft.md C11, V22). What Kauro holds for this project, until when, and the two things a person can
+// do about it:
+//   - one verdict line first ("Files and package deleted on …, unless you extend once (to …)");
+//   - the schedule as a table with absolute dates (RetentionView: class, soft and hard deadlines, state), every date from timeline.ts and the
+//     policy: a purchased package stays 7 days after it is ready, never past 14 days from the payment; one extension of up to 72 hours,
+//     never past that limit;
+//   - two separate panels, not a pair of buttons: More time (only while possible) and Delete now (irreversible and early, so it asks for the
+//     project's name typed, then the authenticator code). Both are owner and admin actions (CMD060, CMD042); every other role reads one line
+//     naming who can, and no control;
+//   - what deletion does not reach, said plainly.
+import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
+import { type FormEvent, type ReactElement, useState } from "react";
 import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
-import { IDS } from "../lib/ids.ts";
+import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { EXTENDED_DEADLINE, EXTENSION_DAYS, HARD_DEADLINE, RECEIPT_DAYS, SOFT_DEADLINE, TARGET_DAYS } from "./delivery.ts";
-import { Badge, moment, PageHead } from "./kit.tsx";
+import { actor } from "./board.ts";
+import { Badge, moment, Only } from "./kit.tsx";
+import { can, onlyLine } from "./people.ts";
+import { TIMELINE } from "./timeline.ts";
 
 export const UI29_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Kept", note: "What the project holds and when each goes; the one extension still available." },
-  { key: "extended", label: "Extended", note: "The extension used: 3 more days, still inside the limit set by the payment date." },
-  { key: "deletion", label: "Deletion requested", note: "The team asked to delete the project's files now: what goes, and what stays." },
-  { key: "deleted", label: "Deleted", note: "The files and package are deleted; no extension can bring them back." },
+  { key: "normal", label: "Kept", note: "What the delivered project holds and when each goes; the one extension still available; early deletion with a typed confirmation." },
+  { key: "extended", label: "Extended", note: "The one extension used: 3 more days, still inside the limit set by the payment date." },
+  { key: "deletion", label: "Deletion requested", note: "An owner asked to delete the project's data now: what goes, and that the page says when it is done." },
+  { key: "deleted", label: "Deleted", note: "The files and package are deleted on their date; nothing can bring them back." },
 ];
+
+const R = POLICY_SNAPSHOT.retention;
+const HOUR = 3_600_000;
+const EXTENSION_HOURS = 72;
+const iso = (ms: number): string => new Date(ms).toISOString().replace(".000Z", "Z");
+const until = TIMELINE.packageAvailableUntil;
+const hard = TIMELINE.packageHardLimit;
+const extendedUntil = iso(Math.min(Date.parse(until) + EXTENSION_HOURS * HOUR, Date.parse(hard)));
+const requestedAt = iso(Date.parse(TIMELINE.packageReadyAt) + 18 * HOUR);
 
 interface Row {
   readonly what: string;
@@ -29,59 +46,71 @@ interface Row {
 }
 
 export function Lifecycle({ ctx, state, project }: PrototypeProps): ReactElement {
-  const agencyId = ctx.agency?.agencyId ?? "";
+  const clean = project.mode === "CLEAN";
   const extended = state === "extended";
   const gone = state === "deleted";
   const deleting = state === "deletion";
-  const canDelete = (ctx.agency?.permittedActions ?? []).includes("REQUEST_DELETION");
-  const [asking, setAsking] = useState(false);
+  const mayAct = can(ctx, "delete");
+  const ends = extended ? extendedUntil : until;
   const files: Row["state"] = gone ? "deleted" : deleting ? "deleting" : "kept";
   const rows: readonly Row[] = [
     {
-      what: "Files and delivery package",
-      holds: "The sealed files, the plan, the package and its report",
-      until: gone ? "Deleted Oct 27, 2026" : moment(extended ? EXTENDED_DEADLINE : SOFT_DEADLINE),
-      rule: `7 days after the first package was ready; never later than ${moment(HARD_DEADLINE)}, 14 days after the payment`,
+      what: "Files, plan and package",
+      holds: "The sealed files, the approved plan, the package and its report",
+      until: gone ? `Deleted ${moment(until)}` : moment(ends),
+      rule: `${R.paidDaysFromFirstPackage} days after the package was ready; never after ${moment(hard)}, ${R.paidDaysHardFromCapture} days after the payment`,
       state: files,
     },
-    {
-      what: "Import results",
-      holds: "The exports your team returned, and their checks",
-      until: `${RECEIPT_DAYS} days after each check is final`,
-      rule: "Or with the project's files, while a stage still needs them",
-      state: files,
-    },
-    {
-      what: "Destination settings you confirmed",
-      holds: "What Kauro read and you confirmed; never a password or a key",
-      until: `Up to ${TARGET_DAYS} days after their last use`,
-      rule: "Used for a new delivery for 30 days at most",
-      state: "kept",
-    },
+    ...(clean
+      ? []
+      : [
+          {
+            what: "Import results",
+            holds: "The exports your team returned, and their checks",
+            until: `${R.importReceiptDaysFromTerminal} days after each check is final`,
+            rule: "Or with the project's files, while a stage still needs them",
+            state: files,
+          },
+          {
+            what: "Destination settings you confirmed",
+            holds: "What your team uploaded and confirmed; never a password or a key",
+            until: `Up to ${R.targetMetadataDaysFromLastUse} days after their last use`,
+            rule: `Used for a new delivery for ${R.targetExecutionFreshnessDays} days at most`,
+            state: "kept" as const,
+          },
+        ]),
     {
       what: "Financial and legal records",
-      holds: "The quote, the order and the payment; no CRM content",
-      until: "As long as the rules require",
+      holds: "The quote, the order, the payment and the invoice; no CRM content",
+      until: "For the period the law requires",
       rule: "Stored apart from CRM content",
       state: "kept",
     },
   ];
+  const verdict = gone
+    ? `The files, plan and package were deleted on ${moment(until)}.`
+    : deleting
+      ? `The files, plan and package are being deleted, at ${actor(ctx, "OWNER")}'s request.`
+      : extended
+        ? `Files, plan and package deleted on ${moment(extendedUntil)}. The one extension is used.`
+        : `Files, plan and package deleted on ${moment(until)}, unless you extend once (to ${moment(extendedUntil)}).`;
   return (
     <>
-      <ProjectHeader current="import" area="nav.project.data.label" />
-      <PageHead title="Data lifecycle" lead="See what remains and what will be deleted." />
+      <ProjectHeader stage="delivery" title="Data and deletion" lead="See what remains and what will be deleted." />
+      <p className="kauro-b-verdict">{verdict}</p>
       {deleting ? (
-        <Banner tone="info" title="Deletion requested on Oct 22, 2026 at 10:30 AM UTC" announce="status">
-          <p>The project&apos;s files, package and import results are being deleted from Kauro&apos;s storage, staging and derived files. This page says when it is done.</p>
+        <Banner tone="info" title={`Deletion requested on ${moment(requestedAt)}`} announce="status">
+          <p>The project&apos;s files, package and import results are being deleted from Kauro&apos;s storage, staging and derived files. This page says when it is done, with the deletion record.</p>
         </Banner>
       ) : null}
       {gone ? (
         <Banner tone="neutral" title="The project's files are deleted" announce="status">
-          <p>Deleted on Oct 27, 2026, at the end of their keeping period. No extension can bring them back; to work on the same data again, start a new project with the files.</p>
+          <p>No extension can bring them back. To work on the same data again, start a new project and upload the files.</p>
         </Banner>
       ) : null}
-      <div className="kauro-table-region">
-        <table className="kauro-table kauro-lifecycle">
+      <section className="kauro-b-section" aria-labelledby="schedule-h">
+        <h2 id="schedule-h">What Kauro holds for this project</h2>
+        <table className="kauro-rtable kauro-b-schedule">
           <caption className="kauro-visually-hidden">What the project holds and when each kind is deleted</caption>
           <thead>
             <tr>
@@ -93,70 +122,99 @@ export function Lifecycle({ ctx, state, project }: PrototypeProps): ReactElement
           <tbody>
             {rows.map((row) => (
               <tr key={row.what}>
-                <th scope="row">
-                  <span className="kauro-lifecycle-what">{row.what}</span>
-                  <span className="kauro-lifecycle-holds">{row.holds}</span>
-                </th>
-                <td data-label="Until">
-                  <strong>{row.until}</strong>
-                  <span className="kauro-lifecycle-rule">{row.rule}</span>
+                <td data-label="">
+                  <span className="kauro-b-name-text">{row.what}</span>
+                  <span className="kauro-sub">{row.holds}</span>
                 </td>
-                <td data-label="State">
+                <td data-label="Until">
+                  <span className="kauro-b-cell">
+                    {row.until}
+                    <span className="kauro-sub">{row.rule}</span>
+                  </span>
+                </td>
+                <td data-label="State" className="kauro-b-nowrap">
                   {row.state === "deleted" ? <Badge tone="neutral">Deleted</Badge> : row.state === "deleting" ? <Badge tone="info">Being deleted</Badge> : <Badge tone="success">Kept</Badge>}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </section>
       {gone || deleting ? null : (
-        <section className="kauro-lifecycle-actions" aria-labelledby="extend-h">
-          <div className="kauro-lifecycle-card">
-            <h2 id="extend-h">More time</h2>
-            {extended ? (
-              <p>
-                The extension is used: the files now stay until <strong>{moment(EXTENDED_DEADLINE)}</strong>. A project has one, and none is left.
-              </p>
-            ) : (
-              <>
-                <p>
-                  This project can have one extension of up to {EXTENSION_DAYS} days, asked for before <strong>{moment(SOFT_DEADLINE)}</strong>. The files would stay until <strong>{moment(EXTENDED_DEADLINE)}</strong>, still before the limit of {moment(HARD_DEADLINE)}.
-                </p>
-                <Button>Extend by {EXTENSION_DAYS} days</Button>
-              </>
-            )}
-          </div>
-          <div className="kauro-lifecycle-card">
-            <h2>Delete now</h2>
-            {canDelete ? (
-              asking ? (
-                <>
-                  <p>The files, the package and the import results are deleted from Kauro, and the package cannot be downloaded again. This cannot be undone.</p>
-                  <div className="kauro-actions">
-                    <Button variant="danger">Delete the project&apos;s files</Button>
-                    <Button onClick={() => setAsking(false)}>Keep them</Button>
-                  </div>
-                </>
+        <section className="kauro-b-section" aria-labelledby="actions-h">
+          <h2 id="actions-h">More time, or delete now</h2>
+          {mayAct ? null : <Only>{onlyLine(ctx, "delete", "extend the dates or delete this project's data")}</Only>}
+          <div className="kauro-b-panels">
+            <div className="kauro-b-panel">
+              <h3>More time</h3>
+              {extended ? (
+                <p>The extension is used: the files now stay until {moment(extendedUntil)}. A project has one, and none is left.</p>
               ) : (
                 <>
-                  <p>Your team does not have to wait for the dates above.</p>
-                  <Button onClick={() => setAsking(true)}>Request deletion</Button>
+                  <p>A project can have one extension, of up to {EXTENSION_HOURS} hours, asked for before {moment(until)}. It never passes {moment(hard)}.</p>
+                  <dl className="kauro-b-panel-fact">
+                    <div>
+                      <dt>New date</dt>
+                      <dd>{moment(extendedUntil)}</dd>
+                    </div>
+                  </dl>
+                  {mayAct ? <Button variant="secondary">Extend by 3 days</Button> : null}
                 </>
-              )
-            ) : (
-              <p>An owner or an admin of this workspace can request it.</p>
-            )}
+              )}
+            </div>
+            <div className="kauro-b-panel">
+              <h3>Delete now</h3>
+              <p>Delete the files, plan, package and import results before their date. Copies already downloaded are not affected.</p>
+              <dl className="kauro-b-panel-fact">
+                <div>
+                  <dt>Can be undone</dt>
+                  <dd>No</dd>
+                </div>
+              </dl>
+              {mayAct ? <DeleteNow name={project.name} /> : null}
+            </div>
           </div>
         </section>
       )}
-      <section className="kauro-screen-section" aria-labelledby="residual-h">
+      <section className="kauro-b-section" aria-labelledby="residual-h">
         <h2 id="residual-h">What deletion does not reach</h2>
         <ul>
           <li>Copies your team downloaded stay with your team.</li>
-          <li>Financial and legal records stay for as long as the rules require, apart from CRM content.</li>
+          <li>Financial and legal records stay for the period the law requires, apart from CRM content.</li>
           <li>Nothing in your CRM: Kauro never had access to it.</li>
         </ul>
       </section>
     </>
+  );
+}
+
+/** Early deletion: the project's name typed, then the authenticator code (CMD042 is a step-up command). */
+function DeleteNow({ name }: { readonly name: string }): ReactElement {
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!asking)
+    return (
+      <Button variant="secondary" onClick={() => setAsking(true)}>
+        Request deletion
+      </Button>
+    );
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const typed = String(new FormData(event.currentTarget).get("confirm") ?? "").trim();
+    setError(typed === name ? null : `Type the project's name exactly: ${name}`);
+  };
+  return (
+    <form className="kauro-b-delete" noValidate onSubmit={submit}>
+      <ErrorSummary title="There is a problem" errors={error === null ? [] : [{ fieldId: "delete-confirm", message: error }]} />
+      <Field id="delete-confirm" label={`Type the project's name to confirm: ${name}`} hint="You confirm with your authenticator code next." error={error ?? undefined}>
+        {(control) => <input {...control} name="confirm" autoComplete="off" spellCheck={false} />}
+      </Field>
+      <div className="kauro-actions">
+        <Button type="submit" variant="danger">
+          Delete the project&apos;s data
+        </Button>
+        <Button onClick={() => setAsking(false)}>Keep the data</Button>
+      </div>
+    </form>
   );
 }

@@ -16,11 +16,16 @@
 // Revision of 2026-10-20 (owner's review of group A): the column of rings beside the form broke its step names one word a line; the path is
 // now one line at the top, and the form reads as four numbered parts. Research: research/auth-onboarding.md (the gate at the first real
 // upload, not at sign-up; the DPA incorporated by reference with a copy to download); research/onboarding-vs-discounts.md (no questionnaire).
+//
+// Round 2 (2026-10-21): the page header is the application's one anatomy (h1 at 28 px, the lead, no larger type than its meaning); the
+// next step after activation is the shared next-step card; while the agreements are unpublished the page offers the one thing that works
+// (save a draft) as its action instead of a disabled "Create" button beside it (GOV.UK: avoid disabled buttons).
 import { Banner, Button, ErrorSummary, Field } from "@kauro/ui";
 import { type FormEvent, type ReactElement, useState } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { day, PageHead, ScreenButton, ScreenLink } from "./kit.tsx";
+import { ProjectHeader } from "@web/screens/shared/project-header.tsx";
+import { day, NextStep, ScreenButton, ScreenLink } from "./kit.tsx";
 
 export const UI09_STATES: readonly StateDef[] = [
   { key: "normal", label: "Before real files", note: "Four short parts: who buys, the name, what Kauro admits, authority and agreements. Billing comes at the first quote." },
@@ -76,22 +81,23 @@ export function AgencySetup({ ctx, state }: PrototypeProps): ReactElement {
   if (activated) {
     return (
       <>
-        <PageHead title={`${label} is ready`} lead="The agreements are accepted and kept with your workspace. Kauro can now receive your real files." />
-        <section className="kauro-next" aria-labelledby="ready-next">
-          <p className="kauro-next-label">Next</p>
-          <h2 id="ready-next">Start your first project</h2>
-          <p>Upload the exports you want prepared. The free data health check measures every row and shows what it finds, then an estimate for your files.</p>
-          <div className="kauro-actions">
+        <ProjectHeader stage="files" title={`${label} is ready`} lead="The agreements are accepted and kept with your workspace. Kauro can now receive your real files." />
+        <NextStep
+          id="ready-next"
+          heading="Start your first project"
+          action={
             <ScreenButton to="UI11" ctx={ctx} variant="primary">
               <span className="kauro-go">Start your first project</span>
             </ScreenButton>
-          </div>
+          }
+        >
+          <p>Upload the exports you want prepared. The free data health check measures every row and shows what it finds, then an estimate for your files.</p>
           {kind === "agency" ? (
-            <p className="kauro-next-who">
+            <p>
               Working for several clients? Each client keeps its own projects and files. <ScreenLink to="UI12" ctx={ctx}>Add your clients</ScreenLink> when you need them.
             </p>
           ) : null}
-        </section>
+        </NextStep>
       </>
     );
   }
@@ -99,24 +105,24 @@ export function AgencySetup({ ctx, state }: PrototypeProps): ReactElement {
   if (state === "draft-exists") {
     return (
       <>
-        <PageHead title="You already have a workspace in setup" lead="Each person can have one organisation in setup at a time." />
-        <section className="kauro-next" aria-labelledby="draft-next">
-          <h2 id="draft-next">
-            <bdi>Northwind Labs</bdi>, started on {day("2026-10-18T16:40:00Z")}
-          </h2>
-          <div className="kauro-actions">
+        <ProjectHeader stage="files" title="You already have a workspace in setup" lead="Each person can have one workspace in setup at a time." />
+        <NextStep
+          id="draft-next"
+          heading="Continue with Northwind Labs"
+          facts={[["Started", day("2026-10-18T16:40:00Z")]]}
+          action={
             <Button variant="primary">
               <span className="kauro-go">Continue with Northwind Labs</span>
             </Button>
-          </div>
-        </section>
+          }
+        />
       </>
     );
   }
 
   return (
     <>
-      <PageHead title="Set up your agency or company" lead="What Kauro needs before it can receive real files. Four short questions; billing details come later." />
+      <ProjectHeader stage="files" title="Set up your agency or company" lead="What Kauro needs before it can receive real files: four short parts. Billing details come later." />
       <p className="kauro-setup-done">
         <span className="kauro-setup-done-mark" aria-hidden="true" />
         <span>
@@ -223,17 +229,22 @@ export function AgencySetup({ ctx, state }: PrototypeProps): ReactElement {
         </fieldset>
 
         <div className="kauro-actions">
-          <Button type="submit" variant="primary" disabled={state === "agreements-today"}>
-            <span className="kauro-go">{state === "agreements-today" ? "Not available yet" : "Create the workspace"}</span>
-          </Button>
-          {state === "agreements-today" ? <Button type="button">Save as a draft</Button> : null}
+          {state === "agreements-today" ? (
+            <Button type="button" variant="primary">
+              Save as a draft
+            </Button>
+          ) : (
+            <Button type="submit" variant="primary">
+              <span className="kauro-go">Create the workspace</span>
+            </Button>
+          )}
         </div>
         <p className="kauro-muted">
-          Billing details are asked before your first quote is issued, not now. <span className="kauro-proposed">Proposed — D-UI09-2</span>
+          Billing details are asked before your first quote is issued, not now. <span className="kauro-proposed kauro-a-proposed">Proposed — D-UI09-2</span>
         </p>
       </form>
       <p className="kauro-setup-join">
-        Joining an agency that already uses Kauro? Open the invitation link you were sent. An email address never adds anyone to an agency on its own. <ScreenLink to="UI51" ctx={ctx}>About invitations</ScreenLink>
+        Joining a team that already uses Kauro? Open the invitation link you were sent. An email address never adds anyone to a workspace on its own. <ScreenLink to="UI51" ctx={ctx}>About invitations</ScreenLink>
       </p>
     </>
   );

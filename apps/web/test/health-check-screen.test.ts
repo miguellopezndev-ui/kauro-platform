@@ -25,7 +25,8 @@ test("fixtures: the health check is valid against the generated schema", () => {
 
 test("UI18: the page is the free data health check, never an audit, and says what it shows with the registry sentence", () => {
   const html = render();
-  assert.ok(html.includes("Review findings and decisions."));
+  // round 2: the registry sentence is the page header's lead; the view does not repeat it
+  assert.ok(!html.includes("Review findings and decisions."));
   assert.doesNotMatch(html, /\baudit|diagnos/i);
   for (const text of ["Reading the full data", "Finishes by", "Free check allowance", "In use"]) assert.ok(html.includes(text), text);
 });
