@@ -42,3 +42,47 @@ buy, receive the cleaned files and their evidence. Optional output preferences a
 analysis).
 
 **Certainty.** Read in the code, with line references; not reproduced by running it.
+
+## F-02. Approval and quote as one moment (proposal)
+
+**Design.** Today an approver approves the plan (CMD025), and then an owner or the billing role asks for the quote (CreateQuote) before
+paying. The owner asked for a better journey if this sequence adds friction. Proposed: approving a plan issues its quote at once, on the
+approved scope, so the person who pays finds the quote waiting; the quote stays formal (14 days, policy `quoteDays`) and nothing is
+charged until it is paid. **What a fix would touch.** ApprovePlan's effect (issue the quote in the same unit of work, or enqueue it),
+CreateQuote's actor rule, the quote's audit trail, tests. **Status.** Proposal for the owner; not implemented.
+
+## F-03. Self-serve free check from the public site (changes A3 §3.2)
+
+**Decision.** The owner, 2026-10-20: "Check a file free" opens a page on the free check; from there the visitor creates an account or
+signs in and continues; a short progressive eligibility step comes before real files; the contact form stays as an alternative. A3 §3.2
+sends the call to action to the fit form first. **What it needs.** An amendment to A3 §3.2; the eligibility step's fields recorded where
+the onboarding records the buyer type (A3 §3.7) and the agreements (CMD002); the free check's budget and capacity states shown before
+upload (A3 §3.2 pause rule; open question Q-4 on 90% versus exhausted). **Status.** Design and simulation only.
+
+## F-04. A read of the health check's findings (P-07)
+
+**Design.** The results page shows each finding with its count, its population, examples, the consequence and the fix. **Code.** The API
+has no read of the check's findings or of the plan's body (research/kauro-baseline.md §5.1). **Needs.** A findings read model and its
+contract, scoped to the tenant, with examples drawn without exposing more data than the plan needs.
+
+## F-05. A read of the estimate after the check
+
+**Design.** After the check, an estimate from the service, the measured units and the current price policy. **Code.** The units are read
+inside CreateQuote (`billableUnitsOf`) and the price by `baseCentsOf` (`packages/application/src/commercial/quotes/create-quote.ts:329-330`);
+no read exposes them before a quote. **Needs.** A read that returns the measured units and the policy price for the project's service,
+marked as an estimate, never a reservation.
+
+## F-06. A read of the project's activity (D-UI13-1)
+
+**Design.** Activity lists typed events (files sealed, check ready, plan revision proposed or approved, quote issued, transfer received,
+package verified, downloaded, stage result returned, deletion stage done), each with actor, time and reference. **Code.** No activity
+read exists. **Needs.** A tenant-scoped event read built from the existing audit records.
+
+## F-07. Sign-in, sign-up and recovery as the owner decided
+
+**Decision.** Google or email and a password of at least 12 characters checked against breached passwords; verified email; Kauro's own
+TOTP always, also after Google; recovery codes; risk-differentiated recovery (an admin may start a member's recovery, never disable the
+factor; owners and accounts without another admin recover through Kauro with independent checks and a person's approval; no recovery
+without reliable evidence). **Code.** The identity provider is undecided (research/kauro-baseline.md Q-8: Google Identity Platform in code,
+Cognito in A9); no sign-up, enrolment, recovery or session-list screens exist (UI50 is blocked). **Needs.** The provider decision, the
+flows and their abuse tests (impersonation, administrative abuse, loss of the owner, fraudulent recovery).
