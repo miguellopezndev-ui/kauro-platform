@@ -1450,7 +1450,7 @@ fieldset.kauro-notice-form {
 }
 .kauro-mapping-samples {
   display: block;
-  max-inline-size: 18rem;
+  max-inline-size: 15rem;
   overflow: hidden;
   color: var(--kauro-color-text-muted);
   font-family: var(--kauro-mono-family);
@@ -1949,8 +1949,9 @@ fieldset.kauro-notice-form {
   margin-block: var(--kauro-space-6) var(--kauro-space-5);
 }
 
-/* on a phone, each source column of the mapping is a card: the column, its destination, then what changes */
-@media (max-width: 47.99rem) {
+/* until the four columns fit beside the menu (under 72rem: phones, tablets, small laptops), each source column of the mapping is a card:
+   the column, its destination, then what changes */
+@media (max-width: 71.99rem) {
   .kauro-main .kauro-mapping,
   .kauro-mapping tbody,
   .kauro-mapping tr,
@@ -3343,5 +3344,12 @@ fieldset.kauro-notice-form {
     grid-column: 1 / -1;
     justify-content: flex-start;
     text-align: start;
+  }
+}
+
+/* UI19 from 72rem: what a choice changes is the reason to read the row; it keeps room for a short sentence, and the samples give way */
+@media (min-width: 72rem) {
+  .kauro-main .kauro-mapping td[data-label="What changes"] {
+    min-inline-size: 11rem;
   }
 }
