@@ -71,6 +71,18 @@ export default function Index() {
             <a href="/__variants/for-agencies">For agencies: a page for the main channel</a>
             <span>Only the statements and limits you set; branded reports shown as not available yet.</span>
           </li>
+          <li>
+            <a href="/__variants/pricing">Pricing: what the price includes, and questions about it</a>
+            <span>
+              Beside <a href="/pricing">the approved page</a>; every answer from an existing rule.
+            </span>
+          </li>
+          <li>
+            <a href="/__variants/contact">Contact: the required authorisation and &quot;Email address&quot;</a>
+            <span>
+              Beside <a href="/contact">the approved page</a>; fixes F-08 on the form. Nothing is sent from the review.
+            </span>
+          </li>
         </ul>
       </section>
       <p className="rx-counts">

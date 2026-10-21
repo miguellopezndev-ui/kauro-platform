@@ -75,7 +75,7 @@ export function FreeCheckPage(): ReactElement {
           <LinkButton href="/login" kind="secondary">
             {PUBLIC_COPY["nav.signin.label"]}
           </LinkButton>
-          <LinkButton href={ROUTE.contact} kind="text">
+          <LinkButton href="/__variants/contact" kind="text">
             Ask a question
           </LinkButton>
         </div>

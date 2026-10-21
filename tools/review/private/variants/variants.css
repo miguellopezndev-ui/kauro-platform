@@ -293,3 +293,36 @@
     padding: 0 0.75rem;
   }
 }
+
+/* Pricing variant: the included and excluded lists in words, and the questions as a two-column list on wide screens */
+.kauro-site-main .kauro-variant-plain-list {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.125rem;
+}
+.kauro-variant-faq {
+  display: grid;
+  gap: var(--kauro-space-5);
+  margin: 0;
+}
+.kauro-variant-faq dt {
+  margin: 0 0 var(--kauro-space-1);
+  font-weight: 650;
+}
+.kauro-variant-faq dd {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+}
+@media (min-width: 62rem) {
+  .kauro-variant-faq {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--kauro-space-7, 3rem);
+  }
+}
+
+/* the contact form's authorisation, set apart above the button */
+.kauro-site-main .kauro-variant-consent {
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}

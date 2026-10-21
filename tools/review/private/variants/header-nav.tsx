@@ -11,17 +11,17 @@ import { ROUTE } from "@web/public/site.ts";
 
 const ITEMS: readonly { readonly href: string; readonly label: string }[] = [
   { href: ROUTE.how, label: PUBLIC_COPY["nav.how.label"] },
-  { href: ROUTE.services, label: PUBLIC_COPY["nav.services.label"] },
-  { href: ROUTE.pricing, label: PUBLIC_COPY["nav.pricing.label"] },
+  { href: "/__variants/supported-services", label: PUBLIC_COPY["nav.services.label"] },
+  { href: "/__variants/pricing", label: PUBLIC_COPY["nav.pricing.label"] },
   { href: ROUTE.sample, label: PUBLIC_COPY["nav.sample.label"] },
   { href: ROUTE.security, label: PUBLIC_COPY["nav.security.label"] },
   { href: "/__variants/for-agencies", label: "For agencies" },
 ];
 const HELP = { href: ROUTE.help, label: PUBLIC_COPY["nav.help.label"] };
-const UTILITIES: readonly { readonly href: string; readonly label: string }[] = [HELP, { href: ROUTE.contact, label: PUBLIC_COPY["nav.contact.label"] }];
+const UTILITIES: readonly { readonly href: string; readonly label: string }[] = [HELP, { href: "/__variants/contact", label: PUBLIC_COPY["nav.contact.label"] }];
 const ACTION = { href: "/__variants/free-check", label: "Check a file free" };
 
-/** The variant pages stand for the approved pages they vary: /__variants/supported-services is Supported services. */
+/** Inside the proposed site a page links to its variant where one exists (Supported services, Pricing), and to the approved page elsewhere. */
 const isCurrent = (pathname: string, href: string): boolean => pathname === href || pathname === href.replace(/^\//, "/__variants/");
 
 export function HeaderNav(): ReactElement {

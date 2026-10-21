@@ -13,8 +13,8 @@ const COLUMNS: readonly { readonly heading: string; readonly links: readonly { r
     links: [
       { href: "/__variants/free-check", label: "Check a file free" },
       { href: ROUTE.how, label: PUBLIC_COPY["nav.how.label"] },
-      { href: ROUTE.services, label: PUBLIC_COPY["nav.services.label"] },
-      { href: ROUTE.pricing, label: PUBLIC_COPY["nav.pricing.label"] },
+      { href: "/__variants/supported-services", label: PUBLIC_COPY["nav.services.label"] },
+      { href: "/__variants/pricing", label: PUBLIC_COPY["nav.pricing.label"] },
       { href: ROUTE.sample, label: PUBLIC_COPY["nav.sample.label"] },
       { href: "/__variants/for-agencies", label: "For agencies" },
     ],
@@ -30,7 +30,7 @@ const COLUMNS: readonly { readonly heading: string; readonly links: readonly { r
     heading: "Help",
     links: [
       { href: ROUTE.help, label: PUBLIC_COPY["nav.help.label"] },
-      { href: ROUTE.contact, label: PUBLIC_COPY["nav.contact.label"] },
+      { href: "/__variants/contact", label: PUBLIC_COPY["nav.contact.label"] },
     ],
   },
   {

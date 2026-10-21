@@ -39,7 +39,7 @@ export function ForAgenciesPage(): ReactElement {
           <li>
             The same prices and discounts as a company buying direct. From earlier projects in the last {POLICY_SNAPSHOT.repeatLookbackDays} days:{" "}
             {TIERS.map((tier, index) => `${tier.percent}% from ${tier.minimum} ${tier.minimum === 1 ? "project" : "projects"}${index < TIERS.length - 1 ? ", " : ""}`).join("")}.{" "}
-            <a href={ROUTE.pricing}>See the prices</a>
+            <a href="/__variants/pricing">See the prices</a>
           </li>
         </ul>
       </Section>
@@ -62,7 +62,7 @@ export function ForAgenciesPage(): ReactElement {
           <LinkButton href="/__variants/free-check" primary>
             Check a file free
           </LinkButton>
-          <LinkButton href={ROUTE.contact} kind="text">
+          <LinkButton href="/__variants/contact" kind="text">
             Ask a question
           </LinkButton>
         </div>
