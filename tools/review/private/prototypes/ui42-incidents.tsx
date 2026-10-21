@@ -8,14 +8,14 @@ import { Banner, Button } from "@kauro/ui";
 import { type ReactElement } from "react";
 import type { PrototypeProps } from "../lib/screens.tsx";
 import type { StateDef } from "../lib/scenario.ts";
-import { Badge, PageHead } from "./kit.tsx";
+import { Badge, PageHead, ScreenLink } from "./kit.tsx";
 
 export const UI42_STATES: readonly StateDef[] = [
   { key: "normal", label: "None open", note: "No open incident: the last one, closed, with its timeline and what it affected." },
   { key: "open", label: "An open incident", note: "S2, download links failing: contained, recovery under way, a notice prepared for review and not sent." },
 ];
 
-export function Incidents({ state }: PrototypeProps): ReactElement {
+export function Incidents({ ctx, state }: PrototypeProps): ReactElement {
   const open = state === "open";
   return (
     <>
@@ -37,7 +37,18 @@ export function Incidents({ state }: PrototypeProps): ReactElement {
           </div>
           <div>
             <dt>Known to be affected</dt>
-            <dd>{open ? "3 packages in 2 workspaces: their links return an error. No file was exposed." : "6 health checks started 41 minutes late. No result was wrong."}</dd>
+            <dd>
+              {open ? (
+                "3 packages in 2 workspaces: their links return an error. No file was exposed."
+              ) : (
+                <>
+                  6 health checks started 41 minutes late. No result was wrong.{" "}
+                  <ScreenLink to="UI40" ctx={ctx}>
+                    See the jobs
+                  </ScreenLink>
+                </>
+              )}
+            </dd>
           </div>
           <div>
             <dt>Next review</dt>
@@ -46,7 +57,7 @@ export function Incidents({ state }: PrototypeProps): ReactElement {
         </dl>
       </section>
       <ol className="kauro-incident-duties">
-        <li className={open ? "is-done" : "is-done"}>
+        <li className="is-done">
           <strong>Containment</strong>
           <span>{open ? "Done at 3:31 PM UTC: new links for the 3 packages are paused; nothing else is affected." : "Done at 8:20 AM UTC: the queue was drained."}</span>
         </li>

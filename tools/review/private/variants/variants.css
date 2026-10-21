@@ -323,6 +323,27 @@
 
 /* the contact form's authorisation, set apart above the button */
 .kauro-site-main .kauro-variant-consent {
+  display: grid;
+  gap: var(--kauro-space-2);
   padding-block-start: var(--kauro-space-4);
   border-block-start: 1px solid var(--kauro-color-border);
+}
+/* the authorisation spans the form's two columns: a plain box and its sentence, not a choice card */
+.kauro-site-main .kauro-site-form > .kauro-variant-consent {
+  grid-column: 1 / -1;
+}
+.kauro-variant-consent label {
+  font-size: 0.9375rem;
+}
+.kauro-variant-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kauro-space-3);
+}
+.kauro-variant-consent-row input {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--kauro-color-primary);
 }

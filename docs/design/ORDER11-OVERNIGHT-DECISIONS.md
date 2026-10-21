@@ -52,6 +52,7 @@ which cites ToS §8 to §11 and PV1 §5), and the api's own views (`apps/web/src
 | N-23 | Finance on a phone: each credit is a labelled card. | The six-column table squeezed words to one letter a line at 320 to 375 px. | — |
 | N-24 | The review refuses finance reads to anyone but the owner, as the server does; the page then shows one refusal and no credit queue. | A seller saw the bank route with "Disable the route" and "Replace the bank details" because the review answered every person alike; the real page then drew the refusal twice beside an unusable filter. | — |
 | N-25 | The audit now flags text squeezed letter by letter (a box under 48 px wide, more than three lines tall). | The Finance defect passed every automated check: nothing overflowed and nothing was cut. Human inspection found it; the check keeps it from coming back. | Remove the check. |
+| N-40 | Incidents with none open: the closed incident links its affected jobs ("See the jobs"). | The page offered no action, and the keyboard check found nothing to reach in its main area; the jobs are where the delayed checks can be seen. | Remove the link. |
 
 ## Across groups
 

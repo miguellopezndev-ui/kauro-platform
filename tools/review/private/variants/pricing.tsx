@@ -9,7 +9,6 @@ import { MarginNote, Pane } from "@web/public/artifacts.tsx";
 import { BandEstimator } from "@web/public/band-estimator.tsx";
 import { MANIFEST_FILES, SAMPLE } from "@web/public/sample-data.ts";
 import { availabilityOf, type Availability, type Publication } from "@web/public/capabilities.ts";
-import { modeName } from "@web/public/estimate-text.ts";
 import { DataTable, LinkButton, MODE_ORDER, PageHead, PriceFigure, Section, ServiceState } from "@web/public/parts.tsx";
 import { BANDS, bandLabel, bandOffered, bandRange, formatCount, formatUsd, priceOf, repeatDiscounts, startingPrice, type ServiceMode } from "@web/public/pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "@web/public/policy-snapshot.ts";
@@ -24,6 +23,9 @@ const LADDER: Readonly<Record<ServiceMode, { readonly name: PublicCopyId; readon
   HUBSPOT: { name: "pricing.ladder.hubspot.name", body: "pricing.ladder.hubspot.body" },
   SALESFORCE: { name: "pricing.ladder.salesforce.name", body: "pricing.ladder.salesforce.body" },
 };
+
+/** The owner's service names (answer 3), as on the Supported services variant. */
+const NAME: Readonly<Record<ServiceMode, string>> = { CLEAN: "Clean your data", HUBSPOT: "Prepare for HubSpot", SALESFORCE: "Prepare for Salesforce" };
 
 const QUESTIONS: readonly { readonly q: string; readonly a: string }[] = [
   { q: "What is a billable source unit?", a: "An admitted record in the files you seal: a contact, an organisation or a deal. Splitting a file into several changes nothing." },
@@ -62,7 +64,7 @@ export function PricingVariant({ publication, signInHref }: PricingPageProps): R
           </li>
           {MODE_ORDER.map((mode) => (
             <li key={mode} className="kauro-site-rung">
-              <h3>{PUBLIC_COPY[LADDER[mode].name]}</h3>
+              <h3>{NAME[mode]}</h3>
               <ServiceState availability={availability[mode]} />
               <PriceFigure amount={formatUsd(startingPrice(mode))} />
               <p>{copy(LADDER[mode].body, { price: formatUsd(startingPrice(mode)), units: firstBand })}</p>
@@ -77,7 +79,7 @@ export function PricingVariant({ publication, signInHref }: PricingPageProps): R
         <DataTable
           variant="kauro-site-table-region--bands"
           caption={PUBLIC_COPY["pricing.table.caption"]}
-          columns={[PUBLIC_COPY["pricing.table.units.label"], ...MODE_ORDER.map(modeName)]}
+          columns={[PUBLIC_COPY["pricing.table.units.label"], ...MODE_ORDER.map((mode) => NAME[mode])]}
           rows={BANDS.map((_band, index) => ({
             key: `band-${index}`,
             head: bandLabel(index),

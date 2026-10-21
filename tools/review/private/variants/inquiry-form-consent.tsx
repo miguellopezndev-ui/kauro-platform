@@ -258,13 +258,13 @@ export function InquiryFormConsent(): ReactElement {
               <Message name="description" errors={errors} />
               <textarea id="contact-description" name="description" rows={6} aria-invalid={invalid("description")} aria-describedby={describedBy("description", "contact-description-hint")} value={values.description} onChange={(event) => set("description", event.target.value)} />
             </div>
-            <div className="kauro-site-field kauro-variant-consent">
+            <div className="kauro-variant-consent">
               {consentMissing ? (
                 <p id="contact-consent-error" className="kauro-site-error">
                   {CONSENT_ERROR}
                 </p>
               ) : null}
-              <div className="kauro-site-choice">
+              <div className="kauro-variant-consent-row">
                 <input
                   id="contact-consent"
                   name="consent"
