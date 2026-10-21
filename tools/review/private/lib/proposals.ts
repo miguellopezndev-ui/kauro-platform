@@ -21,6 +21,65 @@ export interface Proposal {
   readonly anonymous?: boolean;
 }
 
+/**
+ * Round 2 (owner-console.md §4, §6, §10): the owner's pages the registry does not hold. Each is drawn from the review's fixture; the reads
+ * they need are recorded in docs/design/ORDER11-ROUND2-OPS.md.
+ */
+const PROPOSALS_ROUND2: readonly Proposal[] = [
+  {
+    key: "P-24",
+    group: "D",
+    anchor: "UI34",
+    origin: "OPS",
+    title: "Claims",
+    why: "Sellers work prospects; the owner decides claims. Round 1 put the decision inside one seller's prospect list. The api decides a claim by id (AcceptAttribution) and lists none across sellers.",
+    route: "/ops/sales/claims (proposed)",
+    primaryCopy: "Decide which seller found a customer first.",
+    information: "Claims to decide, accepted, won, refused or expired; one opened with its evidence, the check against Kauro's records and what accepting means, in dates.",
+    actions: "Accept the claim (CMD047, step-up); refuse it with a reason from a fixed list (proposed with counsel).",
+    exceptions: "A seller is never told who else claimed; a refusal never names another seller or a customer.",
+  },
+  {
+    key: "P-23",
+    group: "D",
+    anchor: "UI35",
+    origin: "OPS",
+    title: "Customers",
+    why: "The owner cannot see the channels: which agencies and companies bought, how each came (direct or through a seller), who serves it and what it paid. The api lists no customers with their buyer type and channel.",
+    route: "/ops/customers (proposed)",
+    primaryCopy: "Every agency and company that has paid Kauro.",
+    information: "Customer and kind, came through (direct or a seller), served by, projects paid, collected since the start, last payment; a total.",
+    actions: "Filter by kind; open a customer (UI35).",
+    exceptions: "An agency's own clients are never listed (D-33 §4.2).",
+  },
+  {
+    key: "P-22",
+    group: "D",
+    anchor: "UI36",
+    origin: "OPS",
+    title: "Payouts",
+    why: "The owner pays every seller each month and had no page that shows what is owed across sellers, by when, and what holds it. The api reads one statement by id.",
+    route: "/ops/money/payouts (proposed)",
+    primaryCopy: "What you owe sellers, when, and what is holding it.",
+    information: "The cycle's dates; statements to approve; transfers sent and not yet confirmed; every statement with held, payable, pay date and paid reference; what is coming, as facts.",
+    actions: "Open a seller's statements to approve the payout (CMD052, step-up); record a transfer as sent; confirm paid with the bank's proof (CMD053, inert today).",
+    exceptions: "Paid only with the bank's proof; no forecast for a project not yet bought.",
+  },
+  {
+    key: "P-21",
+    group: "D",
+    anchor: "UI37",
+    origin: "OPS",
+    title: "Sellers",
+    why: "The owner cannot see the sellers: what each sold, the kinds and number of customers, what those brought in, what is owed and their rates. The api lists no sellers and aggregates nothing across them.",
+    route: "/ops/sales/sellers (proposed)",
+    primaryCopy: "Who sells for Kauro, what they brought in and what you owe them.",
+    information: "One row per seller: status, owed now and held, next date, customers by kind, collected and commission for a chosen period, claims; a total; the default rates in one sentence.",
+    actions: "Filter by status; change the period; open a seller (UI37); register a seller (RegisterSellerCandidate); download the list as CSV (proposed).",
+    exceptions: "No clicks, rankings or charts; a status with no seller is not drawn.",
+  },
+];
+
 export const PROPOSALS: readonly Proposal[] = [
   {
     key: "P-05",
@@ -121,11 +180,11 @@ export const PROPOSALS: readonly Proposal[] = [
     anchor: "UI37",
     origin: "OPS",
     title: "Seller settings",
-    why: "A seller's own profile, security, payout destination, authorised sender and enablement. Payout change exists (seller, step-up); the rest needs reads.",
-    route: "/ops/sales/settings (proposed)",
+    why: "A seller's own status, sign-in, payout destination, tax documents, sending identity and notifications, opened from the account menu. Payout change exists (seller, step-up); a profile read, documents and notification preferences need contracts.",
+    route: "/ops/settings (proposed, seen as a seller)",
     primaryCopy: "Your seller account, payouts and sending identity.",
-    information: "Enablement state (GetSellerHome); payout destination as a masked label; the sending identity Kauro authorised for you and its state; notices.",
-    actions: "Change the payout destination (ChangePayoutDestination, seller, step-up); ask Kauro to verify a sending identity (owner registers it).",
+    information: "Seller status and agreement; sign-in method and sessions; the payout destination as a masked label and its state; tax documents on file; the sending identity and its state; which emails are always sent and which can be turned off.",
+    actions: "Change the payout destination (ChangePayoutDestination, seller, step-up; Kauro checks it 48 hours later); sign out other sessions; turn optional reminders off (needs a contract).",
     exceptions: "No bank number, token or mailbox secret is shown; a masked label and a state only.",
   },
   {
@@ -133,14 +192,15 @@ export const PROPOSALS: readonly Proposal[] = [
     group: "E",
     anchor: "UI38",
     origin: "OPS",
-    title: "Owner settings",
-    why: "The owner's profile and security, the state of each provider, the operating parameters in force, security controls, audit and recovery. Provider states come from served reads; nothing shows a secret.",
+    title: "Settings",
+    why: "The owner had no configuration page. Round 2 shows only what is true today, each section saying whether it is live (an existing command), read-only (a policy value with its version) or needs backend work.",
     route: "/ops/settings (proposed)",
-    primaryCopy: "How Kauro is connected, protected and recovered.",
-    information: "Identity provider, bank route, email sending, payment provider: state, environment, last check, alerts. Operating parameters from the policy. Break-glass grants. Recovery contacts.",
-    actions: "Open the provider's own screen (bank route, senders); review break-glass grants; go to the operating review. Changes go through their own commands with step-up.",
-    exceptions: "No key, token, account number or password is ever shown; a provider is a state, an environment and dates.",
+    primaryCopy: "What Kauro runs on, as it is today.",
+    information: "You: account and security. Selling: services on offer, prices and discounts, commissions and rates by seller, paying sellers, outreach rules. Money: the bank route. Platform: providers, limits and retention, break-glass. Company: business details, team, notifications, recovery.",
+    actions: "Sign out other sessions; change what is offered (CMD058/059, step-up); open Finance for the bank route. Policy values change only through a reviewed new version.",
+    exceptions: "No key, token, password or full account number is ever shown; sections that need backend work say so and change nothing.",
   },
+  ...PROPOSALS_ROUND2,
 ];
 
 export function proposalOf(key: string): Proposal | undefined {

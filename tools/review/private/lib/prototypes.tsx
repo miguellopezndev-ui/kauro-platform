@@ -45,6 +45,10 @@ import { OperatingReview, UI44_STATES } from "../prototypes/ui44-review.tsx";
 import { Resources, UI53_STATES } from "../prototypes/ui53-resources.tsx";
 import { Outreach, UI54_STATES } from "../prototypes/ui54-outreach.tsx";
 import { SupportOperations, UI55_STATES } from "../prototypes/ui55-support.tsx";
+import { P21_STATES, SellersList } from "../prototypes/p21-sellers.tsx";
+import { P22_STATES, Payouts } from "../prototypes/p22-payouts.tsx";
+import { CustomersList, P23_STATES } from "../prototypes/p23-customers.tsx";
+import { Claims, P24_STATES } from "../prototypes/p24-claims.tsx";
 import type { PrototypeProps } from "./screens.tsx";
 
 export interface PrototypeEntry {
@@ -82,7 +86,7 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   UI42: { Component: Incidents, states: UI42_STATES, contexts: ["owner"] },
   UI43: { Component: Releases, states: UI43_STATES, contexts: ["owner"] },
   UI44: { Component: OperatingReview, states: UI44_STATES, contexts: ["owner"] },
-  UI53: { Component: Resources, states: UI53_STATES, contexts: ["seller"] },
+  UI53: { Component: Resources, states: UI53_STATES, contexts: ["seller", "owner"] },
   UI54: { Component: Outreach, states: UI54_STATES, contexts: ["seller", "owner"] },
   UI55: { Component: SupportOperations, states: UI55_STATES, contexts: ["owner"] },
   "P-01": { Component: PersonalSettings, states: P01_STATES, contexts: ["agency", "company", "operator"] },
@@ -94,4 +98,8 @@ export const PROTOTYPES: Readonly<Record<string, PrototypeEntry>> = {
   "P-07": { Component: HealthResults, states: P07_STATES, contexts: ["agency", "company", "operator"] },
   "P-08": { Component: Activity, states: P08_STATES, contexts: ["agency", "company", "operator"] },
   "P-09": { Component: BillingOverview, states: P09_STATES, contexts: ["agency", "company"] },
+  "P-21": { Component: SellersList, states: P21_STATES, contexts: ["owner"] },
+  "P-22": { Component: Payouts, states: P22_STATES, contexts: ["owner"] },
+  "P-23": { Component: CustomersList, states: P23_STATES, contexts: ["owner"] },
+  "P-24": { Component: Claims, states: P24_STATES, contexts: ["owner"] },
 };

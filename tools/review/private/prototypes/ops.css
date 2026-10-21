@@ -1,0 +1,1156 @@
+/* The owner's and the seller's consoles (Order 11, round 2; research round2/owner-console.md, seller-portal.md, principles-craft.md).
+   Scoped to .kauro-ops so these rules reach the consoles' pages only. Type: h1 28 px (24 px on phones), section h2 20 px, body 16 px, meta
+   13-14 px, figures one size per set. Space: inside a group about half of the space between groups; sections are separated by space, not
+   rules. Tokens only, both themes, reflow at 320 px, no inline style. */
+
+.kauro-main .kauro-ops :where(h1) {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-ops :where(h1) {
+    font-size: 1.5rem;
+  }
+}
+.kauro-main .kauro-ops :where(h2) {
+  margin: 0 0 var(--kauro-space-3);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+.kauro-main .kauro-ops :where(h3) {
+  margin: 0 0 var(--kauro-space-2);
+  font-size: 1rem;
+  font-weight: 600;
+}
+/* sections are separated by space, never by a rule; the first block after the heading starts at the heading's own margin */
+.kauro-main .kauro-ops section + section {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+.kauro-main .kauro-ops > :not(.kauro-ops-head) + :is(section, .kauro-ops-pair, .kauro-ops-next, .kauro-ops-decide) {
+  margin-block-start: var(--kauro-space-7);
+}
+.kauro-main .kauro-ops > .kauro-ops-head + * {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-ops .kauro-ops-pair > section + section {
+  margin-block-start: 0;
+}
+.kauro-ops-ask {
+  margin-block-start: var(--kauro-space-4);
+}
+
+/* ---- the opening of a page ---- */
+.kauro-ops-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-block-end: var(--kauro-space-6);
+}
+.kauro-ops-head .kauro-ops-head-action {
+  margin-block-start: var(--kauro-space-4);
+}
+@media (min-width: 48rem) {
+  .kauro-ops-head--action {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--kauro-space-5);
+  }
+  .kauro-ops-head--action > :not(.kauro-ops-head-action) {
+    grid-column: 1;
+  }
+  .kauro-ops-head--action .kauro-ops-head-action {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+    margin-block-start: 0;
+  }
+}
+.kauro-ops-head-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-3);
+  min-inline-size: 0;
+}
+.kauro-ops-head-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-ops .kauro-ops-lead {
+  max-inline-size: 68ch;
+  margin: var(--kauro-space-2) 0 0;
+  color: var(--kauro-color-text-muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.kauro-main .kauro-ops .kauro-ops-back {
+  margin: 0 0 var(--kauro-space-2);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-ops-back a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 1.5rem;
+  color: var(--kauro-color-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+.kauro-ops-back a:hover {
+  color: var(--kauro-color-primary);
+  text-decoration: underline;
+}
+
+/* ---- a section's heading, its meta line, and its one link ---- */
+.kauro-ops-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-main .kauro-ops .kauro-ops-section-head h2 {
+  margin: 0;
+}
+.kauro-main .kauro-ops .kauro-ops-meta {
+  margin: var(--kauro-space-1) 0 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-ops-section-aside {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-ops :where(p.kauro-ops-sentence) {
+  max-inline-size: 68ch;
+  margin: 0 0 var(--kauro-space-5);
+  font-size: 1rem;
+}
+.kauro-ops-sentence strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ---- the queue: what needs the person ---- */
+.kauro-ops-queue {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  list-style: none;
+}
+.kauro-main .kauro-ops-queue > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  padding: var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-ops-queue > li:last-child {
+  border-block-end: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops-queue > li {
+    grid-template-columns: minmax(0, 1fr) 11rem 13rem;
+    align-items: center;
+    gap: var(--kauro-space-5);
+    padding: var(--kauro-space-4) var(--kauro-space-5);
+  }
+}
+.kauro-main .kauro-ops .kauro-ops-queue-what {
+  margin: 0;
+  font-weight: 600;
+}
+.kauro-main .kauro-ops .kauro-ops-queue-why {
+  margin: var(--kauro-space-1) 0 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-ops .kauro-ops-queue-due {
+  margin: 0;
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-ops-queue-due.is-urgent {
+  font-weight: 650;
+}
+.kauro-ops-queue-action .kauro-button {
+  inline-size: 100%;
+  justify-content: center;
+}
+@media (max-width: 47.99rem) {
+  .kauro-ops-queue-action .kauro-button {
+    inline-size: auto;
+  }
+}
+
+/* ---- a set of equal figures: one size, one weight, label above, note below ---- */
+.kauro-main .kauro-ops dl.kauro-ops-figures {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-ops dl.kauro-ops-figures > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  gap: var(--kauro-space-1);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-ops dl.kauro-ops-figures > div:last-child {
+  border-block-end: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops dl.kauro-ops-figures--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures > div {
+    border-block-end: 0;
+    border-inline-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures > div:last-child {
+    border-inline-end: 0;
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures--4 > div:nth-child(2) {
+    border-inline-end: 0;
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures--4 > div:nth-child(-n + 2) {
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+}
+@media (min-width: 80rem) {
+  .kauro-main .kauro-ops dl.kauro-ops-figures--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures--4 > div:nth-child(2) {
+    border-inline-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-ops dl.kauro-ops-figures--4 > div:nth-child(-n + 2) {
+    border-block-end: 0;
+  }
+}
+.kauro-main .kauro-ops dl.kauro-ops-figures dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-ops dd.kauro-ops-figure {
+  margin: var(--kauro-space-1) 0 0;
+  color: var(--kauro-color-text);
+  font-family: var(--kauro-display-family);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.kauro-ops-figure a {
+  color: inherit;
+  text-decoration-color: var(--kauro-color-control-border);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.kauro-ops-figure a:hover {
+  color: var(--kauro-color-primary);
+  text-decoration-color: currentColor;
+}
+.kauro-main .kauro-ops dd.kauro-ops-figure-note {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-ops-attention {
+  color: var(--kauro-color-warning-text);
+  font-weight: 650;
+}
+
+/* ---- a filter: toggles with counts ---- */
+.kauro-ops-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-2);
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-ops-filter button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  min-block-size: 2.5rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: 62.5rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-ops-filter button:hover {
+  border-color: var(--kauro-color-primary);
+}
+.kauro-ops-filter button[aria-pressed="true"] {
+  border-color: var(--kauro-color-text);
+  background: var(--kauro-color-text);
+  color: var(--kauro-color-background);
+}
+.kauro-ops-filter-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.kauro-ops-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+}
+.kauro-ops-toolbar .kauro-ops-filter {
+  margin-block-end: var(--kauro-space-3);
+}
+.kauro-ops-toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  min-block-size: 2.5rem;
+  margin-block-end: var(--kauro-space-3);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- tables: 16 px, figures right-aligned and tabular, the unit in the header; cards when the box is narrow ---- */
+.kauro-ops-tablewrap {
+  container: ops-table / inline-size;
+}
+.kauro-main .kauro-ops .kauro-ops-table {
+  font-size: 1rem;
+}
+.kauro-main .kauro-ops .kauro-ops-table :is(th, td) {
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  vertical-align: top;
+}
+.kauro-main .kauro-ops .kauro-ops-table thead th {
+  font-size: 0.8125rem;
+  vertical-align: bottom;
+}
+.kauro-main .kauro-ops .kauro-ops-table tbody th {
+  font-weight: 600;
+}
+.kauro-ops-table .kauro-table-end {
+  white-space: nowrap;
+}
+.kauro-main .kauro-ops .kauro-ops-table thead .kauro-table-end {
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.kauro-main .kauro-ops .kauro-ops-table thead th {
+  overflow-wrap: normal;
+  hyphens: manual;
+}
+.kauro-ops-sub {
+  display: block;
+  margin-block-start: 0.125rem;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+}
+.kauro-ops-sub + .kauro-ops-sub {
+  margin-block-start: 0;
+}
+.kauro-ops-table .kauro-ops-cell-badge {
+  display: block;
+  margin-block-start: var(--kauro-space-1);
+}
+.kauro-ops-table tfoot :is(th, td) {
+  border-block-start: 1px solid var(--kauro-color-control-border);
+  background: var(--kauro-color-surface);
+  font-weight: 650;
+}
+.kauro-ops-table tbody tr.is-open {
+  background: color-mix(in srgb, var(--kauro-color-primary) 6%, transparent);
+}
+.kauro-ops-table a {
+  color: var(--kauro-color-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.kauro-ops-zero {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-ops-rowbutton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.kauro-ops-rowbutton[aria-expanded="true"] {
+  text-decoration: none;
+}
+.kauro-ops-detailrow > td {
+  background: var(--kauro-color-surface);
+}
+.kauro-main .kauro-ops .kauro-ops-detailrow dl {
+  margin: 0;
+}
+
+@container ops-table (max-width: 52rem) {
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact),
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) tbody,
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) tfoot,
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) tr,
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) td,
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) th {
+    display: block;
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) tfoot tr {
+    border-block-start: 1px solid var(--kauro-color-control-border);
+    background: var(--kauro-color-surface);
+  }
+  .kauro-main .kauro-ops .kauro-ops-table--cards:not(.kauro-ops-table--compact) :is(th, td) {
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+    background: none;
+    text-align: start;
+    white-space: normal;
+  }
+  .kauro-main .kauro-ops .kauro-ops-table--cards:not(.kauro-ops-table--compact) tbody th {
+    padding-block-end: var(--kauro-space-2);
+  }
+  .kauro-main .kauro-ops .kauro-ops-table--cards:not(.kauro-ops-table--compact) :is(td, th)[data-label] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 var(--kauro-space-3);
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) :is(td, th)[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) :is(td, th)[data-label] > * {
+    text-align: end;
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) td:empty {
+    display: none;
+  }
+  .kauro-ops-table--cards:not(.kauro-ops-table--compact) .kauro-ops-detailrow > td {
+    margin-block-start: var(--kauro-space-2);
+    padding: var(--kauro-space-3);
+    border-radius: var(--kauro-radius);
+    background: var(--kauro-color-surface);
+  }
+}
+@container ops-table (max-width: 30rem) {
+  .kauro-ops-table--cards.kauro-ops-table--compact,
+  .kauro-ops-table--cards.kauro-ops-table--compact tbody,
+  .kauro-ops-table--cards.kauro-ops-table--compact tfoot,
+  .kauro-ops-table--cards.kauro-ops-table--compact tr,
+  .kauro-ops-table--cards.kauro-ops-table--compact td,
+  .kauro-ops-table--cards.kauro-ops-table--compact th {
+    display: block;
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact tfoot tr {
+    border-block-start: 1px solid var(--kauro-color-control-border);
+    background: var(--kauro-color-surface);
+  }
+  .kauro-main .kauro-ops .kauro-ops-table--cards.kauro-ops-table--compact :is(th, td) {
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+    background: none;
+    text-align: start;
+    white-space: normal;
+  }
+  .kauro-main .kauro-ops .kauro-ops-table--cards.kauro-ops-table--compact tbody th {
+    padding-block-end: var(--kauro-space-2);
+  }
+  .kauro-main .kauro-ops .kauro-ops-table--cards.kauro-ops-table--compact :is(td, th)[data-label] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 var(--kauro-space-3);
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact :is(td, th)[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact :is(td, th)[data-label] > * {
+    text-align: end;
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact td:empty {
+    display: none;
+  }
+  .kauro-ops-table--cards.kauro-ops-table--compact .kauro-ops-detailrow > td {
+    margin-block-start: var(--kauro-space-2);
+    padding: var(--kauro-space-3);
+    border-radius: var(--kauro-radius);
+    background: var(--kauro-color-surface);
+  }
+}
+
+/* ---- facts: a definition list with hairlines, the label left, the value right-aligned when it is money ---- */
+.kauro-main .kauro-ops dl.kauro-ops-facts {
+  margin: 0;
+}
+.kauro-main .kauro-ops dl.kauro-ops-facts > div {
+  padding-block: var(--kauro-space-3);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops dl.kauro-ops-facts > div {
+    grid-template-columns: minmax(12rem, 1fr) 2fr;
+  }
+}
+.kauro-main .kauro-ops dl.kauro-ops-facts dt {
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-ops dl.kauro-ops-money > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+}
+.kauro-main .kauro-ops dl.kauro-ops-money dt {
+  color: var(--kauro-color-text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.kauro-main .kauro-ops dl.kauro-ops-money dd {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+.kauro-main .kauro-ops dl.kauro-ops-money .kauro-ops-sub {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: start;
+  white-space: normal;
+}
+
+/* ---- what a setting is backed by ---- */
+.kauro-main .kauro-ops .kauro-ops-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-ops-kind::before {
+  content: "";
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+.kauro-ops-kind--live::before {
+  background: currentColor;
+}
+.kauro-ops-kind--backend::before {
+  border-style: dashed;
+}
+.kauro-main .kauro-ops .kauro-ops-kind--live {
+  color: var(--kauro-color-success-text);
+}
+.kauro-main .kauro-ops .kauro-ops-kind--backend {
+  color: var(--kauro-color-accent-text);
+}
+
+/* ---- the settings page: an index of sections on the left from 62 rem, the sections on the right ---- */
+.kauro-ops-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-6);
+}
+@media (min-width: 72rem) {
+  .kauro-ops-settings {
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: var(--kauro-space-7);
+  }
+}
+.kauro-ops-settings-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-ops .kauro-ops-settings-nav p {
+  margin: var(--kauro-space-4) 0 var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-ops .kauro-ops-settings-nav p:first-child {
+  margin-block-start: 0;
+}
+.kauro-ops-settings-nav a {
+  display: flex;
+  align-items: center;
+  min-block-size: 2.25rem;
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-dense);
+  text-decoration: none;
+}
+.kauro-ops-settings-nav a:hover {
+  color: var(--kauro-color-primary);
+  text-decoration: underline;
+}
+@media (max-width: 71.99rem) {
+  .kauro-ops-settings-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0 var(--kauro-space-5);
+    padding: var(--kauro-space-4) var(--kauro-space-5);
+    border: 1px solid var(--kauro-color-border);
+    border-radius: var(--kauro-radius-large);
+    background: var(--kauro-color-raised);
+  }
+  .kauro-main .kauro-ops .kauro-ops-settings-nav p,
+  .kauro-main .kauro-ops .kauro-ops-settings-nav p:first-child {
+    margin-block-start: var(--kauro-space-2);
+  }
+}
+.kauro-ops-settings-body > section {
+  scroll-margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-ops .kauro-ops-settings-body > section + section {
+  margin-block-start: var(--kauro-space-7);
+}
+.kauro-main .kauro-ops .kauro-ops-settings-body .kauro-ops-group-title {
+  margin: var(--kauro-space-8) 0 var(--kauro-space-5);
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 2px solid var(--kauro-color-text);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-ops .kauro-ops-settings-body .kauro-ops-group-title:first-child {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-ops .kauro-ops-settings-body .kauro-ops-group-title + section {
+  margin-block-start: 0;
+}
+
+.kauro-main .kauro-ops .kauro-ops-setting-title {
+  margin: 0 0 var(--kauro-space-2);
+}
+.kauro-main .kauro-ops .kauro-ops-setting-purpose {
+  max-inline-size: 68ch;
+  margin: 0 0 var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-ops .kauro-ops-settings-body .kauro-ops-tablewrap {
+  margin-block: var(--kauro-space-3);
+}
+.kauro-main .kauro-ops .kauro-ops-settings-foot {
+  margin-block-start: var(--kauro-space-7);
+}
+
+/* ---- a decision or a confirmation: one column, the effect first, the action last ---- */
+.kauro-ops-decide {
+  max-inline-size: none;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-ops-tablewrap + .kauro-ops-decide,
+.kauro-ops-tablewrap + .kauro-ops-letter {
+  margin-block-start: var(--kauro-space-6);
+}
+.kauro-main .kauro-ops .kauro-ops-decide > :last-child {
+  margin-block-end: 0;
+}
+.kauro-ops-decide .kauro-actions {
+  margin-block: var(--kauro-space-4) 0;
+}
+
+/* ---- a history: date in a narrow column, the event beside it ---- */
+.kauro-ops-history {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-ops-history > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--kauro-space-5);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops-history > li {
+    grid-template-columns: 9rem minmax(0, 1fr);
+  }
+}
+.kauro-ops-history time {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- two equal cards, side by side from 48 rem ---- */
+.kauro-ops-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-4);
+}
+@media (min-width: 48rem) {
+  .kauro-ops-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-ops-card {
+  display: grid;
+  align-content: start;
+  gap: var(--kauro-space-2);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-ops .kauro-ops-card > * {
+  margin: 0;
+}
+.kauro-main .kauro-ops .kauro-ops-card .kauro-ops-card-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-ops .kauro-ops-card .kauro-ops-card-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.kauro-ops-card ul {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0;
+  padding-inline-start: 1.125rem;
+}
+
+/* ---- the seller's framed next step ---- */
+.kauro-ops-next {
+  max-inline-size: none;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-ops .kauro-ops-next-label {
+  margin: 0 0 var(--kauro-space-2);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-ops .kauro-ops-next h2 {
+  margin: 0 0 var(--kauro-space-2);
+}
+.kauro-main .kauro-ops .kauro-ops-next p {
+  margin: 0;
+}
+.kauro-ops-next .kauro-actions {
+  margin-block: var(--kauro-space-4) 0;
+}
+
+/* ---- a quiet list of single-line facts (waiting on others, health) ---- */
+.kauro-ops-lines {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-ops-lines > li {
+  max-inline-size: 72ch;
+  padding-inline-start: var(--kauro-space-4);
+  border-inline-start: 2px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-ops-lines > li.is-attention {
+  border-inline-start-color: var(--kauro-color-warning-text);
+}
+
+/* ---- a disclosure: the rules, collapsed after the first visit ---- */
+.kauro-ops-disclosure {
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-ops-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  min-block-size: var(--kauro-target-size);
+  padding: 0 var(--kauro-space-5);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-ops-disclosure > summary::marker {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-ops-disclosure-body {
+  padding: 0 var(--kauro-space-5) var(--kauro-space-5);
+}
+.kauro-main .kauro-ops .kauro-ops-disclosure-body > :first-child {
+  margin-block-start: 0;
+}
+
+/* ---- the onboarding checklist's count ---- */
+.kauro-main .kauro-ops .kauro-ops-progress {
+  margin: 0 0 var(--kauro-space-3);
+  font-weight: 600;
+}
+
+/* ---- a letter, as it will be read ---- */
+.kauro-ops-letter {
+  max-inline-size: 44rem;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-ops .kauro-ops-letter p {
+  max-inline-size: 68ch;
+}
+.kauro-main .kauro-ops .kauro-ops-letter .kauro-ops-letter-subject {
+  margin-block-end: var(--kauro-space-4);
+  padding-block-end: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+  font-weight: 600;
+}
+.kauro-main .kauro-ops .kauro-ops-letter .kauro-ops-letter-foot {
+  margin: var(--kauro-space-4) 0 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ---- a resource row ---- */
+.kauro-ops-resources {
+  margin: 0;
+  padding: 0;
+  border-block-start: 1px solid var(--kauro-color-border);
+  list-style: none;
+}
+.kauro-main .kauro-ops-resources > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops-resources > li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+.kauro-main .kauro-ops .kauro-ops-resources p {
+  margin: 0;
+}
+.kauro-ops-resources .kauro-actions {
+  margin: 0;
+}
+.kauro-ops-resources li.is-replaced {
+  color: var(--kauro-color-text-muted);
+}
+
+/* ---- a form in one column ---- */
+.kauro-ops-form {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 36rem;
+}
+.kauro-main .kauro-ops .kauro-ops-form .kauro-field {
+  margin: 0;
+}
+.kauro-ops-form .kauro-actions {
+  margin: 0;
+}
+
+/* ---- a phone: the page's own action takes the full width under the heading ---- */
+@media (max-width: 47.99rem) {
+  .kauro-ops-head-action,
+  .kauro-ops-head-action .kauro-button {
+    inline-size: 100%;
+  }
+  .kauro-ops-head-action .kauro-button {
+    justify-content: center;
+  }
+}
+
+/* ---- a settings page of one column of sections: the label and its purpose left, the facts right (from 62 rem) ---- */
+.kauro-ops-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-2) var(--kauro-space-7);
+}
+@media (min-width: 62rem) {
+  .kauro-ops-split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+.kauro-main .kauro-ops .kauro-ops-split dl.kauro-ops-facts {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-ops .kauro-ops-split dl.kauro-ops-facts > div:first-child {
+  padding-block-start: 0;
+}
+.kauro-main .kauro-ops > .kauro-ops-split + .kauro-ops-split {
+  margin-block-start: var(--kauro-space-6);
+  padding-block-start: var(--kauro-space-6);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-ops .kauro-ops-split dl.kauro-ops-facts > div {
+    grid-template-columns: minmax(9rem, 1fr) 2fr;
+  }
+}
+.kauro-ops-notices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-ops-notices > li {
+  max-inline-size: none;
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-ops .kauro-ops-notices p {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding-block: var(--kauro-space-2);
+}
+
+/* ---- a funnel: each stage's count as a bar's length, with the number beside it ---- */
+.kauro-ops-funnel {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-3);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-ops-funnel > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  max-inline-size: none;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-ops-funnel > li {
+    grid-template-columns: 16rem minmax(0, 1fr) 3rem;
+  }
+}
+.kauro-ops-funnel-label {
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-ops-funnel progress {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  inline-size: 100%;
+  block-size: 0.75rem;
+  border: 0;
+  border-radius: 62.5rem;
+  background: var(--kauro-color-surface);
+  appearance: none;
+}
+@media (min-width: 48rem) {
+  .kauro-ops-funnel progress {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+.kauro-ops-funnel progress::-webkit-progress-bar {
+  border-radius: 62.5rem;
+  background: var(--kauro-color-surface);
+}
+.kauro-ops-funnel progress::-webkit-progress-value {
+  border-radius: 62.5rem;
+  background: var(--kauro-color-text-muted);
+}
+.kauro-ops-funnel progress::-moz-progress-bar {
+  border-radius: 62.5rem;
+  background: var(--kauro-color-text-muted);
+}
+.kauro-ops-funnel strong {
+  grid-column: 2;
+  grid-row: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+@media (min-width: 48rem) {
+  .kauro-ops-funnel strong {
+    grid-column: 3;
+  }
+}
+
+/* ---- what a customer wrote ---- */
+.kauro-main .kauro-ops .kauro-ops-quote {
+  margin: var(--kauro-space-3) 0;
+  padding-inline-start: var(--kauro-space-4);
+  border-inline-start: 2px solid var(--kauro-color-control-border);
+  font-size: 1rem;
+}
+
+.kauro-ops-after-table {
+  margin-block-start: var(--kauro-space-4);
+}
+
+.kauro-main .kauro-ops .kauro-actions + p,
+.kauro-main .kauro-ops .kauro-actions + .kauro-muted {
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-ops .kauro-ops-footnote {
+  margin-block-start: var(--kauro-space-6);
+}
+.kauro-main .kauro-ops .kauro-ops-tablewrap + .kauro-muted,
+.kauro-main .kauro-ops .kauro-ops-tablewrap + p {
+  margin-block-start: var(--kauro-space-3);
+}
+
+/* ---- Today's projects by stage: a table from 48 rem, a list of one line per stage on a phone ---- */
+.kauro-ops-stages-phone {
+  display: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  list-style: none;
+}
+.kauro-main .kauro-ops-stages-phone > li {
+  display: grid;
+  max-inline-size: none;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-ops-stages-phone > li:last-child {
+  border-block-end: 0;
+}
+.kauro-ops-stages-name {
+  font-weight: 600;
+}
+@media (max-width: 47.99rem) {
+  .kauro-ops-stages-phone {
+    display: block;
+  }
+  .kauro-ops-stages-wide {
+    display: none;
+  }
+}
+
+.kauro-main .kauro-ops .kauro-rings {
+  max-inline-size: 42rem;
+}
+.kauro-ops-disclosure > summary {
+  list-style: none;
+}
+.kauro-ops-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.kauro-ops-disclosure > summary::before {
+  content: "\25B8";
+  color: var(--kauro-color-text-muted);
+}
+.kauro-ops-disclosure[open] > summary::before {
+  content: "\25BE";
+}
+.kauro-ops-table .kauro-status-badge,
+.kauro-ops-table .kauro-ops-date {
+  white-space: nowrap;
+}
+.kauro-main .kauro-ops .kauro-ops-decide h3 {
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-ops dl.kauro-ops-facts + p {
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-ops section.kauro-ops-decide,
+.kauro-main .kauro-ops section.kauro-ops-next,
+.kauro-main .kauro-ops section.kauro-ops-card {
+  padding-block-start: var(--kauro-space-5);
+}
+.kauro-ops a.kauro-text-button {
+  display: inline-flex;
+  align-items: center;
+}
+.kauro-ops-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+.kauro-ops-form :is(input:not([type="checkbox"]), select, textarea) {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+.kauro-ops-decide dl.kauro-ops-facts + .kauro-ops-form {
+  margin-block-start: var(--kauro-space-5);
+}

@@ -44,6 +44,10 @@ export function appPathOf(id: string, ctx: ReviewContext, project: string = IDS.
     if (proposal.key === "P-08") return `${pathOf("UI13", { agencyId, id: project })}/activity`;
     if (proposal.key === "P-05") return "/signup";
     if (proposal.key === "P-06") return "/login/reset";
+    if (proposal.key === "P-21") return "/ops/sales/sellers";
+    if (proposal.key === "P-22") return "/ops/money/payouts";
+    if (proposal.key === "P-23") return "/ops/customers";
+    if (proposal.key === "P-24") return "/ops/sales/claims";
     return proposal.origin === "OPS" ? "/ops/settings" : "/account";
   }
   switch (id) {
