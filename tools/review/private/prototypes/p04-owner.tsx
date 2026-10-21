@@ -259,7 +259,7 @@ export function OwnerSettings({ state }: PrototypeProps): ReactElement {
             <Head id="outreach" title="Outreach rules" kind="live" kindText="Live · sending identities and authorisations" purpose="Who may send messages for Kauro, and what has been authorised. A message leaves only with its exact text authorised." />
             <Facts
               rows={[
-                ["Sending identities", alerts ? "1 verified · 1 revoked on Oct 21 (amara.okafor@sales.kauro.example); her messages have stopped" : "2 verified · 1 revoked (Tomás Vidal's, when his engagement ended)"],
+                ["Sending identities", alerts ? "1 verified · 1 revoked on Oct 21 (amara.okafor@sales.kauro.example); messages from it have stopped" : "2 verified · 1 revoked (Tomás Vidal's, when the engagement ended)"],
                 ["Authorisations in force", "1: Daniel Kim to Ostra Revenue Ops, one send, until Oct 23, 2026"],
                 ["Channel rules in force", "A reply someone asked for, a first contact to an organisation, a follow-up: by country"],
                 ["Do not contact", "1 organisation, on every channel"],

@@ -40,7 +40,7 @@ function OwnerToday({ quiet }: { readonly quiet: boolean }): ReactElement {
   const queue: readonly QueueItem[] = [
     { key: "credit", what: "Match a transfer to its order", why: "Northwind Data sent USD 1,295.00 with an order reference. Their Larch Studio project waits for it.", due: "Today", urgent: true, action: { label: "Match it in Finance", href: OPS_PATH.finance } },
     { key: "case", what: "Answer Northwind Data on import steps", why: "Support case 118. Support answers in writing, Monday to Friday.", due: "Today, 11:00 AM", urgent: true, action: { label: "Open the case", href: OPS_PATH.support } },
-    { key: "assess", what: "Record Lucía Ferrer's assessment", why: "Scheduled for Oct 23. Her activation also waits for her signature.", due: "Oct 23", action: { label: "Open Lucía Ferrer", href: OPS_PATH.seller(SELLER_ID.lucia) } },
+    { key: "assess", what: "Record Lucía Ferrer's assessment", why: "Scheduled for Oct 23. Activation also waits for the signed agreement.", due: "Oct 23", action: { label: "Open Lucía Ferrer", href: OPS_PATH.seller(SELLER_ID.lucia) } },
     { key: "domain", what: "Renew the kauro.example domain", why: "If it lapses, the site and every email address stop. Prepared, USD 18.00.", due: "By Nov 2", action: { label: "Open the action", href: OPS_PATH.actions } },
     { key: "claim", what: "Decide Daniel Kim's claim on Fernhill Growth Partners", why: "No other claim and no customer record matches it.", due: "Since Oct 20", action: { label: "Decide the claim", href: OPS_PATH.claims } },
     { key: "message", what: "Authorise Daniel Kim's follow-up to Saltmarsh Digital", why: "Prepared from the current resources, for one send.", due: "Since Oct 20", action: { label: "Review the message", href: OPS_PATH.outreach } },

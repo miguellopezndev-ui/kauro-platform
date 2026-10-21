@@ -45,18 +45,18 @@ import {
 } from "./sales.ts";
 
 export const UI37_STATES: readonly StateDef[] = [
-  { key: "normal", label: "Active seller", note: "Daniel Kim: two things need you, his money by state, his three customers, his claims and his agreement." },
+  { key: "normal", label: "Active seller", note: "Daniel Kim: two things need you, money by state, three customers, claims and the agreement." },
   { key: "candidate", label: "Onboarding", note: "Lucía Ferrer, a candidate: the setup steps are the page's purpose and come first; no money section is drawn yet." },
-  { key: "ended", label: "Ended", note: "Tomás Vidal, ended on Sep 30: what Kauro still owes him, and his history, kept." },
+  { key: "ended", label: "Ended", note: "Tomás Vidal, ended on Sep 30: what Kauro still owes, and the history, kept." },
   { key: "terminate", label: "Preparing a termination", note: "What ends at once, and what Kauro still owes and keeps paying." },
 ];
 
 const NEEDS: Readonly<Record<string, readonly QueueItem[]>> = {
   [SELLER_ID.daniel]: [
-    { key: "claim", what: "Decide his claim on Fernhill Growth Partners", why: "No other claim and no customer record matches it.", due: "Since Oct 20", action: { label: "Decide the claim", href: OPS_PATH.claims } },
-    { key: "message", what: "Authorise his follow-up to Saltmarsh Digital", why: "Prepared from the current resources, for one send.", due: "Since Oct 20", action: { label: "Review the message", href: OPS_PATH.outreach } },
+    { key: "claim", what: "Decide the claim on Fernhill Growth Partners", why: "No other claim and no customer record matches it.", due: "Since Oct 20", action: { label: "Decide the claim", href: OPS_PATH.claims } },
+    { key: "message", what: "Authorise the follow-up to Saltmarsh Digital", why: "Prepared from the current resources, for one send.", due: "Since Oct 20", action: { label: "Review the message", href: OPS_PATH.outreach } },
   ],
-  [SELLER_ID.lucia]: [{ key: "assess", what: "Record her assessment", why: "Product and English, scheduled with her. Her activation also waits for her signature.", due: "Oct 23", action: { label: "Record the assessment", href: OPS_PATH.seller(SELLER_ID.lucia) } }],
+  [SELLER_ID.lucia]: [{ key: "assess", what: "Record the assessment", why: "Product and English, scheduled for Oct 23. Activation also waits for the signed agreement.", due: "Oct 23", action: { label: "Record the assessment", href: OPS_PATH.seller(SELLER_ID.lucia) } }],
 };
 
 const HISTORY: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
@@ -76,7 +76,7 @@ const HISTORY: Readonly<Record<string, readonly (readonly [string, string])[]>> 
     ["Aug 17, 2026", "Agreement signed by both; account activated"],
   ],
   [SELLER_ID.lucia]: [
-    ["Oct 12, 2026", "Seller agreement 2026-10 sent for her signature"],
+    ["Oct 12, 2026", "Seller agreement 2026-10 sent for signature"],
     ["Oct 9, 2026", "Legal review recorded: independent contractor in Colombia"],
     ["Oct 6, 2026", "Invitation accepted; two-step verification set up"],
   ],
@@ -377,8 +377,8 @@ function Onboarding(): ReactElement {
     { key: "mfa", name: "Two-step verification", fact: "Oct 6", state: "done" as const },
     { key: "legal", name: "Legal review", fact: "You · Oct 9", state: "done" as const },
     { key: "assessment", name: "Assessment", fact: "You · Oct 23", state: "current" as const },
-    { key: "agreement", name: "Agreement signed by both", fact: "Waiting for her since Oct 12", state: "waiting" as const },
-    { key: "confidentiality", name: "Confidentiality accepted", fact: "Waiting for her", state: "waiting" as const },
+    { key: "agreement", name: "Agreement signed by both", fact: "Waiting for the seller since Oct 12", state: "waiting" as const },
+    { key: "confidentiality", name: "Confidentiality accepted", fact: "Waiting for the seller", state: "waiting" as const },
     { key: "payout", name: "Payout destination verified", fact: "Not added yet", state: "waiting" as const },
     { key: "tax", name: "Tax documents on file", fact: "Not sent yet", state: "waiting" as const },
     { key: "activate", name: "Activation", fact: "You, with a fresh confirmation", state: "waiting" as const },
