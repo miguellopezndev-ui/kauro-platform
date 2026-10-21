@@ -673,7 +673,8 @@ body:has(> .kauro-site-header) {
   background: var(--kauro-color-primary);
   color: var(--kauro-color-on-primary);
 }
-.kauro-site-button--primary::after,
+/* the filled button carries its words only (owner, 2026-10-21: the arrow after "check" made it longer and wrapped on a phone); a quiet text
+   link keeps its arrow */
 .kauro-site-arrow::after {
   content: "\2192" / "";
   display: inline-block;
@@ -684,7 +685,6 @@ body:has(> .kauro-site-header) {
   background: var(--kauro-color-primary-hover);
   color: var(--kauro-color-on-primary);
 }
-.kauro-site-button--primary:hover::after,
 .kauro-site-arrow:hover::after {
   transform: translateX(2px);
 }
@@ -10075,4 +10075,15 @@ body:has(> .kauro-site-header) {
   display: inline-flex;
   align-items: center;
   min-block-size: 1.75rem;
+}
+/* on a phone the menu card is as wide as the screen allows, so the call to action fits on one line (from 360 px wide) */
+@media (max-width: 47.99rem) {
+  .kauro-site-header .kauro-site-menu-panel {
+    inline-size: min(22rem, calc(100vw - 2 * var(--kauro-site-gutter)));
+  }
+  .kauro-site-menu-actions .kauro-site-button {
+    min-block-size: 2.75rem;
+    padding-inline: var(--kauro-space-3);
+    font-size: 0.9375rem;
+  }
 }
