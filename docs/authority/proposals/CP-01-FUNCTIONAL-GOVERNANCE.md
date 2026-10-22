@@ -18,13 +18,13 @@ the registry only by the adoption in `README.md`. Items marked `CONDITIONAL` or 
 | Chosen behavior | Section 3 and the delta. |
 | Rejected | F-02 (approval issuing the quote) and F-09 (output preferences): section 4. |
 | Deferred | Every new command, read and contract field (component C3) goes to CP-02, prepared by Order 17 (section 5). |
-| Impacted policy IDs | New: `retention.policyVersion`, `retention.unpaidExtendedCeilingDaysFromSeal`, `retention.pendingPaymentHold` (conditional), `intelligence.freeAuditPauseBps`, `commission.claimRefusalListVersion`, `commission.claimRefusalReasons`, `commission.collectionPeriod`, `commission.refundPeriod`, `commission.retainerDefaultCentsPerMonth`, `legalStatus`, `alerts`, `alerts.relevantProgress` (proposed), `identityResolution` (conditional). No existing key changes value or is removed. |
-| Contracts, commands, cases, gates | Text of CMD020 and CMD060 (precondition, failure); screens UI03, UI07, UI29 and a new UI56; contract RetentionRecord gains a class (conditional). No case or gate is removed; new acceptance cases are listed per item and written by the implementing order, tests first. |
+| Impacted policy IDs | New: `retention.policyVersion`, `retention.extendHardCapExceptions`, `retention.pendingPaymentHold` (conditional), `intelligence.freeAuditPauseBps`, `commission.claimRefusalListVersion` and `commission.claimRefusalReasons` (conditional), `commission.collectionPeriod` and `commission.refundPeriod` (conditional), `commission.retainerDefaultCentsPerMonth`, `legalStatus`, `alerts`, `alerts.relevantProgress` (proposed), `identityResolution` (conditional). No existing key changes value or is removed. |
+| Contracts, commands, cases, gates | Text of CMD020 and CMD060 (precondition, failure) and of their copies in cases CMD020-OK, CMD020-DENY, CMD060-OK, CMD060-DENY and requirements REQ-CMD020-DENY, REQ-CMD060-DENY; contract Audit (`targetContractId` no longer required); contract RetentionRecord (`hardDeadline` description; a class, conditional); screens UI03, UI07, UI29 and a new UI56. No case or gate is removed; new acceptance cases are listed per item and written by the implementing order, tests first. |
 | Data migrations | None at adoption. The implementing orders add append-only migrations (the extended UNPAID ceiling, the hold class) and keep every applied migration. |
 | Producers and consumers | Producers: the authority re-issue. Consumers: `@kauro/contracts` and its generated types, the domain policy copies, SQL checks that pin 1,209,600 s and 259,200 s, the web's policy snapshot and public words, the legal texts. |
 | Security and privacy effects | The 17-day ceiling keeps a free check's data up to 3 days longer, only on an authorised request; the hold keeps data during a confirmation window under hard limits. Neither lowers a deletion, isolation or audit rule. Retention never becomes open-ended. |
 | Price and commission consequences | None to prices. Commission: definitions only (periods, default retainer 0, refusal reasons); no rate changes. |
-| Invalidated evidence | None: no accepted case asserts the contrary. The CMD060-DENY test that refuses an UNPAID-only project changes with F-19 (section 3.2). |
+| Invalidated evidence | The four restated cases (CMD020-OK, CMD020-DENY, CMD060-OK, CMD060-DENY) need new evidence for their new text; their current tests stay valid for HUBSPOT, SALESFORCE and the paid classes. The CMD060-DENY test that refuses an UNPAID-only project changes with F-19 (section 3.2). |
 | Migration and transition | Prospective. Records, quotes, approvals and statements keep the version they were created under (retention labels in section 3.2). |
 | Rollback limits | Text and values can be reversed prospectively. Data already deleted is not restored; an extension already granted under R2-RETENTION-2 keeps its date. |
 | Implementation mandate | Order 17 (api contract, CP-02); the backend, retention and payment orders after it (`docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md` §8). |
@@ -51,14 +51,14 @@ the registry only by the adoption in `README.md`. Items marked `CONDITIONAL` or 
   target contract and refuses `TARGET_STALE` with no mode branch; openapi `StartAuditRequest` requires `targetContractId`. The plan
   compiler already has a canonical CLEAN hash (`plan-compiler.ts:27-28,78`) that no audit can carry. Tests mask it: every CMD020 test
   passes a target, and the helper inserts CLEAN-mode target artifacts (`cmd018-cmd019-target-contract.test.ts:59`).
-- **Change.** CMD020 precondition and failure (delta). The field `targetContractId` stays in the catalogue (the registry has no
-  required flag); the openapi makes it required unless the project's mode is CLEAN.
+- **Change.** CMD020 precondition and failure, their copies in cases and requirements, and the Audit contract's `targetContractId`
+  (now `required: false`, absent for CLEAN) (delta). The openapi makes the field required unless the project's mode is CLEAN.
 - **Rule for Order 17.** CLEAN: no `targetContractId`; one given is refused `422 TARGET_NOT_APPLICABLE` (one canonical hash, no
   ambiguity). The audit records `CLEAN_ONLY_TARGET_HASH`; CreatePlan, ApprovePlan and CreateQuote bind that hash and lock no target
   row for CLEAN. HUBSPOT and SALESFORCE unchanged.
 - **Tests (first).** A CLEAN project reaches audit, plan, approval and quote with no target contract; a target supplied for CLEAN is
-  refused with nothing written; HUBSPOT without a target still `TARGET_STALE`; the quote's target fingerprint for CLEAN is the
-  canonical hash.
+  refused with nothing written; HUBSPOT without a target still `TARGET_STALE`; a CLEAN quote binds the canonical CLEAN hash internally
+  and shows no target fingerprint (ToS §6.1).
 
 ### 3.2 CP-01.02: retention R2-RETENTION-2 (F-19, F-20) — `APPROVED_AWAITING_REISSUE`
 
@@ -73,8 +73,9 @@ the registry only by the adoption in `README.md`. Items marked `CONDITIONAL` or 
 - **What F-20 changes (contradiction proved).** `retention.extendHardCap` is false, CMD060 refuses a "hard-cap change", UI29's
   exception says no extension crosses a hard cap, ToS §13.1/§13.2 and DPA Annex IV say the extension never exceeds the maximums; the
   domain and SQL pin 14 days (`policy.ts:43`, `retention.ts:184`, migrations `0011`, `0012`, `0014`, `0021`, `0082`).
-- **Change.** New keys `retention.unpaidExtendedCeilingDaysFromSeal = 17` and `retention.policyVersion = "R2-RETENTION-2"`; CMD060
-  and UI29 texts (delta). `extendHardCap` stays false for every other class.
+- **Change.** `retention.extendHardCap` keeps its value (false) as the general rule; a new `retention.extendHardCapExceptions` names
+  the only exception (`UNPAID`, ceiling 17 days from sealing, only through the project's one extension); `retention.policyVersion =
+  "R2-RETENTION-2"`; CMD060, its case and requirement copies, UI29 and RetentionRecord's `hardDeadline` description (delta).
 - **Rule.** For an UNPAID record only, the extension sets soft = min(previous soft + requested, seal + 17 days) and moves the hard
   deadline to that value; without an extension nothing changes (14 days). One extension per project across classes: an extension
   used on the free check leaves none for the paid project. A restored backup never revives data whose period ended.
@@ -89,30 +90,36 @@ the registry only by the adoption in `README.md`. Items marked `CONDITIONAL` or 
 ### 3.3 CP-01.03: the free-check pause threshold (X-34, Q-4) — `APPROVED_AWAITING_REISSUE`
 
 - **Decision.** A3 §3.2 (adopted 2026-09-25, citing 14 §Cost controls): new free checks pause at 90% of the funded envelope.
-- **Contradiction proved.** ToS §3.3 said "when the available budget is exhausted"; the registry has no threshold. The ToS draft is
-  aligned editorially in this order (`docs/legal/CHECKLIST.md` §11); the value becomes `intelligence.freeAuditPauseBps = 9000`.
+- **Contradiction proved.** ToS §3.3 says "when the available budget is exhausted" while citing A3; the registry has no threshold.
+  The value becomes `intelligence.freeAuditPauseBps = 9000`. The Terms are **not** changed here: the new wording would let Kauro pause
+  earlier than the draft tells the Customer, so it is LR-11 (owner and counsel; register X-34 stays open for the text).
 - **Not decided here.** The meaning of "funded envelope" stays manual 14's (`money.monthlyOwnerFundingCents`,
   `money.actualAvailableFunding`); the implementing order reads it from there.
 
-### 3.4 CP-01.04: claim refusal reasons and the legal status of the claim rules (F-13, F-18) — `APPROVED_AWAITING_REISSUE`
+### 3.4 CP-01.04: claim refusal reasons (F-13) — `CONDITIONAL`; CP-01.14: legal status of the claim rules (F-18) — `APPROVED_AWAITING_REISSUE`
 
-- **Decision.** Owner, 2026-10-21 (ORDER11-ROUND2-OPS decision 2): a closed list, the seller reads a neutral message, "Other" needs a
-  note; the claim rules are marked "Pending legal review" until counsel validates them.
-- **Code today.** Acceptance carries one of four tokens (`accept-attribution.ts:36`); a rejection carries no reason, no evidence and no
-  seller message (`commercial/machines.ts:94-95`); the only free text is the allocation's `rulingReason`.
-- **Change.** `commission.claimRefusalListVersion = CLAIM-REFUSAL-1`, the seven codes with their seller messages (the owner's list as
-  drawn in `tools/review/private/prototypes/sales.ts:361-367`), and `legalStatus["commission.claimRules"] = PENDING_COUNSEL` since
-  2026-10-21. Approving the list does not validate it legally: the status says so in the data, and the owner's screens read it.
+- **Decision.** Owner, 2026-10-21 (ORDER11-ROUND2-OPS decision 2; the list's content in FG F-13): a closed list, the seller reads a
+  neutral message, "Other" needs a note; the claim rules are marked "Pending legal review" until counsel validates them.
+- **Code today.** Acceptance carries one of four tokens (`accept-attribution.ts:36`). A claim is refused only through a competing
+  allocation (`commercial/machines.ts:94-95`), which carries a label `ruling_reason` and a `ruling_evidence_hash`
+  (`0029_sales_attribution.sql:403-404`). Missing: a closed refusal code and a seller-facing message.
+- **Change.** CP-01.04: `commission.claimRefusalListVersion = CLAIM-REFUSAL-1` and seven codes with their seller messages. The reasons
+  and the four "Not available to claim" messages are the owner's (FG F-13); the code names are Order 16's and the messages of the three
+  own-claim reasons come from the review prototype (`tools/review/private/prototypes/sales.ts:361-367`), so the item waits for the
+  owner's confirmation. CP-01.14: `legalStatus["commission.claimRules"] = PENDING_COUNSEL` since 2026-10-21; approving a list does not
+  validate it legally, and the status says so in the data.
 - **Counsel.** The validation of the 90-day claim, the tail and the reasons is a seller-agreement question (LAWYER_LATER L-12, new
   L-19); until then the state stays `PENDING_COUNSEL`.
 
-### 3.5 CP-01.05: seller money definitions (F-12, F-16) — `APPROVED_AWAITING_REISSUE`
+### 3.5 CP-01.05: the default retainer (F-16) — `APPROVED_AWAITING_REISSUE`; CP-01.13: the periods (F-12) — `CONDITIONAL`
 
-- **Decision.** Owner, 2026-10-21 (decisions 1 and 4): four figures, collections not invoices, each collection once, a repeat project in
-  the month it was collected, a refund in the month of the refund; the retainer is USD 0.00 by default and a signed one is owed.
+- **Decision.** Owner, 2026-10-21 (ORDER11-ROUND2-OPS decisions 1 and 4): four figures, collections not invoices, net of refunds, each
+  collection once; the retainer is USD 0.00 by default and a signed one is owed.
 - **Already consistent.** `commission.base` (net of refund, excluding tax) and `seller_agreements.retainer_cents_per_month DEFAULT 0`.
-- **Change.** `collectionPeriod = MONTH_OF_CAPTURE`, `refundPeriod = MONTH_OF_REFUND`, `retainerDefaultCentsPerMonth = 0`. The statement
-  item for the retainer and the offset fields are contract changes for CP-02 (no `RETAINER` item kind exists: `0031:178`).
+- **Change.** CP-01.05: `retainerDefaultCentsPerMonth = 0`. CP-01.13: `collectionPeriod = MONTH_OF_CAPTURE`, `refundPeriod =
+  MONTH_OF_REFUND`. FG F-12 records these periods as part of the decision, but ROUND2-OPS does not and F-12's own needs ask for the
+  refund period to be defined, so CP-01.13 waits for the owner's confirmation. The statement item for the retainer and the offset
+  fields are contract changes for CP-02 (no `RETAINER` item kind exists: `0031:178`).
 
 ### 3.6 CP-01.06: alert thresholds (F-15) — `APPROVED_AWAITING_REISSUE`
 
@@ -156,6 +163,8 @@ CP-02 field (section 5).
   - Owner review threshold: **2 holds ended unpaid in 90 days** per workspace; the third needs the owner. Small enough to stop a pattern,
     large enough not to punish one bank failure.
   - Proof given with a step-up: **yes**. It keeps personal data longer and binds money; the step-up already exists (900 s).
+  - Calendar: the owner left the coverage calendar's holidays open; the published support calendar is recommended and listed as
+    pending.
   - Still external: the PV1 qualification (Wise not opened; Payments V1 §2 (a)–(f)) decides which evidence the proof is checked
     against. Until then nothing here is adoptable.
 - **Change when unblocked.** `retention.pendingPaymentHold` and the class `PENDING_PAYMENT_HOLD` in RetentionRecord.
@@ -206,3 +215,5 @@ adopted with CP-02 in the same re-issue, so the registry changes once.
 | CP-01.10 | | | |
 | CP-01.11 | | | |
 | CP-01.12 | | | |
+| CP-01.13 | | | |
+| CP-01.14 | | | |

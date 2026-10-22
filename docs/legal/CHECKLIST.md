@@ -237,7 +237,7 @@ every customer right they stated is kept. None of these edits declares complianc
 
 ## 11. Wording changed for Order 16 (2026-10-22)
 
-Order 16 (functional governance) aligned the draft Terms with decisions already in force, by the procedure of section 10: minimal
+Order 16 (functional governance) aligned three places of the draft Terms with decisions already in force, by the procedure of section 10: minimal
 wording, every protection and customer right kept, no compliance declared. The proposals that need a new obligation or competent
 judgement are not applied: they are in `CHANGE-REQUESTS-CP-01.md`, with their entry into force blocked.
 
@@ -245,5 +245,4 @@ judgement are not applied: they are in `CHANGE-REQUESTS-CP-01.md`, with their en
 |---|---|---|---|
 | ToS §2 Plan | "tied to a Revision, a Target Contract and specific decisions" becomes "tied to a Revision, to a Target Contract where the mode has one, and to specific decisions" | owner decision 2026-10-20 ("Clean your data" has no destination); the Terms' own Target Contract definition ("when the mode requires it") | wording changed 2026-10-22; pending competent review (D-31) |
 | ToS §3.2 lead | "a single target instance for its paid revision" applies only "where the mode prepares files for a target CRM" | same; ToS §3.2 CLEAN bullet; A3 §3.3 | wording changed 2026-10-22; pending competent review (D-31) |
-| ToS §3.3 | the pause of new free reviews happens "once ninety percent (90%) of the funded processing budget is used" (was "when the available budget is exhausted") | A3 §3.2, which this clause already cites (14 §Cost controls: pause at 90% of the funded envelope); CP-01.03 | wording changed 2026-10-22; pending competent review (D-31) |
 | ToS §6.1 | the Quote records the target fingerprint "where the mode has a target" | owner decision 2026-10-20; CP-01.01 | wording changed 2026-10-22; pending competent review (D-31) |

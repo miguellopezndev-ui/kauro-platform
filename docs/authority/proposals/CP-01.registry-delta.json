@@ -8,7 +8,9 @@
       "policy.json": "5ad638f13153723aa81f4cb49c9dd718c599988257f384858f20141fc6f2d23e",
       "commands.json": "6fa1a124821609a5ac911779304e8876df1a6954c530e895604da107826af0b6",
       "screens.json": "c9963d7ebe713d88c4f4d2af3ea2b1ad7d44e74c6649fc705f62f49e71a49f80",
-      "contracts.json": "9608c2de39ae0dc5e66c537d241a7257a190c581374aba2c63fd4a1c7d2f29d2"
+      "contracts.json": "9608c2de39ae0dc5e66c537d241a7257a190c581374aba2c63fd4a1c7d2f29d2",
+      "cases.json": "b0a7960d9c44f4d950ae60cf40f8dd61fd29c41d26713c5d76b96dada66302c1",
+      "requirements.json": "3bd812bb80ce7daac35283060916c1dfdd3de30d7566f62b5dd037be63066ae1"
     }
   },
   "statuses": {
@@ -58,6 +60,82 @@
             "path": "/19/failure",
             "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call."
           }
+        ],
+        "contracts.json": [
+          {
+            "op": "test",
+            "path": "/54/name",
+            "value": "Audit"
+          },
+          {
+            "op": "test",
+            "path": "/54/fields/2",
+            "value": {
+              "name": "targetContractId",
+              "type": "id",
+              "required": true,
+              "description": "Exact target version."
+            }
+          },
+          {
+            "op": "replace",
+            "path": "/54/fields/2",
+            "value": {
+              "name": "targetContractId",
+              "type": "id",
+              "required": false,
+              "description": "Exact target version; absent for CLEAN, whose audit binds the canonical CLEAN target hash."
+            }
+          }
+        ],
+        "cases.json": [
+          {
+            "op": "test",
+            "path": "/306/id",
+            "value": "CMD020-OK"
+          },
+          {
+            "op": "test",
+            "path": "/306/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Source is sealed/available, target is eligible, agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "replace",
+            "path": "/306/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Source is sealed/available; for HUBSPOT and SALESFORCE the target is eligible, while CLEAN takes no target contract and binds the canonical CLEAN target hash; agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "test",
+            "path": "/307/id",
+            "value": "CMD020-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/307/expected",
+            "value": "No budget or stale target returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/307/expected",
+            "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          }
+        ],
+        "requirements.json": [
+          {
+            "op": "test",
+            "path": "/307/id",
+            "value": "REQ-CMD020-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/307/statement",
+            "value": "No budget or stale target returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/307/statement",
+            "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          }
         ]
       }
     },
@@ -85,8 +163,13 @@
           },
           {
             "op": "add",
-            "path": "/retention/unpaidExtendedCeilingDaysFromSeal",
-            "value": 17
+            "path": "/retention/extendHardCapExceptions",
+            "value": {
+              "UNPAID": {
+                "ceilingDaysFromSeal": 17,
+                "onlyThroughTheProjectExtension": true
+              }
+            }
           }
         ],
         "commands.json": [
@@ -103,7 +186,7 @@
           {
             "op": "replace",
             "path": "/59/precondition",
-            "value": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap, except that an UNPAID record may be extended up to unpaidExtendedCeilingDaysFromSeal days from its sealing."
+            "value": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap, except that for an UNPAID record the extension may move the hard cap to at most retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal days from sealing."
           },
           {
             "op": "test",
@@ -113,7 +196,7 @@
           {
             "op": "replace",
             "path": "/59/failure",
-            "value": "Reject expired/deleted scope, a second extension, any hard-cap change beyond the UNPAID ceiling, or stale version. A quote/retry cannot create this authority."
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change other than the UNPAID exception, or stale version. A quote/retry cannot create this authority."
           }
         ],
         "screens.json": [
@@ -130,7 +213,78 @@
           {
             "op": "replace",
             "path": "/28/exceptions",
-            "value": "No extension revives expired data or crosses a hard cap; the one extension of an unpaid free check may keep its data at most 17 days from sealing."
+            "value": "No extension revives expired data or crosses a hard cap, except the one extension of an unpaid free check, which may move its hard cap to at most 17 days from sealing."
+          }
+        ],
+        "contracts.json": [
+          {
+            "op": "test",
+            "path": "/61/fields/5",
+            "value": {
+              "name": "hardDeadline",
+              "type": "utc",
+              "required": true,
+              "description": "Absolute maximum from the owning immutable event."
+            }
+          },
+          {
+            "op": "replace",
+            "path": "/61/fields/5",
+            "value": {
+              "name": "hardDeadline",
+              "type": "utc",
+              "required": true,
+              "description": "Absolute maximum from the owning immutable event; only the one extension of an UNPAID record may move it, to at most the policy's UNPAID ceiling from sealing."
+            }
+          }
+        ],
+        "cases.json": [
+          {
+            "op": "test",
+            "path": "/426/id",
+            "value": "CMD060-OK"
+          },
+          {
+            "op": "test",
+            "path": "/426/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap."
+          },
+          {
+            "op": "replace",
+            "path": "/426/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap, except that for an UNPAID record the extension may move the hard cap to at most retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal days from sealing."
+          },
+          {
+            "op": "test",
+            "path": "/427/id",
+            "value": "CMD060-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/427/expected",
+            "value": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/427/expected",
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change other than the UNPAID exception, or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          }
+        ],
+        "requirements.json": [
+          {
+            "op": "test",
+            "path": "/427/id",
+            "value": "REQ-CMD060-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/427/statement",
+            "value": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/427/statement",
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change other than the UNPAID exception, or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
           }
         ]
       }
@@ -162,18 +316,20 @@
     },
     {
       "id": "CP-01.04",
-      "title": "A closed, versioned list of claim refusal reasons, and the legal status of the claim rules",
+      "title": "A closed, versioned list of claim refusal reasons",
       "gaps": [
-        "F-13",
-        "F-18"
+        "F-13"
       ],
-      "status": "APPROVED_AWAITING_REISSUE",
+      "status": "CONDITIONAL",
       "approval": {
         "source": "owner",
         "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+        "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md"
       },
-      "pending": [],
+      "pending": [
+        "owner confirmation of the code names (Order 16's) and of the seller messages of the three own-claim reasons, taken from the review prototype (tools/review/private/prototypes/sales.ts)",
+        "competent review of the claim rules (LAWYER_LATER L-19); the list may be adopted before it, with legalStatus PENDING_COUNSEL (CP-01.14)"
+      ],
       "dependsOn": [],
       "patch": {
         "policy.json": [
@@ -222,31 +378,14 @@
                 "noteRequired": true
               }
             ]
-          },
-          {
-            "op": "add",
-            "path": "/legalStatus",
-            "value": {
-              "commission.claimRules": {
-                "state": "PENDING_COUNSEL",
-                "since": "2026-10-21",
-                "covers": [
-                  "commission.acceptedClaimDays",
-                  "commission.terminationOpportunityTailDays",
-                  "commission.claimRefusalReasons"
-                ],
-                "validation": null
-              }
-            }
           }
         ]
       }
     },
     {
       "id": "CP-01.05",
-      "title": "Seller money: the period of a collection and of a refund, and the default retainer",
+      "title": "Seller money: the default retainer",
       "gaps": [
-        "F-12",
         "F-16"
       ],
       "status": "APPROVED_AWAITING_REISSUE",
@@ -259,16 +398,6 @@
       "dependsOn": [],
       "patch": {
         "policy.json": [
-          {
-            "op": "add",
-            "path": "/commission/collectionPeriod",
-            "value": "MONTH_OF_CAPTURE"
-          },
-          {
-            "op": "add",
-            "path": "/commission/refundPeriod",
-            "value": "MONTH_OF_REFUND"
-          },
           {
             "op": "add",
             "path": "/commission/retainerDefaultCentsPerMonth",
@@ -482,6 +611,7 @@
       "pending": [
         "PV1 qualification of the route and of the evidence it really gives (Payments V1 section 2 (a)-(f))",
         "owner decision on the values: 5 business days, 24 days from sealing, the review threshold (Order 16 recommends 2 holds ended unpaid in 90 days)",
+        "owner decision on the counting calendar and its holidays (Order 16 recommends the published support calendar, America/Bogota)",
         "owner decision on step-up for the proof (Order 16 recommends yes)",
         "competent review of the terms (LR-02)"
       ],
@@ -565,6 +695,72 @@
                 "CHAIN_OF_THREE_OR_MORE_WITH_A_NON_DEMONSTRATED_LINK"
               ],
               "decideManyMaximumGroups": 100
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.13",
+      "title": "Seller money: the period of a collection and of a refund",
+      "gaps": [
+        "F-12"
+      ],
+      "status": "CONDITIONAL",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md"
+      },
+      "pending": [
+        "owner confirmation of the periods: FG F-12 records them as part of the decision, ORDER11-ROUND2-OPS does not, and F-12's own needs list asks for the refund period to be defined"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/commission/collectionPeriod",
+            "value": "MONTH_OF_CAPTURE"
+          },
+          {
+            "op": "add",
+            "path": "/commission/refundPeriod",
+            "value": "MONTH_OF_REFUND"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.14",
+      "title": "The legal status of the claim rules",
+      "gaps": [
+        "F-18"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/legalStatus",
+            "value": {
+              "commission.claimRules": {
+                "state": "PENDING_COUNSEL",
+                "since": "2026-10-21",
+                "covers": [
+                  "commission.acceptedClaimDays",
+                  "commission.terminationOpportunityTailDays",
+                  "commission.claimRefusalReasons"
+                ],
+                "validation": null
+              }
             }
           }
         ]

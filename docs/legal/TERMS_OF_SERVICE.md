@@ -79,11 +79,11 @@ a new approval.
 
 3.3. **Free data health check.** Before buying, the Customer may request a Free data health check on the Files it uploads within
 the published limits. It is free and creates no obligation to buy. It is bounded and abuse-protected: one active review per
-Customer at a time, a processing-spend cap per review and a pause on new free reviews once ninety percent (90%) of the funded
-processing budget is used. It is not always available immediately and its duration depends on observed capacity; Kauro promises
-no fixed time. If the processing budget is exhausted, the Platform delivers the deterministic profile and a specific pending
-status, without inventing a complete interpretation.
-<!-- auth: A3 §3.2 (public name, cap USD 1.50 freeAuditCeilingCents 150, agencyAudits 1, pause at 90%; pause wording aligned with A3 on 2026-10-22 by Order 16, pending competent review, D-31; CHECKLIST §11); A3 §3.5 ("the check is free and creates no obligation to buy"); A3 §3.6 (no fixed time); 02 §5 Receive the audit -->
+Customer at a time, a processing-spend cap per review and a pause on new free reviews when the available budget is exhausted. It
+is not always available immediately and its duration depends on observed capacity; Kauro promises no fixed time. If the
+processing budget is exhausted, the Platform delivers the deterministic profile and a specific pending status, without
+inventing a complete interpretation.
+<!-- auth: A3 §3.2 (public name, cap USD 1.50 freeAuditCeilingCents 150, agencyAudits 1, pause at 90%; the difference with this wording is open: CHANGE-REQUESTS-CP-01.md LR-11); A3 §3.5 ("the check is free and creates no obligation to buy"); A3 §3.6 (no fixed time); 02 §5 Receive the audit -->
 
 3.4. **Covered objects.** The initial object scope is contacts, organizations/accounts and deals/opportunities, with the
 associations supported per target. Unless a qualified capability is published, the following are not included: lead conversion,

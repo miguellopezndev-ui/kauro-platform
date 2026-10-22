@@ -39,7 +39,7 @@ on money, retention, legal text, authorization or a customer promise needs the o
 |---|---|---|---|---|---|
 | F-01 | CLEAN needs no target contract | APPR, CONTRA | Owner 2026-10-20; A3 §3.3 | CMD020 text and handlers require a target | CP-01.01; O17-01; C4 |
 | F-02 | Approval issues the quote | PROP | — | Recommendation: **do not** (founding slot, billing profile, roles) | CP-01 §4; owner |
-| F-03 | Self-serve free check | APPR, CONTRA | Owner 2026-10-20 (direction) | A3 §3.2 binds the CTA to the fit form; amendment text and a registry route | Owner signs an A3 §3.2 amendment (section 9, B-03); then C9 |
+| F-03 | Self-serve free check | APPR, CONTRA | Owner 2026-10-20 (direction) | A3 §3.2 binds the CTA to the fit form; amendment text and a registry route | Owner signs an A3 §3.2 amendment (section 9, B-03); then O17-18, C9 |
 | F-04 | Findings read | APPR | Owner journey (PM-06) | Read model | O17-02 |
 | F-05 | Estimate read | APPR | Owner (PM-06) | Read, marked estimate | O17-02 |
 | F-06 | Activity read | APPR | Owner IA (WS-01); delegated design | Read | O17-02 |
@@ -48,25 +48,25 @@ on money, retention, legal text, authorization or a customer promise needs the o
 | F-09 | Output preferences for CLEAN | PROP | — | Recommendation: **not for V1** | CP-01 §4; owner |
 | F-10 | Quotes and orders list | APPR | Delegated design (read of existing data) | Read | O17-02 |
 | F-11 | Owner reads (sellers, customers, statements, claims) | APPR | Owner (OWN-01) | Reads; owner-only cross-workspace scope | O17-04; Order 15 |
-| F-12 | Seller money, four figures | APPR | Owner 2026-10-21 | Period definitions in policy; read | CP-01.05; O17-04 |
-| F-13 | Claim refusal reasons | APPR, EXT | Owner 2026-10-21; counsel pending | Policy list; refusal command | CP-01.04; O17-05; L-19 |
+| F-12 | Seller money, four figures | APPR, PROP | Owner 2026-10-21 (figures); periods recorded only in FG | Period definitions to confirm; read | CP-01.13; O17-04 |
+| F-13 | Claim refusal reasons | APPR, EXT | Owner 2026-10-21 (list in FG F-13); counsel pending | Policy list (code names and three messages to confirm); refusal code | CP-01.04; O17-05; L-19 |
 | F-14 | Seller review request, decision history | APPR | Owner 2026-10-21 | Commands and history read; seller role | O17-05; Order 15 |
 | F-15 | Alerts | APPR, PROP | Owner 2026-10-21 (thresholds) | Thresholds in policy; "relevant progress" undefined (proposed) | CP-01.06, CP-01.07; O17-07 |
 | F-16 | Retainer | APPR | Owner 2026-10-21 | Default in policy; statement item kind `RETAINER` | CP-01.05; O17-06 |
 | F-17 | Offsets on the statement | APPR | Owner 2026-10-21 | Item fields (refund, line, clause), balance | O17-06 |
-| F-18 | "Pending legal review" per rule group | APPR | Owner 2026-10-21 | `legalStatus` in policy; read | CP-01.04; O17-08 |
-| F-19 | Extension also for the free check | APPR | Owner 2026-10-21; registry and ToS §13.2 already allow it | Implementation only: UNPAID soft deadline never written; paid-only restriction in SQL and row policies | C4/C6; Order 15 (row policies); LR-01 for public words |
-| F-20 | 17-day exceptional ceiling | APPR, CONTRA | Owner 2026-10-21 | Policy key, CMD060, UI29, ToS §13, DPA Annex IV say 14 | CP-01.02; LR-01; C6 |
+| F-18 | "Pending legal review" per rule group | APPR | Owner 2026-10-21 | `legalStatus` in policy; read | CP-01.14; O17-08 |
+| F-19 | Extension also for the free check | APPR | Owner 2026-10-21; registry and ToS §13.2 already allow it | Implementation only: UNPAID soft deadline never written; paid-only restriction in SQL and row policies | O17-14; C4/C6; Order 15 (row policies); LR-01 for public words |
+| F-20 | 17-day exceptional ceiling | APPR, CONTRA | Owner 2026-10-21 | Policy key, CMD060 and its cases, UI29, RetentionRecord, ToS §13, DPA Annex IV say 14 | CP-01.02; O17-14; LR-01; C6 |
 | F-21 | Pending-payment hold | APPR, EXT | Owner 2026-10-21 (principle) | Values, PV1 evidence, proof command | CP-01.11; LR-02; C5 |
 | F-22 | Abuse limits of the hold | APPR, PROP, EXT | Owner 2026-10-21 (limits) | Ceiling 24 and threshold (recommended 2 in 90 days); DB uniqueness | CP-01.11; C10 |
-| F-23 | No preparation on a hold | IMPL | Owner 2026-10-21 | Tests once the hold exists | C11 |
+| F-23 | No preparation on a hold | IMPL | Owner 2026-10-21 | Tests once the hold exists (listed under CP-01.11) | C11 |
 | F-24 | Five dates kept apart | APPR | Owner 2026-10-21 | Project dates read; same names in the Terms | O17-03; LR-02 |
 | F-25 | Batch unification | APPR, PROP | Owner 2026-10-21 (principle) | Definition, accents, cap (recommended) | CP-01.12; O17-09; C7 |
-| F-26 | A change after approval is a new revision | APPR | Owner 2026-10-21 | RevisePlan wired; revision event; quote withdrawn | O17-09; C4, C7 |
-| F-27 | Adversarial identity tests | APPR | Owner 2026-10-21 | Synthetic fixture set | C7, C11 |
-| F-28 | Salesforce route per object | APPR, EXT | Owner 2026-10-21 | Tool facts to verify (Upsert related-object step) | C7; LR-04 |
-| F-29 | Staged reconciliation | APPR, EXT | Owner 2026-10-21 | Tool facts to verify; engine; retention already covered (no new key) | C4, C7 |
-| F-30 | HubSpot association errors | APPR, EXT | Owner 2026-10-21 (answer drawn) | Whether HubSpot exports carry the company record ID | C7 |
+| F-26 | A change after approval is a new revision | APPR | Owner 2026-10-21 | RevisePlan wired; revision event; quote withdrawn | O17-09 (conditional on CP-01.12); C4, C7 |
+| F-27 | Adversarial identity tests | APPR | Owner 2026-10-21 | Synthetic fixture set; cases follow CP-01.12's definition | CP-01.12; C7, C11 |
+| F-28 | Salesforce route per object | APPR, EXT | Owner 2026-10-21 | Tool facts to verify (Upsert related-object step) | O17-17; C7; LR-04 |
+| F-29 | Staged reconciliation | APPR, EXT | Owner 2026-10-21 | Tool facts to verify; engine; retention already covered (no new key) | O17-17; C4, C7 |
+| F-30 | HubSpot association errors | APPR, EXT | Owner 2026-10-21 (answer drawn) | Whether HubSpot exports carry the company record ID | O17-17; C7 |
 | F-31 | Reader refuses packages with rejected rows | IMPL | Order 14 | Fixed by PR #120 (merged 2026-10-22) | — |
 | F-32 | Reader memory | IMPL | Order 14 | Fixed by PR #120 (merged 2026-10-22) | — |
 | F-33 | Refund decision message: sender and send state | PROP, EXT | — (open OQ-R1 to OQ-R4) | Recommendation: Kauro sends within 2 business days; send state recorded | LR-06; O17-10 (conditional) |
@@ -90,7 +90,7 @@ on money, retention, legal text, authorization or a customer promise needs the o
 
 | Point | Class | Finding | Next |
 |---|---|---|---|
-| X-34 / Q-4: free-check pause, 90% vs exhausted | CONTRA → resolved | A3 §3.2 (owner-adopted, citing 14 §Cost controls) says 90%; the draft ToS §3.3 said "exhausted" while citing A3. Aligned (CHECKLIST §11); value to policy | CP-01.03 |
+| X-34 / Q-4: free-check pause, 90% vs exhausted | CONTRA (open for the text) | A3 §3.2 (owner-adopted, citing 14 §Cost controls) says 90%; the draft ToS §3.3 says "exhausted" while citing A3. The value goes to policy; the Terms are not changed, because 90% would narrow what the Customer is told | CP-01.03; LR-11 |
 | X-35: paid enrichment | not a conflict | Kauro does none (ToS §3.5); A3 §3.5(2) is about HubSpot's setting in the import | LR-08 |
 | X-36 / LC-1: activity records in the published DPA template | CONTRA | ToS §3.4 and the public scope exclude activities; DPA Annex I.4 does not list them; only the template does. Recommendation: remove "and activity" at the next re-issue | LC-1 (counsel) |
 | X-37: Help and Data handling narrower than ToS §5.2 | CONTRA (copy) | Public copy, not legal text: add sensitive and children's data to the public lists | C9 |
@@ -118,12 +118,14 @@ on money, retention, legal text, authorization or a customer promise needs the o
 4. **Two retention labels in one column (new).** `R2-RETENTION-1` (`domain/model/source/policy.ts:49`, UNPAID) and `R2-INITIAL`
    (`persistence/src/execution/store.ts:117`, PAID_ORDINARY) in `retention_records.policy_version`; the registry carries no label.
    CP-01.02 makes `retention.policyVersion` the single source.
-5. **ToS §3.3 vs A3 §3.2 (X-34).** Corrected in the draft.
+5. **ToS §3.3 vs A3 §3.2 (X-34).** Not changed in the draft: it narrows a customer promise, so it is LR-11 for the owner and counsel.
 6. **ToS §2, §3.2, §6.1 vs "Clean your data".** The Terms required a target for every project although their own CLEAN bullet and
    Target Contract definition do not. Corrected in the draft.
 7. **Published templates vs D-33 (LC-2)** and **vs ToS §3.4 (LC-1).** Recorded; the templates change only by their re-issue.
-8. **No reason on a claim refusal (F-13).** Rejections carry no reason, evidence or seller message (`commercial/machines.ts:94-95`).
-9. **Approval does not notify (F-33).** `refund.approved.v1` goes only to the payment service (`commerce/events.ts:336`).
+8. **No refusal code on a claim (F-13).** A claim is refused only through a competing allocation (`commercial/machines.ts:94-95`),
+   which carries a label `ruling_reason` and an evidence hash (`0029_sales_attribution.sql:403-404`), but no closed code and no
+   seller-facing message.
+9. **Approval does not notify (F-33).** No notifications subscription exists for `refund.approved.v1`; its subscriber is the payment service (`packages/domain/src/commerce/events.ts:336`).
 10. **FCI overstated three needs.** F-19 needs no policy or legal change (only the ceiling of F-20 does); F-29 needs no retention key
     (`importReceiptDaysFromTerminal`); F-28's processing of record IDs is already in DPA Annex I.4. FCI is corrected.
 
@@ -131,9 +133,9 @@ on money, retention, legal text, authorization or a customer promise needs the o
 
 | Change | Where | Version effect |
 |---|---|---|
-| CP-01 prepared: 12 items (7 approved awaiting the re-issue, 3 conditional, 2 proposed), with the machine delta and its test | `docs/authority/proposals/` | None until adoption; proposed `retention.policyVersion` R2-RETENTION-2, `CLAIM-REFUSAL-1` |
-| ToS draft aligned in four places (§2, §3.2, §3.3, §6.1) | `docs/legal/TERMS_OF_SERVICE.md`; CHECKLIST §11 | Draft 1.0, not in force; pending competent review (D-31), as the D-33 edits |
-| Legal requests LR-01 to LR-10, entry into force blocked | `docs/legal/CHANGE-REQUESTS-CP-01.md` | None |
+| CP-01 prepared: 14 items (7 approved awaiting the re-issue, 5 conditional, 2 proposed), with the machine delta and its test | `docs/authority/proposals/` | None until adoption; proposed `retention.policyVersion` R2-RETENTION-2, `CLAIM-REFUSAL-1` |
+| ToS draft aligned in three places (§2, §3.2, §6.1) | `docs/legal/TERMS_OF_SERVICE.md`; CHECKLIST §11 | Draft 1.0, not in force; pending competent review (D-31), as the D-33 edits |
+| Legal requests LR-01 to LR-11, entry into force blocked | `docs/legal/CHANGE-REQUESTS-CP-01.md` | None |
 | Counsel questions L-19, L-20 | `docs/legal/LAWYER_LATER.md` | None |
 | LC-2 for the published templates | `docs/design/LEGAL-CORRECTION-REQUESTS.md` | None (next versioned re-issue) |
 | FCI reconciled (state after Order 16) | `docs/design/FUNCTIONAL-CHANGE-INVENTORY.md` | — |
@@ -155,7 +157,7 @@ drafted but not adopted until its condition holds.
 | O17-04 | Owner reads: sellers with the four figures (`MONTH_OF_CAPTURE`, `MONTH_OF_REFUND`, tax excluded, split shares once), one seller's record, customers with buyer type and channel, statements by period, claims across sellers; seller home: claims with end dates, next eligible and next payment dates; a won customer's first-payment and completion dates. Owner-only scope across workspaces is Order 15's | F-11, F-12, G-11, G-13 |
 | O17-05 | Claims: `RefuseAttribution` (owner; `reasonCode` from `commission.claimRefusalReasons`, `evidenceRef`, `note` required for `OTHER`); the seller-facing view shows only `sellerMessage`; `RequestClaimReview` (seller, optional note); `DecideClaimReview` (owner, `UPHOLD` or `CHANGE` with a reason code); an append-only decision history read; events for each | F-13, F-14, CP-01.04 |
 | O17-06 | Statements: item kind `RETAINER`; offset items with `refundId`, `adjustedLineId`, `clauseRef`; a balance (earned, held, offsets, retainer, payable) | F-16, F-17 |
-| O17-07 | Alerts read for the owner and for a seller's claims: kinds and precedence from `alerts`; one item once with its other conditions as a second line. The inactivity kind depends on CP-01.07 (conditional) | F-15 |
+| O17-07 | Alerts read for the owner and for a seller's claims: kinds and precedence from `alerts`; one item once with its other conditions as a second line. The inactivity kind depends on CP-01.07 (proposed) | F-15 |
 | O17-08 | `legalStatus` in the owner's settings read | F-18 |
 | O17-11 | Statement PDF and CSV; a seller command asking the owner to authorise a draft | G-12 |
 | O17-12 | Registration consent record: Policy version, Privacy Notice version, user, time; marketing consent separate per channel (POL §8.3, A-14) | F-08 |
@@ -191,14 +193,14 @@ superseded). Dependencies are therefore given by the FCI component each later or
 | C8 identity | Provider decision (A9 vs code); Order 15 | F-07, G-01, G-08; consent record of O17-12 |
 | C9 web | C3 and the above | Every proposed screen onto real reads; public words of LR-01, LR-02 with the legal re-issue; X-37 lists; F-08 contact checkbox |
 | C11 tests | with each step | The named suites of FCI §2 C11, plus section 3 of CP-01 per item |
-| Legal re-issue (counsel) | Implementation of what the text promises | LR-01 to LR-06, LC-1, LC-2, L-18 to L-20 |
+| Legal re-issue (counsel) | Implementation of what the text promises | LR-01 to LR-06, LR-11, LC-1, LC-2, L-18 to L-20 |
 
 ## 9. Still blocked: legal, business, external
 
 | # | Question | Who | Order 16's recommendation |
 |---|---|---|---|
-| B-01 | Sign or reject each CP-01 item | Owner | Adopt the seven approved items with CP-02 in one re-issue |
-| B-02 | CP-01.07 relevant progress; CP-01.09 UI03 wording | Owner | As proposed |
+| B-01 | Sign or reject each CP-01 item | Owner | Adopt the seven approved items (CP-01.01, .02, .03, .05, .06, .08, .14) with CP-02 in one re-issue |
+| B-02 | CP-01.07 relevant progress; CP-01.09 UI03 wording; CP-01.04 code names and three seller messages; CP-01.13 periods | Owner | As proposed |
 | B-03 | A3 §3.2 amendment for the self-serve free check (F-03) | Owner | Amend: "Check a file free" opens the free-check page; account creation before upload; the fit form stays as "Ask a question first"; pause at 90% kept |
 | B-04 | Hold values, review threshold, step-up (F-21, F-22) | Owner, after PV1 | 5 business days; 24 days; 2 in 90 days; step-up yes |
 | B-05 | Demonstrated identity, accents, cap (F-25) | Owner | Email and name; accents not folded; 100 groups |
@@ -207,7 +209,7 @@ superseded). Dependencies are therefore given by the FCI component each later or
 | B-08 | F-02, F-09 | Owner | Reject both for V1 |
 | B-09 | PM-12 billing details at the first quote | Owner | Move |
 | B-10 | Claim rules, legal validation (L-19) | Counsel | — |
-| B-11 | Wording of CHECKLIST §11 and LR-01 to LR-06 (L-20); LC-1, LC-2 | Counsel | — |
+| B-11 | Wording of CHECKLIST §11, LR-01 to LR-06 and LR-11 (L-20); LC-1, LC-2 | Counsel | — |
 | B-12 | COP for Colombian customers (LR-07) | Accountant, counsel | No wording before their answer |
 | B-13 | Identity provider (F-07, A9) | Owner, AWS account | — |
 | B-14 | Data Loader result files echo the source key; Upsert related-object step; HubSpot exports carry company IDs | Verification on the tools | — |
@@ -233,7 +235,7 @@ test's one owned delete).
 
 | Entry | Correction |
 |---|---|
-| F-13 | `decisionReason` is a token from four acceptance reasons (`accept-attribution.ts:36`), not free text; the free text is the allocation's `rulingReason`; rejections carry no reason. |
+| F-13 | `decisionReason` is a token from four acceptance reasons (`accept-attribution.ts:36`), not free text; a refusal goes through a competing allocation with a label `rulingReason` and an evidence hash; missing are a closed code and a seller message. |
 | F-19 | The extension formula is in SQL (`persistence/src/source/retention.ts:261-262`; CHECK `0069:31-35`), not in `records.ts`; unpaid refusal at three layers (`retention.ts:227`, `0069:56,69`, trigger `0069:78`). |
 | F-20 | Note added: CP-01.02 and LR-01; the two retention labels written today (section 5.4). |
 | F-21 | The bank-transfer states are live in a separate `PaymentOrderBank` machine (`0045_bank_transfer_kit.sql:35,88-92`; `0046_bank_routes.sql:191`), not in the PaymentOrder machine. |

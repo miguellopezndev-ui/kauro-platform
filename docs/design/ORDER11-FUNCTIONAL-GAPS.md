@@ -155,7 +155,7 @@ no seller-facing message. **Needs.** A closed, versioned reason code, an evidenc
 refusal, the seller-facing message derived from the code. **Status.** Drawn (P-24; UI34 "Not available" state); list to be validated
 by counsel (F-18).
 
-**Order 16 (2026-10-22).** Correction: `decisionReason` is a token from four acceptance reasons (`accept-attribution.ts:36`), not free text; the free text is the allocation's `rulingReason`; a rejection carries no reason, evidence or seller message (`commercial/machines.ts:94-95`). The list is CP-01.04 (`docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md`); its legal validation is LAWYER_LATER L-19.
+**Order 16 (2026-10-22).** Correction: `decisionReason` is a token from four acceptance reasons (`accept-attribution.ts:36`), not free text; a claim is refused only through a competing allocation (`commercial/machines.ts:94-95`), which carries a label `rulingReason` and an evidence hash (`0029_sales_attribution.sql:403-404`); missing are a closed refusal code and a seller-facing message. The list is CP-01.04 (`docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md`); its legal validation is LAWYER_LATER L-19.
 
 ## F-14. A seller's request for a review, and the decision history
 
@@ -230,7 +230,7 @@ min(extended soft deadline, sealing + 17 days)); restoration (a backup restored 
 days without the extension, at most 17 with it, never more). **Status.** Drawn with the "Proposed" marker on every date table (P-30, P-31,
 UI29).
 
-**Order 16 (2026-10-22).** CP-01.02 proposes `retention.unpaidExtendedCeilingDaysFromSeal = 17` and the label `R2-RETENTION-2`; the legal wording is LR-01. Found meanwhile: two retention labels are written today (`R2-RETENTION-1` for UNPAID, `R2-INITIAL` for PAID_ORDINARY in `persistence/src/execution/store.ts:117`).
+**Order 16 (2026-10-22).** CP-01.02 proposes `retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal = 17` and the label `R2-RETENTION-2`; the legal wording is LR-01. Found meanwhile: two retention labels are written today (`R2-RETENTION-1` for UNPAID, `R2-INITIAL` for PAID_ORDINARY in `persistence/src/execution/store.ts:117`).
 
 ## F-21. A separate, limited hold while a sent bank transfer is confirmed (owner decision, 2026-10-21; value proposed)
 

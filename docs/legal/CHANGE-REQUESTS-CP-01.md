@@ -3,7 +3,8 @@
 The legal side of `docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md` (component C2 of
 `docs/design/FUNCTIONAL-CHANGE-INVENTORY.md`). These are **proposals for competent review** (D-08b, D-31; LAWYER_LATER L-20). None
 is applied to the texts, none is in force, and none may be published until every condition in its "Blocked until" line holds. The
-minimal alignments that needed no new obligation were applied to the draft Terms and are listed in CHECKLIST §11.
+minimal alignments that needed no new obligation and narrowed no promise were applied to the draft Terms and are listed in CHECKLIST
+§11.
 
 Common rule for entry into force: a request enters a text only (1) after competent review, (2) in the same versioned re-issue as the
 implementation that makes it true, tested, and (3) with the published templates (`apps/web/src/legal/templates.ts`, through
@@ -69,7 +70,7 @@ No company data (NIT, address, phone, effective date) is filled in here: they st
 ## LR-06. Who tells the customer a refund decision, and when (F-33)
 
 - **Today.** ToS §10.2: Kauro "explains its decision in writing"; no sender, channel or time. The approval event
-  (`refund.approved.v1`) does not reach the notifications consumer (`commerce/events.ts:336`).
+  (`refund.approved.v1`) does not reach the notifications consumer (`packages/domain/src/commerce/events.ts:336`).
 - **Recommended (owner decision).** Kauro (the owner role) sends the decision, approved or refused, through the Platform and by email
   within two (2) business days of the decision; the refund record keeps the message's due time and send state; an approval never
   counts as the message. Proposed ToS §10.2 addition: "Kauro sends its written decision within two (2) business days of making it."
@@ -102,3 +103,14 @@ the amount, the reference and the order, and say "Bank details: on the Platform"
 The package's files are Customer Data the agency already holds and forwards under its own contract with its End Client (DPA §1.2).
 Recommendation: summary documents meant to be forwarded carry counts and categories only, never rows; the rows stay in the package
 files. No change to the texts.
+
+## LR-11. The free-check pause: 90% of the funded envelope or "exhausted" (register X-34, Q-4; CP-01.03)
+
+- **Today.** ToS §3.3: "a pause on new free reviews when the available budget is exhausted", while the comment under it cites A3 §3.2,
+  which says the pause is "at 90% of the funded envelope (14 §Cost controls)". The register records X-34 as open for the owner and
+  counsel.
+- **Proposed.** "a pause on new free reviews once ninety percent (90%) of the budget funded for free reviews is used". It follows the
+  authority (A3, manual 14) and CP-01.03, but it lets Kauro pause earlier than the current draft says, so it narrows what the Customer
+  is told and is not applied as an alignment.
+- **Blocked until.** The owner confirms the 90% rule for the Terms and counsel reviews the wording.
+
