@@ -56,6 +56,7 @@ replaces version 7 wherever the two differ. Its changes were tested on the 294 j
   - Builders share one page generator and the kit's CSS (§8.4).
   - A fixed pre-critic checklist (§11) removes the critic's routine findings before the critic runs.
   - Concurrency follows the owner's quota (§8.4).
+  - Nothing decided, researched, built or checked is done twice (§8.5, the biggest saving).
 - **What was measured, and rejected:**
   - **A flat 2-judge panel.** It agrees with 3 judges on 270 of 294 pairs and never reverses a winner. But 24 pairs move between
     "clear" and "not clear", and at least one page decision would have changed (Claims, section B).
@@ -655,6 +656,63 @@ This is how about 70 screens stay one system.
    ample. Every agent prompt forbids installing anything.
 7. **The kit is frozen before the next site.** Group B is judged and the kit becomes v1, so pages compose decided parts instead of
    auditioning parts again.
+
+### 8.5 No repeated work (version 8; the biggest saving, same depth)
+
+Nothing that was decided, researched, built or checked once is done again. Every step starts from what already exists and adds only
+what is new. The depth (questions, alternatives, judging, critique) is unchanged; only repetition is removed.
+
+1. **Decisions are inherited, never re-opened by default.**
+   - A decided page, section, kit family or rule (`AUDITIONS.md`, `DECISIONS.md`, `ROUND3-KIT.md`, the decisions register) is the
+     start of the next step, never a candidate again.
+   - It is re-opened only when new evidence contradicts it (D-34) or when the owner asks, and the reason is written down.
+2. **Research is a shared library, not per page.**
+   - Every research finding goes once into `research\round3-library\` as a pattern card, grouped by pattern: tables, filters,
+     decision queues, money states, slips, timelines, settings, empty states.
+   - A card holds the question, the references with links and numbers, the conclusion and where it was used.
+   - A page's brief cites the cards it relies on and researches only its own questions: what no card answers yet.
+   - The first night's research (`round3-system-research`, `round3-owner-research`, `round2\*.md`, each page's BRIEF) is moved into
+     the library before the next site starts.
+3. **Content is written once.** The canon (`world.json`) and each page's CONTENT.md are the single source. Every candidate, final,
+   deliverable and later the product code reads them. Nothing re-types a figure.
+4. **One builder per page, kept for the whole page.**
+   - The builder that wrote the L3 candidates also builds the L4 sections, the final and the fix pass, resumed with its context
+     instead of a fresh agent re-reading everything.
+   - A fresh agent is used only where independence is the point: judges and the critic.
+5. **Candidates differ in idea, not in plumbing.**
+   - Alternatives are generated from the shared page generator (§8.4 rule 2) with the same content and shell. A builder writes only
+     the composition: markup order, layout and its CSS.
+   - Shooting, gates, measures and guards are run by the generator.
+6. **Lessons are applied forward, once.**
+   - Every critic finding that can recur becomes a checklist item (§11) and, where possible, a guard in the generator (it refuses
+     the page). It is never found twice.
+   - Examples from the first night: invented reasons or deadlines, a value running into its date on a phone, a repeated deadline,
+     two stamps in one region.
+7. **Finals are written for the product.**
+   - A final's markup and CSS use the product's tokens and the kit's class names, as in `packages/ui`.
+   - Its content keys follow `apps/web/src/copy`, so implementation translates the final instead of designing it again.
+   - Each final's NOTES lists its components and their kit family ids.
+8. **Pipeline, no waiting.**
+   - The moment one step's output exists, the next step starts on it: batches once candidates are built, the final once the score is
+     in, the critic once the checklist passes.
+   - While a page is being judged, the next page's builder works.
+9. **Similar pages share a first audition.**
+   - When pages share a job (for example Jobs, Deletion, Releases and Incidents: "is anything stuck, what may I do"), the first
+     page's winning composition becomes a candidate for the next one, beside its own new alternatives.
+   - That still means at least 3 alternatives and the corrected incumbent, so depth is the same.
+10. **Records are short and structured.**
+    - AUDITIONS.md holds the results table, the decision, the fixes carried and the judges' points kept for later. Nothing is
+      written twice across BRIEF, COMPOSITIONS and NOTES; they link instead.
+    - The ledger gets one line per step.
+
+**What cannot be cut without losing depth** (measured or reasoned, kept as is):
+- three judges where the result is close (§9.4);
+- the incumbent at the challengers' fidelity;
+- at least 3 alternatives per decision;
+- L4 on Tier A pages;
+- the gates at 8 widths;
+- an outside critic per Tier A and Tier B page;
+- my review of the top two in the browser.
 
 ## 9. How a winner is chosen (as objectively as possible)
 

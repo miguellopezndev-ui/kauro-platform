@@ -93,7 +93,9 @@ in `ORDER11-ROUND3-MASTER-PLAN.md`, and every record is the page's `AUDITIONS.md
    4. the Sellers final;
    5. the Support and Owner actions finals;
    6. the report fix pass.
-5. **Judge kit group B** and freeze the kit at v1.
+5. **Judge kit group B** and freeze the kit at v1. Then, once, before any new page (master plan §8.5):
+   - build the shared page generator (`toolsound3page-kit`);
+   - move the first night's research into `researchound3-library` as pattern cards.
 6. **The nine paused owner pages,** one at a time, from `L3-TASK.md`.
 7. **Then:** the agency workspace, the seller portal, the public site, all four together, the remaining deliverables, and the
    implementation.
