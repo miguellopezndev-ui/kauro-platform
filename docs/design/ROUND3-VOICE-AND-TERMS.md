@@ -524,7 +524,9 @@ Rules for every heading:
   - "See {page}" for a public page;
   - "Read {legal text or guide}";
   - "Open {object}" for a project, case or delivery;
-  - "Go to {area}" for a workspace area.
+  - "Go to {area}" for a workspace area;
+  - "Go to {section or item}" for a jump within the same page ("Go to decision 1", "Go to Alerts"). Added 2026-10-22 from the owner
+    console's Today page.
 
   The object is the page's exact name.
 - Inconsistent today: "View the synthetic sample" (`public.ts:54`), "See the sample delivery" (`:389`), "Read pricing" (`:509`), "See
