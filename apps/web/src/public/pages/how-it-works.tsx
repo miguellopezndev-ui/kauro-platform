@@ -5,10 +5,10 @@
 // invented service. Every figure comes from the policy snapshot, the input limits or the sample.
 //
 // Order 11 round 2: a process page is understood before it reassures (eight of ten process pages in the round-2 sample use short numbered
-// steps), so the six stages open the page at a glance, each with who acts and what it leaves you with, and the call to action follows them.
-// Each stage then says in a few lines what happens, what you get and what stops it, all in view; the rest of its detail (who acts, what it
-// needs, what happens step by step) is folded under one control on the stage itself, so the page halves without moving anything out of
-// reach. The duplicate counts moved to Sample delivery, beside the report they belong to; the example keeps the price, with its counting
+// steps). Owner's section review (2026-10-21): the six stages are one section, not an overview followed by six sheets. They are a timeline
+// that runs down (StagePath); choosing a stage opens what happens, what you get and what stops it, beside the timeline on a wide screen and
+// under the stage on a narrow one, and the call to action closes the section. The rest of a stage's detail (who acts, what it needs, what
+// happens step by step) stays folded under one control inside it. The duplicate counts moved to Sample delivery, beside the report they belong to; the example keeps the price, with its counting
 // rule and the line saying it is invented directly under it.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../../copy/public.ts";
@@ -20,6 +20,7 @@ import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
 import { Block, CHECK_CTA, Closing, Head } from "../r2.tsx";
 import { MANIFEST_FILES, SAMPLE, SAMPLE_MODE } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
+import { StagePath, type PathStage } from "../stage-path.tsx";
 
 type Actor = "team" | "kauro";
 type StageKey = "files" | "check" | "decide" | "quote" | "prepare" | "import";
@@ -145,32 +146,6 @@ const OUTCOME: Readonly<Record<StageKey, PublicCopyId>> = {
   import: "how.stage.import.outcome",
 };
 
-function ActorTag({ actor }: { readonly actor: Actor }): ReactElement {
-  return <span className={`kauro-r2-actor kauro-r2-actor--${actor}`}>{PUBLIC_COPY[ACTOR_LABEL[actor]]}</span>;
-}
-
-/** The six stages at a glance: number, name, who acts and what it leaves you with; each item leads to its stage below. */
-function Overview(): ReactElement {
-  return (
-    <nav className="kauro-r2-overview" aria-label={PUBLIC_COPY["how.index.label"]}>
-      <ul>
-        {STAGES.map((stage, index) => (
-          <li key={stage.key}>
-            <a href={`#stage-${stage.key}`}>
-              <span className="kauro-r2-overview-number" aria-hidden="true">
-                {numberOf(index)}
-              </span>
-              <span className="kauro-r2-overview-name">{PUBLIC_COPY[stage.heading]}</span>
-              <ActorTag actor={stage.actor} />
-              <span className="kauro-r2-overview-outcome">{PUBLIC_COPY[OUTCOME[stage.key]]}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
 function Lines({ lines }: { readonly lines: readonly Line[] }): ReactElement {
   return (
     <ul>
@@ -182,63 +157,64 @@ function Lines({ lines }: { readonly lines: readonly Line[] }): ReactElement {
 }
 
 /**
- * One stage: its number, heading and actor, the summary, then what you get and what stops it, always in view (a stop is a disclosure a
- * buyer must not have to open). Who acts, what it needs and what happens, the detail a buyer reads once, are folded under one control.
+ * The body of one stage, shown when the stage is chosen: the summary, then what you get and what stops it, always in view (a stop is a
+ * disclosure a buyer must not have to open). Who acts, what it needs and what happens, the detail a buyer reads once, are folded under one
+ * control.
  */
-function StageSheet({ stage, index }: { readonly stage: Stage; readonly index: number }): ReactElement {
-  const headingId = `stage-${stage.key}-heading`;
+function StageSheet({ stage }: { readonly stage: Stage }): ReactElement {
   return (
-    <li id={`stage-${stage.key}`} className={`kauro-stage kauro-stage--${stage.actor}`}>
-      <article className="kauro-stage-sheet" aria-labelledby={headingId}>
-        <div className="kauro-r2-stage-head">
-          <span className="kauro-r2-stage-number" aria-hidden="true">
-            {numberOf(index)}
-          </span>
-          <h3 id={headingId}>{PUBLIC_COPY[stage.heading]}</h3>
-          <ActorTag actor={stage.actor} />
+    <article className="kauro-stage-sheet" aria-label={PUBLIC_COPY[stage.heading]}>
+      <p className="kauro-r2-stage-summary">{PUBLIC_COPY[stage.summary]}</p>
+      <dl className="kauro-r2-stage-keys">
+        <div className="kauro-r2-stage-gets">
+          <dt>{PUBLIC_COPY[FIELD_LABEL.gets]}</dt>
+          <dd>
+            <Lines lines={stage.gets} />
+          </dd>
         </div>
-        <p className="kauro-r2-stage-summary">{PUBLIC_COPY[stage.summary]}</p>
-        <dl className="kauro-r2-stage-keys">
+        <div className="kauro-r2-stage-stops">
+          <dt>{PUBLIC_COPY[FIELD_LABEL.stops]}</dt>
+          <dd>
+            <Lines lines={stage.stops} />
+          </dd>
+        </div>
+      </dl>
+      <details className="kauro-r2-stage-more">
+        <summary>{PUBLIC_COPY["how.stage.more"]}</summary>
+        <dl className="kauro-r2-stage-detail">
           <div>
-            <dt>{PUBLIC_COPY[FIELD_LABEL.gets]}</dt>
+            <dt>{PUBLIC_COPY[FIELD_LABEL.who]}</dt>
             <dd>
-              <Lines lines={stage.gets} />
+              <p>{PUBLIC_COPY[stage.who]}</p>
             </dd>
           </div>
           <div>
-            <dt>{PUBLIC_COPY[FIELD_LABEL.stops]}</dt>
+            <dt>{PUBLIC_COPY[FIELD_LABEL.needs]}</dt>
             <dd>
-              <Lines lines={stage.stops} />
+              <Lines lines={stage.needs} />
+            </dd>
+          </div>
+          <div>
+            <dt>{PUBLIC_COPY[FIELD_LABEL.happens]}</dt>
+            <dd>
+              <Lines lines={stage.happens} />
             </dd>
           </div>
         </dl>
-        <details className="kauro-r2-stage-more">
-          <summary>{PUBLIC_COPY["how.stage.more"]}</summary>
-          <dl className="kauro-r2-stage-detail">
-            <div>
-              <dt>{PUBLIC_COPY[FIELD_LABEL.who]}</dt>
-              <dd>
-                <p>{PUBLIC_COPY[stage.who]}</p>
-              </dd>
-            </div>
-            <div>
-              <dt>{PUBLIC_COPY[FIELD_LABEL.needs]}</dt>
-              <dd>
-                <Lines lines={stage.needs} />
-              </dd>
-            </div>
-            <div>
-              <dt>{PUBLIC_COPY[FIELD_LABEL.happens]}</dt>
-              <dd>
-                <Lines lines={stage.happens} />
-              </dd>
-            </div>
-          </dl>
-        </details>
-      </article>
-    </li>
+      </details>
+    </article>
   );
 }
+
+const PATH: readonly PathStage[] = STAGES.map((stage, index) => ({
+  key: stage.key,
+  number: numberOf(index),
+  name: PUBLIC_COPY[stage.heading],
+  actor: stage.actor,
+  actorLabel: PUBLIC_COPY[ACTOR_LABEL[stage.actor]],
+  outcome: PUBLIC_COPY[OUTCOME[stage.key]],
+  sheet: <StageSheet stage={stage} />,
+}));
 
 /** The worked example: from the billable source units of the invented project to its price, with the counting rule right under it. */
 function Example(): ReactElement | null {
@@ -286,21 +262,14 @@ export function HowItWorksPage(): ReactElement {
   return (
     <>
       <Head kind="path" accent={3} eyebrow={PUBLIC_COPY["nav.how.label"]} title={PUBLIC_COPY["how.title"]} lead={PUBLIC_COPY["how.lead"]} />
-      <Block id="how-overview" heading={PUBLIC_COPY["how.overview.heading"]} variant="kauro-r2-block--first">
-        <Overview />
-        <div className="kauro-r2-inline-cta">
+      <Block id="how-stages" heading={PUBLIC_COPY["how.stages.heading"]} lead={PUBLIC_COPY["how.stages.lead"]} tone="sunken">
+        <StagePath stages={PATH} />
+        <div className="kauro-r2-inline-cta kauro-path-cta">
           <a className="kauro-site-button kauro-site-button--primary" href={ROUTE.contact}>
             {PUBLIC_COPY["public.cta.request-health-check.cta"]}
           </a>
           <p className="kauro-r2-hint">{PUBLIC_COPY["pricing.answer.free"]}</p>
         </div>
-      </Block>
-      <Block id="how-steps" heading={PUBLIC_COPY["how.steps.heading"]} lead={PUBLIC_COPY["how.steps.lead"]} tone="sunken">
-        <ol className="kauro-r2-stages">
-          {STAGES.map((stage, index) => (
-            <StageSheet key={stage.key} stage={stage} index={index} />
-          ))}
-        </ol>
       </Block>
       <Block id="how-example" heading={PUBLIC_COPY["how.example.heading"]} lead={copy("how.example.lead", { mode: modeName(SAMPLE_MODE) })} layout="split">
         <Example />

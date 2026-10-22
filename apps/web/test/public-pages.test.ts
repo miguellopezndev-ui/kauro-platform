@@ -230,13 +230,18 @@ test("Home lists the services the publication lists, and says so plainly when it
 
 // ---- How it works ---------------------------------------------------------------------------------------------------------------------
 
-test("How it works is the buyer's guide: the six stages at a glance, then each stage with what you get and what stops it in view, and nothing that plays", () => {
+test("How it works is the buyer's guide: the six stages in one timeline, each opening what you get and what stops it in view; rendered without a script every stage is open; nothing plays", () => {
   const html = page("how").html(ALL);
   const text = textOf(html);
   assert.equal(count(html, "<ol"), 1, "the stages are one ordered list");
   assert.equal(count(html, 'class="kauro-stage kauro-stage--'), 6);
   const stageNames = ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"];
   assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text).slice(0, 6), stageNames);
+  // without a script nothing is hidden: every stage is open, in order, and no control pretends to work
+  const path = html.slice(html.indexOf('class="kauro-path"'), html.indexOf("kauro-path-cta"));
+  assert.doesNotMatch(path, /<[^>]+\shidden[\s=>]/, "no stage is hidden before the script runs");
+  assert.equal(count(path, "aria-expanded"), 0, "no stage says it is open or closed before the script can open or close it");
+  assert.equal(count(path, "kauro-path-turn"), 0, "previous and next appear only with the script");
   const sheets = [...html.matchAll(/<article class="kauro-stage-sheet"[\s\S]*?<\/article>/g)];
   assert.equal(sheets.length, 6);
   for (const sheet of sheets) {
@@ -267,9 +272,12 @@ test("How it works is the buyer's guide: the six stages at a glance, then each s
   assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
   assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
   const primary = linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary"));
-  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "one call to action, repeated under the overview and at the end (A3 3.2)");
+  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "one call to action, closing the stages and again at the end (A3 3.2)");
   assert.ok(primary.length <= 2);
-  for (const stage of ["files", "check", "decide", "quote", "prepare", "import"]) assert.ok(hrefsOf(html).includes(`#stage-${stage}`), `the overview links to stage ${stage}`);
+  for (const stage of ["files", "check", "decide", "quote", "prepare", "import"]) {
+    assert.ok(html.includes(`id="stage-${stage}"`), `a link to #stage-${stage} reaches stage ${stage}`);
+    assert.ok(html.includes(`aria-controls="stage-${stage}-panel"`) && html.includes(`id="stage-${stage}-panel"`), `stage ${stage} opens its own panel`);
+  }
 });
 
 test("How it works: the worked example prices the billable units, with the counting rule and the invented-figures line directly under it", () => {

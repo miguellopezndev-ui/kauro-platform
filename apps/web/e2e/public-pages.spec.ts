@@ -230,6 +230,45 @@ test("one theme (owner, 2026-10-21): every page is dark, offers no theme choice,
   expect(stored.headers()["set-cookie"]).toBeUndefined();
 });
 
+test("How it works, the six stages: one open beside the timeline on a wide screen, none until tapped on a phone, previous and next move between them, a link opens its stage, and axe finds no violation", async ({ browser }) => {
+  const wide = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: true });
+  const desk = await wide.newPage();
+  await desk.goto("/how-it-works");
+  await desk.locator(".kauro-path[data-ready]").waitFor();
+  await expect(desk.locator(".kauro-path [aria-expanded='true']")).toHaveCount(1);
+  await expect(desk.locator("#stage-files-panel")).toBeVisible();
+  await desk.locator("#stage-decide-button").click();
+  await expect(desk.locator("#stage-decide-button")).toHaveAttribute("aria-expanded", "true");
+  await expect(desk.locator("#stage-files-panel")).toBeHidden();
+  await desk.locator("#stage-decide-button").click();
+  await expect(desk.locator("#stage-decide-panel"), "a wide screen always shows one stage").toBeVisible();
+  await desk.locator("#stage-decide-panel .kauro-path-turn-next").click();
+  await expect(desk.locator("#stage-quote-panel")).toBeVisible();
+  await expect(desk.locator("#stage-quote-button")).toBeFocused();
+  await assertAccessible(desk);
+  await desk.goto("/how-it-works#stage-prepare");
+  await desk.locator(".kauro-path[data-ready]").waitFor();
+  await expect(desk.locator("#stage-prepare-panel"), "a link to a stage opens it").toBeVisible();
+  await wide.close();
+
+  const narrow = await browser.newContext({ viewport: { width: 375, height: 812 }, ignoreHTTPSErrors: true });
+  const phone = await narrow.newPage();
+  await phone.goto("/how-it-works");
+  await phone.locator(".kauro-path[data-ready]").waitFor();
+  await expect(phone.locator(".kauro-path [aria-expanded='true']"), "a phone starts with the six closed").toHaveCount(0);
+  await expect(phone.locator(".kauro-path-panel:visible")).toHaveCount(0);
+  await phone.locator("#stage-check-button").click();
+  await expect(phone.locator("#stage-check-panel")).toBeVisible();
+  await phone.locator("#stage-check-button").click();
+  await expect(phone.locator("#stage-check-panel"), "a phone closes the open stage again").toBeHidden();
+  await phone.locator("#stage-check-button").click();
+  await phone.locator("#stage-check-panel .kauro-path-turn-next").click();
+  await expect(phone.locator("#stage-decide-panel")).toBeVisible();
+  await expect(phone.locator("#stage-check-panel")).toBeHidden();
+  await assertAccessible(phone);
+  await narrow.close();
+});
+
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
   await page.goto("/pricing");
   // on a wide screen the main pages are in the header's line and the menu is not drawn (Order 11 round 2): one "Main" navigation is visible

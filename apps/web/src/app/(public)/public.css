@@ -9292,49 +9292,42 @@ body:has(> .kauro-site-header) {
   outline-offset: 2px;
 }
 
-/* ---- How it works: the six stages at a glance, then each stage ---- */
-/* The six stages are one numbered sequence, not six boxed cards (owner's section review, 2026-10-21): numbers in circles joined by a
-   rule, then the name, who acts and the outcome. A column on a phone; a row (two, three, then six to a row) wider, where the rule joins
-   the stages of a row. Each stage still leads to its own sheet below. */
-.kauro-site-main .kauro-r2-overview ul {
-  display: grid;
-  gap: 0;
+/* ---- How it works: the six stages (owner's section review, 2026-10-21) ----
+   One section: a timeline that runs down, numbers in circles joined by a rule, each stage with its name, who acts and what it leaves you
+   with. Choosing a stage opens it: under its name on a narrow screen, in a panel beside the timeline on a wide one. Without the script
+   (data-ready absent) and in print every stage is open, in order. */
+.kauro-site-main .kauro-path-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.kauro-site-main .kauro-r2-overview li {
+.kauro-site-main .kauro-path-stage {
   position: relative;
+  scroll-margin-block-start: 6rem;
 }
-.kauro-site-main .kauro-r2-overview li::before {
+/* the rule from one number down to the next, alongside an open stage too */
+.kauro-site-main .kauro-path-stage:not(:last-child)::before {
+  content: "";
   position: absolute;
+  inset-block: calc(var(--kauro-space-3) + 2.25rem) calc(-1 * var(--kauro-space-3));
+  inset-inline-start: calc(1.125rem - 0.5px);
+  inline-size: 1px;
   background: var(--kauro-color-border);
 }
-.kauro-site-main .kauro-r2-overview a {
+.kauro-site-main .kauro-path-head {
+  position: relative;
   display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
   gap: 0.25rem var(--kauro-space-3);
+  padding-block: var(--kauro-space-3);
   border-radius: var(--kauro-radius);
-  color: var(--kauro-color-text);
-  text-decoration: none;
 }
-.kauro-site-main .kauro-r2-overview a:hover .kauro-r2-overview-name {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.kauro-site-main .kauro-r2-overview a:focus-visible {
-  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
-  outline-offset: var(--kauro-focus-offset);
-}
-.kauro-site-main .kauro-r2-overview-number,
-.kauro-site-main .kauro-r2-stage-number {
-  color: var(--kauro-color-primary);
-  font-family: var(--kauro-mono-family);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.kauro-site-main .kauro-r2-overview .kauro-r2-overview-number {
+.kauro-site-main .kauro-path-number {
   position: relative;
   z-index: 1;
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  align-self: start;
   display: grid;
   place-items: center;
   inline-size: 2.25rem;
@@ -9343,85 +9336,233 @@ body:has(> .kauro-site-header) {
   border: 1px solid var(--kauro-color-border);
   border-radius: 50%;
   background: var(--kauro-color-raised);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
   font-size: 0.8125rem;
+  font-weight: 600;
 }
-.kauro-site-main .kauro-r2-overview-name {
+.kauro-site-main .kauro-path-head :is(.kauro-path-name, .kauro-r2-actor, .kauro-path-outcome) {
+  grid-column: 2;
+}
+.kauro-site-main h3.kauro-path-name {
+  margin: 0;
+  padding-block-start: 0.25rem;
   font-size: 1.0625rem;
   font-weight: 600;
   line-height: 1.3;
 }
-.kauro-site-main .kauro-r2-overview-outcome {
+/* the name itself is a 28 px target too (WCAG 2.2 SC 2.5.8), though the whole row answers */
+.kauro-site-main .kauro-path-name button {
+  scroll-margin-block-start: 6rem;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* the whole row chooses the stage, not only its name */
+.kauro-site-main .kauro-path-name button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--kauro-radius);
+}
+.kauro-site-main .kauro-path-name button:focus-visible {
+  outline: none;
+}
+.kauro-site-main .kauro-path-name button:focus-visible::after {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+.kauro-site-main .kauro-path-name button:disabled {
+  cursor: default;
+}
+.kauro-site-main .kauro-path-head:hover .kauro-path-name button:enabled {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.kauro-site-main .kauro-path-outcome {
   color: var(--kauro-color-text-muted);
   font-size: 0.9375rem;
   line-height: 1.45;
 }
-/* a phone: a column, the number beside its stage, the rule running down from one number to the next */
-@media (max-width: 39.99rem) {
-  .kauro-site-main .kauro-r2-overview li:not(:last-child)::before {
-    content: "";
-    inset-block: calc(var(--kauro-space-3) + 2.25rem) calc(-1 * var(--kauro-space-3));
-    inset-inline-start: calc(1.125rem - 0.5px);
-    inline-size: 1px;
-  }
-  .kauro-site-main .kauro-r2-overview a {
-    grid-template-columns: 2.25rem minmax(0, 1fr);
-    padding-block: var(--kauro-space-3);
-  }
-  .kauro-site-main .kauro-r2-overview .kauro-r2-overview-number {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    align-self: start;
-  }
-  .kauro-site-main .kauro-r2-overview :is(.kauro-r2-overview-name, .kauro-r2-actor, .kauro-r2-overview-outcome) {
-    grid-column: 2;
-  }
-  .kauro-site-main .kauro-r2-overview .kauro-r2-overview-name {
+.kauro-site-main .kauro-path-sign {
+  display: none;
+}
+/* the chosen stage: its number filled */
+.kauro-site-main .kauro-path-stage[data-open] .kauro-path-number {
+  border-color: var(--kauro-color-primary);
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-site-main .kauro-path-panel {
+  margin-inline-start: calc(2.25rem + var(--kauro-space-3));
+  padding-block: var(--kauro-space-2) var(--kauro-space-6);
+}
+.kauro-site-main .kauro-path-panel-title {
+  display: none;
+}
+.kauro-site-main .kauro-path .kauro-stage-sheet {
+  display: grid;
+  gap: var(--kauro-space-4);
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.kauro-site-main .kauro-r2-stage-summary {
+  max-inline-size: 70ch;
+  font-size: 1.0625rem;
+}
+/* the previous and the next stage, at the foot of the open one */
+.kauro-site-main .kauro-path-turn {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kauro-space-4);
+  margin-block-start: var(--kauro-space-5);
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-main .kauro-path-turn button {
+  display: grid;
+  gap: 0.125rem;
+  min-block-size: 2.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.kauro-site-main .kauro-path-turn .kauro-path-turn-next {
+  margin-inline-start: auto;
+  justify-items: end;
+  text-align: end;
+}
+.kauro-site-main .kauro-path-turn-label {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-site-main .kauro-path-turn-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.kauro-site-main .kauro-path-turn-previous .kauro-path-turn-name::before {
+  content: "\2190  " / "";
+}
+.kauro-site-main .kauro-path-turn-next .kauro-path-turn-name::after {
+  content: "  \2192" / "";
+}
+.kauro-site-main .kauro-path-turn button:hover .kauro-path-turn-name {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.kauro-site-main .kauro-path-turn button:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+.kauro-site-main .kauro-path-cta {
+  margin-block-start: var(--kauro-space-6);
+}
+/* a narrow screen, with the script: a sign says whether a stage is open, and a closed stage keeps the rule short */
+@media (max-width: 61.99rem) {
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-sign {
+    display: block;
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
     padding-block-start: 0.375rem;
+    color: var(--kauro-color-primary);
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-sign::before {
+    content: "+" / "";
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage[data-open] .kauro-path-sign::before {
+    content: "\2212" / "";
   }
 }
-/* wider: a row, the number above its stage, the rule running across from one number to the next one in the same row */
-@media (min-width: 40rem) {
-  .kauro-site-main .kauro-r2-overview ul {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--kauro-space-6) var(--kauro-space-5);
-  }
-  .kauro-site-main .kauro-r2-overview li::before {
-    content: "";
-    inset-block-start: calc(1.125rem - 0.5px);
-    inset-inline: calc(2.25rem + var(--kauro-space-2)) calc(-1 * var(--kauro-space-5) + var(--kauro-space-2));
-    block-size: 1px;
-  }
-  .kauro-site-main .kauro-r2-overview li:nth-child(2n)::before {
-    content: none;
-  }
-  .kauro-site-main .kauro-r2-overview a {
-    align-content: start;
-    justify-items: start;
-  }
-  .kauro-site-main .kauro-r2-overview .kauro-r2-overview-number {
-    margin-block-end: var(--kauro-space-2);
-  }
-}
+/* a wide screen, with the script: the timeline is the index on the left and the open stage reads in a panel beside it */
 @media (min-width: 62rem) {
-  .kauro-site-main .kauro-r2-overview ul {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-list {
+    display: grid;
+    grid-template-columns: minmax(17rem, 23rem) minmax(0, 1fr);
+    grid-template-rows: repeat(6, auto) 1fr;
+    column-gap: var(--kauro-space-6);
+    align-items: start;
   }
-  .kauro-site-main .kauro-r2-overview li:nth-child(2n)::before {
-    content: "";
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage {
+    display: contents;
   }
-  .kauro-site-main .kauro-r2-overview li:nth-child(3n)::before {
+  /* a box that draws nothing has no rule of its own: the rule hangs from each row instead */
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:not(:last-child)::before {
     content: none;
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-head {
+    grid-column: 1;
+    padding-inline: var(--kauro-space-3);
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:nth-child(1) .kauro-path-head { grid-row: 1; }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:nth-child(2) .kauro-path-head { grid-row: 2; }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:nth-child(3) .kauro-path-head { grid-row: 3; }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:nth-child(4) .kauro-path-head { grid-row: 4; }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:nth-child(5) .kauro-path-head { grid-row: 5; }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:nth-child(6) .kauro-path-head { grid-row: 6; }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage:not(:last-child) .kauro-path-head::before {
+    content: "";
+    position: absolute;
+    inset-block: calc(var(--kauro-space-3) + 2.25rem) calc(-1 * var(--kauro-space-3));
+    inset-inline-start: calc(var(--kauro-space-3) + 1.125rem - 0.5px);
+    inline-size: 1px;
+    background: var(--kauro-color-border);
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-stage[data-open] .kauro-path-head {
+    background: var(--kauro-color-raised);
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-panel {
+    grid-column: 2;
+    grid-row: 1 / span 7;
+    align-self: stretch;
+    margin: 0;
+    padding: clamp(1.5rem, 2.5vw, 2.25rem);
+    border: 1px solid var(--kauro-color-border);
+    border-radius: var(--kauro-radius-large);
+    background: var(--kauro-color-raised);
+  }
+  .kauro-site-main .kauro-path[data-ready] .kauro-path-panel-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--kauro-space-3);
+    margin: 0 0 var(--kauro-space-4);
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .kauro-site-main .kauro-path-panel-number {
+    color: var(--kauro-color-primary);
+    font-family: var(--kauro-mono-family);
+    font-size: 0.9375rem;
   }
 }
-@media (min-width: 80rem) {
-  .kauro-site-main .kauro-r2-overview ul {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+@media print {
+  .kauro-site-main .kauro-path-panel[hidden] {
+    display: block;
   }
-  .kauro-site-main .kauro-r2-overview li:nth-child(3n)::before {
-    content: "";
-  }
-  .kauro-site-main .kauro-r2-overview li:last-child::before {
-    content: none;
+  .kauro-site-main .kauro-path-turn {
+    display: none;
   }
 }
 .kauro-site-main .kauro-r2-actor {
@@ -9449,38 +9590,6 @@ body:has(> .kauro-site-header) {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--kauro-space-3) var(--kauro-space-5);
-}
-.kauro-site-main .kauro-r2-stages {
-  display: grid;
-  gap: var(--kauro-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.kauro-site-main .kauro-r2-stages .kauro-stage-sheet {
-  display: grid;
-  gap: var(--kauro-space-4);
-  padding: clamp(1.25rem, 3vw, 2rem);
-  border: 1px solid var(--kauro-color-border);
-  border-radius: var(--kauro-radius-large);
-  background: var(--kauro-color-raised);
-  scroll-margin-block-start: 6rem;
-}
-.kauro-site-main .kauro-r2-stages > li {
-  scroll-margin-block-start: 6rem;
-}
-.kauro-site-main .kauro-r2-stage-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--kauro-space-2) var(--kauro-space-4);
-}
-.kauro-site-main .kauro-r2-stage-head h3 {
-  font-size: 1.375rem;
-}
-.kauro-site-main .kauro-r2-stage-summary {
-  max-inline-size: 70ch;
-  font-size: 1.0625rem;
 }
 .kauro-site-main .kauro-r2-stage-keys,
 .kauro-site-main .kauro-r2-stage-detail {
