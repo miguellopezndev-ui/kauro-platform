@@ -26,6 +26,11 @@ recorded provenance until an item is adopted.
 
 `ADOPTED` is not used until the first adoption (below); the test refuses it.
 
+CP-02 adds, beside the status, a `class` with a fourth value, `BLOCKED_EXTERNAL` (status `CONDITIONAL`): not adoptable even with the
+owner's decision until counsel, the accountant, a provider or a tool fact answers. An approved CP-02 item that must name vocabulary of a
+CP-01 item not yet approved declares it under `reserves` (`tools/test/cp02-api-contracts.test.mjs` refuses any other mention). CP-02's
+delta is generated from `CP-02.api.json` by `tools/cp02.mjs`.
+
 Each item also carries:
 
 - `approval`: who decided, when, the record, and since the CP-01 owner resolution the `decision` in the owner's terms (`APPROVED`,

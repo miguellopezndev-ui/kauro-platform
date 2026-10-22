@@ -2,7 +2,7 @@
   "proposal": "CP-01",
   "document": "docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md",
   "preparedBy": "Order 16, 2026-10-22",
-  "revision": 2,
+  "revision": 3,
   "revisions": [
     {
       "revision": 1,
@@ -16,6 +16,13 @@
       "by": "Order 16, owner resolution",
       "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "note": "Owner decisions recorded; CP-01.07, CP-01.12 and CP-01.11 corrected; nothing adopted."
+    },
+    {
+      "revision": 3,
+      "date": "2026-10-22",
+      "by": "Order 17, rectification",
+      "record": "docs/design/ORDER17-API-CONTRACTS.md",
+      "note": "CP-01.01's error contract in the document (section 3.1) aligned with the api's convention and with CP-02.01: a target given for CLEAN is 400 INVALID_REQUEST TARGET_NOT_APPLICABLE, a missing CRM target 400 INVALID_REQUEST TARGET_CONTRACT_REQUIRED, a given but stale target 422 TARGET_STALE. The owner's decision (CLEAN needs no target contract), every operation, status, approval and base hash are unchanged; nothing adopted."
     }
   ],
   "ownerResolution": {
