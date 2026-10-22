@@ -38,10 +38,19 @@ run "r2_073_doubling_api_instances_beyond_the_budget_stops_the_plan" {
   expect_failures = [terraform_data.connection_budget]
 }
 
+run "the_database_is_never_enabled_without_the_owners_backup_decision" {
+  command = plan
+  variables {
+    enabled = true
+  }
+  expect_failures = [terraform_data.backup_decision]
+}
+
 run "enabled_instance_is_private_tls_only_protected_and_logs_no_statement" {
   command = plan
   variables {
     enabled = true
+    backup  = { retention_days = 14, window = "08:00-08:30" }
   }
 
   assert {
@@ -57,8 +66,8 @@ run "enabled_instance_is_private_tls_only_protected_and_logs_no_statement" {
     error_message = "PostgreSQL 17 (transaction_timeout)."
   }
   assert {
-    condition     = aws_db_instance.this[0].backup_retention_period >= 1
-    error_message = "Point-in-time recovery stays on (DPA)."
+    condition     = aws_db_instance.this[0].backup_retention_period == 14 && aws_db_instance.this[0].backup_window == "08:00-08:30"
+    error_message = "The owner's backup retention and window, exactly."
   }
   assert {
     condition     = one([for p in aws_db_parameter_group.this[0].parameter : p.value if p.name == "rds.force_ssl"]) == "1"
@@ -73,7 +82,7 @@ run "enabled_instance_is_private_tls_only_protected_and_logs_no_statement" {
 run "point_in_time_recovery_cannot_be_turned_off" {
   command = plan
   variables {
-    backup_retention_days = 0
+    backup = { retention_days = 0, window = "08:00-08:30" }
   }
-  expect_failures = [var.backup_retention_days]
+  expect_failures = [var.backup]
 }

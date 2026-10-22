@@ -20,10 +20,9 @@ monthly ceiling. None of them is a secret, but none belongs in a public reposito
 
 | Step | Root | What it creates | Needs from before | Rollback if it fails or is wrong |
 |---|---|---|---|---|
-| 1 | management | organization (all features, SCP + RCP types), OUs, the data and workload accounts, guard SCPs/RCP, CloudTrail delegated administrator, permission sets, budget + spend stop, anomaly detection, state bucket | gates 1–2 | Detach the guard policies (`aws organizations detach-policy`) before anything else if a guard locks the owner out (the management account is never bound by them); member accounts are never closed by Terraform (`close_on_deletion = false`, `prevent_destroy`) |
+| 1 | management | organization (all features, SCP + RCP types), OUs, the data and workload accounts, guard SCPs/RCP, CloudTrail delegated administrator, permission sets **and the owner's assignments in every account** (so the owner's sessions exist before steps 2–3: the data account's RCP refuses `OrganizationAccountAccessRole` from the management account), budget + spend stop, anomaly detection, management alarms, state bucket | gates 1–2; the owner's activation inputs `owner_principal_id`, `monthly_ceiling_usd`, `spend_stop_approval` | Detach the guard policies (`aws organizations detach-policy`) before anything else if a guard locks the owner out (the management account is never bound by them); member accounts are never closed by Terraform (`close_on_deletion = false`, `prevent_destroy`) |
 | 2 | workload | VPC, subnets, route table, S3 gateway endpoint, security groups, ECR repository, cluster, log group, execution and control-plane roles, attempt boundary, launcher policy, GitHub OIDC provider and image publisher, state bucket. **Not**: interface endpoints, task definition, database | step 1 outputs: `owner_admin_role_pattern`, the account ids | `tofu destroy -target=…` of the failed resource only; nothing here holds data yet |
 | 3 | data | customer-data and journal buckets (Object Lock), audit bucket, organization trail, guard alarms (confirm the SNS e-mail), deletion role, signing profile, code-signing configuration, signing bucket, state bucket | step 1 and step 2 outputs: `organization_id`, `s3_gateway_endpoint_id`, the role patterns | Buckets with Object Lock cannot be deleted while they hold locked versions and are `prevent_destroy`: a wrong bucket is left empty and renamed in configuration, never forced |
-| 4 | management | (re-apply) assignments of the owner's permission sets once the user id is known | the owner's Identity Center user id | Remove the assignment |
 
 ### Bootstrap of each root's state
 
@@ -79,8 +78,10 @@ show no replacement.
 - **Database**: `aws rds restore-db-instance-to-point-in-time --source-db-instance-identifier kauro-<env> --target-db-instance-identifier kauro-<env>-restore-<date> --restore-time <instant> --db-subnet-group-name kauro-<env> --vpc-security-group-ids <database sg> --no-publicly-accessible`;
   then the recovery runner's steps S1–S8 against the copy (`apps/control/src/recovery/restore-runner.ts`), the authority journal
   replay from the journal bucket, and the comparison; the copy is deleted after the drill (its final snapshot kept per B16).
-- **An object version**: `aws s3api list-object-versions` then `copy-object` of the wanted version over the key (a new version);
-  never by deleting the newer version (only the deletion identity may).
+- **An object version**: there is no in-place restore. Every creation outside `heartbeat/` must carry If-None-Match
+  (`NoOverwriteOutsideHeartbeats`, the journal's `AppendOnly`), so nobody copies an old version over its key, and only the deletion
+  identity deletes the newer one. A noncurrent version stays readable by its version id (`GetObjectVersion`) until its expiry; the
+  platform (B07/B15) either re-points its record to that version or copies it to a **new** key with If-None-Match.
 - **The state of a root**: the state bucket is versioned; restore the previous version of the state object, then `tofu plan` must
   show the drift to repair.
 

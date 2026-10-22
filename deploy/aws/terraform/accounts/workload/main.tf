@@ -85,6 +85,20 @@ variable "database_enabled" {
   default     = false
 }
 
+variable "database_backup" {
+  description = "OWNER ACTIVATION INPUT (BLOCKED_OWNER): the database's automated-backup retention in days and daily backup window (UTC). Required, with no default, when database_enabled is true."
+  type = object({
+    retention_days = number
+    window         = string
+  })
+  default = null
+
+  validation {
+    condition     = !var.database_enabled || var.database_backup != null
+    error_message = "BLOCKED_OWNER: database_enabled = true needs the owner's database_backup (retention days and window)."
+  }
+}
+
 variable "github_repository" {
   type    = string
   default = "miguellopezndev-ui/kauro-platform"
@@ -134,6 +148,7 @@ module "database" {
 
   environment       = var.environment
   enabled           = var.database_enabled
+  backup            = var.database_backup
   subnet_ids        = module.network.database_subnet_ids
   security_group_id = module.network.database_security_group_id
 }

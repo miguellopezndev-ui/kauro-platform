@@ -139,6 +139,15 @@ test("static guards detect what they forbid (negative controls)", () => {
   assert.deepEqual(guards.scanSecretsText("manage_master_user_password = true"), []);
 });
 
+test("static guards: a deploying command through a variable or a matrix value, and a provider whose account binding is only a comment, are caught", () => {
+  assert.equal(guards.scanWorkflowText("x.yml", '            "$TOOL" apply -auto-approve').length, 1);
+  assert.equal(guards.scanWorkflowText("x.yml", "      run: ${{ matrix.tool }} destroy").length, 1);
+  assert.equal(guards.scanWorkflowText("x.yml", "      run: tofu -chdir=deploy import x y").length, 1);
+  assert.deepEqual(guards.scanWorkflowText("x.yml", '            "$TOOL" init -backend=false -input=false -lockfile=readonly'), []);
+  assert.equal(guards.providersBoundToAnAccount('provider "aws" {\n  region = "us-east-1"\n  # allowed_account_ids = [var.x]\n}\n'), false);
+  assert.equal(guards.providersBoundToAnAccount('provider "aws" {\n  region              = var.region\n  allowed_account_ids = [var.x]\n}\n'), true);
+});
+
 test("Terraform and OpenTofu run the same plan tests: each .tofutest.hcl is its .tftest.hcl without override_during", () => {
   const tests = guards.terraformTestPairs();
   assert.ok(tests.length >= 6);

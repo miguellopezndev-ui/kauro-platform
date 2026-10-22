@@ -48,14 +48,22 @@ variable "max_allocated_storage_gib" {
   default     = 50
 }
 
-variable "backup_retention_days" {
-  description = "Automated backups and point-in-time recovery window (DPA: daily metadata backups with PITR). The number is not set by any contract: BLOCKED_OWNER, 7 is a placeholder the owner confirms or changes at activation."
-  type        = number
-  default     = 7
+variable "backup" {
+  description = "OWNER ACTIVATION INPUT (BLOCKED_OWNER): the automated-backup retention in days (the point-in-time recovery window the DPA promises) and the daily backup window (UTC, hh24:mi-hh24:mi). No contract fixes either, so there is no default: the database cannot be enabled without the owner's values."
+  type = object({
+    retention_days = number
+    window         = string
+  })
+  default = null
 
   validation {
-    condition     = var.backup_retention_days >= 1 && var.backup_retention_days <= 35
+    condition     = var.backup == null || try(var.backup.retention_days >= 1 && var.backup.retention_days <= 35, false)
     error_message = "RDS keeps automated backups 1 to 35 days; 0 would turn point-in-time recovery off, which the DPA promises."
+  }
+
+  validation {
+    condition     = var.backup == null || try(can(regex("^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$", var.backup.window)), false)
+    error_message = "The backup window is hh24:mi-hh24:mi (UTC)."
   }
 }
 
@@ -136,6 +144,18 @@ resource "aws_db_parameter_group" "this" {
   }
 }
 
+# The owner's backup decision is required before the database exists (no default stands in for it).
+resource "terraform_data" "backup_decision" {
+  input = var.backup
+
+  lifecycle {
+    precondition {
+      condition     = !var.enabled || var.backup != null
+      error_message = "BLOCKED_OWNER: the database cannot be enabled without the owner's backup retention and window (var.backup)."
+    }
+  }
+}
+
 # Evaluated on every plan, with or without the instance: a rollout whose pools exceed the instance stops here (R2-073).
 resource "terraform_data" "connection_budget" {
   input = local.budget_needed
@@ -178,8 +198,8 @@ resource "aws_db_instance" "this" {
   parameter_group_name   = aws_db_parameter_group.this[0].name
   ca_cert_identifier     = "rds-ca-rsa2048-g1"
 
-  backup_retention_period   = var.backup_retention_days
-  backup_window             = "06:00-06:30"
+  backup_retention_period   = try(var.backup.retention_days, null)
+  backup_window             = try(var.backup.window, null)
   maintenance_window        = "sun:07:00-sun:07:30"
   copy_tags_to_snapshot     = true
   delete_automated_backups  = false
@@ -197,6 +217,8 @@ resource "aws_db_instance" "this" {
   lifecycle {
     prevent_destroy = true
   }
+
+  depends_on = [terraform_data.backup_decision]
 }
 
 output "enabled" {

@@ -134,22 +134,41 @@ export function pinnedToolchain() {
 }
 
 /** Nothing in CI or in the repository can deploy: no apply, no AWS credentials, no OIDC role assumed by a workflow. */
+// A Terraform or OpenTofu invocation, written directly or through a variable or a matrix value (as aws-iac.yml does).
+const TOOL = String.raw`(?:\b(?:terraform|tofu)\b|"?\$\{?TOOL\}?"?|\$\{\{\s*matrix\.tool\s*\}\})`;
+const DEPLOYING_COMMAND = new RegExp(`${TOOL}\\s+(?:-[^\\s]+\\s+)*(?:apply|destroy|import)\\b`);
+const PLAN_COMMAND = new RegExp(`${TOOL}\\s+(?:-[^\\s]+\\s+)*plan\\b`);
+
+/** The problems of one workflow text: a deploying command, a plan against a backend, AWS credentials, an OIDC token. */
+export function scanWorkflowText(name, text) {
+  const problems = [];
+  if (DEPLOYING_COMMAND.test(text)) problems.push(`.github/workflows/${name}: runs apply, destroy or import`);
+  if (PLAN_COMMAND.test(text) && !/-backend=false/.test(text)) problems.push(`.github/workflows/${name}: plans against a backend`);
+  if (/configure-aws-credentials|secrets\.AWS_|AWS_ACCESS_KEY_ID|AWS_ROLE_ARN/.test(text)) problems.push(`.github/workflows/${name}: obtains AWS credentials`);
+  if (/id-token:\s*write/.test(text) && /aws/i.test(name)) problems.push(`.github/workflows/${name}: may request an OIDC token`);
+  return problems;
+}
+
+/** Each `provider "aws"` block of a text, comments removed; true when every one sets allowed_account_ids. */
+export function providersBoundToAnAccount(text) {
+  const code = text.split("\n").map((line) => line.replace(/(^|\s)(#|\/\/).*$/, "")).join("\n");
+  const blocks = [...code.matchAll(/^provider\s+"aws"\s*\{([\s\S]*?)^\}/gm)].map((m) => m[1]);
+  return blocks.every((body) => /^\s*allowed_account_ids\s*=/m.test(body));
+}
+
+/** Nothing in CI or in the repository can deploy: no apply, no AWS credentials, no OIDC role assumed by a workflow. */
 export function noAccidentalDeployment() {
   const problems = [];
   const workflows = join(REPO, ".github", "workflows");
-  for (const name of existsSync(workflows) ? readdirSync(workflows) : []) {
-    const text = readFileSync(join(workflows, name), "utf8");
-    if (/\b(terraform|tofu)\s+(apply|destroy|import)\b/.test(text)) problems.push(`.github/workflows/${name}: runs apply, destroy or import`);
-    if (/\b(terraform|tofu)\s+plan\b/.test(text) && !/-backend=false/.test(text)) problems.push(`.github/workflows/${name}: plans against a backend`);
-    if (/configure-aws-credentials|secrets\.AWS_|AWS_ACCESS_KEY_ID|AWS_ROLE_ARN/.test(text)) problems.push(`.github/workflows/${name}: obtains AWS credentials`);
-    if (/id-token:\s*write/.test(text) && /aws/i.test(name)) problems.push(`.github/workflows/${name}: may request an OIDC token`);
-  }
+  for (const name of existsSync(workflows) ? readdirSync(workflows) : []) problems.push(...scanWorkflowText(name, readFileSync(join(workflows, name), "utf8")));
   for (const file of terraformFiles()) {
-    const text = readFileSync(file, "utf8");
-    if (/allowed_account_ids/.test(text) === false && /^provider "aws"/m.test(text)) problems.push(`${rel(file)}: a provider without allowed_account_ids`);
+    if (!providersBoundToAnAccount(readFileSync(file, "utf8"))) problems.push(`${rel(file)}: a provider without allowed_account_ids`);
   }
   for (const root of ["management", "data", "workload"]) {
-    const main = readFileSync(join(TERRAFORM_DIR, "accounts", root, "main.tf"), "utf8");
+    const dir = join(TERRAFORM_DIR, "accounts", root);
+    const providers = readFileSync(join(dir, "providers.tf"), "utf8");
+    if (!/^provider\s+"aws"/m.test(providers)) problems.push(`${root}: no provider block`);
+    const main = readFileSync(join(dir, "main.tf"), "utf8");
     if (!new RegExp(`KAURO-ACT-\\[0-9\\]\\{4\\}-\\[0-9\\]\\{2\\}-\\[0-9\\]\\{2\\}-${root.toUpperCase()}-`).test(main)) problems.push(`${root}: no activation gate`);
   }
   return problems;

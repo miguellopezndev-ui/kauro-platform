@@ -1,6 +1,8 @@
 # Activation gates (Order 25 §9)
 
-Nothing in `deploy/aws/terraform` can be planned until the owner records an activation reference for that account
+No account root of `deploy/aws/terraform` (`accounts/management`, `accounts/data`, `accounts/workload`, the only entry points:
+the modules carry no provider configuration and are never applied on their own) can be planned until the owner records an
+activation reference for that account
 (`KAURO-ACT-YYYY-MM-DD-<MANAGEMENT|DATA|WORKLOAD>-<n>`, with gates 1–2 confirmed for the management account, which then builds gates 3–4, and gates 1–4 for the data and workload accounts): each root's `activation_authorization` variable refuses
 any other value, so `plan` and `apply` stop before any AWS call that creates something. This page lists the gates in order. **None
 of them is to be executed now**: they wait for the company's unblocking (A9 §5).
@@ -33,3 +35,15 @@ activation_authorization = {
 
 A reference names one account and its date; a new phase (qualification, production) gets a new reference. The reference is a
 guard against accidents, not against the owner: the owner can always act directly in the console.
+
+## Owner activation inputs (no default; the roots refuse to plan without them)
+
+| Input | Root | Gate | What it decides |
+|---|---|---|---|
+| `owner_principal_id` | management | 2 | the owner's Identity Center user, assigned to the owner's permission sets in every account at the first apply |
+| `monthly_ceiling_usd` | management | 4 | the monthly cloud ceiling (at most the USD 220 funding row) |
+| `spend_stop_approval` | management | 4 | whether Budgets applies the spend stop automatically or asks the owner first |
+| `database_backup` | workload | before `database_enabled = true` | the database's automated-backup retention (PITR window) and daily backup window |
+
+The control plane's role trusts ECS tasks by default (`control_plane_trusted_service`): that is a PROPOSED placeholder, not the
+runtime decision (R-A1); nothing assumes the role until that decision is taken and built.

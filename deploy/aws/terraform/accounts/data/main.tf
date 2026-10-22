@@ -28,7 +28,7 @@ variable "organization_id" {
 
   validation {
     condition     = can(regex("^o-[a-z0-9]{10,32}$", var.organization_id))
-    error_message = "An AWS Organizations id (o-â€¦)."
+    error_message = "An AWS Organizations id (o-...)."
   }
 }
 
@@ -66,7 +66,7 @@ variable "s3_gateway_endpoint_id" {
 
   validation {
     condition     = can(regex("^vpce-[0-9a-f]{8,17}$", var.s3_gateway_endpoint_id))
-    error_message = "A VPC endpoint id (vpce-â€¦)."
+    error_message = "A VPC endpoint id (vpce-...)."
   }
 }
 

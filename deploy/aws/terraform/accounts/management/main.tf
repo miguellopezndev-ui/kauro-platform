@@ -53,9 +53,13 @@ variable "workload_account" {
 }
 
 variable "owner_principal_id" {
-  description = "The owner's Identity Center user id; null until it exists."
+  description = "OWNER ACTIVATION INPUT (gate 2): the owner's Identity Center user id. Required at the first apply, so the owner's sessions exist in the member accounts before their roots are applied."
   type        = string
-  default     = null
+
+  validation {
+    condition     = can(regex("^[0-9a-f-]{10,64}$", var.owner_principal_id))
+    error_message = "An Identity Center user id."
+  }
 }
 
 variable "monthly_ceiling_usd" {
@@ -66,6 +70,11 @@ variable "monthly_ceiling_usd" {
     condition     = var.monthly_ceiling_usd > 0 && var.monthly_ceiling_usd <= 220
     error_message = "The ceiling is positive and never above the owner's monthly funding (policy.json monthlyOwnerFundingCents = 22000)."
   }
+}
+
+variable "spend_stop_approval" {
+  description = "OWNER ACTIVATION INPUT (gate 4): AUTOMATIC or MANUAL approval of the spend-stop SCP at the monthly ceiling."
+  type        = string
 }
 
 variable "alert_email" {
@@ -110,6 +119,7 @@ module "cost_guardrails" {
 
   policies_dir             = local.policies_dir
   monthly_ceiling_usd      = var.monthly_ceiling_usd
+  spend_stop_approval      = var.spend_stop_approval
   alert_email              = var.alert_email
   workloads_ou_id          = module.organization.workloads_ou_id
   owner_admin_role_pattern = module.organization.owner_admin_role_pattern

@@ -41,9 +41,8 @@ variable "anomaly_threshold_usd" {
 }
 
 variable "spend_stop_approval" {
-  description = "AUTOMATIC applies the spend-stop SCP at 100 % of actual spend; MANUAL e-mails the owner to approve it."
+  description = "OWNER ACTIVATION INPUT (gate 4): AUTOMATIC applies the spend-stop SCP at 100 % of actual spend; MANUAL e-mails the owner to approve it. No default."
   type        = string
-  default     = "AUTOMATIC"
 
   validation {
     condition     = contains(["AUTOMATIC", "MANUAL"], var.spend_stop_approval)

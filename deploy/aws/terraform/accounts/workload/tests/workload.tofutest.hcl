@@ -159,6 +159,14 @@ run "the_control_plane_role_carries_its_boundary" {
   }
 }
 
+run "the_database_is_never_enabled_without_the_owners_backup_decision" {
+  command = plan
+  variables {
+    database_enabled = true
+  }
+  expect_failures = [var.database_backup]
+}
+
 run "the_default_connection_budget_fits_the_proposed_instance" {
   command = plan
 

@@ -51,6 +51,8 @@ override_resource {
 variables {
   management_account_id    = "000000000000"
   monthly_ceiling_usd      = 70
+  spend_stop_approval      = "MANUAL"
+  owner_principal_id       = "906700000a-0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0"
   activation_authorization = { reference = "KAURO-ACT-2026-11-02-MANAGEMENT-1", gates_confirmed = [1, 2, 3, 4] }
 }
 
