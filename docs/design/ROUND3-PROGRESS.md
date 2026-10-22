@@ -67,3 +67,20 @@ both from the first line to the last. Then this ledger.
 - **The engine's documents** (audit summary, importer guides, exception and trace files, manifest, README) are delivered as finished
   specimens and an archived patch, not merged. The reason: the Intelligence Core accepts only Migration Core 3.0.0 and may not be
   modified (deliverables plan §1.1).
+
+## Stopped by the owner, 2026-10-22
+
+The owner asked to stop everything ("quedó como quedó"). Every agent is stopped, nothing is pushed, and PR #118 is untouched. Some
+work was cut off mid-pass and may be partly edited:
+- **Refunds final fix pass:** the state before the pass is in `refunds/final/pre-fix/`.
+- **Sellers final:** started, not finished.
+- **The report fix pass:** in progress when stopped.
+- **The Claims accept-reason fix:** in progress when stopped.
+
+Decided but not finished, recorded in each page's AUDITIONS.md:
+- **Owner actions:** a3.
+- **Support cases:** v1.
+- **Sellers:** s1.
+- **Customers:** critique "ready with fixes"; the fix pass was not run.
+
+Nine owner pages and kit group B were paused earlier.
