@@ -8,6 +8,9 @@
  *   BANK_CREDIT  CMD220 ApproveTreasuryRefund (the route-scope refund of an unassigned credit; excess-only: one amount, agency NULL).
  *
  * Order (lock order §7.28; TIME-AFTER-AWAIT):
+ *   0. first of all, the caller's ACTIVE KAURO_OWNER grant in an OPERATOR unit of its own (ownerFirst, Order 15 F-01): a person without it is
+ *      refused before anything below runs — no evidence read, no source located or scope adopted, no OUTBOUND lock — so an unknown, a foreign
+ *      and an existing id answer alike and nobody but the owner can queue behind or ahead of the owner's stream;
  *   1. before the unit: the payer evidence read from the restricted store under the provider-call bound (F1), then the named point
  *      `bank:gate-read`; a read that outlived its bound is CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE, never permission;
  *   2. in the unit: the source located (CAPTURE: the refund's scope adopted, the account of its transfer instructions; BANK_CREDIT: the
@@ -15,17 +18,15 @@
  *      owner's identity, grant and step-up at the database clock after their transition locks; OK records the act every guard of the unit
  *      requires), then the owner's journal entry (agency NULL; the digest covers the body without the proof, so a lost answer replays under a
  *      new proof and another body is BODY_CONFLICT), then the evidence judged over the bytes actually read (hash, account, payer link), the
- *      destination normalized (destination-norm-v1) and fingerprinted, then the source's row lock and preconditions, the writes, the ALLOW
- *      fact and the journal's response;
+ *      destination normalized (destination-norm-v1) and fingerprinted, then the source's row lock and preconditions, the writes, the caller's
+ *      session fenced and judged in the unit as its last lock (rule 16: kauro.payment_session_fence, 0081; Order 15 F-02), the ALLOW fact and
+ *      the journal's response;
  *   3. immediately before COMMIT: the step-up judged again at the effect clock read last (a proof that expired meanwhile refuses everything).
  * A denial (ACCESS / ASSURANCE / NOT_AUTHORIZED) is recorded afterwards in its own SERVICE unit (agency NULL, naming the adopted agency).
- *
- * GAP (reported): the cookie-session fence of rule 16 (judgedUnderHold) needs the session row FOR SHARE under kauro_app; these units run as
- * kauro_payment, so the credential is judged by the transport's authentication and the owner's authority by the definer only.
  */
 import type { CommandId, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, rawDigest } from "@kauro/contracts";
-import type { AgencyId, AssuranceProofId, CausationId, CommerceUnitOfWork, CommerceUnitOfWorkFactory, CorrelationId, RefundId, ServiceContext, UserId } from "@kauro/domain";
+import type { AgencyId, AssuranceProofId, CausationId, CommerceUnitOfWork, CommerceUnitOfWorkFactory, CorrelationId, IdentityFacts, OperatorContext, RefundId, ServiceContext, UserId } from "@kauro/domain";
 import {
   COMMERCE_POLICY_VERSION,
   DomainFailure,
@@ -50,6 +51,7 @@ import {
   refundTaxFailure,
   refundableBalance,
 } from "@kauro/domain";
+import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { STEP_UP_FRESHNESS_SECONDS } from "../../ports/assurance-and-admission.js";
@@ -58,7 +60,7 @@ import type { StoredBankEvidence } from "../ports.js";
 import type { ApproveRefundView } from "../views.js";
 import { refundEffectsView, refundView } from "../request/projections.js";
 import { moneyField, refundEffectsOf } from "../request/approve-refund.js";
-import { DENIAL_CODES, resultOf, versionOfView, type CommerceRequestCollaborators, type CommerceRequestRuntime } from "../request/runtime.js";
+import { CommerceAccessDenied, DENIAL_CODES, recordCommerceDenial, resultOf, versionOfView, type CommerceRequestCollaborators, type CommerceRequestRuntime } from "../request/runtime.js";
 import type { BankRefundRepository, BankRouteCollaborators, OwnerAuthorityVerdict } from "./ports.js";
 import { evidenceUnavailable, type BankRouteRequest } from "./route-config.js";
 
@@ -108,6 +110,29 @@ export interface OwnerRefundDependencies {
 
 export const integrity = (reason: "DESTINATION_NOT_CAPTURED" | "DESTINATION_INVALID" | "DESTINATION_UNPROVEN" | "HASH_MISMATCH", message: string): DomainFailure => new DomainFailure("INTEGRITY_FAILURE", message, { reason });
 export const stepUpStale = (): DomainFailure => new DomainFailure("ASSURANCE_REQUIRED", "the owner's step-up is not fresh at the effect", { reason: "STEP_UP_STALE" });
+
+/**
+ * The caller's ACTIVE KAURO_OWNER grant, judged in an OPERATOR unit of its own before an owner bank refund command reads or locks anything
+ * (Order 15 F-01; OWASP API5 BFLA: the function before the object). The commands' SERVICE units see every agency, so without this a person
+ * without the grant reached the restricted-store read, the source lookup (an unknown id answered NOT_FOUND, an existing one of any agency was
+ * located and its scope adopted, named in the denial) and the account's OUTBOUND stream lock before the definer refused it. The definer's
+ * verdict in the unit stays the authority at the effect (identity, grant and step-up at the database clock); this refuses early and alike.
+ * A refusal is recorded here, in the person's own stream (actor USER, no agency), and returned; null when the caller holds the grant.
+ */
+export async function ownerFirst(d: Pick<OwnerRefundDependencies, "runtime">, identity: IdentityFacts, correlationId: CorrelationId, operation: string): Promise<DomainFailure | null> {
+  const context: OperatorContext = { kind: "OPERATOR", userId: identity.userId as UserId, correlationId };
+  try {
+    const decision = await d.runtime.unitOfWork.run(context, (uow) => d.runtime.commerceAuthorizer.authorizeOperator(uow, { identity, role: "KAURO_OWNER" }));
+    if (decision.kind === "ALLOW") return null;
+    const refused = CommerceAccessDenied.of(operation, decision);
+    await recordCommerceDenial(d.runtime, context, operation, refused, null);
+    return refused;
+  } catch (e) {
+    // a unit that could not decide (no connection, a lock or statement timeout) is the command's answer, never permission
+    if (e instanceof DomainFailure && e.code !== "INTERNAL_ERROR") return e;
+    throw e;
+  }
+}
 
 /** The definer's verdict as the failure the caller answers (OK: none). */
 export function verdictFailure(v: OwnerAuthorityVerdict): DomainFailure | null {
@@ -205,6 +230,10 @@ interface OwnerRefundRun<View> {
   readonly correlationId: CorrelationId;
   readonly idempotencyKey: string;
   readonly userId: UserId;
+  /** The caller's identity facts, judged for the grant before anything else (ownerFirst). */
+  readonly identity: IdentityFacts;
+  /** The request's credential, fenced and judged in the unit before the effect (rule 16). */
+  readonly authority: RequestAuthority | undefined;
   readonly path: Readonly<Record<string, string>>;
   readonly body: { readonly authorizationRef: string; readonly destination?: RefundDestinationFields; readonly destinationEvidence?: RefundDestinationEvidenceFields };
   /** Locates the source in the unit (adopting its scope when it has one): the account whose OUTBOUND stream L1 locks. */
@@ -221,6 +250,9 @@ class Replayed {
 async function runOwnerRefund<View>(d: OwnerRefundDependencies, run: OwnerRefundRun<View>): Promise<CommandResult<View>> {
   const context: ServiceContext = { kind: "SERVICE", serviceId: d.paymentServiceId, correlationId: run.correlationId };
   let adopted: AgencyId | null = null;
+  // 0. the owner before anything of the command is read or locked (F-01): a refusal is already recorded in the person's stream
+  const refused = await ownerFirst(d, run.identity, run.correlationId, run.operation);
+  if (refused !== null) return resultOf<View>(refused, run.correlationId);
   try {
     const bank = d.bank;
     const payment = d.payment;
@@ -257,6 +289,8 @@ async function runOwnerRefund<View>(d: OwnerRefundDependencies, run: OwnerRefund
       if (reservation.kind === "REPLAY") {
         const status = reservation.entry.responseStatus;
         if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+        // a replay answers only under a credential that still authenticates the request (rule 16)
+        await judgedUnderHold(run.authority, uow, d.runtime.clock);
         return new Replayed(status, reservation.entry.responseBody);
       }
       if (reservation.kind === "CONFLICT") throw new DomainFailure("IDEMPOTENCY_CONFLICT", "idempotency key reused with a different request body", { reason: "BODY_CONFLICT" });
@@ -266,6 +300,9 @@ async function runOwnerRefund<View>(d: OwnerRefundDependencies, run: OwnerRefund
       // no await between this instant and its judgment
       if (!freshAt(verdict, at)) throw stepUpStale();
       const outcome = await run.apply(uow, repo, reservation.entryId as string as CausationId, at, proven, proof);
+      // rule 16 (F-02): the caller's session fenced in this unit (kauro.payment_session_fence, 0081) as its LAST lock, after the source's
+      // transition and row locks apply took, and judged now: a logout committed meanwhile rolls the approval back, a later one waits for COMMIT
+      await judgedUnderHold(run.authority, uow, d.runtime.clock);
       await uow.securityEvents.append({
         agencyId: null,
         requestedAgencyId: uow.commerceScope,
@@ -335,6 +372,8 @@ export function approveCaptureWithDestination(d: OwnerRefundDependencies, co: Co
     correlationId: envelope.correlationId,
     idempotencyKey: envelope.idempotencyKey,
     userId,
+    identity: envelope.subject.identity,
+    authority: envelope.authority,
     path: envelope.path,
     body,
     async locate(uow) {
@@ -447,6 +486,8 @@ export function approveTreasuryHandler(d: OwnerRefundDependencies): (request: Ba
         correlationId: request.correlationId,
         idempotencyKey: request.idempotencyKey,
         userId,
+        identity: request.subject.identity,
+        authority: request.authority,
         path: request.path,
         body,
         async locate(_uow, repo) {

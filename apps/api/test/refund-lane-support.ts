@@ -484,7 +484,8 @@ export const openBank = (login: "kauro_payment_test" | "kauro_app_test" = BANK_C
 /** Runs a command with every unit of work it opens routed over `conn` (crashable `uow`, SqlStep points). */
 export function routed<T>(ctx: FaultContext, conn: HarnessConnection, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
   // the bank owner commands run their SERVICE units on the payment service's factory: routed over the same connection
-  return L().iw.faults.on(conn, BANK_COMMAND_ROLE, ctx.points, steps, fn, { payment: true, ...(target === undefined ? {} : { target }) });
+  // the owner's grant is judged first in a kauro_app OPERATOR unit of its own (ownerFirst, Order 15 F-01): it runs on the api's own pool, unrouted
+  return L().iw.faults.on(conn, BANK_COMMAND_ROLE, ctx.points, steps, fn, { payment: true, unrouted: ["kauro_app"], ...(target === undefined ? {} : { target }) });
 }
 /** A routed command over a fresh connection, closed after. */
 export async function onFresh<T>(ctx: FaultContext, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {

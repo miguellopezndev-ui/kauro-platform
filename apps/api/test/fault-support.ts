@@ -43,6 +43,8 @@ interface Route {
   readonly unit?: UnitLog;
   /** Lane L-REFUND: the payment service's commerce units (wrapCommerce) are routed over the same connection too (the bank owner commands run as kauro_payment). */
   readonly payment?: boolean;
+  /** Roles whose request units run on the api's own pool, unrouted and uncounted, as in production (Routing.unrouted). */
+  readonly unrouted?: ReadonlySet<RouteRole>;
   /** The step clock re-applied before each statement marked `/* b12:judge *\/` (the world turned positionEveryUnit on): null when none is set. */
   readonly judgeClock?: () => StepClockOf | null;
 }
@@ -84,6 +86,12 @@ export interface Routing {
   readonly log?: UnitLog[];
   /** Route the payment service's commerce units (wrapCommerce) over the connection as well (lane L-REFUND: a bank owner command's SERVICE units). */
   readonly payment?: boolean;
+  /**
+   * Request units of these roles run on the api's own pool, unrouted and uncounted, as in production; a unit of any other role the invocation
+   * does not serve still fails loudly. Lane L-REFUND: a bank owner command first judges the caller's grant in a kauro_app OPERATOR unit of its
+   * own (ownerFirst, Order 15 F-01); the cells route and number only the command's SERVICE units.
+   */
+  readonly unrouted?: ReadonlyArray<RouteRole>;
 }
 
 type AnyFactory = { run(context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown): Promise<unknown> };
@@ -375,7 +383,7 @@ export class FaultRouting {
    * into `routing.log` (B10-KIT-SUITES section 3).
    */
   on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing: Routing = {}): Promise<T> {
-    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, judgeClock: this.#judgeClock, ...(routing.payment === true ? { payment: true } : {}) }, fn);
+    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, judgeClock: this.#judgeClock, ...(routing.payment === true ? { payment: true } : {}), ...(routing.unrouted !== undefined ? { unrouted: new Set(routing.unrouted) } : {}) }, fn);
   }
 
   /**
@@ -529,21 +537,31 @@ export class FaultRouting {
         }
         if (route === undefined || typeof value !== "function") return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
-        const invocation = route.invocation;
-        if (invocation === undefined) {
-          const routed = this.unit(route.conn, route.role, route.points, route.steps);
-          return routed.run.bind(routed);
-        }
-        // the ordinal is taken when the unit runs, from the invocation's counter (never per factory access); SqlStep.nth counts within the
-        // unit, as before
-        return (context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown) => {
-          invocation.seq += 1;
-          const unit: UnitLog = { ordinal: invocation.seq, name: invocation.target === invocation.seq ? "target" : "uow", role: null, attempts: 0, statements: [] };
-          invocation.log.push(unit);
-          const routed = crashableFactory(new RoutedFactory({ ...route, unit, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock, () => this.positionEveryUnit) as unknown as AnyFactory, route.points, unit.name, ["run"]);
-          return routed.run(context, work, options);
-        };
+        const routedRun = this.#routedRun(route);
+        // a role the invocation leaves to the api's own pool (Routing.unrouted): the production unit, outside the routed counter and points
+        const unrouted = route.unrouted;
+        if (unrouted === undefined) return routedRun;
+        return (context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown) =>
+          unrouted.has(runtimeRoleOf(context) as RouteRole) ? (value as (...a: unknown[]) => Promise<unknown>).call(target, context, work, options) : routedRun(context, work, options);
       },
     });
+  }
+
+  /** The routed `run` of a request unit-of-work factory inside an invocation: each unit over the invocation's connection, numbered when it runs. */
+  #routedRun(route: Route): (context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown) => Promise<unknown> {
+    const invocation = route.invocation;
+    if (invocation === undefined) {
+      const routed = this.unit(route.conn, route.role, route.points, route.steps);
+      return routed.run.bind(routed);
+    }
+    // the ordinal is taken when the unit runs, from the invocation's counter (never per factory access); SqlStep.nth counts within the
+    // unit, as before
+    return (context, work, options) => {
+      invocation.seq += 1;
+      const unit: UnitLog = { ordinal: invocation.seq, name: invocation.target === invocation.seq ? "target" : "uow", role: null, attempts: 0, statements: [] };
+      invocation.log.push(unit);
+      const routed = crashableFactory(new RoutedFactory({ ...route, unit, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock, () => this.positionEveryUnit) as unknown as AnyFactory, route.points, unit.name, ["run"]);
+      return routed.run(context, work, options);
+    };
   }
 }

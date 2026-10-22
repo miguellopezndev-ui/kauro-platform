@@ -26,14 +26,16 @@
  *       UNCERTAIN_EFFECT case resolved, the ALLOW fact and the journal's answer. Nothing is ever re-sent (NEVER-RESEND).
  *   The queue: the DECLARED attempts with what to send (last four and holder only), for the corporate owner (kauro_app, OPERATOR).
  *
- * GAP (reported): the cookie-session fence of rule 16 is not taken in these SERVICE units (see approve-destination.ts).
+ * Every command first judges the caller's ACTIVE KAURO_OWNER grant in an OPERATOR unit of its own (ownerFirst, Order 15 F-01), before the
+ * restricted store, the source or the attempt is read and before L1: a person without it is refused alike for any id, naming no agency.
+ * Rule 16: the caller's session is fenced in each SERVICE unit (kauro.payment_session_fence, 0081) as the last lock before the effect.
  * DP-RECIPIENT (DV1-10, DV1-11): X1/X4 may bind a provider recipient record (id + version) with its recipient-record artifact, read outside any
  * unit and re-verified by hash under the locks; its full details must give exactly the captured fingerprint, else RECIPIENT_ALIAS. G2/G4/X3
  * then accept, without full details, a receipt carrying the same recipient id AND version; anything weaker stays DESTINATION_UNPROVEN.
  */
 import type { CommandId, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { rawDigest } from "@kauro/contracts";
-import type { AgencyId, CausationId, FailureReason, CommerceUnitOfWork, CommerceUnitOfWorkFactory, CorrelationId, OperatorContext, OutboundEvidence, RefundId, ServiceContext, UserId } from "@kauro/domain";
+import type { AgencyId, CausationId, Clock, FailureReason, CommerceUnitOfWork, CommerceUnitOfWorkFactory, CorrelationId, OperatorContext, OutboundEvidence, RefundId, ServiceContext, UserId } from "@kauro/domain";
 import {
   COMMERCE_POLICY_VERSION,
   DomainFailure,
@@ -59,7 +61,7 @@ import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { STEP_UP_FRESHNESS_SECONDS } from "../../ports/assurance-and-admission.js";
 import type { DestinationFingerprinter, StoredBankEvidence } from "../ports.js";
 import { CommerceAccessDenied, DENIAL_CODES, recordCommerceDenial, resultOf } from "../request/runtime.js";
-import { BANK_REFUND_COMMAND_IDS, approveTreasuryHandler, freshAt, integrity, stepUpStale, verdictFailure, type ApproveTreasuryRefundBody, type OwnerRefundDependencies, type TreasuryRefundView } from "./approve-destination.js";
+import { BANK_REFUND_COMMAND_IDS, approveTreasuryHandler, freshAt, integrity, ownerFirst, stepUpStale, verdictFailure, type ApproveTreasuryRefundBody, type OwnerRefundDependencies, type TreasuryRefundView } from "./approve-destination.js";
 import type { BankCreditClassifier, BankRefundRepository, BankRouteCollaborators, CapturedDestination, ExecutionAttemptRecord, ExecutionGateOutcomeName, ExecutionOfferCommandName, ExecutionOfferRecord, OwnerAuthorityVerdict } from "./ports.js";
 import { evidenceUnavailable, type BankRouteRequest } from "./route-config.js";
 
@@ -191,8 +193,16 @@ function partsOf(d: OwnerRefundDependencies): Parts {
   return { bank, payment: d.payment, refunds: bank.refunds };
 }
 
-/** Runs one owner command; a denial (ACCESS / ASSURANCE / NOT_AUTHORIZED) is recorded afterwards in its own SERVICE unit (agency NULL). */
-async function ownerCommand<View>(d: OwnerRefundDependencies, operation: string, correlationId: CorrelationId, body: (context: ServiceContext, adopt: (agency: AgencyId | null) => void) => Promise<CommandResult<View>>): Promise<CommandResult<View>> {
+/**
+ * Runs one owner command: the caller's grant first (ownerFirst: nothing of the command is read or locked for a person without it, and its
+ * refusal is the person's own fact), then the command; a later denial (ACCESS / ASSURANCE / NOT_AUTHORIZED) is recorded afterwards in its own
+ * SERVICE unit (agency NULL).
+ */
+async function ownerCommand<View>(d: OwnerRefundDependencies, operation: string, request: Pick<BankRouteRequest<unknown>, "correlationId" | "subject">, body: (context: ServiceContext, adopt: (agency: AgencyId | null) => void) => Promise<CommandResult<View>>): Promise<CommandResult<View>> {
+  const correlationId = request.correlationId;
+  // the owner before anything of the command is read or locked (F-01): a refusal is already recorded in the person's stream
+  const refused = await ownerFirst(d, request.subject.identity, correlationId, operation);
+  if (refused !== null) return resultOf<View>(refused, correlationId);
   const context: ServiceContext = { kind: "SERVICE", serviceId: d.paymentServiceId, correlationId };
   let adopted: AgencyId | null = null;
   try {
@@ -256,6 +266,8 @@ interface Journal {
   readonly identity: { readonly environment: BankRouteRequest<unknown>["environment"]; readonly actor: { readonly kind: "USER"; readonly userId: UserId }; readonly agencyId: null; readonly operation: CommandId; readonly key: string };
   readonly digest: Sha256Hex;
   readonly correlationId: CorrelationId;
+  /** The request's credential: a replay is answered only while it still authenticates the request (rule 16). */
+  readonly authority: RequestAuthority | undefined;
 }
 function journalOf(operation: string, request: BankRouteRequest<{ readonly authorizationRef: string }>): Journal {
   const { authorizationRef: _proof, ...digested } = request.body;
@@ -263,14 +275,17 @@ function journalOf(operation: string, request: BankRouteRequest<{ readonly autho
     identity: { environment: request.environment, actor: { kind: "USER", userId: request.subject.identity.userId as UserId }, agencyId: null, operation: operation as CommandId, key: request.idempotencyKey },
     digest: commandRequestDigest({ operation: operation as CommandId, aggregate: request.path, body: digested }),
     correlationId: request.correlationId,
+    authority: request.authority,
   };
 }
 /** The owner's journal entry: NEW (its id), or the journaled answer of the same key and body; another body is BODY_CONFLICT. */
-async function reserve(uow: CommerceUnitOfWork, j: Journal): Promise<{ readonly entryId: string } | Replayed> {
+async function reserve(uow: CommerceUnitOfWork, j: Journal, clock: Clock): Promise<{ readonly entryId: string } | Replayed> {
   const reservation = await uow.journal.reserve(j.identity, j.digest, j.correlationId);
   if (reservation.kind === "REPLAY") {
     const status = reservation.entry.responseStatus;
     if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+    // a replay answers only under a credential that still authenticates the request (rule 16, Order 15)
+    await judgedUnderHold(j.authority, uow, clock);
     return new Replayed(status, reservation.entry.responseBody);
   }
   if (reservation.kind === "CONFLICT") throw new DomainFailure("IDEMPOTENCY_CONFLICT", "idempotency key reused with a different request body", { reason: "BODY_CONFLICT" });
@@ -407,7 +422,7 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
   const refundId = request.path["refundId"]!;
   const userId = request.subject.identity.userId as UserId;
   const body = request.body;
-  return ownerCommand<DeclareExecutionView>(d, operation, request.correlationId, async (context, adopt) => {
+  return ownerCommand<DeclareExecutionView>(d, operation, request, async (context, adopt) => {
     const { bank, payment, refunds } = partsOf(d);
     const amount = BigInt(body.amountCents);
     const journal = journalOf(operation, request);
@@ -431,7 +446,7 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
       }
       await repo.lockOutboundStream(source.environment, source.accountRef);
       const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
-      const reservation = await reserve(uow, journal);
+      const reservation = await reserve(uow, journal, d.runtime.clock);
       if (reservation instanceof Replayed) return reservation;
       // 2. L2, then the refund's row (L3)
       await lockSource(repo, { sourceKind: source.scope, sourceId: source.sourceId });
@@ -519,7 +534,7 @@ function recordBounce(d: OwnerRefundDependencies, request: BankRouteRequest<Reco
   const attemptId = request.path["attemptId"]!;
   const userId = request.subject.identity.userId as UserId;
   const body = request.body;
-  return ownerCommand<RecordBounceView>(d, operation, request.correlationId, async (context, adopt) => {
+  return ownerCommand<RecordBounceView>(d, operation, request, async (context, adopt) => {
     const { bank, payment, refunds } = partsOf(d);
     const store = bank.evidence();
     const classifier = bank.creditClassifier?.() ?? null;
@@ -549,7 +564,7 @@ function recordBounce(d: OwnerRefundDependencies, request: BankRouteRequest<Reco
       }
       await repo.lockOutboundStream(seen.environment, seen.accountRef);
       const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
-      const reservation = await reserve(uow, journal);
+      const reservation = await reserve(uow, journal, d.runtime.clock);
       if (reservation instanceof Replayed) return reservation;
       // 2. L2, then the attempt (L3)
       await lockSource(repo, seen);
@@ -600,7 +615,7 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
   const attemptId = request.path["attemptId"]!;
   const userId = request.subject.identity.userId as UserId;
   const body = request.body;
-  return ownerCommand<DeclareExecutionView>(d, operation, request.correlationId, async (context, adopt) => {
+  return ownerCommand<DeclareExecutionView>(d, operation, request, async (context, adopt) => {
     const { bank, payment, refunds } = partsOf(d);
     const amount = BigInt(body.amountCents);
     const journal = journalOf(operation, request);
@@ -618,7 +633,7 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
       }
       await repo.lockOutboundStream(seen.environment, seen.accountRef);
       const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
-      const reservation = await reserve(uow, journal);
+      const reservation = await reserve(uow, journal, d.runtime.clock);
       if (reservation instanceof Replayed) return reservation;
       // 2. L2, then the bounced attempt (L3)
       await lockSource(repo, seen);
@@ -767,7 +782,7 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
   const userId = request.subject.identity.userId as UserId;
   const body = request.body;
   const key = request.idempotencyKey;
-  return ownerCommand<RecordExecutionView>(d, operation, request.correlationId, async (context, adopt) => {
+  return ownerCommand<RecordExecutionView>(d, operation, request, async (context, adopt) => {
     const { bank, payment, refunds } = partsOf(d);
     const store = bank.evidence();
     const fingerprinter = bank.fingerprinter?.() ?? null;
@@ -846,7 +861,7 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
       const prior = await repo.outcomeOf(theOffer.offerId);
       if (prior !== null && prior.footprint === "REVIEW") return new Refusal(refusalOf(prior.outcomeCode));
       if (prior !== null) {
-        const replay = await reserve(uow, journal);
+        const replay = await reserve(uow, journal, d.runtime.clock);
         if (replay instanceof Replayed) return replay;
         throw new DomainFailure("INTEGRITY_FAILURE", "a RECORDED outcome without its journaled answer");
       }
@@ -870,7 +885,7 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
         await repo.openCaseIfNone({ caseId: uow.ids.next() as string, kind: judged.caseKind, environment: attempt.environment, accountRef: attempt.accountRef, attemptId: attempt.attemptId, sourceKind: attempt.sourceKind, sourceId: attempt.sourceId, detailCode: judged.code, evidenceHash: theOffer.expectedEvidenceHash });
         return new Refusal(refusalOf(judged.code));
       }
-      const reservation = await reserve(uow, journal);
+      const reservation = await reserve(uow, journal, d.runtime.clock);
       if (reservation instanceof Replayed) return reservation;
       const causationId = reservation.entryId as string as CausationId;
       const executionId = judged.evidence.bankExecutionId;
@@ -968,7 +983,7 @@ function resolveNotExecuted(d: OwnerRefundDependencies, request: BankRouteReques
   const operation = BANK_REFUND_COMMAND_IDS.resolveExecution;
   const attemptId = request.path["attemptId"]!;
   const userId = request.subject.identity.userId as UserId;
-  return ownerCommand<ResolveExecutionView>(d, operation, request.correlationId, async (context, adopt) => {
+  return ownerCommand<ResolveExecutionView>(d, operation, request, async (context, adopt) => {
     const { bank, payment, refunds } = partsOf(d);
     const journal = journalOf(operation, request);
     const proofId = isUuid(request.body.authorizationRef) ? request.body.authorizationRef : null;
@@ -984,7 +999,7 @@ function resolveNotExecuted(d: OwnerRefundDependencies, request: BankRouteReques
       }
       await repo.lockOutboundStream(seen.environment, seen.accountRef);
       const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
-      const reservation = await reserve(uow, journal);
+      const reservation = await reserve(uow, journal, d.runtime.clock);
       if (reservation instanceof Replayed) return reservation;
       // 2. L2, then the attempt (L3)
       await lockSource(repo, seen);

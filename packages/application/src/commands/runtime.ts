@@ -44,6 +44,7 @@ import type {
 } from "@kauro/domain";
 import { DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
 import { unauthenticatedProblem } from "../api/admission.js";
+import { judgedUnderHold } from "../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../api/envelope.js";
 import { problemOf, type Problem } from "../api/problems.js";
 import type { AllowDecision, AuthorizationDecision, AuthorizationRequest, Authorizer } from "../ports/authorizer.js";
@@ -253,6 +254,8 @@ export async function runCommandIn<Body, View, U extends UnitOfWork>(
         if ((status !== 200 && status !== 201 && status !== 202) || reservation.entry.responseBody === undefined) {
           throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
         }
+        // a replay answers only under a credential that still authenticates the request (rule 16, Order 15 F-04)
+        await judgedUnderHold(envelope.authority, uow, runtime.clock);
         if (status === 202) return new ReplayedAccepted(acceptedOf(reservation.entry.responseBody));
         return new ReplayedResult<View>(status, reservation.entry.responseBody as View, versionOf(reservation.entry.responseBody));
       }
@@ -288,6 +291,10 @@ export async function runCommandIn<Body, View, U extends UnitOfWork>(
           occurredAt: now,
         });
       }
+      // rule 16 (Order 15 F-04): the request's own credential fenced in this unit as its last lock (a cookie session's row FOR SHARE) and
+      // judged now, so a logout committed while the command ran refuses it with everything rolled back, and one that starts after waits
+      // for this COMMIT; the membership and the identity were fenced by their transition locks at step 5 (D-TX-2)
+      await judgedUnderHold(envelope.authority, uow, runtime.clock);
       // the response snapshot is part of the same transaction, and the answer is the journaled record itself (D-PORT-2): the
       // first execution, a concurrent duplicate and a retry after a lost response answer with the same durable bytes
       const committed = await uow.journal.commit(reservation.entryId, {

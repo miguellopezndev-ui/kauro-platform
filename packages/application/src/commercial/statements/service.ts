@@ -8,7 +8,7 @@
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CommerceUnitOfWork, CorrelationId, IdempotencyIdentity, ServiceContext, ServiceIdentity } from "@kauro/domain";
-import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, commandRequestDigest } from "@kauro/domain";
+import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, SERVICE_ROLE_TABLE, commandRequestDigest } from "@kauro/domain";
 import type { CommandResult } from "../../api/envelope.js";
 import { problemOf } from "../../api/problems.js";
 import type { CommercialServiceRole } from "../authorizer.js";
@@ -47,13 +47,28 @@ export function serviceContextOf(identity: ServiceIdentity, correlationId: Corre
   return { kind: "SERVICE", serviceId: identity.serviceId, correlationId };
 }
 
-/** The durable DENY fact of a service command in its own transaction (the service stream: no agency, actor SERVICE; 0028). */
-export async function recordServiceDenial(rt: Pick<ServiceRunRuntime, "units" | "clock">, context: ServiceContext, action: string, failure: DomainFailure): Promise<void> {
+/**
+ * The context a command's own service runs in: the SERVICE context of the service that holds `role` (the code-owned table). A refusal of
+ * another service identity is recorded in it, because the presented identity may belong to a runtime group whose pool this route's units
+ * never bind (Order 15 F-03: a payment-service credential on CMD051 or CMD056 failed to record its denial and answered 422 or 500 instead of
+ * SERVICE_NOT_PERMITTED); the fact still names the presented service as its actor.
+ */
+export function ownServiceContextOf(role: CommercialServiceRole, correlationId: CorrelationId): ServiceContext {
+  const serviceId = Object.keys(SERVICE_ROLE_TABLE).find((id) => SERVICE_ROLE_TABLE[id] === role);
+  if (serviceId === undefined) throw new DomainFailure("INTEGRITY_FAILURE", `no service holds the role ${role}`);
+  return { kind: "SERVICE", serviceId, correlationId };
+}
+
+/**
+ * The durable DENY fact of a service command in its own transaction (the service stream: no agency, actor SERVICE; 0028), run in `context`
+ * and naming `actor` (the presented service; the context's own service when absent).
+ */
+export async function recordServiceDenial(rt: Pick<ServiceRunRuntime, "units" | "clock">, context: ServiceContext, action: string, failure: DomainFailure, actor: string = context.serviceId): Promise<void> {
   await rt.units.run(context, (uow) =>
     uow.securityEvents.append({
       agencyId: null,
       requestedAgencyId: null,
-      actor: { kind: "SERVICE", serviceId: context.serviceId },
+      actor: { kind: "SERVICE", serviceId: actor },
       action,
       outcome: "DENY",
       reasonCode: failure.details.reason ?? failure.code,
@@ -102,7 +117,8 @@ export async function runServiceCommand<Body, View>(
   const decision = rt.authorizer.authorizeCommercialService({ identity: request.identity, role: input.role, deploymentEnvironment: rt.environment });
   if (decision.kind === "DENY") {
     const failure = new DomainFailure(decision.code, `${command} denied: ${String(decision.reason)}`, decision.reason !== null ? { reason: decision.reason } : {});
-    await recordServiceDenial(rt, context, command, failure);
+    // recorded in the command's own service group, naming the presented service (F-03)
+    await recordServiceDenial(rt, ownServiceContextOf(input.role, request.correlationId), command, failure, request.identity.serviceId);
     return rejection(failure, request.correlationId);
   }
   const identity: IdempotencyIdentity = { environment: rt.environment, actor: { kind: "SERVICE", serviceId: request.identity.serviceId }, agencyId: null, operation: command, key: request.idempotencyKey };

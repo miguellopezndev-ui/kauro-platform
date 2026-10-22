@@ -117,7 +117,8 @@ async function hw<H, W>(ctx: FaultContext, what: string, holder: Actor<H>, waite
   const hApp = holder.alsoApp === true ? await openConnection(iw.h.pg.clientConfig("kauro_app_test")) : null;
   const wApp = waiter.alsoApp === true ? await openConnection(iw.h.pg.clientConfig("kauro_app_test")) : null;
   const routedOn = <T>(conn: HarnessConnection, appConn: HarnessConnection | null, a: Actor<T>, st: ReadonlyArray<SqlStep>): Promise<T> =>
-    appConn === null ? iw.faults.on(conn, a.role, ctx.points, st, a.run, { payment: a.role === "kauro_payment" }) : iw.faults.onRoles({ kauro_payment: conn, kauro_app: appConn }, ctx.points, st, a.run, { payment: true });
+    // a bank owner command first judges the owner's grant in a kauro_app unit of its own (ownerFirst, Order 15 F-01): on the api's own pool, unrouted
+    appConn === null ? iw.faults.on(conn, a.role, ctx.points, st, a.run, a.role === "kauro_payment" ? { payment: true, unrouted: ["kauro_app"] } : { payment: false }) : iw.faults.onRoles({ kauro_payment: conn, kauro_app: appConn }, ctx.points, st, a.run, { payment: true });
   try {
     const pause = ctx.points.pause(at);
     // a bank actor's SERVICE units run on the payment service's factory: routed over the same connection (as refund-lane-support routed())
