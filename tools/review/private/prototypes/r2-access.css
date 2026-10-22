@@ -1,0 +1,384 @@
+/* Round 2 (2026-10-21): the access pages (sign-in, setup, the chooser, Team) and the two settings scopes (Your account, Workspace settings).
+   Tokens only, no inline style, reflow at 320 px, both themes. Sizes: h1 28 px (24 px on a phone), section h2 20 px, body 16 px, meta and
+   labels 14 px, nothing below 13 px. */
+
+/* ---- a proposal marker at the 13 px floor (foundation's is 11 px) ---- */
+.kauro-main .kauro-proposed.kauro-a-proposed {
+  display: inline-block;
+  padding: 0.1875rem 0.625rem;
+  border-radius: var(--kauro-radius);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+.kauro-main section > .kauro-proposed.kauro-a-proposed {
+  margin-block-start: var(--kauro-space-3);
+}
+
+/* ---- small marks that sat under the floor ---- */
+.kauro-main .kauro-setup-done-mark::after {
+  font-size: 0.8125rem;
+}
+/* the account line of the setup: the mark beside its words, never alone on a line above them */
+.kauro-main .kauro-setup-done {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.kauro-main .kauro-setup-done > span:last-child {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* ---- the settings frame: context line, h1, scope; then the scope's pages beside the content ---- */
+.kauro-main .kauro-settings-head {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin-block-end: var(--kauro-space-6);
+  padding-block-end: var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-settings-head > * {
+  margin: 0;
+}
+.kauro-main .kauro-settings-context {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-settings-head h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.kauro-main .kauro-settings-head .kauro-scope {
+  margin: 0;
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-body);
+}
+.kauro-settings-body {
+  display: grid;
+  gap: var(--kauro-space-6);
+}
+.kauro-main .kauro-settings-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-1) var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-settings-nav li {
+  max-inline-size: none;
+  margin: 0;
+}
+.kauro-main .kauro-settings-nav a {
+  display: flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-dense);
+  text-decoration: none;
+}
+.kauro-main .kauro-settings-nav a:hover {
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-settings-nav a[aria-current="page"] {
+  border-color: var(--kauro-color-primary);
+  background: var(--kauro-color-raised);
+  font-weight: 650;
+  box-shadow: inset 3px 0 0 var(--kauro-color-primary);
+}
+.kauro-main .kauro-settings-page {
+  min-inline-size: 0;
+  max-inline-size: 48rem;
+}
+.kauro-main .kauro-settings-page > section:first-child,
+.kauro-main .kauro-settings-page > [role="status"]:first-child + section,
+.kauro-main .kauro-settings-page > .kauro-banner:first-child + section {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-settings-page > section > h2:first-child {
+  margin-block-start: var(--kauro-space-2);
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-settings-page > section:first-child > h2:first-child {
+  margin-block-start: 0;
+}
+/* from 1012 px the pages are a vertical list beside the content, as tall as their names, never sticking to the screen */
+@media (min-width: 63.25rem) {
+  .kauro-settings-body {
+    grid-template-columns: 15.5rem minmax(0, 1fr);
+    align-items: start;
+    gap: var(--kauro-space-7);
+  }
+  .kauro-main .kauro-settings-nav ul {
+    display: grid;
+    gap: var(--kauro-space-1);
+  }
+  .kauro-main .kauro-settings-nav a {
+    min-block-size: 2.5rem;
+    border-color: transparent;
+    font-size: 0.9375rem;
+  }
+  .kauro-main .kauro-settings-nav a[aria-current="page"] {
+    border-color: transparent;
+  }
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-settings-head h1 {
+    font-size: 1.5rem;
+  }
+  .kauro-main .kauro-settings-nav ul {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- a limited role's line, on a settings page and above a table ---- */
+.kauro-main .kauro-a-only {
+  margin: var(--kauro-space-3) 0 0;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-raised);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-a-only--page {
+  margin: 0 0 var(--kauro-space-6);
+}
+
+/* ---- forms on a settings page ---- */
+.kauro-main .kauro-a-form {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 40rem;
+}
+.kauro-main .kauro-a-form .kauro-actions {
+  margin: 0;
+}
+.kauro-a-logo {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--kauro-space-4);
+}
+.kauro-main .kauro-a-form ul {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+/* ---- closing the workspace: last, apart, in the danger colour's border, never the primary ---- */
+.kauro-main section.kauro-a-danger {
+  margin-block-start: var(--kauro-space-7);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-danger-text);
+  border-radius: var(--kauro-radius-large);
+}
+.kauro-main section.kauro-a-danger > h2:first-child {
+  margin-block-start: 0;
+}
+.kauro-main section.kauro-a-danger > p:last-child,
+.kauro-main section.kauro-a-danger .kauro-actions {
+  margin-block-end: 0;
+}
+
+/* ---- sessions and security events: one line each, what, then when ---- */
+.kauro-main .kauro-a-sessions,
+.kauro-main .kauro-a-events,
+.kauro-main .kauro-a-records {
+  display: grid;
+  margin: var(--kauro-space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-a-sessions > li,
+.kauro-main .kauro-a-events > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  max-inline-size: none;
+  margin: 0;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-a-sessions > li > span:first-child {
+  display: grid;
+  gap: var(--kauro-space-1);
+}
+.kauro-main .kauro-a-events > li {
+  display: grid;
+  justify-content: start;
+  gap: var(--kauro-space-1);
+}
+.kauro-main .kauro-a-sub,
+.kauro-main .kauro-a-when {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main td.kauro-a-when {
+  white-space: nowrap;
+}
+@media (max-width: 47.99rem) {
+  .kauro-main td.kauro-a-when {
+    white-space: normal;
+  }
+}
+
+/* ---- notifications ---- */
+.kauro-main .kauro-a-notices {
+  display: grid;
+  gap: var(--kauro-space-4);
+}
+.kauro-main .kauro-a-notices fieldset {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-a-notices legend {
+  margin-block-end: var(--kauro-space-2);
+  padding: 0;
+  font-weight: 600;
+}
+.kauro-main .kauro-a-notices .kauro-actions {
+  margin: 0;
+}
+
+/* ---- the activity log's filters: three controls in a row on a wide screen ---- */
+.kauro-main .kauro-a-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--kauro-space-3) var(--kauro-space-4);
+  margin: var(--kauro-space-4) 0 var(--kauro-space-5);
+}
+.kauro-main .kauro-a-filters label {
+  display: grid;
+  gap: var(--kauro-space-1);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-a-filters :is(select, input) {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-weight: 400;
+}
+
+/* ---- Team: who approves and who pays, above the table; roles as can and cannot ---- */
+.kauro-main .kauro-a-duties {
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-a-duties-list {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-a-duties-list > div {
+  display: grid;
+  grid-template-columns: none;
+  gap: var(--kauro-space-1);
+  padding: 0;
+  border: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-a-duties-list {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--kauro-space-6);
+  }
+}
+.kauro-main .kauro-a-duties-list dd .kauro-text-button {
+  min-block-size: 1.5rem;
+  font-size: inherit;
+}
+.kauro-main .kauro-a-roles th[scope="row"] {
+  padding: var(--kauro-space-3) var(--kauro-space-3) var(--kauro-space-3) 0;
+  border-block-end: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text);
+  font-size: var(--kauro-font-size-body);
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.kauro-main .kauro-a-roles td {
+  font-size: var(--kauro-font-size-dense);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-a-roles td {
+    inline-size: 45%;
+  }
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-a-roles th[scope="row"] {
+    display: block;
+    padding: 0 0 var(--kauro-space-1);
+    border: 0;
+  }
+  /* on a phone a role's can and cannot read as two short paragraphs, each under its word, never squeezed beside it */
+  .kauro-main .kauro-a-roles td {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding-block: var(--kauro-space-1);
+  }
+}
+
+/* ---- the retention schedule reads as two columns; the rule is the long one ---- */
+@media (min-width: 48rem) {
+  .kauro-main .kauro-a-retention td:first-child {
+    inline-size: 34%;
+    font-weight: 600;
+  }
+}
+
+.kauro-main .kauro-setup-done-mark {
+  flex: none;
+}
+
+/* a deletion record is one sentence, read left to right */
+.kauro-main .kauro-a-records > li {
+  max-inline-size: none;
+  margin: 0;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+
+/* a note under a table belongs to it, a little apart from its last row */
+.kauro-main .kauro-settings-page .kauro-rtable + .kauro-muted,
+.kauro-main .kauro-settings-page .kauro-rtable + .kauro-actions {
+  margin-block-start: var(--kauro-space-3);
+}
+
+/* a row's button keeps its own width on a phone card */
+.kauro-main .kauro-settings-page .kauro-rtable td > button {
+  justify-self: start;
+}
+
+/* closing: the sentence leads straight into its list */
+.kauro-main .kauro-a-close > p:first-of-type {
+  margin: 0 0 calc(var(--kauro-space-4) * -1);
+}
+
+/* the activity log reads at 15 px so its four columns fit beside the pages' list */
+.kauro-main .kauro-a-log td {
+  font-size: 0.9375rem;
+}
+
+/* the chooser: a workspace in its ordinary state carries no badge, and its empty slot leaves no gap */
+.kauro-main .kauro-workspace-state:empty {
+  display: none;
+}

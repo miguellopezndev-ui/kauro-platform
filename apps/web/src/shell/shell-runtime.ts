@@ -20,6 +20,8 @@ export function createShell(page: BrowserPage): Shell {
     agencyId: runtime.activeAgency(),
     // the agency is in the path (the operation names it as a path parameter): the client sends no separate agency header for it
     read: (agencyId, signal) => client.call("GetAgency", { path: { agencyId }, signal }),
+    // the person's own memberships, for the role the account button names (the largest page the api serves, so one read covers nearly everyone)
+    readMemberships: (signal) => client.call("ListAgencies", { query: { limit: 100 }, signal }),
   });
   const stop = agency.follow(runtime);
   return {

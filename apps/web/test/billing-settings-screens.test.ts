@@ -30,9 +30,9 @@ const credential = (): IdentityCredential => new IdentityCredential("CONTRACT_FA
 const bodyOf = (init: { body?: string }): Record<string, unknown> => JSON.parse(init.body ?? "{}") as Record<string, unknown>;
 const keyOf = (init: { headers: Readonly<Record<string, string>> }): string | undefined => init.headers["Idempotency-Key"];
 
-const form = (overrides: Partial<BillingViewProps["form"]> = {}): BillingViewProps["form"] => ({ reason: "", details: "", problems: [], submitting: false, onReasonChange: noop, onDetailsChange: noop, onSubmit: noop, ...overrides });
-const billing = (overrides: Partial<BillingViewProps> = {}): string => renderToStaticMarkup(createElement(BillingDetails, { agency: agency(), detail: orderDetail(), refund: null, form: form(), ...overrides }));
-const settings = (overrides: Partial<Parameters<typeof SettingsDetails>[0]> = {}): string => renderToStaticMarkup(createElement(SettingsDetails, { agency: agency(), onClose: noop, closing: false, closure: null, ...overrides }));
+const form = (overrides: Partial<BillingViewProps["form"]> = {}): BillingViewProps["form"] => ({ reason: "", details: "", problems: [], submitting: false, onReasonChange: noop, onDetailsChange: noop, onSubmit: noop, open: true, onOpen: noop, ...overrides });
+const billing = (overrides: Partial<BillingViewProps> = {}): string => renderToStaticMarkup(createElement(BillingDetails, { agency: agency(), detail: orderDetail(), refund: null, form: form(), projectHref: "/agencies/a/projects/p", ...overrides }));
+const settings = (overrides: Partial<Parameters<typeof SettingsDetails>[0]> = {}): string => renderToStaticMarkup(createElement(SettingsDetails, { agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_AGENCY"] }), onClose: noop, closing: false, closure: null, ...overrides }));
 
 test("fixtures: the billing and settings DTOs are valid against the generated schemas (a drifted fixture cannot prove anything)", () => {
   const checks: readonly (readonly [string, unknown])[] = [
@@ -49,7 +49,7 @@ test("fixtures: the billing and settings DTOs are valid against the generated sc
 
 test("UI30: the order shows captures, tax documents and refunds from the server only; a local summary is never called an invoice; a member without MANAGE_BILLING gets the request-to-owner text", () => {
   const html = billing();
-  assert.ok(html.includes("Track quotes, payments, fiscal documents and refunds."), "the registry sentence, word for word");
+  assert.equal(EN["screen.billing.lead.body"], "Track quotes, payments, fiscal documents and refunds.", "the registry sentence, word for word (round 2: drawn by the page header)");
   // money is the server's integer cents, formatted without arithmetic
   for (const text of ["USD 1,500.00", "USD 1,400.00", "USD 100.00", "USD 0.00"]) assert.ok(html.includes(text), text);
   assert.ok(html.includes("Payment confirmed") && html.includes("SETT-000123"), "the capture and the issued document come from the order read");
@@ -74,7 +74,10 @@ test("UI30: the order shows captures, tax documents and refunds from the server 
   const refunded = billing({ refund: refund() });
   assert.ok(refunded.includes("Refund requested") && refunded.includes("USD 1,400.00") && refunded.includes("These amounts are proposed and may change when the refund is approved."));
   assert.ok(!refunded.includes('name="reason"'), "no second refund form beside a refund");
-  assert.ok(billing().includes("No refund has been requested from this page."));
+  assert.ok(billing().includes("No refund has been requested for this order."));
+  // the form opens on request: closed, a button names the act and the refund terms are read first
+  const closed = billing({ form: form({ open: false }) });
+  assert.ok(!closed.includes('name="reason"') && closed.includes("Request a refund") && closed.includes("Before the preparation starts, a refund is full."));
 
   // MANAGE_BILLING decides the control; without it the owner text replaces the form, and nothing to send is offered
   const manager = billing();
@@ -152,7 +155,7 @@ test("UI30/CMD031: a refund request first opens a BILLING support case and sends
 
 test("UI32/CMD043: closure is separated from display edits, needs a fresh step-up, states its obligations, and an expired proof is the STEP_UP state that keeps the page", async () => {
   const html = settings();
-  assert.ok(html.includes("Manage agency details and safe branding."), "the registry sentence, word for word");
+  assert.equal(EN["screen.settings.lead.body"], "Manage agency details and safe branding.", "the registry sentence, word for word (round 2: drawn by the page header)");
   const display = html.slice(html.indexOf('id="settings-display"'), html.indexOf('id="settings-legal"'));
   const closing = html.slice(html.indexOf('data-section="closure"'));
   assert.ok(display.includes("Acme Growth Partners") && display.includes("Renaming does not reset discounts, attribution or client identity."));
@@ -162,9 +165,13 @@ test("UI32/CMD043: closure is separated from display edits, needs a fresh step-u
   for (const text of ["It needs a fresh confirmation of your identity.", "Open quotes are withdrawn.", "Live authorizations for paid work are ended.", "stay with Kauro until they finish.", "scheduled for deletion."]) assert.ok(closing.includes(text), text);
 
   // only the server's permittedActions offer the control; a closing agency offers nothing
-  assert.deepEqual(settingsModel(agency()), { canClose: true, closing: false, mustAskOwner: false });
+  const owner = ["MANAGE_AGENCY", "MANAGE_TEAM", "MANAGE_CLIENTS", "CREATE_CLIENTS", "OPERATE_PROJECTS", "APPROVE_PLANS", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_BRANDING", "VIEW"] as const;
+  const admin = ["MANAGE_TEAM", "MANAGE_CLIENTS", "CREATE_CLIENTS", "OPERATE_PROJECTS", "REQUEST_DELETION", "MANAGE_BRANDING", "VIEW"] as const;
+  assert.deepEqual(settingsModel(agency({ permittedActions: [...owner] })), { canClose: true, closing: false, mustAskOwner: false });
+  // an admin holds REQUEST_DELETION but closure (CMD043) is the owner's: it is not offered, and the page says who can
+  assert.deepEqual(settingsModel(agency({ permittedActions: [...admin] })), { canClose: false, closing: false, mustAskOwner: true });
   const manager = settings({ agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING"] }) });
-  assert.ok(manager.includes("Only an owner of the agency can request closure.") && !manager.includes("Request closure"));
+  assert.ok(manager.includes("Only an owner of this workspace can request its closure.") && !manager.includes("Request closure"));
   const already = settings({ agency: agency({ state: "CLOSING" }) });
   assert.ok(already.includes("It cannot be requested again.") && !already.includes("Request closure"));
 
@@ -198,7 +205,7 @@ test("UI32/CMD043: closure is separated from display edits, needs a fresh step-u
   const stale = harness(async (entry) => (entry.url === "/api/v1/assurance/step-ups" ? respond(201, { proofId: PROOF, expiresAt: "2026-10-14T01:00:00Z" }) : respond(403, problem(403, "ASSURANCE_REQUIRED", { reason: "STEP_UP_STALE" }))));
   const expired = await closeWithStepUp(stale.client, fastRunner(), agency(), async () => credential());
   assert.deepEqual(expired, { kind: "STEP_UP", cause: "PROOF_STALE" });
-  const kept = renderToStaticMarkup(createElement(StepUpPanel, { result: expired, onStepUp: noop }, createElement(SettingsDetails, { agency: agency(), onClose: noop, closing: false, closure: null })));
+  const kept = renderToStaticMarkup(createElement(StepUpPanel, { result: expired, onStepUp: noop }, createElement(SettingsDetails, { agency: agency({ permittedActions: ["VIEW", "MANAGE_BILLING", "REQUEST_DELETION", "MANAGE_AGENCY"] }), onClose: noop, closing: false, closure: null })));
   assert.match(kept, /data-state="STEP_UP"/);
   assert.ok(kept.includes("Confirm identity") && kept.includes("Acme Growth Partners") && kept.includes("Request closure"), "the page and its control are still there");
   assert.ok(!kept.includes("Closure requested"));
@@ -230,7 +237,7 @@ test("UI30/UI32: both containers draw LOADING with no private value before the f
     assert.ok(!text.includes("Acme Growth Partners") && !text.includes(order().orderId.slice(0, 8)));
   }
   const none = within(createElement(BillingScreen, { agencyId: AGENCY, orderId: null }));
-  assert.ok(none.includes("Choose an order"));
+  assert.ok(none.includes("Billing shows one order at a time") && none.includes("Go to projects"), "no order: the way to one, not a dead end");
   assert.equal(sent.length, 0, "rendering sends nothing; the reads start in effects");
 });
 

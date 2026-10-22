@@ -169,3 +169,11 @@ test("keyboard behaviour: the dialog returns focus to the invoker, Escape cancel
   assert.equal(focusFieldById((id) => elements.get(id) ?? null, "missing"), false);
   assert.deepEqual(focused, ["field-1"]);
 });
+
+test("an effect that counts nothing (a role that changes, a period that starts) is disclosed and acknowledged without a count", () => {
+  const uncounted: readonly ConfirmEffect[] = [{ id: "wait", description: "A waiting period starts.", acknowledgeLabel: "I understand a waiting period applies" }];
+  const markup = renderToStaticMarkup(createElement(ConfirmDialogView, { ...base, effects: uncounted, acknowledged: new Set<string>(), onToggle: noop }));
+  assert.match(markup, /A waiting period starts\./);
+  assert.match(markup, /I understand a waiting period applies/);
+  assert.doesNotMatch(markup, /undefined/);
+});

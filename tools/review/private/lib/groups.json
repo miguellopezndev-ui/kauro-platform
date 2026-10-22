@@ -1,0 +1,7 @@
+[
+  { "key": "A", "title": "Access, identity, organisation and settings", "ids": ["UI50", "UI51", "UI09", "UI10", "UI31", "UI32"] },
+  { "key": "B", "title": "Clients, projects and the service", "ids": ["UI11", "UI12", "UI13", "UI14", "UI15", "UI16", "UI17", "UI18", "UI19", "UI20", "UI21", "UI22", "UI25", "UI26", "UI27", "UI28", "UI29", "UI52"] },
+  { "key": "C", "title": "Quote, payment and billing", "ids": ["UI23", "UI24", "UI30"] },
+  { "key": "D", "title": "Sales and sellers", "ids": ["UI34", "UI35", "UI36", "UI37", "UI53", "UI54"] },
+  { "key": "E", "title": "Owner, administration and operations", "ids": ["UI33", "UI38", "UI39", "UI40", "UI41", "UI42", "UI43", "UI44", "UI55"] }
+]

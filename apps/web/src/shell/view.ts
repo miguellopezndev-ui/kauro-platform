@@ -8,7 +8,7 @@
 //   - The navigation lists a screen only when its page exists in this build; an agency with no implemented entry has no navigation.
 import type { SessionPhase } from "../client/session.ts";
 import type { MessageId } from "../copy/en.ts";
-import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, pathOf, signInHref } from "../screens.ts";
+import { agencyOfPathname, IMPLEMENTED_SCREENS, matchRoute, navigationFor, opsNavigationFor, originOfPath, pathOf, projectAreasFor, projectOfPathname, type ServiceMode, signInHref } from "../screens.ts";
 import type { AgencyContext, AgencyState } from "./agency-context.ts";
 
 export type RefusedAction = { readonly kind: "SIGN_IN"; readonly href: string } | { readonly kind: "CHECK_AGAIN" } | { readonly kind: "SIGN_OUT" } | { readonly kind: "NONE" };
@@ -23,16 +23,34 @@ export interface NavigationItem {
   readonly label: MessageId;
   readonly href: string;
   readonly current: boolean;
+  /** The heading it sits under (none: the first group; "nav.group.help.label": the foot of the menu). */
+  readonly group?: MessageId;
+}
+
+/** The project a page is inside, as the menu nests it under Projects and the project's header names it. */
+export interface ProjectInView {
+  readonly name: string;
+  readonly clientLabel: string;
+  readonly mode: ServiceMode;
+  readonly areas: readonly { readonly key: string; readonly label: MessageId; readonly href: string; readonly current: boolean; readonly apart: boolean }[];
 }
 
 export interface ShellView {
   readonly gate: Gate;
   /** The agency indicator: its name (a customer string, drawn as a text node) and the message id of its state. */
-  readonly agency: { readonly name: string; readonly state: MessageId } | null;
+  readonly agency: { readonly name: string; readonly state: MessageId; readonly role?: MessageId | null } | null;
   readonly navigation: readonly NavigationItem[];
   /** The agency switcher, when its screen exists. */
   readonly switchHref: string | null;
   readonly signOut: boolean;
+  /** True on the operations origin: the menu is Kauro's own, with no workspace in it. */
+  readonly ops: boolean;
+  /** The person's own settings, when that screen exists (none in this build). */
+  readonly accountHref: string | null;
+  /** True on a screen without a person (sign-in, invitation): a plain header, never the private menu. */
+  readonly anonymous?: boolean;
+  /** The project the page is inside, with its areas for its service (Order 11); null outside a project or before the project is read. */
+  readonly project?: ProjectInView | null;
 }
 
 export interface ShellInput {
@@ -42,11 +60,15 @@ export interface ShellInput {
   /** The agency of the page's URL when it was loaded: the agency this page's runtime belongs to for its whole life. */
   readonly activeAgency: string | null;
   readonly implemented?: ReadonlySet<string>;
+  /** The operations screens this person may open, as their capabilities say; absent, every implemented entry is listed. */
+  readonly allowedOps?: ReadonlySet<string>;
+  /** The project of the page, once read: its name, its client and its service. Absent, the menu does not nest a project. */
+  readonly project?: { readonly projectId: string; readonly name: string; readonly clientLabel: string; readonly mode: ServiceMode };
 }
 
 const stateLabel = (state: AgencyState): MessageId => `shell.agency.state.${state}.label`;
 
-const CLOSED_SHELL: Pick<ShellView, "agency" | "navigation" | "switchHref" | "signOut"> = { agency: null, navigation: [], switchHref: null, signOut: false };
+const CLOSED_SHELL: Pick<ShellView, "agency" | "navigation" | "switchHref" | "signOut" | "ops" | "accountHref"> = { agency: null, navigation: [], switchHref: null, signOut: false, ops: false, accountHref: null };
 
 function refused(title: MessageId, body: MessageId, action: RefusedAction): Gate {
   return { kind: "REFUSED", title, body, action };
@@ -54,7 +76,7 @@ function refused(title: MessageId, body: MessageId, action: RefusedAction): Gate
 
 export function viewOf(input: ShellInput): ShellView {
   const implemented = input.implemented ?? IMPLEMENTED_SCREENS;
-  if (matchRoute(input.pathname)?.screen.anonymous === true) return { gate: { kind: "OPEN" }, ...CLOSED_SHELL };
+  if (matchRoute(input.pathname)?.screen.anonymous === true) return { gate: { kind: "OPEN" }, ...CLOSED_SHELL, anonymous: true };
   const { phase } = input;
   switch (phase.kind) {
     case "CHECKING":
@@ -79,8 +101,17 @@ export function viewOf(input: ShellInput): ShellView {
 }
 
 function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellView {
-  const switchHref = implemented.has("UI10") ? pathOf("UI10") : null;
-  const withPerson = { agency: null, navigation: [], switchHref, signOut: true } as const;
+  // the agency switcher is a screen of the application origin: an operations page (the owner, a seller) has no agency to switch (Order 11 D-03)
+  const ops = originOfPath(input.pathname) === "OPS" || input.pathname === "/ops" || input.pathname.startsWith("/ops/");
+  // Order 11 (D-06): no way to the switcher from the switcher itself or from the setup, where there is nothing to switch from
+  const switchHref = implemented.has("UI10") && !ops && input.pathname !== pathOf("UI10") && input.pathname !== pathOf("UI09") ? pathOf("UI10") : null;
+  const current = (entry: { readonly href: string }): boolean => input.pathname === entry.href || input.pathname.startsWith(`${entry.href}/`);
+  if (ops) {
+    // the home's entry ("/ops") is current only on itself, never on every operations page under it
+    const navigation = opsNavigationFor(implemented, input.allowedOps).map((entry) => ({ ...entry, current: entry.href === "/ops" ? input.pathname === "/ops" : current(entry) }));
+    return { gate: { kind: "OPEN" }, agency: null, navigation, switchHref: null, signOut: true, ops: true, accountHref: null };
+  }
+  const withPerson = { agency: null, navigation: [], switchHref, signOut: true, ops: false, accountHref: null } as const;
   // a client-side navigation that crossed into another agency (or out of one) is never drawn: the page waits for the hard navigation
   if (agencyOfPathname(input.pathname) !== input.activeAgency) return { gate: { kind: "WAIT", message: "shell.session.switching.body" }, ...withPerson };
   if (input.activeAgency === null) {
@@ -95,8 +126,15 @@ function signedIn(input: ShellInput, implemented: ReadonlySet<string>): ShellVie
     case "UNAVAILABLE":
       return { gate: refused("state.DENIED.title", "shell.agency.unavailable.body", { kind: "CHECK_AGAIN" }), ...withPerson };
     case "READY": {
-      const navigation = navigationFor(input.activeAgency, implemented).map((entry) => ({ ...entry, current: input.pathname === entry.href || input.pathname.startsWith(`${entry.href}/`) }));
-      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state) }, navigation, switchHref, signOut: true };
+      const navigation = navigationFor(input.activeAgency, implemented).map((entry) => ({ ...entry, current: current(entry) }));
+      // inside a project the menu nests the project's areas under Projects; the project must be the one the URL names
+      const inside = projectOfPathname(input.pathname);
+      const project =
+        inside !== null && input.project !== undefined && input.project.projectId === inside.projectId
+          ? { name: input.project.name, clientLabel: input.project.clientLabel, mode: input.project.mode, areas: projectAreasFor(input.pathname, input.project.mode, implemented) }
+          : null;
+      const role = input.agency.role === null ? null : (`shell.role.${input.agency.role}.label` as const);
+      return { gate: { kind: "OPEN" }, agency: { name: input.agency.displayName, state: stateLabel(input.agency.state), role }, navigation, switchHref, signOut: true, ops: false, accountHref: null, project };
     }
   }
 }

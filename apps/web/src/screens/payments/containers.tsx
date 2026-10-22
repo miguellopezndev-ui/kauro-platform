@@ -55,6 +55,7 @@ export function QuoteScreen({ agencyId, projectId, quoteId }: { readonly agencyI
         creating={command.state.kind === "RUNNING" || created !== null}
         termsHref="/legal/terms"
         reuploadHref={pathOf("UI14", { agencyId, id: projectId })}
+        planHref={pathOf("UI22", { agencyId, id: projectId })}
       />
       {created === null ? null : (
         <section role="status">
@@ -85,6 +86,9 @@ export function PaymentScreen({ agencyId, orderId }: { readonly agencyId: string
       onRefresh={refresh}
       refreshing={false}
       hrefs={{ CONTACT_SUPPORT: pathOf("UI52", { agencyId }), REQUEST_NEW_QUOTE: pathOf("UI23", { agencyId, id: order.projectId }), REQUEST_NEW_REVIEW: pathOf("UI18", { agencyId, id: order.projectId }) }}
+      projectHref={pathOf("UI13", { agencyId, id: order.projectId })}
+      preparationHref={`${pathOf("UI25", { agencyId, id: order.projectId })}?order=${encodeURIComponent(order.orderId)}`}
+      billingHref={`${pathOf("UI30", { agencyId })}?order=${encodeURIComponent(order.orderId)}`}
     />
   );
 }

@@ -1,11 +1,21 @@
 // UI24 Payment as markup (registry: "Your status comes from verified payment information."). The status text comes from `paymentStatus`
 // and the actions from `nextActions` only (model.ts); the bank details of the ACH/USD transfer appear while nothing is pending. A pending or
 // checking status says not to pay again, and nothing here reads a redirect, a return address or a screenshot as payment.
-import { Banner, Button, Deadline, Money, StatusBadge, type Tone } from "@kauro/ui";
+//
+// Round 2 (research agency-workspace.md section 5.13; Wise, Stripe and GOV.UK put the reference beside the amount): the three things a
+// transfer needs (the amount, the reference read in groups of four, the date to send by) come first, in one enclosed block, each at one
+// size with its copy button; the bank's own fields follow. A confirmed payment is the receipt: the amount, the state, the next step.
+//
+// Order 11: the page names its project and links back to it; each bank detail the person types elsewhere has a copy button; the date
+// rule (the bank's booking time counts) and the matching rule (a different amount, reference or payer is reviewed and returned) come from
+// ToS §8.2 and §8.3; arrival time is Wise's published ACH timing (PV1 §5). A confirmed payment says what comes next: the team starts the
+// preparation. The order's id is kept for support, below, instead of beside the amount.
+import { Banner, Button, Deadline, LinkButton, Money, StatusBadge, type Tone } from "@kauro/ui";
 import type { ReactElement } from "react";
 import type { PaymentOrderView, getTransferInstructionsResponse200 as Instructions } from "../../api/generated.ts";
 import { message } from "../../copy/en.ts";
 import type { StateDecision } from "../../client/states.ts";
+import { CopyValue } from "../shared/copy-value.tsx";
 import { StatePanel } from "../shared/state-panel.tsx";
 import { type PaymentAction, paymentModel } from "./model.ts";
 
@@ -24,7 +34,21 @@ export interface PaymentViewProps {
   readonly refreshing: boolean;
   /** Where each action that is a link leads. */
   readonly hrefs: Readonly<Record<Exclude<PaymentAction, "REFRESH_STATUS">, string>>;
+  /** The project this order pays for, and its preparation. */
+  readonly projectHref: string;
+  readonly preparationHref: string;
+  /** This order's payments, fiscal documents and refunds (UI30). */
+  readonly billingHref: string;
 }
+
+/** The amount as a bank's form takes it: digits and a decimal point, no currency, no separators. */
+const plainAmount = (cents: string): string => {
+  const padded = cents.padStart(3, "0");
+  return `${padded.slice(0, -2)}.${padded.slice(-2)}`;
+};
+
+/** A long reference read in groups of four, as a bank's form is checked by eye ("K012 3456 789A ..."); the copy button gives it unspaced. */
+const grouped = (reference: string): string => reference.replace(/(.{4})(?=.)/g, "$1 ");
 
 const TONE: Readonly<Record<PaymentOrderView["paymentStatus"], Tone>> = { NOT_STARTED: "info", PENDING: "info", CHECKING: "warning", CONFIRMED: "success", FAILED: "danger" };
 
@@ -50,44 +74,93 @@ function Details({ read, amountCents }: { readonly read: InstructionsRead; reado
     case "READY": {
       const d = read.instructions;
       return (
-        <section aria-labelledby="payment-instructions">
+        <section className="kauro-transfer" aria-labelledby="payment-instructions">
           <h2 id="payment-instructions">{message("screen.payment.instructions.heading")}</h2>
-          <dl>
-            <div><dt>{message("screen.payment.instructions.beneficiary.label")}</dt><dd>{d.beneficiaryName}</dd></div>
+          <p className="kauro-transfer-intro">{message("screen.payment.instructions.three.body")}</p>
+          <dl className="kauro-transfer-three">
+            <div>
+              <dt>{message("screen.payment.amount.label")}</dt>
+              <dd>
+                <span className="kauro-transfer-value"><Money minor={amountCents} currency="USD" /></span>
+                <CopyValue value={plainAmount(amountCents)} label={message("screen.payment.amount.label")} />
+                <span className="kauro-transfer-hint">{message("screen.payment.instructions.amount.hint")}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>{message("screen.payment.instructions.reference.label")}</dt>
+              <dd>
+                <span className="kauro-transfer-value kauro-transfer-reference">
+                  <span aria-hidden="true">{grouped(d.reference)}</span>
+                  <span className="kauro-visually-hidden-text">{d.reference}</span>
+                </span>
+                <CopyValue value={d.reference} label={message("screen.payment.instructions.reference.label")} />
+                <span className="kauro-transfer-hint">{message("screen.payment.instructions.reference.hint")}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>{message("screen.payment.instructions.send-by.label")}</dt>
+              <dd>
+                <span className="kauro-transfer-value"><Deadline at={d.sendBy} timeZone="UTC" /></span>
+                <span className="kauro-transfer-hint">{message("screen.payment.instructions.send-by.hint")}</span>
+              </dd>
+            </div>
+          </dl>
+          <h3 className="kauro-transfer-bank-heading">{message("screen.payment.instructions.bank.heading")}</h3>
+          <dl className="kauro-transfer-slip">
+            <div><dt>{message("screen.payment.instructions.beneficiary.label")}</dt><dd>{d.beneficiaryName} <CopyValue value={d.beneficiaryName} label={message("screen.payment.instructions.beneficiary.label")} /></dd></div>
             <div><dt>{message("screen.payment.instructions.bank.label")}</dt><dd>{d.bankName}</dd></div>
-            <div><dt>{message("screen.payment.instructions.routing.label")}</dt><dd>{d.routingNumber}</dd></div>
-            <div><dt>{message("screen.payment.instructions.account.label")}</dt><dd>{d.accountNumber}</dd></div>
+            <div><dt>{message("screen.payment.instructions.routing.label")}</dt><dd>{d.routingNumber} <CopyValue value={d.routingNumber} label={message("screen.payment.instructions.routing.label")} /></dd></div>
+            <div><dt>{message("screen.payment.instructions.account.label")}</dt><dd>{d.accountNumber} <CopyValue value={d.accountNumber} label={message("screen.payment.instructions.account.label")} /></dd></div>
             <div><dt>{message("screen.payment.instructions.type.label")}</dt><dd>{message(`screen.payment.instructions.type.${d.accountType}`)}</dd></div>
-            <div><dt>{message("screen.payment.amount.label")}</dt><dd><Money minor={amountCents} currency="USD" /> {message("screen.payment.instructions.amount.hint")}</dd></div>
-            <div><dt>{message("screen.payment.instructions.reference.label")}</dt><dd><strong>{d.reference}</strong> {message("screen.payment.instructions.reference.hint")}</dd></div>
-            <div><dt>{message("screen.payment.instructions.send-by.label")}</dt><dd><Deadline at={d.sendBy} timeZone="UTC" /></dd></div>
             <div><dt>{message("screen.payment.instructions.expires.label")}</dt><dd><Deadline at={d.transferExpiresAt} timeZone="UTC" /></dd></div>
           </dl>
+          <h3 className="kauro-transfer-rules-heading">{message("screen.payment.instructions.rules.heading")}</h3>
+          <ul className="kauro-transfer-rules">
+            <li>{message("screen.payment.instructions.rules.1")}</li>
+            <li>{message("screen.payment.instructions.rules.2")}</li>
+            <li>{message("screen.payment.instructions.rules.3")}</li>
+          </ul>
         </section>
       );
     }
   }
 }
 
-export function PaymentDetails({ order, instructions, onRefresh, refreshing, hrefs }: PaymentViewProps): ReactElement {
+export function PaymentDetails({ order, instructions, onRefresh, refreshing, hrefs, projectHref, preparationHref, billingHref }: PaymentViewProps): ReactElement {
   const model = paymentModel(order);
   return (
     <div className="kauro-payment">
-      <p>{message("screen.payment.lead.body")}</p>
-      <dl>
-        <div><dt>{message("screen.payment.order.label")}</dt><dd>{order.orderId}</dd></div>
-        <div><dt>{message("screen.payment.amount.label")}</dt><dd><Money minor={order.expectedAmountCents} currency={order.currency} /></dd></div>
-      </dl>
-      <section aria-labelledby="payment-status">
+      <p className="kauro-payment-for">
+        {message("screen.payment.project.label")} <a href={projectHref}>{message("screen.payment.project.link")}</a>
+      </p>
+      <section className="kauro-payment-status" aria-labelledby="payment-status">
         <h2 id="payment-status">
           <StatusBadge tone={TONE[model.status]}>{message(`screen.payment.status.${model.status}.label`)}</StatusBadge>
         </h2>
+        {model.showsInstructions ? null : (
+          <p className="kauro-payment-amount">
+            <Money minor={order.expectedAmountCents} currency={order.currency} />
+          </p>
+        )}
         <p role="status">{message(`screen.payment.status.${model.status}.body`)}</p>
-        {model.discouragesRepeat ? <p>{message("state.UNCERTAIN.body")}</p> : null}
+        {model.discouragesRepeat && model.status === "CHECKING" ? <p>{message("state.UNCERTAIN.body")}</p> : null}
+        {model.status === "PENDING" ? <p>{message("screen.payment.next.PENDING.body")}</p> : null}
       </section>
+      {model.status === "CONFIRMED" ? (
+        <section className="kauro-payment-next" aria-labelledby="payment-next">
+          <p className="kauro-payment-next-label">{message("screen.payment.next.label")}</p>
+          <h2 id="payment-next">{message("screen.payment.next.CONFIRMED.title")}</h2>
+          <p>{message("screen.payment.next.CONFIRMED.body")}</p>
+          <p>
+            <LinkButton href={preparationHref} variant="primary">
+              {message("screen.payment.next.CONFIRMED.link")}
+            </LinkButton>
+          </p>
+        </section>
+      ) : null}
       {model.showsInstructions ? <Details read={instructions} amountCents={order.expectedAmountCents} /> : null}
-      <p>{message("screen.payment.return.hint")}</p>
-      <ul className="kauro-actions">
+      <p className="kauro-payment-hint">{message("screen.payment.return.hint")}</p>
+      <ul className="kauro-actions kauro-payment-actions">
         {model.actions.map((action) => (
           <li key={action}>
             {action === "REFRESH_STATUS" ? (
@@ -95,7 +168,7 @@ export function PaymentDetails({ order, instructions, onRefresh, refreshing, hre
                 <Button variant="secondary" disabled={refreshing} aria-busy={refreshing ? true : undefined} onClick={onRefresh}>
                   {message("screen.payment.action.REFRESH_STATUS.label")}
                 </Button>
-                <p>{message("screen.payment.refresh.hint")}</p>
+                <p className="kauro-payment-hint">{message("screen.payment.refresh.hint")}</p>
               </>
             ) : (
               <a href={hrefs[action]}>{message(`screen.payment.action.${action}.label`)}</a>
@@ -103,6 +176,9 @@ export function PaymentDetails({ order, instructions, onRefresh, refreshing, hre
           </li>
         ))}
       </ul>
+      <p className="kauro-payment-order">
+        {message("screen.payment.order.label")} <code>{order.orderId}</code> · <a href={billingHref}>{message("screen.payment.billing.link")}</a>
+      </p>
     </div>
   );
 }

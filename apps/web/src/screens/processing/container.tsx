@@ -2,11 +2,12 @@
 // The container of UI25 (design D-PRIV-1, D-OPS-1, D-STATE-1): reads the paid order named in the address (its commercial authorization) and
 // the job, and runs CMD036 (execute) and CMD037 (cancel) through the page's runner. The clock is read only through shared/use-now.ts and only
 // words the elapsed time.
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { pathOf } from "../../screens.ts";
 import { useShell } from "../../shell/shell-context.ts";
 import { pageRunner, useCommand } from "../shared/run-command.ts";
+import { ImplementedScreens } from "../shared/implemented-screens.ts";
 import { StatePanel } from "../shared/state-panel.tsx";
 import { useNow } from "../shared/use-now.ts";
 import { useRead } from "../shared/use-read.ts";
@@ -18,6 +19,8 @@ const NO_ANSWER = { kind: "NO_ANSWER", reason: "ABORTED", status: null } as cons
 export function ProcessingScreen({ agencyId, projectId, orderId, jobId }: { readonly agencyId: string; readonly projectId: string; readonly orderId: string | null; readonly jobId: string | null }): ReactElement {
   const { client } = useShell();
   const nowMs = useNow();
+  const implemented = useContext(ImplementedScreens);
+  const deliveryHref = implemented.has("UI26") ? pathOf("UI26", { agencyId, id: projectId }) : null;
   const [startedJob, setStartedJob] = useState<string | null>(null);
   const activeJob = jobId ?? startedJob;
   const order = useRead((signal) => (orderId === null ? Promise.resolve(NO_ANSWER) : client.call("GetPaymentOrder", { path: { orderId }, signal })), orderId ?? "none");
@@ -55,7 +58,7 @@ export function ProcessingScreen({ agencyId, projectId, orderId, jobId }: { read
     const shown = done !== null && done.outcome.kind === "COMPLETED" ? done.outcome.data : done !== null && done.outcome.kind === "RECOVERED" ? done.outcome.data : job;
     return (
       <>
-        <ProcessingDetails job={shown} nowMs={nowMs} readAt={readAt} supportHref={supportHref} onRefresh={jobRead.refresh} onCancel={cancel.run} cancelling={cancel.state.kind === "RUNNING"} cancelRecorded={recorded} />
+        <ProcessingDetails job={shown} nowMs={nowMs} readAt={readAt} supportHref={supportHref} onRefresh={jobRead.refresh} onCancel={cancel.run} cancelling={cancel.state.kind === "RUNNING"} cancelRecorded={recorded} deliveryHref={deliveryHref} />
         {done === null || recorded ? null : <StatePanel decision={done.decision} onNext={done.decision.next === "RELOAD" || done.decision.next === "REQUERY" || done.decision.next === "COMPARE_VERSIONS" ? jobRead.refresh : undefined} />}
       </>
     );

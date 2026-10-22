@@ -10,7 +10,7 @@ export default async function Page({ searchParams }: { readonly searchParams: Pr
   return (
     <>
       <h1>{message("screen.finance.title")}</h1>
-      <p>{message("screen.finance.lead.body")}</p>
+      <p className="kauro-screen-lead">{message("screen.finance.lead.body")}</p>
       <FinanceScreen routeId={idOrNull(route)} />
     </>
   );

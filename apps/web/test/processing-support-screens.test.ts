@@ -42,12 +42,13 @@ test("the screens say the registry's primary sentences word for word", () => {
   const sentence = (id: string): string | undefined => registry.find((row) => row.id === id)?.primaryCopy;
   assert.equal(EN["screen.processing.lead.body"], sentence("UI25"));
   assert.equal(EN["screen.support.lead.body"], sentence("UI52"));
-  assert.ok(details(job()).includes("Your approved project is being prepared."));
+  // round 2: the sentence is the page header's lead (ProjectHeader), so the view no longer repeats it
+  assert.ok(!details(job()).includes("Your approved project is being prepared."));
 });
 
-test("UI25: queue, start, run, verify and publish are separate phases with elapsed time and last update; no progress percentage comes from a heartbeat", () => {
+test("UI25: queue, start, run, verify and publish are separate phases in the customer's words with when it was queued and last checked; no elapsed counter, deadline, heartbeat or percentage", () => {
   const html = details(job({ state: "RUNNING", activeProviderState: "RUNNING" }));
-  const order = ["Queue", "Startup", "Execution", "Verification", "Publication"].map((label) => html.indexOf(`>${label}<`));
+  const order = ["Waiting for its turn", "Opening the sealed files and the approved plan", "Preparing the files", "Checking every output row against its source", "Building the report and releasing the package"].map((label) => html.indexOf(`>${label}<`));
   assert.ok(order.every((at) => at >= 0) && [...order].sort((a, b) => a - b).join() === order.join(), "five phases, in order, each its own item");
   assert.deepEqual(jobModel(job({ state: "RUNNING" }), NOW_80_MIN).phases, [
     { id: "QUEUE", status: "done" },
@@ -62,12 +63,11 @@ test("UI25: queue, start, run, verify and publish are separate phases with elaps
   assert.deepEqual([marked("QUEUED"), marked("ADMITTED"), marked("RUNNING"), marked("VERIFYING")], [["QUEUE"], ["START"], ["RUN"], ["VERIFY"]]);
   assert.deepEqual(jobModel(job({ state: "READY", publishedPackageId: JOB }), NOW_80_MIN).phases?.map((phase) => phase.status), ["done", "done", "done", "done", "done"]);
   assert.equal(jobModel(job({ state: "READY" }), NOW_80_MIN).phases?.[4]?.status, "current", "ready without a published package is not published yet");
-  // elapsed time and the last update are written; both are instants/durations, not a fraction
-  assert.ok(html.includes("Elapsed time") && html.includes("1 h 20 min"), "80 minutes since the job was queued");
-  assert.ok(html.includes("Last updated") && html.includes("13:19"));
-  assert.ok(html.includes("Queued at") && html.includes("Delivery deadline"));
-  // a heartbeat is a sign of life, labelled so, and never a percentage or a bar
-  assert.ok(html.includes("Worker report") && html.includes("not how much work is done"));
+  // round 2 (research agency-workspace.md section 5.14, C-6): the instants stay; a ticking elapsed time, a delivery deadline no policy
+  // states and the worker's heartbeat are gone; the page says nothing is needed and the person may leave
+  assert.ok(html.includes("Last checked") && html.includes("13:19"));
+  assert.ok(html.includes("Queued at") && html.includes("Nothing is needed from you"));
+  assert.ok(!html.includes("Elapsed time") && !html.includes("Delivery deadline") && !html.includes("Worker report"));
   assert.doesNotMatch(html, /%|<progress|progressbar|aria-valuenow|style="[^"]*width/i);
   for (const state of ["QUEUED", "ADMITTED", "RUNNING", "VERIFYING", "READY", "FAILED", "CANCEL_REQUESTED", "CANCELLED", "EXPIRED"] as const) {
     assert.doesNotMatch(details(job({ state, activeProviderState: "LAUNCHING" })), /%|<progress|progressbar/i, state);
@@ -75,7 +75,7 @@ test("UI25: queue, start, run, verify and publish are separate phases with elaps
   // an ended job states how it ended, shows no phase it may not have reached, no elapsed counter and no worker report
   for (const state of ["FAILED", "EXPIRED", "CANCELLED", "CANCEL_REQUESTED"] as const) {
     const ended = details(job({ state, activeProviderState: "RUNNING" }));
-    assert.ok(!ended.includes("Verification") && !ended.includes("Elapsed time") && !ended.includes("Worker report"), state);
+    assert.ok(!ended.includes("Checking every output row") && !ended.includes("Elapsed time") && !ended.includes("Nothing is needed from you"), state);
     assert.ok(ended.includes("Open support") && ended.includes("/support?project="), `${state}: the next action is support`);
   }
   assert.ok(details(job({ state: "FAILED" })).includes("This did not finish"));
@@ -223,7 +223,7 @@ test("UI52/CMD044: the form warns against secrets and CRM rows, shows the SECURE
   assert.equal(keys[0], form.key, "the key the form minted when it opened");
   assert.equal(lost.sent[0]?.url, `/api/v1/projects/${PROJECT}/support-cases`);
   const shown = renderToStaticMarkup(createElement(CaseCreated, { item: created, listHref: SUPPORT_HREF }));
-  assert.ok(shown.includes("Your case is open") && shown.includes("Next response by") && shown.includes("Oct 14, 2026, 10:00 AM GMT-5"), "the next response time is written");
+  assert.ok(shown.includes("Your case is open") && shown.includes("Next response by") && shown.includes("Oct 14, 2026, 3:00 PM UTC"), "the next response time is written, in UTC like every deadline of the application");
   // every retry lost: the project's cases are read back; only a case that was not there before counts, so an older identical case is never claimed
   const allLost = (listed: SupportCaseView[]) =>
     harness(async (entry) => {

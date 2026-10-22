@@ -25,7 +25,7 @@ const OTHER = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb2";
 const PROJECTS = `/agencies/${AGENCY}/projects`;
 const SESSION = { userId: "user-1", emailVerified: true, mfaEnrolled: true, mfaAt: null, stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z" } as const;
 const SIGNED_IN: SessionPhase = { kind: "SIGNED_IN", session: SESSION };
-const READY: AgencyContext = { kind: "READY", agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE" };
+const READY: AgencyContext = { kind: "READY", agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE", role: null };
 const ALL = new Set(["UI10", ...AGENCY_NAVIGATION.map((entry) => entry.screen)]);
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -129,13 +129,15 @@ test("11: the navigation lists only screens whose page exists, marks the current
     ],
   );
   assert.equal(some.switchHref, pathOf("UI10"));
+  // an operations page has no agency to switch: the switcher is offered on the application origin only
+  assert.equal(viewOf(input({ pathname: "/ops/finance", implemented: new Set(["UI10", "UI39"]) })).switchHref, null);
   // a deeper screen of the same section keeps its section current; a sibling section does not
   assert.deepEqual(viewOf(input({ pathname: `${PROJECTS}/p1`, implemented: new Set(["UI11", "UI12"]) })).navigation.map((item) => item.current), [true, false]);
   assert.deepEqual(viewOf(input({ pathname: `/agencies/${AGENCY}/clients`, implemented: new Set(["UI11", "UI12"]) })).navigation.map((item) => item.current), [false, true]);
   // the order is the reference's, and the six entries are the six agency-level screens
   assert.deepEqual(viewOf(input()).navigation.map((item) => item.screen), ["UI11", "UI12", "UI31", "UI30", "UI32", "UI52"]);
   const shown = viewOf(input());
-  assert.deepEqual(shown.agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label" });
+  assert.deepEqual(shown.agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label", role: null });
 });
 
 // ---- what is rendered ----
@@ -154,7 +156,7 @@ test("D-A11Y-1, D-PRIV-1: the frame is a skip link first, one banner, one naviga
   assert.ok(html.includes(`<main id="${MAIN_ID}" class="kauro-main" tabindex="-1">`), "the skip link's target exists and takes focus");
   assert.equal((html.match(/<header\b/g) ?? []).length, 1);
   assert.equal((html.match(/<nav\b/g) ?? []).length, 1);
-  assert.ok(html.includes('<nav class="kauro-shell-nav" aria-label="Agency navigation">'));
+  assert.ok(html.includes('<nav class="kauro-shell-nav" aria-label="Workspace navigation">'));
   assert.ok(html.indexOf("<header") < html.indexOf("<nav") && html.indexOf("<nav") < html.indexOf("<main"), "banner, navigation, main");
   assert.ok(html.includes('<a href="' + PROJECTS + '" data-recorded="yes" aria-current="page">Projects</a>'), "the current entry is marked and is a plain link");
   assert.ok(prefetchOf.length >= 7, "the navigation entries, the switcher and nothing else went through the anchor");
@@ -165,10 +167,10 @@ test("D-A11Y-1, D-PRIV-1: the frame is a skip link first, one banner, one naviga
 
 test("D-DS-3, D-SEC-1: an agency's name is a text node in <bdi>, never markup, and no frame carries an inline style, a script or raw HTML", () => {
   const hostile = '<img src=x onerror="alert(1)"> & "quotes" </bdi><script>1</script>';
-  const html = render(viewOf(input({ agency: { kind: "READY", agencyId: AGENCY, displayName: hostile, state: "RESTRICTED" } })));
+  const html = render(viewOf(input({ agency: { kind: "READY", agencyId: AGENCY, displayName: hostile, state: "RESTRICTED", role: null } })));
   assert.ok(html.includes('<bdi class="kauro-agency-name">&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &quot;quotes&quot; &lt;/bdi&gt;&lt;script&gt;1&lt;/script&gt;</bdi>'), "escaped, inside the bdi");
   assert.ok(html.includes('<span class="kauro-agency-state">Restricted</span>'));
-  assert.ok(html.includes('<span class="kauro-agency-label">Agency</span>'));
+  assert.ok(html.includes('<span class="kauro-agency-label">Workspace</span>'));
   // the tags of the markup are the frame's own: no script, no image, no inline style and no event attribute on any of them
   const tags = html.match(/<[^>]+>/g) ?? [];
   assert.ok(tags.length > 10);
@@ -211,9 +213,9 @@ test("D-STATE-1, D-A11Y-1: while the session is unknown the page says so in the 
   assert.ok(stuck.includes('<button type="button" class="kauro-button">Sign out</button>'), "the one next step is to try again");
 
   const noAgency = render(viewOf(input({ agency: { kind: "UNAVAILABLE" } })));
-  assert.ok(noAgency.includes("This agency is not available"));
+  assert.ok(noAgency.includes("This workspace is not available"));
   assert.ok(noAgency.includes('<button type="button" class="kauro-button">Check again</button>'));
-  assert.ok(noAgency.includes('<button type="button" class="kauro-button">Sign out</button>'), "and the person can still leave");
+  assert.ok(noAgency.includes('<button type="button" class="kauro-account-item">Sign out</button>'), "and the person can still leave, from the account menu");
 });
 
 test("D-A11Y-1: a public screen's frame is the skip link and the one main landmark, and nothing of the private shell", () => {
@@ -275,6 +277,9 @@ test("D-PRIV-1, D-STATE-1: the composed shell reads the session, then asks for t
     await agencyReply;
     return world.json(200, AGENCY_BODY);
   });
+  // the person's own memberships, read beside the agency for the role the account button names (Order 11 round 2)
+  const membership = { agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE", version: 3, membershipId: "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f10", role: "APPROVER", membershipState: "ACTIVE", permittedActions: ["VIEW", "APPROVE_PLANS"] };
+  world.answers.set("GET /api/v1/agencies?limit=100", async () => world.json(200, { kind: "READ", data: { items: [membership] } }));
   const shell = createShell(world.page);
   const drawn = (): ShellView => viewOf({ phase: shell.session.snapshot(), agency: shell.agency.snapshot(), pathname: PROJECTS, activeAgency: shell.session.activeAgency(), implemented: ALL });
   assert.deepEqual(drawn().gate, { kind: "WAIT", message: "shell.session.checking.body" }, "before anything is read");
@@ -286,7 +291,7 @@ test("D-PRIV-1, D-STATE-1: the composed shell reads the session, then asks for t
   assert.equal(drawn().agency, null, "no name before the agency answers");
   assert.deepEqual(
     world.sent.map((request) => `${request.method} ${request.url}`),
-    ["GET /api/v1/sessions/current", `GET /api/v1/agencies/${AGENCY}`],
+    ["GET /api/v1/sessions/current", `GET /api/v1/agencies/${AGENCY}`, "GET /api/v1/agencies?limit=100"],
   );
   const asked = world.sent[1];
   assert.ok(asked);
@@ -296,7 +301,7 @@ test("D-PRIV-1, D-STATE-1: the composed shell reads the session, then asks for t
   releaseAgency();
   await settled(shell, () => shell.agency.snapshot().kind === "READY");
   assert.deepEqual(drawn().gate, { kind: "OPEN" });
-  assert.deepEqual(drawn().agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label" });
+  assert.deepEqual(drawn().agency, { name: "Northwind Data", state: "shell.agency.state.ACTIVE.label", role: "shell.role.APPROVER.label" }, "the role comes from the person's own active membership");
 
   // leaving the page clears what the page knew: nothing of the agency is drawn from a restored page
   world.win.dispatchEvent(new Event("pagehide"));
@@ -326,4 +331,44 @@ test("D-PRIV-1: a shell outside an agency reads no agency, and a session that is
   assert.equal(viewOf({ phase: anonymous.session.snapshot(), agency: anonymous.agency.snapshot(), pathname: PROJECTS, activeAgency: anonymous.session.activeAgency() }).agency, null);
   assert.deepEqual(signedOut.sent.map((request) => request.url), ["/api/v1/sessions/current"], "no agency is read without a session");
   anonymous.detach();
+});
+
+test("Order 11: inside a project the menu nests its areas for its service; a destination and an import exist only for HubSpot and Salesforce", () => {
+  const project = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa2";
+  const built = new Set([...ALL, "UI13", "UI14", "UI17", "UI18", "UI19", "UI23", "UI26", "UI27", "UI29"]);
+  const input = (mode: "CLEAN" | "HUBSPOT", path: string): ShellInput => ({ phase: SIGNED_IN, agency: READY, pathname: path, activeAgency: AGENCY, implemented: built, project: { projectId: project, name: "Contacts and companies", clientLabel: "Larch Studio", mode } });
+  const audit = pathOf("UI18", { agencyId: AGENCY, id: project });
+  const hubspot = viewOf(input("HUBSPOT", audit)).project;
+  assert.deepEqual(hubspot?.areas.map((area) => area.key), ["overview", "files", "destination", "check", "plan", "purchase", "delivery", "import", "data"]);
+  assert.equal(hubspot?.areas.find((area) => area.current)?.key, "check");
+  const clean = viewOf(input("CLEAN", audit)).project;
+  assert.deepEqual(clean?.areas.map((area) => area.key), ["overview", "files", "check", "plan", "purchase", "delivery", "data"]);
+  // a project the page does not name, or a page outside every project, nests nothing
+  assert.equal(viewOf({ ...input("HUBSPOT", PROJECTS), project: { projectId: project, name: "x", clientLabel: "y", mode: "HUBSPOT" } }).project, null);
+  const markup = renderToStaticMarkup(createElement(ShellFrame, { view: viewOf(input("CLEAN", audit)), actions: { signOut: () => undefined, checkAgain: () => undefined }, children: null }));
+  assert.match(markup, /Contacts and companies/);
+  assert.doesNotMatch(markup, />Import</);
+});
+
+test("ProjectHeader (round 2): the project's name is the h1 under its client and service; the six stages are named once each; the page's own name is its h2; without a project the page's name is the h1", async () => {
+  const { ProjectHeader } = await import("../src/screens/shared/project-header.tsx");
+  const { ProjectContext } = await import("../src/shell/frame.tsx");
+  const project = { projectId: "p", name: "Contacts and companies", clientLabel: "Larch Studio", mode: "HUBSPOT" as const };
+  const within = (child: ReactElement, value: unknown = project): string => renderToStaticMarkup(createElement(ProjectContext.Provider, { value: value as never }, child));
+  const quote = within(createElement(ProjectHeader, { stage: "purchase", title: "Quote", lead: "Review price, scope and availability." }));
+  assert.match(quote, /<h1><bdi>Contacts and companies<\/bdi><\/h1>/);
+  assert.match(quote, /<h2>Quote<\/h2>/);
+  assert.ok(quote.includes("Larch Studio") && quote.includes("Prepare for HubSpot") && quote.includes("Stage 4 of 6 · Quote and payment"));
+  assert.equal((quote.match(/<h1/g) ?? []).length, 1, "exactly one h1");
+  // the preparation and the delivery are two stages (round 1 drew both as "step 5")
+  const preparing = within(createElement(ProjectHeader, { stage: "preparation", title: "Processing" }));
+  const delivered = within(createElement(ProjectHeader, { stage: "delivery", title: "Delivery" }));
+  assert.ok(preparing.includes("Stage 5 of 6 · Preparation") && delivered.includes("Stage 6 of 6 · Delivery and import"));
+  // "Clean your data" has six stages too; its sixth is the delivery alone
+  const clean = within(createElement(ProjectHeader, { stage: "import", title: "Delivery" }), { ...project, mode: "CLEAN" });
+  assert.ok(clean.includes("Stage 6 of 6 · Delivery<") && !clean.includes("and import"), "Clean your data has no import");
+  // no project read: the page's own name is the one h1
+  const alone = within(createElement(ProjectHeader, { stage: "files", title: "Upload the files" }), null);
+  assert.match(alone, /<h1>Upload the files<\/h1>/);
+  assert.ok(!alone.includes("<h2"));
 });

@@ -8,8 +8,8 @@
  * TOKENS is the single source of truth; tokens.css is its rendering (renderTokenCss), checked byte for byte by the tests, so the stylesheet
  * the application loads can never drift from the values the contrast checks bind. Both themes bind the same pairs.
  *
- * Themes: the light theme is the default. The dark theme applies when the document says so (`<html data-theme="dark">`, from the visitor's
- * stored preference) or, with no stored preference, when the system asks for it (prefers-color-scheme) and the document does not say light.
+ * One theme (owner, 2026-10-21): Kauro is dark, with no choice of a light theme. The light palette was set aside in
+ * D:\Backups\Rollback\2026-10-21-kauro-light-theme (and in git before that date).
  *
  * Focus (B11 design D-DS-2): the focus colour is the primary colour of its theme, so the focus ring is always drawn as an outline offset by
  * FOCUS.offsetPx from the control, over the surface it sits on — never adjacent to a primary fill. The contrast checks bind the focus colour
@@ -30,44 +30,8 @@ export const BRAND = Object.freeze({
   clay: "#C4A693",
 });
 
+/** The palette: carbon pages, porcelain text, clay for the primary action and the focus, wine for the brand's bands. */
 export const COLOR = Object.freeze({
-  text: BRAND.carbon,
-  textMuted: "#5F5955",
-  background: BRAND.porcelain,
-  surface: "#F1EDE8",
-  /** A warm porcelain white for cards and documents (owner, 2026-10-19: pure white is not in the palette and made carbon read as black). */
-  raised: "#FAF8F5",
-  border: "#E3DCD4",
-  controlBorder: "#8C837D",
-  primary: BRAND.wine,
-  primaryHover: "#4F2C37",
-  onPrimary: BRAND.porcelain,
-  focus: BRAND.wine,
-  accent: BRAND.clay,
-  accentText: "#7A5A45",
-  accentSurface: "#ECE2D9",
-  ink: BRAND.carbon,
-  onInk: BRAND.porcelain,
-  inkMuted: "#B5ADA6",
-  inkBorder: "#3D3B3F",
-  inkAccent: BRAND.clay,
-  wine: BRAND.wine,
-  onWine: BRAND.porcelain,
-  wineMuted: "#E3D3D2",
-  dangerText: "#9E2F26",
-  dangerSurface: "#F7E3DF",
-  warningText: "#7A4D0C",
-  warningSurface: "#F5E8D2",
-  successText: "#2E5B38",
-  successSurface: "#E3EDE2",
-  infoText: "#344E6B",
-  infoSurface: "#E4E9EF",
-});
-
-export type ColorToken = keyof typeof COLOR;
-
-/** The dark theme: the same tokens, so every rule that reads a token follows the theme without a rule of its own. */
-export const COLOR_DARK: Readonly<Record<ColorToken, string>> = Object.freeze({
   text: "#F1ECE6",
   textMuted: "#ADA59E",
   background: BRAND.carbon,
@@ -100,14 +64,11 @@ export const COLOR_DARK: Readonly<Record<ColorToken, string>> = Object.freeze({
   infoSurface: "#242D38",
 });
 
-/**
- * The inverse band (`.kauro-inverse`): a carbon section inside a light page, drawn with the dark theme's tokens. Inside a dark page the
- * band sinks one step below the page instead (COLOR_INVERSE_DARK), so it still reads as a band.
- */
-export const COLOR_INVERSE: Readonly<Record<ColorToken, string>> = COLOR_DARK;
+export type ColorToken = keyof typeof COLOR;
 
-export const COLOR_INVERSE_DARK: Readonly<Record<ColorToken, string>> = Object.freeze({
-  ...COLOR_DARK,
+/** The inverse band (`.kauro-inverse`): a section one step below the page, so it still reads as a band on a dark page. */
+export const COLOR_INVERSE: Readonly<Record<ColorToken, string>> = Object.freeze({
+  ...COLOR,
   background: "#19191B",
   surface: "#141416",
   raised: "#262528",
@@ -115,9 +76,9 @@ export const COLOR_INVERSE_DARK: Readonly<Record<ColorToken, string>> = Object.f
   accentSurface: "#2B2623",
 });
 
-/** The wine band (`.kauro-wine`): a wine section in either theme; its primary action is porcelain with wine text. */
+/** The wine band (`.kauro-wine`): a wine section; its primary action is porcelain with wine text. */
 export const COLOR_WINE: Readonly<Record<ColorToken, string>> = Object.freeze({
-  ...COLOR_DARK,
+  ...COLOR,
   text: BRAND.porcelain,
   textMuted: "#E3D3D2",
   background: BRAND.wine,
@@ -137,7 +98,7 @@ export const COLOR_WINE: Readonly<Record<ColorToken, string>> = Object.freeze({
   infoText: "#C2D2E5",
 });
 
-export const THEMES = Object.freeze({ light: COLOR, dark: COLOR_DARK, inverse: COLOR_INVERSE, inverseDark: COLOR_INVERSE_DARK, wine: COLOR_WINE });
+export const THEMES = Object.freeze({ page: COLOR, inverse: COLOR_INVERSE, wine: COLOR_WINE });
 
 export type ThemeName = keyof typeof THEMES;
 
@@ -172,7 +133,7 @@ export const TARGET_SIZE_PX = 44;
 /** The width of the border of a control, a table rule and a card. */
 export const BORDER_WIDTH_PX = 1;
 
-/** Text colours and the surfaces they are drawn on: each pair must reach 4.5:1 in both themes (WCAG 2.2 SC 1.4.3, normal text). */
+/** Text colours and the surfaces they are drawn on: each pair must reach 4.5:1 on the page and in each band (WCAG 2.2 SC 1.4.3, normal text). */
 export const TEXT_PAIRS: ReadonlyArray<readonly [ColorToken, ColorToken]> = Object.freeze([
   ["text", "background"],
   ["text", "surface"],
@@ -210,7 +171,7 @@ export const TEXT_PAIRS: ReadonlyArray<readonly [ColorToken, ColorToken]> = Obje
   ["text", "infoSurface"],
 ] as const);
 
-/** Non-text indicators and the surfaces they are drawn on: each pair must reach 3:1 in both themes (WCAG 2.2 SC 1.4.11). */
+/** Non-text indicators and the surfaces they are drawn on: each pair must reach 3:1 on the page and in each band (WCAG 2.2 SC 1.4.11). */
 export const NON_TEXT_PAIRS: ReadonlyArray<readonly [ColorToken, ColorToken]> = Object.freeze([
   ["focus", "background"],
   ["focus", "surface"],
@@ -258,7 +219,7 @@ export function renderTokenCss(): string {
   const lines: string[] = [
     "/* Generated from packages/ui/src/tokens.ts (renderTokenCss); packages/ui/test/tokens.test.ts checks it. Do not edit by hand. */",
     ":root {",
-    "  color-scheme: light;",
+    "  color-scheme: dark;",
   ];
   lines.push(...colorLines(COLOR, "  "));
   lines.push(`  --kauro-font-family: ${TYPOGRAPHY.fontFamily};`);
@@ -277,30 +238,12 @@ export function renderTokenCss(): string {
   lines.push(`  --kauro-target-size: ${TARGET_SIZE_PX}px;`);
   lines.push(`  --kauro-border-width: ${BORDER_WIDTH_PX}px;`);
   lines.push("}");
-  lines.push("@media (prefers-color-scheme: dark) {");
-  lines.push('  :root:not([data-theme="light"]) {');
-  lines.push("    color-scheme: dark;");
-  lines.push(...colorLines(COLOR_DARK, "    "));
-  lines.push("  }");
-  lines.push("}");
-  lines.push(':root[data-theme="dark"] {');
-  lines.push("  color-scheme: dark;");
-  lines.push(...colorLines(COLOR_DARK, "  "));
-  lines.push("}");
   // The bands: an element that carries the class draws its own background and text, and every token inside it follows the band.
   lines.push(".kauro-inverse {");
   lines.push("  color-scheme: dark;");
   lines.push(...colorLines(COLOR_INVERSE, "  "));
   lines.push("  color: var(--kauro-color-text);");
   lines.push("  background: var(--kauro-color-background);");
-  lines.push("}");
-  lines.push("@media (prefers-color-scheme: dark) {");
-  lines.push('  :root:not([data-theme="light"]) .kauro-inverse {');
-  lines.push(...colorLines(COLOR_INVERSE_DARK, "    "));
-  lines.push("  }");
-  lines.push("}");
-  lines.push(':root[data-theme="dark"] .kauro-inverse {');
-  lines.push(...colorLines(COLOR_INVERSE_DARK, "  "));
   lines.push("}");
   lines.push(".kauro-wine {");
   lines.push("  color-scheme: dark;");
@@ -329,8 +272,6 @@ export function renderTokenCss(): string {
   lines.push("  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);");
   lines.push("  outline-offset: var(--kauro-focus-offset);");
   lines.push("}");
-  // While the theme changes, nothing transitions: the page is redrawn in its new colours in one step.
-  lines.push(":root[data-theme-switching] *, :root[data-theme-switching] *::before, :root[data-theme-switching] *::after { transition: none !important; }");
   lines.push("@media (prefers-reduced-motion: reduce) {");
   lines.push("  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }");
   lines.push("}");

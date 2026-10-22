@@ -39,7 +39,7 @@ import { NavList, SiteFrame } from "../src/public/frame.tsx";
 import { BANDS, bandIndexOf, formatCount, formatUsd, priceOf } from "../src/public/pricing-bands.ts";
 import { RETENTION_ROWS } from "../src/public/retention.ts";
 import { MANIFEST_FILES, SAMPLE, SAMPLE_GROUPS, SAMPLE_MODE } from "../src/public/sample-data.ts";
-import { FOOTER_NAV, MAIN_NAV, ROUTE, SITE_PAGES, type PageKey } from "../src/public/site.ts";
+import { FOOTER_NAV, HEADER_NAV, ROUTE, SITE_PAGES, type PageKey } from "../src/public/site.ts";
 import { registryScreens } from "./support/registry.ts";
 
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -153,7 +153,7 @@ test("every table has a caption first and a scope on every header cell, and ever
     const markup = html(ALL);
     for (const table of markup.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g)) {
       assert.match(table[1] ?? "", /^<caption>[^<]+<\/caption>/, `${key}: a table starts with its caption`);
-      for (const header of (table[1] ?? "").matchAll(/<th(\s[^>]*)?>/g)) assert.match(header[1] ?? "", /\sscope="(col|row)"/, `${key}: a header cell names what it heads`);
+      for (const header of (table[1] ?? "").matchAll(/<th(\s[^>]*)?>/g)) assert.match(header[1] ?? "", /\sscope="(col|row|rowgroup)"/, `${key}: a header cell names what it heads`);
     }
     assert.equal(count(markup, "<table"), count(markup, "</table>"));
     for (const item of markup.matchAll(/<li[\s>]/g)) assert.ok(item.index !== undefined && /<(ul|ol)[\s>]/.test(markup.slice(0, item.index)), `${key}: <li> outside a list`);
@@ -218,27 +218,43 @@ test("Home: the job line, one call to action, the sample and pricing beside it, 
 
 test("Home lists the services the publication lists, and says so plainly when it lists none or cannot be read", () => {
   const modes = (read: Publication): string => textOf((/<section[^>]*aria-labelledby="home-modes-heading"[\s\S]*?<\/section>/.exec(page("home").html(read)) ?? [""])[0]);
-  assert.match(modes(ALL), /CLEAN.*HubSpot.*Salesforce/);
+  assert.match(modes(ALL), /Clean your data.*Prepare for HubSpot.*Prepare for Salesforce/);
   const clean = modes(CLEAN_ONLY);
-  assert.match(clean, /CLEAN/);
+  assert.match(clean, /Clean your data/);
   assert.doesNotMatch(clean, /HubSpot|Salesforce/, "a service the publication does not list is not named as open");
   assert.match(modes(NOTHING), /No service is open for new projects right now\./);
-  assert.doesNotMatch(modes(NOTHING), /CLEAN|HubSpot|Salesforce/);
+  assert.doesNotMatch(modes(NOTHING), /Clean your data|HubSpot|Salesforce/);
   assert.match(modes(UNAVAILABLE), /cannot be read right now/);
-  assert.doesNotMatch(modes(UNAVAILABLE), /CLEAN|HubSpot|Salesforce/, "an unreadable publication opens nothing");
+  assert.doesNotMatch(modes(UNAVAILABLE), /Clean your data|HubSpot|Salesforce/, "an unreadable publication opens nothing");
 });
 
 // ---- How it works ---------------------------------------------------------------------------------------------------------------------
 
-test("How it works is the buyer's guide: six stages, each with the same five fields, and nothing that plays", () => {
+test("How it works is the buyer's guide: the six stages in one timeline, each opening what you get and what stops it in view; rendered without a script every stage is open; nothing plays", () => {
   const html = page("how").html(ALL);
   const text = textOf(html);
-  assert.equal(count(html, "<ol"), 1, "the stages are one ordered list");
+  assert.equal(count(html, '<ol class="kauro-path-list"'), 1, "the stages are one ordered list");
   assert.equal(count(html, 'class="kauro-stage kauro-stage--'), 6);
-  assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text), ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"]);
+  const stageNames = ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"];
+  assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text).slice(0, 6), stageNames);
+  // without a script nothing is hidden: every stage is open, in order, and no control pretends to work
+  const path = html.slice(html.indexOf('class="kauro-path"'), html.indexOf("kauro-path-details"));
+  assert.doesNotMatch(path, /<[^>]+\shidden[\s=>]/, "no stage is hidden before the script runs");
+  assert.equal(count(path, "aria-expanded"), 0, "no stage says it is open or closed before the script can open or close it");
+  assert.equal(count(path, "kauro-path-turn"), 0, "previous and next appear only with the script");
   const sheets = [...html.matchAll(/<article class="kauro-stage-sheet"[\s\S]*?<\/article>/g)];
   assert.equal(sheets.length, 6);
-  for (const sheet of sheets) assert.deepEqual([...sheet[0].matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["Who acts", "What it needs", "What happens", "What you get", "What stops it"]);
+  // each card holds what you get and what stops it, always in view, and nothing folded
+  for (const sheet of sheets) {
+    assert.deepEqual([...sheet[0].matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["What you get", "What stops it"]);
+    assert.doesNotMatch(sheet[0], /<details/);
+  }
+  // who acts, what it needs and what happens: one folded block for all six stages, in order, above the call to action
+  const details = /<details class="kauro-path-details"[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
+  const answers = [...details.matchAll(/<li>[\s\S]*?<\/dl><\/li>/g)].map((item) => item[0]);
+  assert.equal(answers.length, 6);
+  for (const answer of answers) assert.deepEqual([...answer.matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["Who acts", "What it needs", "What happens"]);
+  assert.ok(html.indexOf("kauro-path-details") < html.indexOf('id="how-responsibility"'), "the detail closes the stages, before the closing band");
   assert.doesNotMatch(html, /kauro-flow|kauro-scene/, "the long animation of the process is retired: Home tells it");
   for (const claim of [
     "free and creates no obligation to buy",
@@ -252,38 +268,35 @@ test("How it works is the buyer's guide: six stages, each with the same five fie
     "Returning to a page never confirms a payment",
     "Kauro does not write to your CRM at any step",
     "The project stays prepared for import until your team reports the result",
-    "for CLEAN, standard files with no steps for a particular CRM",
+    "for Clean your data, standard files with no steps for a particular CRM",
   ])
     assert.ok(text.includes(claim), claim);
   assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "no stage names a duration");
-  assert.doesNotMatch(text.slice(0, text.indexOf("A worked example")), /HubSpot|Salesforce/, "the stages name a destination only through the capability publication, on Supported services; the invented example names its service");
+  assert.doesNotMatch(text, /HubSpot|Salesforce/, "the page names a destination only through the capability publication, on Supported services");
   assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
   assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
-  assert.deepEqual(linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary")).map((link) => `${link.text}|${link.href}`), [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "start the fit assessment (A3 3.2)");
-  for (const stage of ["files", "check", "decide", "quote", "prepare", "import"]) assert.ok(hrefsOf(html).includes(`#stage-${stage}`), `the index links to stage ${stage}`);
+  const primary = linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary"));
+  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "one call to action (A3 3.2)");
+  assert.equal(primary.length, 1, "the closing band is the page's one call to action: no second button right above it (owner, 2026-10-21)");
+  for (const stage of ["files", "check", "decide", "quote", "prepare", "import"]) {
+    assert.ok(html.includes(`id="stage-${stage}"`), `a link to #stage-${stage} reaches stage ${stage}`);
+    assert.ok(html.includes(`aria-controls="stage-${stage}-panel"`) && html.includes(`id="stage-${stage}-panel"`), `stage ${stage} opens its own panel`);
+  }
 });
 
-test("How it works: the worked example keeps candidate groups, approved unifications and unified rows apart, and prices the billable units", () => {
-  const text = textOf(page("how").html(ALL));
-  const { pairs, triples, pairsKeptApart } = SAMPLE_GROUPS;
-  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
-  const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
-  assert.ok(contacts !== undefined && companies !== undefined);
-  const units = contacts.source + companies.source;
-  assert.equal(units, 15_684, "both sealed files are counted, before anything is unified");
-  const band = bandIndexOf(units);
-  assert.ok(band !== null);
-  for (const fact of [
-    `${formatCount(pairs + triples)} groups holding ${formatCount(pairs * 2 + triples * 3)} contacts`,
-    `${formatCount(pairs + triples - pairsKeptApart)} of ${formatCount(pairs + triples)} groups`,
-    `kept ${formatCount(pairsKeptApart)} groups apart`,
-    `${formatCount(contacts.source)} source rows become ${formatCount(contacts.rows)} delivered rows`,
-    `the price counts ${formatCount(units)} units, while the delivery holds ${formatCount(contacts.rows + companies.rows)} rows`,
-    formatUsd(priceOf(band, SAMPLE_MODE)),
-    "Invented figures.",
-    "prepared for an import with the HubSpot service",
-  ])
-    assert.ok(text.includes(fact), fact);
+test("How it works tells no invented project of its own (Home and Sample delivery do): the quote's stage says the price counts the units sealed and leads to Pricing, the delivery's stage leads to the sample", () => {
+  const html = page("how").html(ALL);
+  assert.doesNotMatch(html, /kauro-record|One project, start to finish|A worked example/);
+  // what Kauro does not do is no section of its own here (Home has it): the stages and the closing band still say all three
+  assert.doesNotMatch(html, /What Kauro does not do|kauro-r2-never/);
+  const said = textOf(html);
+  for (const limit of ["Kauro does not write to your CRM at any step", "runs the import", "approves every change"]) assert.ok(said.includes(limit), limit);
+  const sheet = (key: string): string => /<article class="kauro-stage-sheet"[\s\S]*?<\/article>/.exec(html.slice(html.indexOf(`id="stage-${key}-panel"`)))?.[0] ?? "";
+  assert.ok(hrefsOf(sheet("quote")).includes(ROUTE.pricing), "the quote's card leads to Pricing");
+  assert.ok(hrefsOf(sheet("import")).includes(ROUTE.sample), "the delivery's card leads to the sample");
+  for (const key of ["files", "check", "decide", "prepare"]) assert.equal(hrefsOf(sheet(key)).length, 0, `stage ${key} leads nowhere else`);
+  const details = /<details class="kauro-path-details"[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
+  assert.ok(textOf(details).includes("The price counts the units in the files your team sealed, before duplicates are unified, not the rows delivered."));
 });
 
 // ---- Supported services ---------------------------------------------------------------------------------------------------------------
@@ -294,34 +307,47 @@ function card(html: string, name: string): string {
   return textOf(found);
 }
 
-test("Supported services: CLEAN stands beside HubSpot and Salesforce as one of three peers, each with its state read from the publication", () => {
+const SERVICES = ["Prepare for HubSpot", "Prepare for Salesforce", "Clean your data"] as const;
+
+test("Supported services: three peers as equal cards, the qualified destinations first, each with its state read from the publication", () => {
   const html = page("services").html(ALL);
   const h3 = headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text);
-  assert.deepEqual(h3, ["CLEAN", "HubSpot", "Salesforce"]);
+  assert.deepEqual(h3.slice(0, 3), [...SERVICES]);
   assert.equal(count(html, "<article"), 3);
-  for (const name of ["CLEAN", "HubSpot", "Salesforce"]) assert.match(card(html, name), /Available for new projects/);
-  // the read time is not shown on this page (owner review, Order 10); Service status keeps it
+  assert.doesNotMatch(textOf(html), /\bCLEAN\b/, "the uppercase name is never shown");
+  for (const name of SERVICES) assert.match(card(html, name), /Available for new projects/);
+  // the read time is not shown on this page (owner review, Order 10)
   assert.doesNotMatch(textOf(html), /Read from the capability publication at/);
-  assert.match(card(html, "HubSpot"), /Publication version 2026\.10\.0, available since 2026-10-01 15:00 UTC\./);
-  assert.match(card(html, "CLEAN"), /Kauro qualifies imports only for HubSpot and Salesforce\./);
-  assert.match(card(html, "HubSpot"), /marketing-contact status and paid enrichment stay switched off/);
-  assert.match(card(html, "Salesforce"), /does not deploy fields, validation rules, automations or external identifier settings/);
-  assert.match(card(html, "CLEAN"), /A cleaned file is not a promise about how another CRM will read it\./);
+  // the publication's version is not printed on the cards (owner, 2026-10-21; amendment R2-3)
+  for (const name of SERVICES) assert.doesNotMatch(card(html, name), /Publication version|available since/);
+  assert.match(card(html, "Clean your data"), /Kauro qualifies imports only for HubSpot and Salesforce\./);
+  assert.match(card(html, "Prepare for HubSpot"), /marketing-contact status and paid enrichment stay switched off/);
+  assert.match(card(html, "Prepare for Salesforce"), /does not deploy fields, validation rules, automations or external identifier settings/);
+  assert.match(card(html, "Clean your data"), /A cleaned file is not a promise about how another CRM will read it\./);
+  for (const name of SERVICES) assert.match(card(html, name), /Destination .* You receive /, `${name}: the same rows in the same order`);
+  // owner's section review (2026-10-21): what a service delivers is three short points; the sample delivery is offered once, under the
+  // cards beside pricing (it is one HubSpot project), and the section's heading asks the choice instead of repeating the H1
+  const markup = (name: string): string => [...html.matchAll(/<article[^>]*>[\s\S]*?<\/article>/g)].map((match) => match[0]).find((article) => headings(article)[0]?.text === name) ?? "";
+  for (const name of SERVICES) assert.equal(count(markup(name), "<li>"), 3, `${name}: three points`);
+  for (const name of SERVICES) assert.ok(!hrefsOf(markup(name)).includes(ROUTE.sample), `${name}: no sample link on the card`);
+  assert.equal(hrefsOf(html.slice(html.indexOf('class="kauro-r2-services-after"'))).filter((href) => href === ROUTE.sample).length >= 1, true);
+  assert.ok(headings(html).some((heading) => heading.level === 2 && heading.text === "Choose by where the data goes"));
   assert.doesNotMatch(textOf(html), /compatible|works with any/i, "no compatibility claim");
+  assert.doesNotMatch(textOf(html), /USD \d/, "prices stay on Pricing: each figure once on the site");
 });
 
-test("Supported services: a service the publication does not list is not offered, and CLEAN names as qualified only the destinations it lists", () => {
+test("Supported services: a service the publication does not list is not offered, and Clean your data names as qualified only the destinations it lists", () => {
   const partial = page("services").html(publication(entry("CLEAN"), entry("HUBSPOT", "AVAILABLE_LIMITED")));
-  assert.match(card(partial, "HubSpot"), /Available for new projects, within the published limits/);
-  assert.match(card(partial, "Salesforce"), /Not available for purchase/);
-  assert.doesNotMatch(card(partial, "Salesforce"), /Data Loader|Publication version/, "a closed service is not described as if it were open");
-  assert.match(card(partial, "CLEAN"), /Kauro qualifies imports only for HubSpot\./);
-  assert.doesNotMatch(card(partial, "CLEAN"), /Salesforce/);
+  assert.match(card(partial, "Prepare for HubSpot"), /Available for new projects, within the published limits/);
+  assert.match(card(partial, "Prepare for Salesforce"), /Not available for purchase/);
+  assert.doesNotMatch(card(partial, "Prepare for Salesforce"), /Data Loader|Publication version/, "a closed service is not described as if it were open");
+  assert.match(card(partial, "Clean your data"), /Kauro qualifies imports only for HubSpot\./);
+  assert.doesNotMatch(card(partial, "Clean your data"), /Salesforce/);
   const clean = page("services").html(CLEAN_ONLY);
-  assert.match(card(clean, "CLEAN"), /does not qualify an import for any destination right now/);
-  assert.match(card(clean, "HubSpot"), /Not available for purchase/);
+  assert.match(card(clean, "Clean your data"), /does not qualify an import for any destination right now/);
+  assert.match(card(clean, "Prepare for HubSpot"), /Not available for purchase/);
   const none = page("services").html(NOTHING);
-  for (const name of ["CLEAN", "HubSpot", "Salesforce"]) assert.match(card(none, name), /Not available for purchase/);
+  for (const name of SERVICES) assert.match(card(none, name), /Not available for purchase/);
   assert.match(textOf(none), /lists no service as available for new projects right now/);
   assert.match(textOf(none), /There is nothing to buy right now\./);
 });
@@ -330,35 +356,59 @@ test("Supported services: a publication that cannot be read shows no service as 
   const html = page("services").html(UNAVAILABLE);
   const text = textOf(html);
   assert.match(text, /The capability publication cannot be read right now, so no service is shown as available\./);
-  for (const name of ["CLEAN", "HubSpot", "Salesforce"]) {
+  for (const name of SERVICES) {
     assert.match(card(html, name), /Availability cannot be read right now/);
     assert.doesNotMatch(card(html, name), /Available for new projects|Publication version/);
   }
-  assert.match(card(html, "CLEAN"), /Which imports Kauro qualifies is shown here when the capability publication can be read\./);
-  assert.doesNotMatch(card(html, "CLEAN"), /HubSpot|Salesforce/);
+  assert.match(card(html, "Clean your data"), /Which imports Kauro qualifies is shown here when the capability publication can be read\./);
+  assert.doesNotMatch(card(html, "Clean your data"), /HubSpot|Salesforce/);
   assert.doesNotMatch(text, /Read from the capability publication at/, "no observation time is invented");
 });
 
-test("Supported services: the scope, the exclusions and the limits of a project, with the limits taken from the policy", () => {
-  const text = textOf(page("services").html(ALL));
-  for (const claim of ["contacts, organisations or accounts, and deals or opportunities", "Lead conversion, custom objects, activities, attachments, engagement history, campaign memberships, owner setup and automations are not included", "CSV and spreadsheet (XLSX) files", "Up to 50 files in one set, and up to 2 GB for each file", "Up to 5 GB for the whole set of files, and up to 800 columns in a table", "Up to 500,000 billable source units in one project at launch", "ask in writing"]) assert.ok(text.includes(claim), claim);
-  assert.ok(hrefsOf(page("services").html(ALL)).includes(ROUTE.contact));
+test("Supported services: the scope, the exclusions and the limits of a project as one table, with the limits taken from the policy", () => {
+  const html = page("services").html(ALL);
+  const text = textOf(html);
+  assert.ok(text.includes("ask in writing"));
+  // what is in scope: two lists of short items, the same for all three services (owner's section review, 2026-10-21)
+  const scope = /<section id="services-scope"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+  const items = (side: string): string[] => [...(new RegExp(`kauro-r2-pair-item--${side}"[\\s\\S]*?<\\/ul>`).exec(scope)?.[0] ?? "").matchAll(/<li>([^<]*)<\/li>/g)].map((match) => match[1] ?? "");
+  assert.deepEqual(items("in"), ["Contacts", "Organisations or accounts", "Deals or opportunities", "The associations each destination supports"]);
+  assert.deepEqual(items("out"), ["Lead conversion", "Custom objects", "Activities and engagement history", "Attachments", "Campaign memberships", "Owner setup", "Automations"]);
+  const table = /<table[\s\S]*?<\/table>/.exec(html)?.[0] ?? "";
+  const rows = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((match) => [...(match[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? "")));
+  assert.deepEqual(rows, [
+    ["Each file or worksheet"],
+    ["Format", "CSV or XLSX"],
+    ["Structure", "One object, one header row"],
+    ["Size", "2 GB"],
+    ["Columns", "800"],
+    ["Each set of files"],
+    ["Files", "50"],
+    ["Total size", "5 GB"],
+    ["Each project"],
+    ["Billable source units", "500,000"],
+  ]);
+  assert.doesNotMatch(html, /kauro-site-specs--plate|kauro-site-figure/, "no plates and no display figures inside sentences");
+  assert.ok(hrefsOf(html).includes(ROUTE.contact));
 });
 
 // ---- Pricing --------------------------------------------------------------------------------------------------------------------------
 
-test("Pricing: the ladder is the policy's bands, with the first three bands priced and the fourth marked not offered and unpriced", () => {
+test("Pricing: one table of the policy's bands, the first three priced and the fourth marked not offered and unpriced; each price appears once", () => {
   const html = page("pricing").html(ALL);
   const table = /<table[\s\S]*?<\/table>/.exec(html)?.[0] ?? "";
   const rows = [...table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((match) => [...(match[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? "")));
   assert.deepEqual(rows, [
-    ["Billable source units", "CLEAN", "HubSpot", "Salesforce"],
-    ["Up to 50,000", "USD 695", "USD 1,295", "USD 1,495"],
-    ["50,001 to 150,000", "USD 1,095", "USD 1,995", "USD 2,295"],
-    ["150,001 to 500,000", "USD 1,795", "USD 2,995", "USD 3,495"],
+    ["Billable source units", "Prepare for HubSpot", "Prepare for Salesforce", "Clean your data"],
+    ["Up to 50,000", "1,295", "1,495", "695"],
+    ["50,001 to 150,000", "1,995", "2,295", "1,095"],
+    ["150,001 to 500,000", "2,995", "3,495", "1,795"],
     ["500,001 to 1,000,000", "Not offered yet", "Not offered yet", "Not offered yet"],
   ]);
+  assert.match(textOf(table), /Indicative price per project, in US dollars, before tax/);
   assert.match(textOf(html), /Prices are in US dollars and before tax\. A band that is not offered yet carries no price\./);
+  for (const price of ["695", "1,495", "2,295", "1,095", "3,495", "1,795"]) assert.equal(count(textOf(html), `USD ${price}`), 0, `${price} is shown in the table only`);
+  assert.doesNotMatch(html, /kauro-site-ladder|kauro-site-rung/, "the card ladder that repeated each price is gone");
 });
 
 test("Pricing: every price is an indicative band until the server quotes, tax is on the quote, and the free check obliges nothing", () => {
@@ -367,63 +417,57 @@ test("Pricing: every price is an indicative band until the server quotes, tax is
     "Every price on this page is an indicative band. The price you pay is the quote Kauro issues from the exact count in your sealed files, and an estimate reserves nothing.",
     "An estimate on this page is not a quote. A binding quote is issued from your sealed files, stays valid for 14 days, and shows the band, any discount, taxes, the total and the currency.",
     "Prices are before tax. Any tax that applies is shown on your quote before you pay.",
-    "Free. It measures your files before you decide, and creates no obligation to buy.",
-    "From USD 695 for up to 50,000 billable source units.",
-    "From USD 1,295 for up to 50,000 billable source units.",
-    "From USD 1,495 for up to 50,000 billable source units.",
-    "5%, 10% and 15% off a new quote for a customer that has bought before.",
+    "The check is free and creates no obligation to buy.",
+    "the quote may carry a repeat discount: 5%, 10% or 15%.",
+    "50,000 units for Prepare for HubSpot is USD 1,295; 50,001 units is USD 1,995.",
     "The unit is a billable source unit",
     "counted before any duplicates are unified",
     "Splitting a file into several files does not lower the count",
+    "Connecting to or writing into your CRM",
   ]) assert.ok(text.includes(claim), claim);
   assert.doesNotMatch(text, /\b(save|saving|savings|discount of|% off your project)\b/i, "no savings claim, only the repeat discount on a new quote");
 });
 
-test("Pricing: the company sentence says a company buys at the same prices and discounts, and the repeat discounts are the policy's tiers over its lookback window", () => {
+test("Pricing: the company sentence says a company buys at the same prices and discounts, and the repeat discounts are the policy's tiers over its lookback window, once", () => {
   const html = page("pricing").html(ALL);
   const text = textOf(html);
   assert.equal(count(text, "Companies preparing their own CRM data can buy Kauro directly, at the same prices and discounts as agencies."), 1);
-  const table = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((match) => match[0])[1] ?? "";
-  const rows = [...table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((match) => [...(match[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? "")));
+  const tables = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((match) => match[0]);
+  assert.equal(tables.length, 2, "the price table and the repeat table, and no second discount section");
+  const rows = [...(tables[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((match) => [...(match[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? "")));
   assert.deepEqual(rows, [["Qualifying projects", "Discount on the new quote"], ["1 to 9 projects", "5%"], ["10 to 24 projects", "10%"], ["25 or more projects", "15%"]]);
-  assert.match(textOf(table), /Repeat discount by qualifying projects in the preceding 365 days/);
+  assert.match(textOf(tables[1] ?? ""), /Repeat discount by qualifying projects in the preceding 365 days/);
   assert.match(text, /does not stack with another discount/);
   assert.match(text, /approvals are never reused/);
 });
 
-test("Pricing: the mode cards say whether each service can be bought now, and only from the publication", () => {
-  const stateOf = (read: Publication, name: string): string => {
-    const found = [...page("pricing").html(read).matchAll(/<li[^>]*>[\s\S]*?<\/li>/g)].map((match) => match[0]).find((item) => headings(item)[0]?.text === name);
-    assert.ok(found !== undefined, name);
-    return textOf(found);
-  };
-  assert.match(stateOf(ALL, "CLEAN"), /Available for new projects/);
-  assert.match(stateOf(CLEAN_ONLY, "HubSpot preparation"), /Not available for purchase/);
-  assert.match(stateOf(UNAVAILABLE, "Salesforce preparation"), /Availability cannot be read right now/);
-  assert.doesNotMatch(stateOf(UNAVAILABLE, "CLEAN"), /Available for new projects/);
-});
-
-test("Pricing: the estimator is a labelled form, the account link goes to sign-in, and a visitor without JavaScript is told what to read instead", () => {
+test("Pricing: the estimator comes first, offers each service with none chosen for the visitor, and says which services can be bought now only from the publication", () => {
   const html = page("pricing").html(ALL);
+  const text = textOf(html);
+  assert.ok(text.indexOf("Estimate a band") < text.indexOf("Prices by band"), "the estimator is above the prices");
   assert.match(html, /<label[^>]*for="[^"]+"[^>]*>Billable source units<\/label>/);
-  assert.match(html, /<label[^>]*for="[^"]+"[^>]*>Service<\/label>/);
+  assert.match(html, /<legend>Service<\/legend>/);
+  const radios = [...html.matchAll(/<input[^>]*type="radio"[^>]*value="([^"]*)"[^>]*>/g)];
+  assert.deepEqual(radios.map((match) => match[1]), ["HUBSPOT", "SALESFORCE", "CLEAN"]);
+  assert.equal(radios.some((match) => /\schecked/.test(match[0])), false, "no service is chosen for the visitor");
   assert.match(html, /<button[^>]*type="submit"[^>]*>Show the indicative band<\/button>/);
   assert.match(html, /role="status"/);
-  assert.match(textOf(html), /Enter a number to see the indicative band\./);
-  assert.match(html, /<noscript>[\s\S]*The estimate needs JavaScript\. The table above shows every band and price\.[\s\S]*<\/noscript>/);
+  assert.match(text, /Enter a number to see the indicative band\./);
+  assert.match(html, /<noscript>[\s\S]*The estimate needs JavaScript\. The table below shows every band and price\.[\s\S]*<\/noscript>/);
   const account = linkTexts(html).filter((link) => link.text === "Sign in or create an account");
   assert.deepEqual(account.map((link) => link.href), [SIGN_IN]);
-  assert.deepEqual([...html.matchAll(/<option[^>]*value="([^"]*)"/g)].map((match) => match[1]), ["CLEAN", "HUBSPOT", "SALESFORCE"]);
+  assert.deepEqual([...new Set(linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary")).map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`]);
 });
 
 // ---- Sample delivery ------------------------------------------------------------------------------------------------------------------
 
-test("Sample delivery: it says at the top that everything is invented, and its numbers reconcile in the markup a visitor reads", () => {
+test("Sample delivery: it says at the top that everything is invented, names the package, and its numbers reconcile in the markup a visitor reads", () => {
   const html = page("sample").html(ALL);
   const text = textOf(html);
   assert.ok(text.indexOf("Synthetic sample data") < text.indexOf("Sample report"), "the label comes before the report");
   assert.match(text, /Everything on this page is invented\. No customer, logo, quote or import shown here is real, and none of this data was ever imported anywhere\./);
   assert.match(text, /The report of a free data health check on one invented file of 12,480 contacts\./);
+  for (const name of ["The report", "The cleaned files", "The manifest", "The import instructions"]) assert.ok(text.includes(name), name);
   const tables = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((match) => [...match[0].matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((row) => [...(row[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? ""))));
   assert.deepEqual(tables[0], [
     ["Measure", "Count", "Out of", "Share"],
@@ -433,7 +477,7 @@ test("Sample delivery: it says at the top that everything is invented, and its n
     ["Contacts with no company", "1,137", "12,480 contacts", "9.1%"],
     ["Target settings to fix before an import", "3", "Not applicable", "Not applicable"],
   ]);
-  assert.deepEqual(tables[1], [
+  assert.deepEqual(tables[2], [
     ["Output file", "Rows", "Source rows", "Unified with approval"],
     ["contacts-clean.csv", "12,266", "12,480", "214"],
     ["companies-clean.csv", "2,951", "3,204", "253"],
@@ -446,12 +490,27 @@ test("Sample delivery: it says at the top that everything is invented, and its n
   assert.doesNotMatch(text, /@|https?:\/\//, "an invented sample carries no address");
 });
 
+test("Sample delivery: the duplicate counts keep candidate groups, approved unifications and unified rows apart", () => {
+  const text = textOf(page("sample").html(ALL));
+  const { pairs, triples, pairsKeptApart } = SAMPLE_GROUPS;
+  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
+  assert.ok(contacts !== undefined);
+  for (const fact of [
+    `${formatCount(pairs + triples)} groups holding ${formatCount(pairs * 2 + triples * 3)} contacts`,
+    `${formatCount(pairs + triples - pairsKeptApart)} of ${formatCount(pairs + triples)} groups`,
+    `kept ${formatCount(pairsKeptApart)} groups apart`,
+    `${formatCount(contacts.source)} source rows become ${formatCount(contacts.rows)} delivered rows`,
+  ])
+    assert.ok(text.includes(fact), fact);
+});
+
 // ---- Data handling --------------------------------------------------------------------------------------------------------------------
 
-test("Data handling: what is processed, isolation, what a model sees, who decides, the full retention schedule and what deletion does not cover", () => {
+test("Data handling: the answers first, then what is processed, isolation, what a model sees, who decides, the full retention schedule and what deletion does not cover", () => {
   const html = page("security").html(ALL);
   const text = textOf(html);
   assert.deepEqual(headings(html).filter((heading) => heading.level === 2).map((heading) => heading.text), [
+    "What happens to a file",
     "What Kauro processes",
     "How customers are kept apart",
     "What a model may see",
@@ -461,6 +520,9 @@ test("Data handling: what is processed, isolation, what a model sees, who decide
     "What this page does not claim",
     "Read the terms or ask a question",
   ]);
+  // the head answers before any section: both windows of each retention, never one "at most"
+  const head = text.slice(0, text.indexOf("What happens to a file"));
+  for (const fact of ["None. Kauro works on exported files only.", "Removed 7 days after the check is ready, and no later than 14 days after the files were sealed.", "Removed 7 days after the first package is ready, and no later than 14 days after payment is confirmed.", "None claimed."]) assert.ok(head.includes(fact), fact);
   const table = /<table[\s\S]*?<\/table>/.exec(html)?.[0] ?? "";
   assert.equal(count(table, "<tr>"), RETENTION_ROWS.length + 1);
   for (const row of RETENTION_ROWS) {
@@ -480,13 +542,16 @@ test("Data handling: what is processed, isolation, what a model sees, who decide
     "does not guarantee that you meet any regulation",
   ]) assert.ok(text.includes(claim), claim);
   for (const route of [ROUTE.processing, ROUTE.privacy, ROUTE.contact]) assert.ok(hrefsOf(html).includes(route), route);
+  assert.equal(linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary")).length, 1, "one filled button: ask a security question");
 });
 
 // ---- Contact --------------------------------------------------------------------------------------------------------------------------
 
-test("Contact: a labelled fit form with the buyer-type question, the api's vocabularies, no file field, and no way to submit without a script", () => {
+test("Contact: it names the free check the call to action promised, and holds a labelled fit form with the buyer-type question, the api's vocabularies, no file field, and no way to submit without a script", () => {
   const html = page("contact").html(ALL);
   const text = textOf(html);
+  assert.equal(headings(html)[0]?.text, `${HEALTH_CHECK_CTA}.`, "the page the call to action opens is headed by that call to action");
+  assert.match(text, /Questions about scope or data handling come through this form too./);
   assert.match(html, /<form[^>]*\smethod="post"/, "an unscripted submit is a POST, never a GET that would put an address in a link");
   assert.doesNotMatch(html, /<form[^>]*\saction=/);
   assert.match(html, /<form[^>]*\snovalidate/i);
@@ -512,20 +577,21 @@ test("Contact: a labelled fit form with the buyer-type question, the api's vocab
   assert.match(text, /Describe the task, not the data: no credentials, keys or customer records\./);
   assert.match(text, /Do not attach CRM exports, and do not paste records, passwords or keys into any field\./);
   assert.match(text, /Up to 2000 characters/);
-  assert.match(text, /All fields are required except the last one\./);
+  assert.match(text, /Anything we should know\? \(optional\)/, "the one optional field says so at the field");
+  assert.match(text, /It tells us whether the project fits the published limits\./);
   assert.doesNotMatch(html, /aria-invalid="true"|kauro-error-summary/, "a form nobody has filled in shows no error");
 });
 
 // ---- Service status -------------------------------------------------------------------------------------------------------------------
 
-test("Service status: the published services, or an honest unavailable state that claims neither running nor down", () => {
+test("Service status: the published services as rows of state, or an honest unavailable state that claims neither running nor down", () => {
   const read = textOf(page("status").html(ALL));
   // the read time is not shown (owner review, Order 10)
   assert.doesNotMatch(read, /Observed at/);
-  assert.match(read, /CLEAN.*Available for new projects.*HubSpot.*Available for new projects.*Salesforce.*Available for new projects/);
+  assert.match(read, /Prepare for HubSpot Available for new projects Prepare for Salesforce Available for new projects Clean your data Available for new projects/);
   assert.match(read, /No incident summary is published on this page yet\. That is not a statement that none is open\./);
   const limited = textOf(page("status").html(publication(entry("CLEAN", "AVAILABLE_LIMITED"))));
-  assert.match(limited, /CLEAN.*Available for new projects, within the published limits/);
+  assert.match(limited, /Clean your data Available for new projects, within the published limits/);
   assert.doesNotMatch(limited, /HubSpot|Salesforce/, "a service the publication does not list is not on the status page");
   const none = textOf(page("status").html(NOTHING));
   assert.match(none, /lists no service as available for new projects right now/);
@@ -533,8 +599,9 @@ test("Service status: the published services, or an honest unavailable state tha
   const unread = textOf(html);
   assert.match(unread, /Status cannot be shown/);
   assert.match(unread, /Kauro could not read its own service publication just now, so it shows no status\./);
-  for (const banned of [/all systems/i, /operational/i, /Available for new projects/, /Observed at/, /No incident summary/, /CLEAN|HubSpot|Salesforce/]) assert.doesNotMatch(unread, banned, String(banned));
+  for (const banned of [/all systems/i, /operational/i, /Available for new projects/, /Observed at/, /No incident summary/, /Clean your data|HubSpot|Salesforce/]) assert.doesNotMatch(unread, banned, String(banned));
   assert.ok(hrefsOf(html).includes(ROUTE.contact));
+  assert.deepEqual(headings(page("status").html(ALL)).filter((heading) => heading.level === 2).map((heading) => heading.text), ["Services open for new projects", "Incidents and help"]);
 });
 
 // ---- Help -----------------------------------------------------------------------------------------------------------------------------
@@ -546,8 +613,16 @@ test("Help: an index of seven static guides that link to their sections, each wi
   const targets = hrefsOf(index);
   assert.deepEqual(targets, ["#guide-files", "#guide-target", "#guide-approval", "#guide-payment", "#guide-stages", "#guide-retention", "#guide-support"]);
   assert.deepEqual(headings(html).filter((heading) => heading.level === 2).map((heading) => heading.text), ["Prepare your files", "Confirm your target settings", "Approve the plan", "Pay for a project", "Import in stages and return receipts", "How long files stay", "Ask for help"]);
-  assert.match(text, /Guide version 1\.3, last changed 2026-10-20/);
-  for (const claim of ["up to 50 files in one set, up to 2 GB for each file and 5 GB for the whole set, up to 800 columns in a table, and up to 500,000 billable source units in one project at launch", "180 days after the last confirmation", "The quote stays valid for 14 days", "Pressing Enter never approves anything", "An arbitrary file marked as a success is not proof", "Never email a CRM export or a password"]) assert.ok(text.includes(claim), claim);
+  assert.match(text, /Guide version 1\.4, last changed 2026-10-21/);
+  for (const claim of [
+    "up to 50 files in one set, up to 2 GB for each file and 5 GB for the whole set, up to 800 columns in a table, and up to 500,000 billable source units in one project at launch",
+    "180 days after the last confirmation",
+    "The quote stays valid for 14 days",
+    "Pressing Enter never approves anything",
+    "An arbitrary file marked as a success is not proof",
+    "Never email a CRM export or a password",
+    "stay available for 7 days after it is ready, and are removed no later than 14 days after the files were sealed",
+  ]) assert.ok(text.includes(claim), claim);
   assert.ok(hrefsOf(html).includes(ROUTE.contact));
   assert.doesNotMatch(html, /<form|<input|<button|type="search"/, "search is not offered yet");
 });
@@ -605,7 +680,7 @@ function walk(directory: string): string[] {
 
 test("the frame: the skip link is first, one header, one main, one footer, two named navigations, the current page marked once, and a sign-in link", () => {
   const frame = (current: string | null): string =>
-    render(createElement(SiteFrame, { signInHref: SIGN_IN, nav: createElement(NavList, { items: MAIN_NAV, current, label: "site.nav.main.label" }), children: createElement("p", null, "Body") }));
+    render(createElement(SiteFrame, { signInHref: SIGN_IN, nav: createElement(NavList, { items: HEADER_NAV, current, label: "site.nav.main.label" }), children: createElement("p", null, "Body") }));
   const html = frame("/pricing");
   assert.match(html, /^<a class="kauro-site-skip" href="#kauro-main">Skip to main content<\/a>/);
   assert.equal(count(html, "<header"), 1);
@@ -617,7 +692,7 @@ test("the frame: the skip link is first, one header, one main, one footer, two n
   assert.match(html, /<a[^>]*href="\/pricing"[^>]*aria-current="page"[^>]*>Pricing<\/a>|<a[^>]*aria-current="page"[^>]*href="\/pricing"[^>]*>Pricing<\/a>/);
   assert.equal(count(frame(null), 'aria-current="page"'), 0);
   assert.equal(count(frame("/unsubscribe/anything"), 'aria-current="page"'), 0, "a page outside the navigation marks nothing");
-  assert.deepEqual(linkTexts(html).map((link) => link.text), ["Skip to main content", "Kauro", ...MAIN_NAV.map((item) => textOf(PUBLIC_COPY[item.label])), "Sign in", ...FOOTER_NAV.map((item) => PUBLIC_COPY[item.label])]);
+  assert.deepEqual(linkTexts(html).map((link) => link.text), ["Skip to main content", "Kauro", ...HEADER_NAV.map((item) => textOf(PUBLIC_COPY[item.label])), "Sign in", ...FOOTER_NAV.map((item) => PUBLIC_COPY[item.label])]);
   assert.deepEqual(linkTexts(html).filter((link) => link.text === "Sign in").map((link) => link.href), [SIGN_IN]);
   assert.match(textOf(html), /Kauro prepares exported CRM files\. It does not connect to, change or delete records in a live CRM\./);
   assert.doesNotMatch(html, /<html|<body|<head[ >]/, "the frame renders inside the document the root layout draws");

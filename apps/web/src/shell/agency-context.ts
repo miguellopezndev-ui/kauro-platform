@@ -9,24 +9,43 @@
 //     cannot vouch for.
 //   - A re-confirmation of the same session (the tab came back) refreshes the context without blanking it: a refusal ends it (the person
 //     may have lost access while away), a lost answer keeps what was confirmed, exactly as the session runtime treats its own re-read.
-import type { AgencyView, GetAgencyReply } from "../api/generated.ts";
+import type { AgencyMembershipView, AgencyView, GetAgencyReply, ListAgenciesReply } from "../api/generated.ts";
 import type { ApiAnswer } from "../client/answer.ts";
 import type { SessionPhase } from "../client/session.ts";
 
 export type AgencyState = AgencyView["state"];
+export type MembershipRole = AgencyMembershipView["role"];
 
 export type AgencyContext =
   | { readonly kind: "NONE" }
   | { readonly kind: "LOADING" }
   | { readonly kind: "UNAVAILABLE" }
-  | { readonly kind: "READY"; readonly agencyId: string; readonly displayName: string; readonly state: AgencyState };
+  | {
+      readonly kind: "READY";
+      readonly agencyId: string;
+      readonly displayName: string;
+      readonly state: AgencyState;
+      /** The person's role in this agency, from their own active membership (Order 11 round 2: the account button names it); null when unknown. */
+      readonly role: MembershipRole | null;
+    };
 
 /** What one api answer means for the agency the URL names. Anything but a reply for exactly that agency is unavailable. */
-export function agencyContextOf(agencyId: string, answer: ApiAnswer<GetAgencyReply>): AgencyContext {
+export function agencyContextOf(agencyId: string, answer: ApiAnswer<GetAgencyReply>, role: MembershipRole | null = null): AgencyContext {
   if (answer.kind !== "REPLY") return { kind: "UNAVAILABLE" };
   const view = answer.body.data;
   if (view.agencyId !== agencyId) return { kind: "UNAVAILABLE" };
-  return { kind: "READY", agencyId: view.agencyId, displayName: view.displayName, state: view.state };
+  return { kind: "READY", agencyId: view.agencyId, displayName: view.displayName, state: view.state, role };
+}
+
+/**
+ * The person's role in one agency, from the list of their own memberships: only an active membership of exactly that agency names a role.
+ * Anything else (no answer, a refusal, an agency on a later page) is "unknown", and unknown shows no role: it never decides access, which
+ * stays with the api's permitted actions.
+ */
+export function roleOf(agencyId: string, answer: ApiAnswer<ListAgenciesReply> | null): MembershipRole | null {
+  if (answer === null || answer.kind !== "REPLY") return null;
+  const mine = answer.body.data.items.find((item) => item.agencyId === agencyId && item.membershipState === "ACTIVE");
+  return mine?.role ?? null;
 }
 
 export interface AgencyContextDeps {
@@ -34,6 +53,8 @@ export interface AgencyContextDeps {
   readonly agencyId: string | null;
   /** GetAgency for that agency under the session; the signal ends the read when the session it belongs to no longer stands. */
   readonly read: (agencyId: string, signal: AbortSignal) => Promise<ApiAnswer<GetAgencyReply>>;
+  /** ListAgencies under the session (the person's own memberships), read beside GetAgency for the role; absent, no role is shown. */
+  readonly readMemberships?: (signal: AbortSignal) => Promise<ApiAnswer<ListAgenciesReply>>;
 }
 
 /** The two things the context needs of a session runtime. */
@@ -45,7 +66,7 @@ export interface SessionSource {
 function same(left: AgencyContext, right: AgencyContext): boolean {
   if (left.kind !== right.kind) return false;
   if (left.kind !== "READY" || right.kind !== "READY") return true;
-  return left.agencyId === right.agencyId && left.displayName === right.displayName && left.state === right.state;
+  return left.agencyId === right.agencyId && left.displayName === right.displayName && left.state === right.state && left.role === right.role;
 }
 
 export class AgencyContextRuntime {
@@ -115,16 +136,28 @@ export class AgencyContextRuntime {
   }
 
   async #read(agencyId: string, controller: AbortController, generation: number, mode: "FIRST" | "REFRESH"): Promise<void> {
+    const memberships = this.#deps.readMemberships;
+    // the role is asked beside the agency, never before it: the agency's answer alone decides what the page may show
+    let pending: Promise<ApiAnswer<GetAgencyReply>>;
+    try {
+      pending = this.#deps.read(agencyId, controller.signal);
+    } catch {
+      pending = Promise.resolve({ kind: "NO_ANSWER", reason: "UNREADABLE", status: null });
+    }
+    const role = memberships === undefined ? null : memberships(controller.signal).catch((): ApiAnswer<ListAgenciesReply> => ({ kind: "NO_ANSWER", reason: "UNREADABLE", status: null }));
     let answer: ApiAnswer<GetAgencyReply>;
     try {
-      answer = await this.#deps.read(agencyId, controller.signal);
+      answer = await pending;
     } catch {
       answer = { kind: "NO_ANSWER", reason: "UNREADABLE", status: null };
     }
+    const mine = role === null ? null : await role;
     if (generation !== this.#generation) return;
     this.#controller = null;
     if (mode === "REFRESH" && answer.kind === "NO_ANSWER") return;
-    this.#set(agencyContextOf(agencyId, answer));
+    // a lost answer about the role keeps the role already confirmed, as a lost answer about the agency keeps the agency
+    const previous = this.#context.kind === "READY" && this.#context.agencyId === agencyId ? this.#context.role : null;
+    this.#set(agencyContextOf(agencyId, answer, mine !== null && mine.kind === "NO_ANSWER" ? previous : roleOf(agencyId, mine)));
   }
 
   #set(next: AgencyContext): void {

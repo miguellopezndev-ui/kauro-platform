@@ -25,6 +25,7 @@ const props = (overrides: Partial<Parameters<typeof QuoteDetails>[0]> = {}) => (
   onCreate: noop,
   creating: false,
   termsHref: "/legal/terms",
+  planHref: "/agencies/a/projects/p/plan/approval",
   reuploadHref: "/agencies/a/projects/p/sources",
   ...overrides,
 });
@@ -40,8 +41,9 @@ test("fixtures: the quote and the order are valid against the generated schemas 
 
 test("UI23: the quote shows base, one discount, service, tax, total, units, terms and both expiries, with money from minor units and the exact registry sentence", () => {
   const html = render({ quote: quote({ discount: { bps: 1000, basis: "REPEAT" }, discountCents: "15000", serviceCents: "135000", taxCents: "0", totalCents: "135000" }) });
-  assert.ok(html.includes("Review price, scope and availability."));
-  for (const text of ["USD 1,500.00", "USD 1,350.00", "1200", "Repeat-project discount, 10 percent.", "Prepare for HubSpot", "Price valid until", "Source files kept until", "Read the service terms"]) assert.ok(html.includes(text), text);
+  // round 2: the registry sentence is the page header's lead; the view does not repeat it
+  assert.ok(!html.includes("Review price, scope and availability."));
+  for (const text of ["USD 1,500.00", "USD 1,350.00", "1,200", "Repeat-project discount (10%)", "Prepare for HubSpot", "Price valid until", "Source files kept until", "Read the service terms"]) assert.ok(html.includes(text), text);
   assert.match(html, /dateTime="2026-10-20T12:00:00.000Z"/);
   assert.match(html, /dateTime="2026-10-27T12:00:00.000Z"/);
 });
@@ -149,6 +151,9 @@ const detailsProps = (over: Partial<Parameters<typeof PaymentDetails>[0]> = {}) 
   onRefresh: noop,
   refreshing: false,
   hrefs: { CONTACT_SUPPORT: "/agencies/a/support", REQUEST_NEW_QUOTE: "/agencies/a/projects/p/purchase", REQUEST_NEW_REVIEW: "/agencies/a/projects/p/audit" },
+  projectHref: "/agencies/a/projects/p",
+  preparationHref: "/agencies/a/projects/p/processing?order=o",
+  billingHref: "/agencies/a/billing?order=o",
   ...over,
 });
 const renderPayment = (over: Partial<Parameters<typeof PaymentDetails>[0]> = {}): string => renderToStaticMarkup(createElement(PaymentDetails, detailsProps(over)));
@@ -166,7 +171,6 @@ test("UI24: each payment status has its own text from paymentStatus alone, and p
     const html = renderPayment({ order: order(over) });
     assert.ok(html.includes(label), label);
     assert.equal(html.includes("Do not pay again"), repeat, label);
-    assert.ok(html.includes("Your status comes from verified payment information."));
     assert.ok(html.includes("is not payment"), "a return or screenshot is not payment");
   }
 });
@@ -220,4 +224,15 @@ test("UI24: the bank details are read for the order in the address under the act
   assert.equal(headers["X-Kauro-Agency"], AGENCY);
   assert.equal(headers["Idempotency-Key"], undefined);
   assert.equal(answer.kind, "REPLY");
+});
+
+test("UI23 (Order 11): the hint under a disabled pay button asks to accept the terms only when that is what is missing, and never invites a second payment", () => {
+  const hint = (html: string): string => /<p class="kauro-quote-hint">([^<]*)<\/p>/.exec(html)?.[1] ?? "";
+  assert.equal(hint(render()), "Accept the terms to continue.");
+  assert.equal(hint(render({ termsAccepted: true })), "", "open and accepted: no hint");
+  const paid = render({ quote: quote({ checkoutReady: false, checkoutBlockers: ["ALREADY_PAID"] }), termsAccepted: true });
+  assert.equal(hint(paid), "Payment is not available for this quote right now.");
+  assert.doesNotMatch(paid, /Resolve what is listed/);
+  const silent = render({ quote: quote({ checkoutReady: false, checkoutBlockers: [] }) });
+  assert.equal(hint(silent), "Payment is not available for this quote right now.", "a gate closed without a listed blocker does not ask for the terms");
 });

@@ -20,11 +20,11 @@ interface PageUnderTest {
 const PAGES: readonly PageUnderTest[] = [
   { route: "/", h1: "Prepare and verify CRM data from files.", reads: true },
   { route: "/how-it-works", h1: "From source files to a reviewed import package.", reads: false },
-  { route: "/supported-services", h1: "Check your files and target before you start.", reads: true },
+  { route: "/supported-services", h1: "Three services for your exported CRM files.", reads: true },
   { route: "/pricing", h1: "One scoped project, priced by source units.", reads: true },
   { route: "/sample-delivery", h1: "See a synthetic delivery package.", reads: false },
   { route: "/security", h1: "Know what is processed and when it is deleted.", reads: false },
-  { route: "/contact", h1: "Describe the task; keep CRM files out of this form.", reads: false },
+  { route: "/contact", h1: "Request a free data health check.", reads: false },
   { route: "/status", h1: "Current service availability.", reads: true },
   { route: "/help", h1: "Find the next step for your project.", reads: false },
   { route: "/unsubscribe/an-opaque-value-from-a-link", h1: "Stop optional messages.", reads: false },
@@ -162,7 +162,7 @@ for (const route of ["/sample-delivery", "/legal/terms"]) {
 test("the pages give the same reading twice in a row: the publication is read on every request, never cached", async ({ page }) => {
   api.publish([["CLEAN", "AVAILABLE"]]);
   await page.goto("/status");
-  await expect(page.locator("main")).toContainText("CLEAN");
+  await expect(page.locator("main")).toContainText("Clean your data");
   await expect(page.locator("main")).not.toContainText("HubSpot");
   api.publish([["CLEAN", "AVAILABLE"], ["HUBSPOT", "AVAILABLE"]]);
   await page.goto("/status");
@@ -218,58 +218,66 @@ test("navigation: on a short screen (a phone in landscape) every link of the ope
   await expect(page).toHaveURL(/\/contact$/);
 });
 
-test("theme preference without JavaScript: the native form stores the choice and returns to the page it came from (independent review R-110-4)", async ({ browser }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false, ignoreHTTPSErrors: true });
-  const page = await context.newPage();
-  await page.goto("/pricing");
-  const before = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  const answered = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
-  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
-  expect((await answered).status(), "the site's own form is not refused (Origin: null under no-referrer)").toBe(303);
-  await expect(page).toHaveURL(/\/pricing$/);
-  const after = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  expect(after === "light" || after === "dark", "the stored theme is drawn").toBe(true);
-  expect(after).not.toBe(before);
-  expect((await context.cookies()).some((cookie) => cookie.name === "kauro_theme")).toBe(true);
-  await context.close();
-});
-
-test("theme preference with JavaScript: the choice is drawn at once and is still there after a reload (it was stored, not only drawn)", async ({ page }) => {
-  await page.goto("/pricing");
-  await page.waitForFunction(() => {
-    const form = document.querySelector("form[action^='/preferences/theme']");
-    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
-  });
-  const stored = page.waitForResponse((response) => response.url().includes("/preferences/theme") && response.request().method() === "POST");
-  await page.locator("form[action^='/preferences/theme'] button[type='submit']").first().click();
-  expect((await stored).status(), "the background post is accepted").toBe(204);
-  const chosen = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
-  expect(chosen === "light" || chosen === "dark").toBe(true);
-  await page.reload();
-  expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe(chosen);
-});
-
-test("theme preference: the route stores a choice only for a page of this exact origin, scheme included (independent review R-110-3)", async ({ request, baseURL }) => {
-  const own = new URL(baseURL ?? "https://localhost:44300").origin;
-  const other = own.replace(/^https:/, "http:");
-  const post = (headers: Record<string, string>) => request.post("/preferences/theme", { headers, form: { theme: "dark" }, maxRedirects: 0 });
-  const same = await post({ origin: own, "x-kauro-theme": "1" });
-  expect(same.status()).toBe(204);
-  expect(same.headers()["set-cookie"] ?? "").toContain("kauro_theme=dark");
-  for (const headers of [{ origin: other }, { origin: other, "x-kauro-theme": "1" }, { origin: "null" }, { origin: own, "sec-fetch-site": "cross-site" }]) {
-    const refused = await post(headers);
-    expect(refused.status(), JSON.stringify(headers)).toBe(403);
-    expect(refused.headers()["set-cookie"], JSON.stringify(headers)).toBeUndefined();
+test("one theme (owner, 2026-10-21): every page is dark, offers no theme choice, and the old preference route is gone", async ({ page, request }) => {
+  for (const path of ["/", "/pricing", "/contact", "/legal/privacy"]) {
+    await page.goto(path);
+    expect(await page.evaluate(() => document.documentElement.hasAttribute("data-theme")), path).toBe(false);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), path).toBe("dark");
+    await expect(page.locator("form[action*='/preferences/']"), path).toHaveCount(0);
   }
+  const stored = await request.post("/preferences/theme", { form: { theme: "light" }, maxRedirects: 0 });
+  expect(stored.status()).toBe(404);
+  expect(stored.headers()["set-cookie"]).toBeUndefined();
+});
+
+test("How it works, the six stages: one open beside the timeline on a wide screen, none until tapped on a phone, previous and next move between them, a link opens its stage, and axe finds no violation", async ({ browser }) => {
+  const wide = await browser.newContext({ viewport: { width: 1280, height: 900 }, ignoreHTTPSErrors: true });
+  const desk = await wide.newPage();
+  await desk.goto("/how-it-works");
+  await desk.locator(".kauro-path[data-ready]").waitFor();
+  await expect(desk.locator(".kauro-path [aria-expanded='true']")).toHaveCount(1);
+  await expect(desk.locator("#stage-files-panel")).toBeVisible();
+  await desk.locator("#stage-decide-button").click();
+  await expect(desk.locator("#stage-decide-button")).toHaveAttribute("aria-expanded", "true");
+  await expect(desk.locator("#stage-files-panel")).toBeHidden();
+  await desk.locator("#stage-decide-button").click();
+  await expect(desk.locator("#stage-decide-panel"), "a wide screen always shows one stage").toBeVisible();
+  await desk.locator("#stage-decide-panel .kauro-path-turn-next").click();
+  await expect(desk.locator("#stage-quote-panel")).toBeVisible();
+  await expect(desk.locator("#stage-quote-button")).toBeFocused();
+  await assertAccessible(desk);
+  await desk.goto("/how-it-works#stage-prepare");
+  await desk.locator(".kauro-path[data-ready]").waitFor();
+  await expect(desk.locator("#stage-prepare-panel"), "a link to a stage opens it").toBeVisible();
+  await wide.close();
+
+  const narrow = await browser.newContext({ viewport: { width: 375, height: 812 }, ignoreHTTPSErrors: true });
+  const phone = await narrow.newPage();
+  await phone.goto("/how-it-works");
+  await phone.locator(".kauro-path[data-ready]").waitFor();
+  await expect(phone.locator(".kauro-path [aria-expanded='true']"), "a phone starts with the six closed").toHaveCount(0);
+  await expect(phone.locator(".kauro-path-panel:visible")).toHaveCount(0);
+  await phone.locator("#stage-check-button").click();
+  await expect(phone.locator("#stage-check-panel")).toBeVisible();
+  await phone.locator("#stage-check-button").click();
+  await expect(phone.locator("#stage-check-panel"), "a phone closes the open stage again").toBeHidden();
+  await phone.locator("#stage-check-button").click();
+  await phone.locator("#stage-check-panel .kauro-path-turn-next").click();
+  await expect(phone.locator("#stage-decide-panel")).toBeVisible();
+  await expect(phone.locator("#stage-check-panel")).toBeHidden();
+  await assertAccessible(phone);
+  await narrow.close();
 });
 
 test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
   await page.goto("/pricing");
-  // the main navigation is folded into the header's menu (amendment A10): open it, as a visitor does
-  await page.locator(".kauro-site-menu summary").click();
+  // on a wide screen the main pages are in the header's line and the menu is not drawn (Order 11 round 2): one "Main" navigation is visible
+  await expect(page.locator(".kauro-site-menu")).toBeHidden();
   const main = page.getByRole("navigation", { name: "Main" });
+  await expect(main).toHaveCount(1);
   await expect(main.locator('a[aria-current="page"]')).toHaveText("Pricing");
   await expect(main.locator('a[aria-current="page"]')).toHaveCount(1);
+  await expect(page.locator("header .kauro-site-header-cta")).toHaveAttribute("href", "/contact");
   const hrefs = await page.locator("header a, footer a").evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).getAttribute("href") ?? ""));
   expect(hrefs.length).toBeGreaterThan(8);
   for (const href of new Set(hrefs.filter((value) => value.startsWith("/") && value !== "/login"))) {
@@ -321,7 +329,8 @@ test("contact: an empty form sends nothing, moves focus to a summary that links 
   ] as const) {
     const control = page.locator(`#${field}`);
     await expect(control).toHaveAttribute("aria-invalid", "true");
-    await expect(control).toHaveAttribute("aria-describedby", `${field}-error`);
+    // a field with a hint keeps it, and its message is named last (the size question says why it is asked)
+    await expect(control).toHaveAttribute("aria-describedby", new RegExp(`^(?:\\S+ )?${field}-error$`));
     await expect(page.locator(`#${field}-error`)).toHaveText(message);
   }
   await expect(page.locator("#contact-buyer")).toHaveAttribute("aria-describedby", "contact-buyer-error");
@@ -450,7 +459,7 @@ test("no scripts: the fit form and the estimator each say they need scripts, in 
     await expect(page.locator("noscript > p")).toHaveText("This form needs JavaScript to send your inquiry.");
     await expect(page.locator("noscript > p")).toBeVisible();
     await page.goto("/pricing");
-    await expect(page.locator("noscript > p")).toHaveText("The estimate needs JavaScript. The table above shows every band and price.");
+    await expect(page.locator("noscript > p")).toHaveText("The estimate needs JavaScript. The table below shows every band and price.");
     await expect(page.locator("noscript > p")).toBeVisible();
   } finally {
     await context.close();
@@ -462,7 +471,7 @@ test("no scripts: the fit form and the estimator each say they need scripts, in 
 test("pricing: the estimator answers in a polite live region only when asked, in words a screen reader can read, and never as a quote", async ({ page }) => {
   await page.goto("/pricing");
   await page.waitForFunction(() => {
-    const form = document.querySelector("form.kauro-site-form");
+    const form = document.querySelector("form.kauro-r2-estimator");
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
   const result = page.locator("#estimate-result");
@@ -471,13 +480,16 @@ test("pricing: the estimator answers in a polite live region only when asked, in
   await page.getByLabel("Billable source units").fill("many");
   await expect(result, "typing announces nothing").toContainText("Enter a number to see the indicative band.");
   await page.getByRole("button", { name: "Show the indicative band" }).click();
+  await expect(result, "no service is chosen for the visitor").toContainText("Choose a service to see the indicative band.");
+  await page.getByLabel("Prepare for HubSpot").check();
+  await page.getByRole("button", { name: "Show the indicative band" }).click();
   await expect(result).toContainText("Enter a whole number of units, such as 42,000.");
   await page.getByLabel("Billable source units").fill("42,000");
   await page.getByRole("button", { name: "Show the indicative band" }).press("Enter");
-  await expect(result).toContainText(/Indicative band: .+ units, .+ for CLEAN\. This is an estimate and reserves nothing\./);
-  await page.getByLabel("Service").selectOption("HUBSPOT");
+  await expect(result).toContainText(/Indicative band for Prepare for HubSpot: .+ units, .+\. This is an estimate and reserves nothing\./);
+  await page.getByLabel("Clean your data").check();
   await page.getByRole("button", { name: "Show the indicative band" }).click();
-  await expect(result).toContainText(/for HubSpot/);
+  await expect(result).toContainText(/for Clean your data/);
   await assertAccessible(page);
 });
 
@@ -485,11 +497,11 @@ test("pricing: a service the publication does not list says it cannot be bought,
   api.publish([["CLEAN", "AVAILABLE"]]);
   await page.goto("/pricing");
   await page.waitForFunction(() => {
-    const form = document.querySelector("form.kauro-site-form");
+    const form = document.querySelector("form.kauro-r2-estimator");
     return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
   });
   await page.getByLabel("Billable source units").fill("42,000");
-  await page.getByLabel("Service").selectOption("SALESFORCE");
+  await page.getByLabel("Prepare for Salesforce").check();
   await page.getByRole("button", { name: "Show the indicative band" }).click();
   await expect(page.locator("#estimate-result")).toContainText("Salesforce is not available for purchase right now.");
 });
@@ -498,8 +510,8 @@ test("pricing: a service the publication does not list says it cannot be bought,
 
 // UI49 as B12 built it (L-ACT, "UI49 form" and "UI49 submit"): one explicit button posts the RFC 8058 one-click body to the api's opt-out
 // route. The unit tests hold the markup and the request contract; this case holds what only a browser shows: opening the link changes
-// nothing, the press sends once, each answer is said, and the essential notices stay apart, in both themes.
-test("unsubscribe (UI49): opening the link sends nothing and never shows the value; one explicit press sends the one-click body once; failure, limit and success are said; essential notices stay apart; accessible in both themes", async ({ page }) => {
+// nothing, the press sends once, each answer is said, and the essential notices stay apart, and the page is accessible.
+test("unsubscribe (UI49): opening the link sends nothing and never shows the value; one explicit press sends the one-click body once; failure, limit and success are said; essential notices stay apart; accessible", async ({ page }) => {
   const token = "abc123-not-a-real-token";
   const optOut = `/api/v1/public/outreach/opt-out/${token}`;
   const posts: Array<{ readonly method: string; readonly body: string; readonly type: string | undefined; readonly cookie: string | undefined }> = [];
@@ -511,15 +523,6 @@ test("unsubscribe (UI49): opening the link sends nothing and never shows the val
     await held;
     await route.fulfill({ status, contentType: "application/json", body: "{}" });
   });
-  const theme = async (name: "light" | "dark"): Promise<void> => {
-    await page.evaluate((value) => {
-      const root = document.documentElement;
-      root.setAttribute("data-theme-switching", "");
-      root.setAttribute("data-theme", value);
-      void getComputedStyle(root).color;
-      root.removeAttribute("data-theme-switching");
-    }, name);
-  };
 
   // opening the page (a GET, as a mail client's prefetch would) changes nothing
   const seen = watch(page);
@@ -540,9 +543,6 @@ test("unsubscribe (UI49): opening the link sends nothing and never shows the val
   await expect(essential).toContainText("this page never turns them off");
   await expect(essential.locator("form, button, input")).toHaveCount(0);
   await assertAccessible(page);
-  await theme("dark");
-  await assertAccessible(page);
-  await theme("light");
 
   // a failure is said and the press can be repeated; a limit says to wait
   await stop.click();
@@ -574,8 +574,6 @@ test("unsubscribe (UI49): opening the link sends nothing and never shows the val
   }
   await expect(page.locator("main form[method='post']")).toHaveCount(0);
   await expect(essential).toBeVisible();
-  await assertAccessible(page);
-  await theme("dark");
   await assertAccessible(page);
 });
 

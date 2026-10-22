@@ -1,11 +1,14 @@
-// UI25 Processing as markup. The five phases are listed separately (PhaseList: words and icons, never a bar or a percentage), with the
-// elapsed time and the moment of the last read; a worker report is labelled as a sign of life, not of progress. Pure markup: the container
-// owns the reads, the clock and the two commands.
+// UI25 Processing as markup. The five phases are listed separately (PhaseList: words and icons, never a bar or a percentage), named in the
+// customer's words (research agency-workspace.md section 5.14: "Queue, Startup, Execution, Verification, Publication" were the job engine's
+// words), with when the work was queued and when the page last read it. Round 2 removed the ticking elapsed time (a number that grows reads
+// as worry, not information), the delivery deadline (no policy states a preparation time, C-6) and the worker's heartbeat (internal); the
+// page says instead that nothing is needed and the person can leave. Cancelling is destructive, so it sits last and apart, with what it
+// does at this phase. Pure markup: the container owns the reads, the clock and the two commands.
 import { Banner, Button, Deadline, LinkButton, PhaseList, StatusBadge, type Phase, type PhaseState, type Tone } from "@kauro/ui";
 import type { ReactElement } from "react";
 import type { JobView } from "../../api/generated.ts";
 import { message } from "../../copy/en.ts";
-import { type ExecuteOffer, elapsedParts, jobModel } from "./model.ts";
+import { type ExecuteOffer, jobModel } from "./model.ts";
 
 const TONE: Readonly<Record<JobView["state"], Tone>> = {
   QUEUED: "info",
@@ -38,41 +41,31 @@ export interface ProcessingViewProps {
   readonly cancelling: boolean;
   /** CMD037 was recorded in this page: say so (the job read back may already show it). */
   readonly cancelRecorded: boolean;
+  /** The delivery's page, when this build has it: offered once the package is ready. */
+  readonly deliveryHref?: string | null;
 }
 
-function elapsedText(ms: number): string {
-  const { hours, minutes } = elapsedParts(ms);
-  if (hours > 0) return message("screen.processing.elapsed.hours.body", { hours, minutes });
-  return minutes === 0 ? message("screen.processing.elapsed.under-minute.body") : message("screen.processing.elapsed.minutes.body", { minutes });
-}
 
-export function ProcessingDetails({ job, nowMs, readAt, supportHref, onRefresh, onCancel, cancelling, cancelRecorded }: ProcessingViewProps): ReactElement {
+export function ProcessingDetails({ job, nowMs, readAt, supportHref, onRefresh, onCancel, cancelling, cancelRecorded, deliveryHref = null }: ProcessingViewProps): ReactElement {
   const model = jobModel(job, nowMs);
   const phases: readonly Phase[] | null = model.phases === null ? null : model.phases.map((phase) => ({ id: phase.id, label: message(`screen.processing.phase.${phase.id}`), state: phase.status }));
   const advice = job.state === "QUEUED" || job.state === "ADMITTED" || job.state === "RUNNING" || job.state === "VERIFYING" ? null : (`screen.processing.next.${job.state}.body` as const);
   return (
     <div className="kauro-processing">
-      <p>{message("screen.processing.lead.body")}</p>
-      <section aria-labelledby="processing-status">
+      <section className="kauro-set-status" aria-labelledby="processing-status">
         <h2 id="processing-status">{message("screen.processing.state.label")}</h2>
         <p role="status">
           <StatusBadge tone={TONE[job.state]}>{message(`screen.processing.state.${job.state}`)}</StatusBadge>
         </p>
+        {model.ended ? null : <p className="kauro-set-open">{message("screen.processing.leave.body")}</p>}
+      </section>
+      <section className="kauro-processing-work" aria-labelledby="processing-phases">
+        <h2 id="processing-phases">{message("screen.processing.phases.heading")}</h2>
+        {model.ended ? null : <p className="kauro-processing-note">{message("screen.processing.estimate.body")}</p>}
         {phases === null ? null : <PhaseList label={message("screen.processing.phases.label")} phases={phases} copy={PHASE_COPY} />}
-        {model.ended ? null : <p>{message("screen.processing.estimate.body")}</p>}
-        <dl>
+        <dl className="kauro-facts-grid">
           <div><dt>{message("screen.processing.queued.label")}</dt><dd><Deadline at={job.queuedAt} timeZone="UTC" /></dd></div>
-          {model.elapsedMs === null ? null : <div><dt>{message("screen.processing.elapsed.label")}</dt><dd>{elapsedText(model.elapsedMs)}</dd></div>}
           <div><dt>{message("screen.processing.updated.label")}</dt><dd><Deadline at={readAt} timeZone="UTC" /></dd></div>
-          <div><dt>{message("screen.processing.deadline.label")}</dt><dd><Deadline at={job.deliveryDeadlineAt} timeZone="UTC" /></dd></div>
-          {job.activeProviderState === undefined || model.ended ? null : (
-            <div>
-              <dt>{message("screen.processing.worker.label")}</dt>
-              <dd>
-                {message(`screen.processing.worker.${job.activeProviderState}`)}. {message("screen.processing.worker.note")}
-              </dd>
-            </div>
-          )}
         </dl>
         {advice === null ? null : (
           <Banner tone={TONE[job.state] === "danger" ? "danger" : "info"} title={message(`screen.processing.state.${job.state}`)} announce="status">
@@ -80,27 +73,34 @@ export function ProcessingDetails({ job, nowMs, readAt, supportHref, onRefresh, 
           </Banner>
         )}
       </section>
-      {model.cancelExplains === null ? null : (
-        <section aria-labelledby="processing-cancel">
-          <h2 id="processing-cancel">{message("screen.processing.cancel.heading")}</h2>
-          <p>{message(`screen.processing.cancel.${model.cancelExplains}.body`)}</p>
-        </section>
-      )}
       <p className="kauro-actions">
+        {job.state === "READY" && deliveryHref !== null ? (
+          <LinkButton href={deliveryHref} variant="primary">
+            {message("screen.processing.delivery.cta")}
+          </LinkButton>
+        ) : null}{" "}
         {model.ended ? null : (
           <Button variant="secondary" onClick={onRefresh}>
             {message("screen.processing.refresh.label")}
           </Button>
         )}{" "}
-        {model.canCancel ? (
-          <Button variant="secondary" disabled={cancelling} aria-busy={cancelling ? true : undefined} onClick={() => (cancelling ? undefined : onCancel())}>
-            {message("screen.processing.cancel.cta")}
-          </Button>
-        ) : null}{" "}
-        <LinkButton href={supportHref} variant="secondary">
+        <a className="kauro-processing-support" href={supportHref}>
           {message("screen.processing.support.cta")}
-        </LinkButton>
+        </a>
       </p>
+      {model.cancelExplains === null ? null : (
+        <section className="kauro-processing-cancel" aria-labelledby="processing-cancel">
+          <h2 id="processing-cancel">{message("screen.processing.cancel.heading")}</h2>
+          <p>{message(`screen.processing.cancel.${model.cancelExplains}.body`)}</p>
+          {model.canCancel ? (
+            <p className="kauro-actions">
+              <Button variant="secondary" disabled={cancelling} aria-busy={cancelling ? true : undefined} onClick={() => (cancelling ? undefined : onCancel())}>
+                {message("screen.processing.cancel.cta")}
+              </Button>
+            </p>
+          ) : null}
+        </section>
+      )}
       {cancelling ? <p role="status">{message("screen.processing.cancel.working.body")}</p> : null}
       {cancelRecorded ? <p role="status">{message("screen.processing.cancel.done.body")}</p> : null}
     </div>

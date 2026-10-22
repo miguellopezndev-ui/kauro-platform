@@ -1,7 +1,7 @@
 // The copy of the support screen (design D-COPY-1): UI52, registry primaryCopy "Track your questions and next actions." word for word.
 // Keys are screen.support.*; the lane that builds the area adds its keys here only.
 export const SUPPORT_COPY = {
-  "screen.support.title": "Support cases",
+  "screen.support.title": "Support",
   "screen.support.lead.body": "Track your questions and next actions.",
   "screen.support.noproject.title": "Choose a project",
   "screen.support.noproject.body": "Support cases belong to a project. Open support from the project you have a question about.",
@@ -19,7 +19,7 @@ export const SUPPORT_COPY = {
   "screen.support.case.next.label": "Next response by",
   "screen.support.case.summary.label": "What you wrote",
   "screen.support.case.opened.label": "Opened",
-  "screen.support.case.commitment.body": "The next response time counts covered support hours only.",
+  "screen.support.case.commitment.body": "Kauro answers in writing, Monday to Friday except holidays, 09:00 to 17:00 Bogotá time (14:00 to 22:00 UTC); the next response time counts those hours only.",
   "screen.support.category.PRODUCT_DEFECT": "Something is not working",
   "screen.support.category.IMPORT_GUIDANCE": "Help with an import",
   "screen.support.category.BILLING": "Billing",

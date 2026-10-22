@@ -16,7 +16,7 @@ export function escapeHtml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
-/** The rules of a legal page: tokens only (so the stored theme applies), one column of readable measure, a skip link that shows on focus. */
+/** The rules of a legal page: tokens only (so the one theme applies), one column of readable measure, a skip link that shows on focus. */
 export const LEGAL_CSS = `
 body { display: flex; flex-direction: column; min-height: 100dvh; margin: 0; background: var(--kauro-color-background); color: var(--kauro-color-text); }
 .kauro-legal-main { flex: 1 0 auto; width: 100%; }
@@ -96,11 +96,11 @@ function nav(current: string): string {
 }
 
 /** The whole page and its status. `css` is the stylesheet the caller wants (the design tokens and LEGAL_CSS). */
-export function legalResponse(document: RenderedLegal, options: { readonly nonce: string; readonly css: string; readonly theme?: "light" | "dark" | null }): Response {
+export function legalResponse(document: RenderedLegal, options: { readonly nonce: string; readonly css: string }): Response {
   if (!NONCE_PATTERN.test(options.nonce)) throw new Error("CSP_NONCE_MISSING: a legal page is written under the nonce the proxy minted for the request");
   const body = document.published ? published(document) : refused();
   const html =
-    `<!doctype html><html lang="en"${options.theme === "light" || options.theme === "dark" ? ` data-theme="${options.theme}"` : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex, nofollow">` +
     `<title>${escapeHtml(document.title)} | Kauro</title><style nonce="${options.nonce}">${options.css}</style></head>` +
     `<body><a class="kauro-legal-skip" href="#kauro-main">Skip to the document</a>` +

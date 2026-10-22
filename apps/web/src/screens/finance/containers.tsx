@@ -3,7 +3,7 @@
 // api client, holds the queue's state filter and pages and the run of one command, and hands everything to the pure views. The step-up
 // credential comes from `obtainStepUp`, the shell's re-authentication (none is wired yet: every step-up command answers the STEP_UP state,
 // which keeps the form; see the lane report's gap). Nothing private is stored; the page's heap is the only place.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import type { IdentityCredential } from "../../client/identity/port.ts";
 import { message } from "../../copy/en.ts";
@@ -18,12 +18,17 @@ import { CreditQueue, RouteSection } from "./view.tsx";
 /** The shell's step-up (D-AUTH-4). Not wired in this build: no credential, so the command is not sent and the STEP_UP state is drawn. */
 const obtainStepUp = async (): Promise<IdentityCredential | null> => null;
 
-function RoutePanel({ routeId }: { readonly routeId: string }): ReactElement {
+function RoutePanel({ routeId, onDenied }: { readonly routeId: string; readonly onDenied: (denied: boolean) => void }): ReactElement {
   const { client } = useShell();
   const { state, refresh } = useRead((signal) => client.call("getBankRoute", { path: { routeId }, signal }), routeId);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<StepUpResult<unknown> | null>(null);
   const route = state.kind === "ANSWERED" && state.answer.kind === "REPLY" ? state.answer.body.route : null;
+  // a refusal of access covers the whole page: the queue is not drawn beside it to say the same thing again
+  const denied = state.kind !== "LOADING" && route === null && state.decision.state === "DENIED";
+  useEffect(() => {
+    onDenied(denied);
+  }, [denied, onDenied]);
   if (state.kind === "LOADING") return <StatePanel decision={state.decision} />;
   if (route === null) return <StatePanel decision={state.decision} onNext={refresh} />;
   const onCommand = (command: RouteCommand): void => {
@@ -91,6 +96,9 @@ function QueuePanel(): ReactElement {
 }
 
 export function FinanceScreen({ routeId }: { readonly routeId: string | null }): ReactElement {
+  const [denied, setDenied] = useState(false);
+  const onDenied = useCallback((value: boolean) => setDenied(value), []);
+  useEffect(() => setDenied(false), [routeId]);
   return (
     <>
       {routeId === null ? (
@@ -99,9 +107,9 @@ export function FinanceScreen({ routeId }: { readonly routeId: string | null }):
           <p>{message("screen.finance.route.none.body")}</p>
         </section>
       ) : (
-        <RoutePanel routeId={routeId} />
+        <RoutePanel routeId={routeId} onDenied={onDenied} />
       )}
-      <QueuePanel />
+      {denied ? null : <QueuePanel />}
     </>
   );
 }

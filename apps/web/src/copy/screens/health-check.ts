@@ -30,6 +30,8 @@ export const HEALTH_CHECK_COPY = {
   "screen.health.reason.label": "Reason code",
   "screen.health.progress.body": "This runs on its own. This page shows the current status; you can leave and come back.",
   "screen.health.refresh.label": "Check the status again",
+  "screen.health.phases.label": "How far the check is",
+  "screen.health.plan.cta": "Review the proposed plan",
   "screen.health.cancel.cta": "Cancel this check",
   "screen.health.cancel.working.body": "Cancelling. Do not repeat this step.",
   "screen.health.none.title": "No free data health check yet",

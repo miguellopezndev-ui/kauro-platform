@@ -29,10 +29,10 @@ export interface ConfirmEffect {
   readonly id: string;
   /** What will happen, in a sentence. */
   readonly description: ReactNode;
-  /** How many rows, companies or contacts it touches. */
-  readonly count: CountValue;
-  /** What the count counts, for example "rows change". */
-  readonly countLabel: string;
+  /** How many rows, companies or contacts it touches; absent for an effect that counts nothing (a role that changes, a period that starts). */
+  readonly count?: CountValue | undefined;
+  /** What the count counts, for example "rows change"; given with the count. */
+  readonly countLabel?: string | undefined;
   /** The checkbox's label, for example "I understand that 1,200 rows are cleared". */
   readonly acknowledgeLabel: string;
 }
@@ -90,7 +90,7 @@ function assertEffects(effects: readonly ConfirmEffect[]): void {
     if (!EFFECT_ID.test(effect.id)) throw new RangeError(`not a usable effect id: ${JSON.stringify(effect.id)}`);
     if (seen.has(effect.id)) throw new RangeError(`effect id repeated: ${effect.id}`);
     seen.add(effect.id);
-    countToBigInt(effect.count, `count of effect ${effect.id}`);
+    if (effect.count !== undefined) countToBigInt(effect.count, `count of effect ${effect.id}`);
   }
 }
 
@@ -137,9 +137,11 @@ export function ConfirmDialogView(props: ConfirmDialogViewProps): ReactElement {
             <li key={effect.id} className={CLASS.effect}>
               <div id={`${control}-description`} className={CLASS.effectDescription}>
                 <p>{effect.description}</p>
-                <p>
-                  <Count value={effect.count} /> {effect.countLabel}
-                </p>
+                {effect.count === undefined ? null : (
+                  <p>
+                    <Count value={effect.count} /> {effect.countLabel}
+                  </p>
+                )}
               </div>
               <div className={CLASS.effectAcknowledge}>
                 <input

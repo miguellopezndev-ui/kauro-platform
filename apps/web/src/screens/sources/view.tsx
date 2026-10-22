@@ -5,6 +5,7 @@ import { Banner, Button, Count, Deadline, LinkButton, SafeText, StatusBadge, typ
 import type { ReactElement } from "react";
 import type { InspectionFileView, InspectionTableView, InspectionView, SourceRevisionView, UploadView } from "../../api/generated.ts";
 import { message } from "../../copy/en.ts";
+import { formatBytes, INPUT_LIMITS } from "../../public/limits.ts";
 import {
   columnLabel,
   countsView,
@@ -40,9 +41,10 @@ const REVISION_TONE: Readonly<Record<SourceRevisionView["state"], Tone>> = {
   DELETED: "neutral",
 };
 
+/** The set's state and what still waits on it, as one quiet line above the page's work (Order 11). */
 export function RevisionStatus({ revision }: { readonly revision: SourceRevisionView }): ReactElement {
   return (
-    <section aria-labelledby="sources-revision">
+    <section className="kauro-set-status" aria-labelledby="sources-revision">
       <h2 id="sources-revision">{message("screen.sources.revision.state.label")}</h2>
       <p role="status">
         <StatusBadge tone={REVISION_TONE[revision.state]}>{message(`screen.sources.revision.state.${revision.state}`)}</StatusBadge>
@@ -53,19 +55,16 @@ export function RevisionStatus({ revision }: { readonly revision: SourceRevision
 }
 
 export function Blockers({ blockers }: { readonly blockers: readonly RevisionBlocker[] }): ReactElement {
+  if (blockers.length === 0) return <p className="kauro-set-open">{message("screen.sources.blockers.none.body")}</p>;
   return (
-    <>
+    <div className="kauro-set-open">
       <h3>{message("screen.sources.blockers.heading")}</h3>
-      {blockers.length === 0 ? (
-        <p>{message("screen.sources.blockers.none.body")}</p>
-      ) : (
-        <ul>
-          {blockers.map((blocker) => (
-            <li key={blocker}>{message(`screen.sources.blocker.${blocker}`)}</li>
-          ))}
-        </ul>
-      )}
-    </>
+      <ul>
+        {blockers.map((blocker) => (
+          <li key={blocker}>{message(`screen.sources.blocker.${blocker}`)}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -100,31 +99,51 @@ export interface SourcesViewProps {
   readonly onRefresh: () => void;
 }
 
-function FileInput({ label, onFile }: { readonly label: string; readonly onFile: (file: File) => void }): ReactElement {
+/**
+ * A file input. As the page's way to add a file it is a drop area with the limits said before anything is chosen (Order 11); the input
+ * covers the whole area, so a file dropped anywhere on it is the input's own, and the keyboard reaches it as one control.
+ */
+function FileInput({ label, onFile, zone = false }: { readonly label: string; readonly onFile: (file: File) => void; readonly zone?: boolean }): ReactElement {
+  const input = (
+    <input
+      type="file"
+      accept=".csv,.xlsx"
+      onChange={(event) => {
+        const file = event.currentTarget.files?.[0];
+        if (file !== undefined) onFile(file);
+      }}
+    />
+  );
+  if (!zone)
+    return (
+      <label className="kauro-file-input">
+        {label}
+        {input}
+      </label>
+    );
   return (
-    <label>
-      {label}
-      <input
-        type="file"
-        accept=".csv,.xlsx"
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0];
-          if (file !== undefined) onFile(file);
-        }}
-      />
+    <label className="kauro-dropzone">
+      <span className="kauro-dropzone-title">{message("screen.sources.upload.drop.body")}</span>
+      <span className="kauro-dropzone-label">{label}</span>
+      <span className="kauro-dropzone-limits">{message("screen.sources.upload.limits.body", { files: INPUT_LIMITS.files, fileSize: INPUT_LIMITS.fileSize, setSize: INPUT_LIMITS.setSize })}</span>
+      {input}
     </label>
   );
 }
 
+// Round 2 (research agency-workspace.md section 5.4): a file row says its name and its state in words; the separate facts behind that
+// state (size, upload, receipt, scan, structure) stay one click away in "File details", opened by itself when the file was refused or not
+// fully checked, so the row is read, not decoded. The facts are named for the person ("Upload from this page", "Received by Kauro"), not
+// for the transport.
 export function UploadFacts({ upload, progress }: { readonly upload: UploadView; readonly progress: UploadProgress | null }): ReactElement {
   const facts = uploadFacts(upload, progress);
   const scanner = facts.scanner;
   return (
-    <dl>
+    <dl className="kauro-file-facts">
       <div>
         <dt>{message("screen.sources.fact.declared.label")}</dt>
         <dd>
-          <Count value={facts.declaredBytes} />
+          {formatBytes(facts.declaredBytes)} <span className="kauro-file-bytes">({message("screen.sources.fact.bytes.body", { bytes: facts.declaredBytes })})</span>
         </dd>
       </div>
       <div>
@@ -142,12 +161,12 @@ export function UploadFacts({ upload, progress }: { readonly upload: UploadView;
             message("screen.sources.fact.scanner.none.body")
           ) : (
             <>
-              <span>
+              <span className={scanner.state === "COVERED_CLEAN" && scanner.fullyChecked ? "kauro-file-ok" : "kauro-file-warn"}>
                 {scanner.state === "COVERED_CLEAN" && !scanner.fullyChecked
                   ? message("screen.sources.fact.scanner.partial.body", { scanned: scanner.coverage.scannedParts, expected: scanner.coverage.expectedParts })
                   : message(`screen.sources.fact.scanner.${scanner.state}`)}
               </span>{" "}
-              <span>{message("screen.sources.fact.scanner.coverage.body", { ...scanner.coverage })}</span>
+              <span className="kauro-file-bytes">{message("screen.sources.fact.scanner.coverage.body", { ...scanner.coverage })}</span>
             </>
           )}
         </dd>
@@ -185,25 +204,42 @@ export function UploadFacts({ upload, progress }: { readonly upload: UploadView;
   );
 }
 
+const UPLOAD_TONE: Readonly<Record<UploadView["state"], Tone>> = {
+  RESERVED: "neutral",
+  UPLOADING: "info",
+  VERIFYING: "info",
+  ADMITTED: "success",
+  CANCELLED: "neutral",
+  EXPIRED: "neutral",
+  REJECTED: "danger",
+};
+
 function UploadRow({ upload, revision, props }: { readonly upload: UploadView; readonly revision: SourceRevisionView; readonly props: SourcesViewProps }): ReactElement {
   const actions = uploadActions(upload, revision, props.nowMs);
   const sending = props.progress[upload.uploadId] ?? null;
   return (
-    <li>
-      <h3>{safe(upload.displayName)}</h3>
-      <p>
-        <StatusBadge tone={upload.state === "ADMITTED" ? "success" : upload.state === "REJECTED" ? "danger" : "neutral"}>{message(`screen.sources.upload.state.${upload.state}`)}</StatusBadge>
-      </p>
-      <UploadFacts upload={upload} progress={sending} />
+    <li className={`kauro-file kauro-file--${upload.state.toLowerCase()}`}>
+      <div className="kauro-file-head">
+        <span className="kauro-file-format" aria-hidden="true">
+          {upload.declaredFormat}
+        </span>
+        <h3>{safe(upload.displayName)}</h3>
+        <span className="kauro-file-size">{formatBytes(upload.reservedBytes)}</span>
+        <StatusBadge tone={UPLOAD_TONE[upload.state]}>{message(`screen.sources.upload.state.${upload.state}`)}</StatusBadge>
+      </div>
+      <details className="kauro-file-details" open={upload.state === "REJECTED" || upload.inspection?.scanState === "NOT_SCANNED" ? true : undefined}>
+        <summary>{message("screen.sources.fact.details.summary")}</summary>
+        <UploadFacts upload={upload} progress={sending} />
+      </details>
       {upload.state === "RESERVED" || upload.state === "UPLOADING" ? (
-        <p>
+        <p className="kauro-file-note">
           {message("screen.sources.expiry.label")}: <Deadline at={upload.applicationExpiresAt} timeZone="UTC" />
         </p>
       ) : null}
       {actions.resume === "OFFERED" ? <FileInput label={message("screen.sources.upload.resume.cta")} onFile={(file) => props.onResume(upload, file)} /> : null}
-      {actions.resume === "OFFERED" ? <p>{message("screen.sources.upload.resume.file.hint")}</p> : null}
+      {actions.resume === "OFFERED" ? <p className="kauro-file-note">{message("screen.sources.upload.resume.file.hint")}</p> : null}
       {actions.resume === "DISABLED_BY_CLOCK" ? (
-        <p>
+        <p className="kauro-file-note">
           <Button variant="secondary" disabled>
             {message("screen.sources.upload.resume.cta")}
           </Button>{" "}
@@ -212,14 +248,16 @@ function UploadRow({ upload, revision, props }: { readonly upload: UploadView; r
       ) : null}
       {actions.newReservation ? (
         <>
-          <p>{message("screen.sources.upload.reserve.new.body")}</p>
+          <p className="kauro-file-note">{message("screen.sources.upload.reserve.new.body")}</p>
           <FileInput label={message("screen.sources.upload.reserve.new.cta")} onFile={props.onFile} />
         </>
       ) : null}
       {actions.canCancel ? (
-        <Button variant="secondary" disabled={props.busy} onClick={() => (props.busy ? undefined : props.onCancel(upload))}>
-          {message("screen.sources.upload.cancel.cta")}
-        </Button>
+        <div className="kauro-file-actions">
+          <Button variant="secondary" disabled={props.busy} onClick={() => (props.busy ? undefined : props.onCancel(upload))}>
+            {message("screen.sources.upload.cancel.cta")}
+          </Button>
+        </div>
       ) : null}
     </li>
   );
@@ -230,25 +268,24 @@ export function SourcesView(props: SourcesViewProps): ReactElement {
   const model = sourcesModel(revision, props.uploadOrigin);
   return (
     <div className="kauro-sources">
-      <p>{message("screen.sources.intake.lead.body")}</p>
       <RevisionStatus revision={revision} />
-      <section aria-labelledby="sources-add">
+      <section className="kauro-screen-section" aria-labelledby="sources-add">
         <h2 id="sources-add">{message("screen.sources.upload.heading")}</h2>
         {model.uploadUnavailable ? (
           <Banner tone="warning" title={message("screen.sources.upload.unavailable.title")} announce="status">
             <p>{message("screen.sources.upload.unavailable.body")}</p>
           </Banner>
         ) : null}
-        {model.canAdd ? <FileInput label={message("screen.sources.upload.field.label")} onFile={props.onFile} /> : null}
+        {model.canAdd ? <FileInput zone label={message("screen.sources.upload.field.label")} onFile={props.onFile} /> : null}
         {props.refused === null ? null : <p role="alert">{props.refused === "FORMAT" ? message("screen.sources.upload.format.refused.body") : message("screen.sources.upload.name.refused.body")}</p>}
         {props.busy ? <p role="status">{message("screen.sources.upload.sending.body")}</p> : null}
       </section>
-      <section aria-labelledby="sources-files">
+      <section className="kauro-screen-section" aria-labelledby="sources-files">
         <h2 id="sources-files">{message("screen.sources.uploads.heading")}</h2>
         {props.uploads.length === 0 ? (
           <p>{message("screen.sources.uploads.none.body")}</p>
         ) : (
-          <ul>
+          <ul className="kauro-files">
             {props.uploads.map((upload) => (
               <UploadRow key={upload.uploadId} upload={upload} revision={revision} props={props} />
             ))}
@@ -261,10 +298,14 @@ export function SourcesView(props: SourcesViewProps): ReactElement {
         ) : null}
       </section>
       <p className="kauro-actions">
+        {model.canGoToSelection ? (
+          <LinkButton href={props.hrefs.selection} variant="primary">
+            {message("screen.sources.step.selection.link")}
+          </LinkButton>
+        ) : null}{" "}
         <Button variant="secondary" onClick={props.onRefresh}>
           {message("screen.sources.upload.refresh.cta")}
-        </Button>{" "}
-        {model.canGoToSelection ? <LinkButton href={props.hrefs.selection}>{message("screen.sources.step.selection.link")}</LinkButton> : null}
+        </Button>
       </p>
     </div>
   );
@@ -289,19 +330,22 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
   const name = table.name ?? message("screen.sources.selection.table.unnamed.body", { ordinal: table.ordinal + 1 });
   const editable = file.admitted && props.revision.permittedActions.includes("SelectInputTables");
   return (
-    <li>
-      <h3>{message("screen.sources.selection.table.heading")} {safe(name)}</h3>
-      <p>
+    <li className={`kauro-source-table${choice.include ? " kauro-source-table--included" : ""}`}>
+      <div className="kauro-source-table-head">
+        <h3>
+          <span className="kauro-visually-hidden-text">{message("screen.sources.selection.table.heading")} </span>
+          {safe(name)}
+        </h3>
         <StatusBadge tone={table.visibility === "VISIBLE" ? "neutral" : "warning"}>{message(`screen.sources.selection.visibility.${table.visibility}`)}</StatusBadge>
         {table.hasFormulas ? (
           <>
             {" "}
             <StatusBadge tone="warning">{message("screen.sources.selection.formulas.present")}</StatusBadge>{" "}
-            {message("screen.sources.selection.formulas.cache", { cache: message(`screen.sources.selection.formulas.cache.${table.formulaCache}`) })}
+            <span className="kauro-source-table-note">{message("screen.sources.selection.formulas.cache", { cache: message(`screen.sources.selection.formulas.cache.${table.formulaCache}`) })}</span>
           </>
         ) : null}
-      </p>
-      <p>
+      </div>
+      <p className="kauro-source-table-meta">
         {message("screen.sources.selection.counts.line", {
           columns: table.columnCount,
           rows: table.rowEstimate ?? message("screen.sources.selection.counts.rows.unknown"),
@@ -319,26 +363,28 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
           ))}
         </ul>
       )}
-      <h4>{message("screen.sources.selection.columns.heading")}</h4>
-      <ol>
+      <h4 className="kauro-source-table-columns-heading">{message("screen.sources.selection.columns.heading")}</h4>
+      <ol className="kauro-columns">
         {table.columns.map((column) => (
-          <li key={column.ordinal}>{safe(columnLabel(column))}</li>
+          <li key={column.ordinal} className={column.labelState === "PRESENT" ? undefined : "kauro-column--flag"}>
+            {safe(columnLabel(column))}
+          </li>
         ))}
       </ol>
       {editable ? (
-        <>
-          <label>
+        <div className="kauro-source-table-choice">
+          <label className="kauro-source-table-include">
             <input type="checkbox" checked={choice.include} onChange={(event) => props.onChange(table.tableId, { include: event.currentTarget.checked })} />
             {message("screen.sources.selection.include.label")}
           </label>
           {choice.include && table.visibility !== "VISIBLE" ? (
-            <label>
+            <label className="kauro-source-table-include">
               <input type="checkbox" checked={choice.hiddenAcknowledged} onChange={(event) => props.onChange(table.tableId, { hiddenAcknowledged: event.currentTarget.checked })} />
               {message("screen.sources.selection.hidden.ack.label")}
             </label>
           ) : null}
           {choice.include ? null : (
-            <label>
+            <label className="kauro-source-table-reason">
               {message("screen.sources.selection.reason.label")}
               <select value={choice.reason} onChange={(event) => props.onChange(table.tableId, { reason: event.currentTarget.value })}>
                 <option value="">{message("screen.sources.selection.reason.choose")}</option>
@@ -350,7 +396,7 @@ function TableRow({ file, table, choice, props }: { readonly file: InspectionFil
               </select>
             </label>
           )}
-        </>
+        </div>
       ) : null}
       {problems.map((entry) => (
         <p key={entry.problem} role="alert">
@@ -369,21 +415,26 @@ export function SelectionView(props: SelectionViewProps): ReactElement {
   const names = new Map(inspection.uploads.map((upload) => [upload.fileId ?? "", upload.displayName] as const));
   return (
     <div className="kauro-selection">
-      <p>{message("screen.sources.selection.lead.body")}</p>
       <RevisionStatus revision={revision} />
       {inspection.files.length === 0 ? <p>{message("screen.sources.selection.none.body")}</p> : null}
       {inspection.files.map((file) => (
-        <section key={file.fileId} aria-labelledby={`file-${file.fileId}`}>
-          <h2 id={`file-${file.fileId}`}>{message("screen.sources.selection.file.heading")} {safe(names.get(file.fileId) ?? file.fileId)}</h2>
+        <section key={file.fileId} className="kauro-screen-section" aria-labelledby={`file-${file.fileId}`}>
+          <h2 id={`file-${file.fileId}`} className="kauro-file-title">
+            <span className="kauro-file-format" aria-hidden="true">
+              {file.format}
+            </span>
+            <span className="kauro-visually-hidden-text">{message("screen.sources.selection.file.heading")} </span>
+            {safe(names.get(file.fileId) ?? file.fileId)}
+          </h2>
           {file.admitted ? null : <p role="alert">{message("screen.sources.selection.file.rejected.body")}</p>}
-          <ul>
+          <ul className="kauro-source-tables">
             {file.tables.map((table) => (
               <TableRow key={table.tableId} file={file} table={table} choice={draft[table.tableId] ?? { include: false, reason: "", hiddenAcknowledged: false }} props={props} />
             ))}
           </ul>
         </section>
       ))}
-      <section aria-labelledby="selection-counts">
+      <section className="kauro-screen-section" aria-labelledby="selection-counts">
         <h2 id="selection-counts">{message("screen.sources.selection.counts.heading")}</h2>
         {counts.stale ? (
           <Banner tone="warning" title={message("screen.sources.selection.counts.stale.title")} announce="status">
@@ -405,16 +456,20 @@ export function SelectionView(props: SelectionViewProps): ReactElement {
         )}
       </section>
       <p className="kauro-actions">
+        {revision.state === "READY_TO_SEAL" ? (
+          <LinkButton href={props.hrefs.seal} variant="primary">
+            {message("screen.sources.step.seal.link")}
+          </LinkButton>
+        ) : null}{" "}
         {revision.permittedActions.includes("SelectInputTables") ? (
-          <Button variant="primary" disabled={!canConfirm} aria-busy={props.busy ? true : undefined} onClick={() => (canConfirm ? props.onConfirm() : undefined)}>
+          <Button variant={revision.state === "READY_TO_SEAL" ? "secondary" : "primary"} disabled={!canConfirm} aria-busy={props.busy ? true : undefined} onClick={() => (canConfirm ? props.onConfirm() : undefined)}>
             {message("screen.sources.selection.confirm.cta")}
           </Button>
         ) : null}{" "}
         <Button variant="secondary" onClick={props.onRefresh}>
           {message("screen.sources.upload.refresh.cta")}
         </Button>{" "}
-        <LinkButton href={props.hrefs.sources}>{message("screen.sources.step.sources.link")}</LinkButton>{" "}
-        {revision.state === "READY_TO_SEAL" ? <LinkButton href={props.hrefs.seal}>{message("screen.sources.step.seal.link")}</LinkButton> : null}
+        <LinkButton href={props.hrefs.sources}>{message("screen.sources.step.sources.link")}</LinkButton>
       </p>
       {props.busy ? <p role="status">{message("screen.sources.selection.confirm.working.body")}</p> : null}
       {props.confirmed ? <p role="status">{message("screen.sources.selection.confirm.done.body")}</p> : null}
@@ -460,15 +515,14 @@ export function SealView({ revision, inspection, busy, hrefs, onSeal, onRefresh 
   const selected = selectedTables(inspection);
   return (
     <div className="kauro-seal">
-      <p>{message("screen.sources.seal.lead.body")}</p>
       <RevisionStatus revision={revision} />
-      <section aria-labelledby="seal-measures">
+      <section className="kauro-screen-section" aria-labelledby="seal-measures">
         <h2 id="seal-measures">{message("screen.sources.seal.measures.heading")}</h2>
         {measures === null ? <p>{message("screen.sources.seal.measures.none.body")}</p> : <MeasureList measures={measures} stale={false} />}
       </section>
-      <section aria-labelledby="seal-selection">
+      <section className="kauro-screen-section" aria-labelledby="seal-selection">
         <h2 id="seal-selection">{message("screen.sources.seal.selection.heading")}</h2>
-        <ul>
+        <ul className="kauro-seal-tables">
           {selected
             .filter((table) => table.disposition === "INCLUDE")
             .map((table) => (
@@ -478,6 +532,8 @@ export function SealView({ revision, inspection, busy, hrefs, onSeal, onRefresh 
             ))}
         </ul>
         {revision.selection === undefined ? null : (
+          <details className="kauro-fingerprints">
+            <summary>{message("screen.sources.seal.fingerprints.label")}</summary>
           <dl>
             <div>
               <dt>{message("screen.sources.seal.selection.hash.label")}</dt>
@@ -492,16 +548,17 @@ export function SealView({ revision, inspection, busy, hrefs, onSeal, onRefresh 
               </dd>
             </div>
           </dl>
+          </details>
         )}
         {selected.some((table) => table.disposition === "EXCLUDE") ? (
           <>
             <h3>{message("screen.sources.seal.excluded.heading")}</h3>
-            <ul>
+            <ul className="kauro-seal-tables kauro-seal-tables--out">
               {selected
                 .filter((table) => table.disposition === "EXCLUDE")
                 .map((table) => (
                   <li key={table.tableId}>
-                    {safe(table.fileName)} / {safe(table.tableName)}: {message("screen.sources.seal.excluded.reason.label")} {safe(exclusionReasonText(table.exclusionReason ?? ""))}
+                    {safe(table.fileName)} / {safe(table.tableName)} <span className="kauro-seal-reason">· {message("screen.sources.seal.excluded.reason.label")} {safe(exclusionReasonText(table.exclusionReason ?? ""))}</span>
                   </li>
                 ))}
             </ul>
@@ -509,14 +566,14 @@ export function SealView({ revision, inspection, busy, hrefs, onSeal, onRefresh 
         ) : null}
       </section>
       {revision.dataAvailableUntil === undefined ? null : (
-        <section aria-labelledby="seal-retention">
+        <section className="kauro-screen-section" aria-labelledby="seal-retention">
           <h2 id="seal-retention">{message("screen.sources.seal.retention.heading")}</h2>
           <p>
             {message("screen.sources.seal.retention.until.label")}: <Deadline at={revision.dataAvailableUntil} timeZone="UTC" />
           </p>
         </section>
       )}
-      <p>{message("screen.sources.seal.notice.body")}</p>
+      <p className="kauro-seal-notice">{message("screen.sources.seal.notice.body")}</p>
       {offer.kind === "SEALED" ? (
         <Banner tone="success" title={message("screen.sources.seal.sealed.title")} announce="status">
           <p>{message("screen.sources.seal.sealed.body")}</p>

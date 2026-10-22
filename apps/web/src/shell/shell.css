@@ -24,11 +24,10 @@ body {
   transform: none;
 }
 
+/* A page without a person (sign-in, invitation): the wordmark alone, in a quiet band. */
 .kauro-shell-header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--kauro-space-3) var(--kauro-space-5);
   min-block-size: 4rem;
   box-sizing: border-box;
   padding: var(--kauro-space-2) clamp(1rem, 3vw, 2rem);
@@ -44,135 +43,409 @@ body {
   letter-spacing: -0.035em;
 }
 
-.kauro-agency {
+/* ---- Order 11: the menu at the side (Linear, Stripe, Attio, Vercel), folded behind one button on a phone ------------------------- */
+
+.kauro-shell {
+  min-block-size: 100vh;
+}
+
+.kauro-shell-side {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--kauro-space-3);
+  box-sizing: border-box;
+  padding: var(--kauro-space-3) clamp(1rem, 3vw, 1.5rem);
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+
+.kauro-shell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+  min-block-size: 2.75rem;
+}
+
+.kauro-shell-menu {
+  display: inline-flex;
   align-items: center;
   gap: var(--kauro-space-2);
-  min-width: 0;
-  padding: 0.25rem 0.375rem 0.25rem 0.875rem;
-  border: 1px solid var(--kauro-color-border);
-  /* a pill on one line, a soft card when a long agency name wraps */
-  border-radius: 1.25rem;
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kauro-shell-menu:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+
+/* three short lines, the sign every phone menu uses; drawn, not an icon font */
+.kauro-shell-menu-glyph {
+  inline-size: 1rem;
+  block-size: 0.6875rem;
+  border-block: 1.5px solid currentColor;
+  background: linear-gradient(currentColor, currentColor) center / 100% 1.5px no-repeat;
+}
+
+/* the workspace (Order 11 round 2): one control, its ink mark, its name, and its state only when the state asks for attention. When
+   there is somewhere to switch to, the whole block is the way there, with the up-down sign every product uses for a switch. */
+.kauro-agency {
+  margin: 0;
+}
+
+.kauro-agency:not(.kauro-agency--switch),
+.kauro-agency--switch > a {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  min-block-size: 3rem;
+  box-sizing: border-box;
+  padding: 0.375rem var(--kauro-space-2);
+  border-radius: 0.5rem;
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+
+.kauro-agency--switch > a:hover {
   background: var(--kauro-color-raised);
 }
 
-.kauro-agency-label {
+.kauro-agency--switch > a:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 0;
+}
+
+.kauro-agency-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 0.5rem;
+  background: var(--kauro-color-ink);
+  color: var(--kauro-color-on-ink);
+  font-family: var(--kauro-display-family);
+  font-size: 0.8125rem;
+  box-shadow: inset 0 0 0 1px var(--kauro-color-ink-border);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.kauro-agency--ops .kauro-agency-mark {
+  background: var(--kauro-color-wine);
+  color: var(--kauro-color-on-wine);
+}
+
+.kauro-agency-text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+/* the word "Workspace" is for a screen reader: the mark and the place already say it to the eye */
+.kauro-agency-label,
+.kauro-shell-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.kauro-agency-name {
+  overflow: hidden;
+  color: var(--kauro-color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kauro-agency-state {
+  color: var(--kauro-color-warning-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* the up-down sign of a switch or a menu: two short strokes, drawn, never an icon font */
+.kauro-chevron {
+  position: relative;
+  inline-size: 0.625rem;
+  block-size: 0.875rem;
   color: var(--kauro-color-text-muted);
-  font-size: 0.75rem;
+}
+
+.kauro-chevron::before,
+.kauro-chevron::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.15rem;
+  inline-size: 0.3rem;
+  block-size: 0.3rem;
+  border: solid currentColor;
+  border-width: 1.5px 1.5px 0 0;
+}
+
+.kauro-chevron::before {
+  inset-block-start: 0.1rem;
+  transform: rotate(-45deg);
+}
+
+.kauro-chevron::after {
+  inset-block-end: 0.1rem;
+  transform: rotate(135deg);
+}
+
+.kauro-shell-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kauro-space-4);
+}
+
+/* on a phone the panel opens under the bar, and only when asked for */
+.kauro-shell-side:not([data-open]) .kauro-shell-panel {
+  display: none;
+}
+
+.kauro-shell-switch {
+  margin: calc(var(--kauro-space-2) * -1) 0 0;
+  padding-inline-start: var(--kauro-space-3);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-shell-switch a {
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+  text-underline-offset: 0.2em;
+}
+
+.kauro-shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kauro-space-4);
+}
+
+.kauro-shell-group ul {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kauro-shell-group-heading {
+  margin: 0 0 var(--kauro-space-1);
+  padding-inline-start: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.kauro-agency-name {
-  color: var(--kauro-color-text);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.kauro-agency-state {
-  padding: 0.125rem 0.625rem;
-  border-radius: 62.5rem;
-  background: var(--kauro-color-accent-surface);
-  color: var(--kauro-color-accent-text);
-  font-size: var(--kauro-font-size-dense);
-  font-weight: 600;
-}
-
-.kauro-shell-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--kauro-space-3);
-  margin-inline-start: auto;
-}
-
-.kauro-shell-actions a {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: 2.75rem;
-  color: var(--kauro-color-primary);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.kauro-shell-actions a:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
-}
-
-.kauro-shell-theme {
-  display: inline-grid;
-  place-items: center;
-  inline-size: 2.75rem;
-  block-size: 2.75rem;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--kauro-color-text);
-  cursor: pointer;
-}
-
-.kauro-shell-theme:hover {
-  border-color: var(--kauro-color-border);
-  background: var(--kauro-color-raised);
-}
-
-/* A circle half filled: the sign for contrast, drawn in the text colour (the public frame draws the same sign). */
-.kauro-theme-glyph {
-  display: block;
-  box-sizing: border-box;
-  inline-size: 1.125rem;
-  block-size: 1.125rem;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
-}
-
-.kauro-shell-nav {
-  border-block-end: 1px solid var(--kauro-color-border);
-  background: var(--kauro-color-background);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.kauro-shell-nav ul {
-  display: flex;
-  gap: var(--kauro-space-1) var(--kauro-space-5);
-  margin: 0;
-  padding: 0 clamp(1rem, 3vw, 2rem);
-  list-style: none;
-  white-space: nowrap;
-}
-
 .kauro-shell-nav a {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-block-size: 3rem;
+  min-block-size: 2.5rem;
+  padding: 0 var(--kauro-space-3);
+  border-radius: 0.5rem;
   color: var(--kauro-color-text-muted);
   font-size: 0.9375rem;
+  font-weight: 500;
   text-decoration: none;
 }
 
 .kauro-shell-nav a:hover {
+  background: color-mix(in srgb, var(--kauro-color-raised) 70%, transparent);
   color: var(--kauro-color-text);
 }
 
 .kauro-shell-nav a[aria-current="page"] {
+  background: var(--kauro-color-raised);
+  box-shadow: inset 3px 0 0 var(--kauro-color-primary), 0 1px 2px color-mix(in srgb, var(--kauro-color-ink) 8%, transparent);
   color: var(--kauro-color-text);
   font-weight: 600;
 }
 
-.kauro-shell-nav a[aria-current="page"]::after {
-  content: "";
+/* ---- the person's own controls (Order 11 round 2): one button at the foot, its short menu opening upward beside it ------------------ */
+
+.kauro-account {
+  position: relative;
+  margin-block-start: auto;
+  padding-block-start: var(--kauro-space-3);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+
+.kauro-account-button {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  inline-size: 100%;
+  min-block-size: 3rem;
+  box-sizing: border-box;
+  padding: 0.375rem var(--kauro-space-2);
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.kauro-account-button:hover,
+.kauro-account-button[aria-expanded="true"] {
+  background: var(--kauro-color-raised);
+}
+
+.kauro-account-button:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 0;
+}
+
+/* a circle is a person, as a rounded square is an organisation; head and shoulders drawn in the accent's text colour */
+.kauro-account-mark {
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 37%, var(--kauro-color-accent-text) 0 0.3rem, transparent 0.32rem),
+    radial-gradient(ellipse 0.62rem 0.5rem at 50% 100%, var(--kauro-color-accent-text) 0 96%, transparent 100%),
+    var(--kauro-color-accent-surface);
+}
+
+.kauro-account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kauro-account-panel {
   position: absolute;
+  inset-block-end: calc(100% + var(--kauro-space-1));
   inset-inline: 0;
-  inset-block-end: 0;
-  block-size: 2px;
-  background: var(--kauro-color-primary);
+  z-index: 30;
+  min-inline-size: 14rem;
+  box-sizing: border-box;
+  padding: 0.375rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--kauro-color-ink) 16%, transparent), 0 1px 3px color-mix(in srgb, var(--kauro-color-ink) 10%, transparent);
+}
+
+.kauro-account-panel[hidden] {
+  display: none;
+}
+
+.kauro-account-panel ul {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kauro-account-panel a,
+.kauro-account-item {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: 2.5rem;
+  box-sizing: border-box;
+  padding: 0 var(--kauro-space-3);
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kauro-account-panel a:hover,
+.kauro-account-item:hover {
+  background: var(--kauro-color-surface);
+}
+
+.kauro-account-panel a:focus-visible,
+.kauro-account-item:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: -2px;
+}
+
+/* Sign out last, after a rule, as in every account menu */
+.kauro-account-leave {
+  margin-block-start: 0.25rem;
+  padding-block-start: 0.25rem;
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+
+@media (max-width: 61.99rem) {
+  .kauro-shell-side {
+    max-block-size: 100vh;
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 62rem) {
+  .kauro-shell {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    align-items: start;
+    /* the menu's column keeps its colour and its rule the whole height of a long page, under the menu that stays in view */
+    background: linear-gradient(90deg, var(--kauro-color-surface) 0 16rem, var(--kauro-color-border) 16rem calc(16rem + 1px), transparent calc(16rem + 1px));
+  }
+  .kauro-shell-side {
+    block-size: 100vh;
+    gap: var(--kauro-space-5);
+    padding: var(--kauro-space-5) var(--kauro-space-4);
+    overflow-y: auto;
+    border-block-end: 0;
+    border-inline-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-shell-top {
+    padding-inline-start: var(--kauro-space-3);
+  }
+  .kauro-shell-menu {
+    display: none;
+  }
+  .kauro-shell-side:not([data-open]) .kauro-shell-panel,
+  .kauro-shell-panel {
+    display: flex;
+    flex: 1;
+  }
+  .kauro-shell-nav {
+    flex: 1;
+  }
+  .kauro-shell-group--foot {
+    margin-block-start: auto;
+  }
+  /* the screen starts beside the menu, not centred in what is left of the window */
+  .kauro-shell > .kauro-main {
+    max-inline-size: 74rem;
+    margin-inline: 0;
+    padding-inline: clamp(2rem, 4vw, 4rem);
+  }
 }
 
 /* ---- the screen ------------------------------------------------------------------------------------------------------------------- */
@@ -196,16 +469,24 @@ body {
   text-wrap: balance;
 }
 
+/* Order 11 round 2: work pages are read many times, so the page's name is one fixed size (28 px, 24 px on a phone), never larger than
+   its meaning; the two-weight display heading stays on the pages that open a path */
 .kauro-main :where(h1) {
-  margin: 0 0 var(--kauro-space-5);
-  font-size: clamp(1.875rem, 1.4rem + 1.8vw, 2.75rem);
+  margin: 0 0 var(--kauro-space-4);
+  font-size: 1.75rem;
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.022em;
+}
+
+@media (max-width: 47.99rem) {
+  .kauro-main :where(h1) {
+    font-size: 1.5rem;
+  }
 }
 
 .kauro-main :where(h2) {
   margin: var(--kauro-space-7) 0 var(--kauro-space-3);
-  font-size: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.018em;
 }
@@ -343,6 +624,16 @@ ul.kauro-actions > li {
   margin-block-start: 0;
 }
 
+/* Order 11 (D-05): a heading inside an error summary or a banner opens its box; the section spacing of main does not apply to it */
+.kauro-main .kauro-error-summary :where(h2, h3, h4),
+.kauro-main .kauro-banner :where(h2, h3, h4) {
+  margin-block-start: 0;
+}
+.kauro-main .kauro-error-summary :where(h2, h3, h4) {
+  margin-block-end: var(--kauro-space-2);
+  font-size: 1.0625rem;
+}
+
 .kauro-state[role="alert"] {
   border-inline-start: 0.25rem solid var(--kauro-color-danger-text);
 }
@@ -351,7 +642,9 @@ ul.kauro-actions > li {
   border-inline-start: 0.25rem solid var(--kauro-color-accent);
 }
 
-.kauro-button {
+/* The shell's own plain buttons (check again, sign out, a state's next step). A button of the design system carries its variant
+   (primary, secondary, danger) and keeps that look: this rule must not repaint it (Order 11: primary and danger buttons drew as neutral). */
+.kauro-button:not(.kauro-button-primary, .kauro-button-secondary, .kauro-button-danger) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -367,7 +660,7 @@ ul.kauro-actions > li {
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.kauro-button:hover {
+.kauro-button:not(.kauro-button-primary, .kauro-button-secondary, .kauro-button-danger):hover {
   border-color: var(--kauro-color-text);
 }
 
@@ -514,5 +807,167 @@ ul.kauro-actions > li {
   .kauro-state,
   .kauro-refused {
     border-color: CanvasText;
+  }
+}
+
+/* ---- Order 11: a project in the menu, and the head of its pages (shell/frame.tsx, screens/shared/project-header.tsx) -------------- */
+
+/* the project's areas nest under Projects: its name, its work in order, then apart its activity and its data */
+.kauro-shell-project {
+  margin: var(--kauro-space-1) 0 var(--kauro-space-2) var(--kauro-space-3);
+  padding-inline-start: var(--kauro-space-3);
+  border-inline-start: 1px solid var(--kauro-color-border);
+}
+.kauro-shell-project-name {
+  margin: var(--kauro-space-2) 0 var(--kauro-space-1);
+  padding-inline-start: var(--kauro-space-3);
+  overflow: hidden;
+  color: var(--kauro-color-text);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kauro-shell-project ul {
+  display: grid;
+  gap: 0.0625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-shell-nav .kauro-shell-project a {
+  min-block-size: 2.125rem;
+  font-size: 0.875rem;
+}
+.kauro-shell-project ul.kauro-shell-project-apart {
+  margin-block-start: var(--kauro-space-2);
+  padding-block-start: var(--kauro-space-2);
+  border-block-start: 1px dashed var(--kauro-color-border);
+}
+
+/* the head of a project page: client and service, the project's name, where the project stands */
+.kauro-main .kauro-project-header {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0 0 var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-project-header p {
+  margin: 0;
+}
+.kauro-main .kauro-project-header-context {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-project-header-name {
+  color: var(--kauro-color-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+.kauro-project-progress {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin-block-start: var(--kauro-space-2);
+}
+.kauro-main .kauro-project-progress-count {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-project-progress-steps {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--kauro-space-1);
+  max-inline-size: 44rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-project-step {
+  display: grid;
+  gap: var(--kauro-space-1);
+  max-inline-size: none;
+  margin: 0;
+}
+.kauro-project-step::before {
+  content: "";
+  display: block;
+  block-size: 0.25rem;
+  border-radius: 999px;
+  background: var(--kauro-color-border);
+}
+.kauro-project-step--done::before {
+  background: var(--kauro-color-primary);
+}
+.kauro-project-step--current::before {
+  background: linear-gradient(90deg, var(--kauro-color-primary) 50%, var(--kauro-color-border) 50%);
+}
+.kauro-project-step-name {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-project-step--current .kauro-project-step-name {
+  color: var(--kauro-color-text);
+  font-weight: 650;
+}
+/* on a phone the count names the current step; the row keeps the marks only */
+@media (max-width: 47.99rem) {
+  .kauro-project-step-name {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (forced-colors: active) {
+  .kauro-project-step::before {
+    border: 1px solid CanvasText;
+  }
+  .kauro-project-step--done::before,
+  .kauro-project-step--current::before {
+    background: CanvasText;
+  }
+}
+
+/* the account button's two lines: who it is for, and the role that decides what this person may press here */
+.kauro-account-text {
+  display: grid;
+  min-inline-size: 0;
+  line-height: 1.25;
+}
+.kauro-account-role {
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Order 11 round 2: on a wide screen the menu has a fixed head (the name and the workspace), a middle that scrolls (the navigation, which
+   grows with a project's areas) and a fixed foot (the person's own controls), so the account button never slides out of reach */
+@media (min-width: 62rem) {
+  .kauro-shell-side {
+    overflow: hidden;
+  }
+  .kauro-shell-side .kauro-shell-panel {
+    min-block-size: 0;
+  }
+  .kauro-shell-nav {
+    min-block-size: 0;
+    margin-inline: calc(var(--kauro-space-2) * -1);
+    padding-inline: var(--kauro-space-2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  .kauro-account {
+    flex: none;
   }
 }

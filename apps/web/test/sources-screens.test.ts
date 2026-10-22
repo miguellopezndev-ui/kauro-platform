@@ -30,6 +30,7 @@ import {
 } from "../src/screens/sources/model.ts";
 import { SealView, SelectionView, SourcesView, UploadFacts } from "../src/screens/sources/view.tsx";
 import { StatePanel } from "../src/screens/shared/state-panel.tsx";
+import { EN } from "../src/copy/en.ts";
 import { contentSecurityPolicy, newNonce, uploadConnectOrigins, uploadOriginOrNull } from "../src/server/security-headers.ts";
 import { harness, problem, respond, REVISION } from "./support/fixtures.ts";
 import {
@@ -125,9 +126,9 @@ test("UI14: each file shows declared size, upload progress, provider observation
   assert.equal(facts.scanner.kind === "INSPECTED" && facts.scanner.fullyChecked, false, "a skip is not a clean scan");
   assert.equal(facts.parser.kind === "PARSED" && facts.parser.structure, "STRUCTURE_VALID", "the parser's state does not depend on the scanner's");
   const html = renderToStaticMarkup(createElement(UploadFacts, { upload: skipped, progress: { sent: 1024, total: 2048 } }));
-  for (const label of ["Declared size", "Upload progress from this browser", "Provider observation", "Scanner coverage", "Parser state"]) assert.ok(html.includes(label), label);
+  for (const label of ["Size", "Upload from this page", "Received by Kauro", "Security scan", "Structure"]) assert.ok(html.includes(label), label);
   assert.ok(html.includes("Not fully checked: the scanner skipped this file"));
-  assert.ok(html.includes("1,024 of 2,048 bytes sent") && html.includes("2,048 bytes seen at") && html.includes("The structure is valid"));
+  assert.ok(html.includes("1,024 of 2,048 bytes sent") && html.includes("2,048 bytes, at") && html.includes("The structure is valid"));
   // a clean scan that covered only part of the file is still not fully checked
   const partial = upload({ inspection: { ...(scannerSkipped().inspection as NonNullable<ReturnType<typeof scannerSkipped>["inspection"]>), scanState: "COVERED_CLEAN", scanCoverage: { expectedParts: 4, scannedParts: 3, expectedBytes: 2048, scannedBytes: 1536 } } });
   assert.ok(renderToStaticMarkup(createElement(UploadFacts, { upload: partial, progress: null })).includes("Not fully checked: 3 of 4 parts were scanned"));
@@ -293,7 +294,7 @@ test("UI15: positional duplicate headers show as 'Email - column 3', hidden shee
   assert.ok(selectionHtml(noAck, insp, rev).includes("A hidden sheet needs your confirmation before it is included."));
   assert.ok(!/<button[^>]*disabled[^>]*>Confirm this selection/.test(selectionHtml(undefined, insp, rev)), "a complete selection can be confirmed");
   // the registry sentence, and no control the server did not permit
-  assert.ok(html.includes("Confirm the records this project includes."));
+  assert.ok(!html.includes("Confirm the records this project includes."), "round 2: the registry sentence is the page header's lead");
   assert.ok(!selectionHtml(undefined, insp, revision({ permittedActions: [] })).includes("Confirm this selection"));
 });
 
@@ -337,12 +338,12 @@ test("UI16/R2-065: the seal review shows physical rows, billable source units an
   assert.ok(html.includes("The units the service is priced on") && html.includes("The links between records that the selection declares"), "each measure has its definition");
   assert.ok(!html.includes("7,777"), "the logical record count is not composed into a figure");
   assert.ok(!/total records|records total|\brecords:/i.test(html));
-  assert.ok(html.includes("Confirm this exact source revision."));
+  assert.ok(!html.includes("Confirm this exact source revision."), "round 2: the registry sentence is the page header's lead");
   // selected and excluded tables with their reason, the hashes, the retention date
   assert.ok(html.includes("contacts.xlsx") && html.includes("Contacts") && html.includes("Old or archived data"));
   assert.ok(html.includes(SELECTION_HASH) && html.includes(INVENTORY_HASH));
   assert.ok(html.includes("Files available until"));
-  assert.ok(html.includes("It does not start a funded run."));
+  assert.ok(html.includes("It does not start anything you pay for."));
   // before the selection is evaluated there is no figure, only the sentence saying so
   const unevaluated = sealHtml(unevaluatedRevision(), unevaluatedInspection());
   assert.ok(unevaluated.includes("The counts are not available until the selection is evaluated.") && !unevaluated.includes("Physical rows"));
@@ -351,7 +352,7 @@ test("UI16/R2-065: the seal review shows physical rows, billable source units an
 test("UI16/CMD017: seal is offered only for READY_TO_SEAL with no unresolved input, sends the inventory hash it showed, and a changed hash is STALE", async () => {
   const offered = sealOffer(readyToSeal(), evaluated());
   assert.deepEqual(offered, { kind: "OFFERED", selectionHash: SELECTION_HASH, inventoryHash: INVENTORY_HASH });
-  assert.ok(sealHtml().includes("Seal this revision"));
+  assert.ok(sealHtml().includes("Seal this set"));
   // not offered: not ready, a blocker, no selection, a failed evaluation, sealed, not permitted
   const cases: ReadonlyArray<readonly [string, ReturnType<typeof readyToSeal>, ReturnType<typeof evaluated>, string]> = [
     ["not ready", readyToSeal({ state: "INSPECTING" }), evaluated(), "BLOCKED"],
@@ -364,7 +365,7 @@ test("UI16/CMD017: seal is offered only for READY_TO_SEAL with no unresolved inp
   ];
   for (const [name, rev, insp, kind] of cases) {
     assert.equal(sealOffer(rev, insp).kind, kind, name);
-    assert.ok(!sealHtml(rev, insp).includes("Seal this revision"), `${name}: no seal control`);
+    assert.ok(!sealHtml(rev, insp).includes("Seal this set"), `${name}: no seal control`);
   }
   assert.ok(sealHtml(readyToSeal({ blockers: ["INPUT_REJECTED_NOT_EXCLUDED"] })).includes("A rejected file is not excluded yet."));
   assert.ok(sealHtml(readyToSeal(), evaluated({ inventoryHash: "b".repeat(64) })).includes("The selection and the files no longer match"));
@@ -407,8 +408,9 @@ test("UI14-UI16: the shared states carry the screens - denied clears the view, a
   // the registry sentence of each screen, word for word (UI14's earlier brand is written as the product name: the copy lint refuses the old one)
   const registry = new Map(registryScreens().map((row) => [(row as unknown as { id: string }).id, (row as unknown as { primaryCopy: string }).primaryCopy] as const));
   const sentence = (id: string): string => (registry.get(id) ?? "").replace(/\bK[a]vo\b/, "Kauro");
-  assert.ok(sourcesHtml().includes(sentence("UI14")), "UI14");
-  assert.ok(selectionHtml().includes(sentence("UI15")), "UI15");
-  assert.ok(sealHtml().includes(sentence("UI16")), "UI16");
+  // round 2: each sentence is its page header's lead (the page passes it to ProjectHeader), so the copy holds it word for word
+  assert.equal(EN["screen.sources.intake.lead.body"], sentence("UI14"), "UI14");
+  assert.equal(EN["screen.sources.selection.lead.body"], sentence("UI15"), "UI15");
+  assert.equal(EN["screen.sources.seal.lead.body"], sentence("UI16"), "UI16");
   assert.equal(sentence("UI15"), "Confirm the records this project includes.");
 });

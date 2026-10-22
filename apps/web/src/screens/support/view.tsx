@@ -21,15 +21,15 @@ const STATE_TONE: Readonly<Record<SupportCaseView["state"], Tone>> = {
 
 function CaseFacts({ item }: { readonly item: SupportCaseView }): ReactElement {
   return (
-    <dl>
+    <dl className="kauro-ledger-facts">
       <div><dt>{message("screen.support.case.category.label")}</dt><dd>{message(`screen.support.category.${item.category}`)}</dd></div>
       <div><dt>{message("screen.support.case.severity.label")}</dt><dd>{message(`screen.support.severity.${item.severity}`)}</dd></div>
       <div>
         <dt>{message("screen.support.case.state.label")}</dt>
         <dd><StatusBadge tone={STATE_TONE[item.state]}>{message(`screen.support.state.${item.state}`)}</StatusBadge></dd>
       </div>
-      <div><dt>{message("screen.support.case.next.label")}</dt><dd><Deadline at={item.nextReviewAt} timeZone="America/Bogota" /></dd></div>
-      <div><dt>{message("screen.support.case.opened.label")}</dt><dd><Deadline at={item.createdAt} timeZone="America/Bogota" /></dd></div>
+      <div><dt>{message("screen.support.case.next.label")}</dt><dd><Deadline at={item.nextReviewAt} timeZone="UTC" /></dd></div>
+      <div><dt>{message("screen.support.case.opened.label")}</dt><dd><Deadline at={item.createdAt} timeZone="UTC" /></dd></div>
     </dl>
   );
 }
@@ -53,16 +53,19 @@ export function CaseList({ cases, hasMore, loading, onMore, caseHref }: CaseList
     );
   }
   return (
-    <section aria-labelledby="support-cases">
+    <section className="kauro-screen-section" aria-labelledby="support-cases">
       <h2 id="support-cases">{message("screen.support.list.heading")}</h2>
-      <p>{message("screen.support.case.commitment.body")}</p>
-      <ul>
+      <p className="kauro-ledger-note">{message("screen.support.case.commitment.body")}</p>
+      <ul className="kauro-ledger-list">
         {cases.map((item) => (
-          <li key={item.caseId}>
+          <li key={item.caseId} className="kauro-ledger-item">
+            <div className="kauro-ledger-item-head">
+              <h3 className="kauro-case-summary">{item.summary}</h3>
+              <LinkButton href={caseHref(item.caseId)} variant="secondary">
+                {message("screen.support.case.open.cta")}
+              </LinkButton>
+            </div>
             <CaseFacts item={item} />
-            <LinkButton href={caseHref(item.caseId)} variant="secondary">
-              {message("screen.support.case.open.cta")}
-            </LinkButton>
           </li>
         ))}
       </ul>
@@ -78,12 +81,12 @@ export function CaseList({ cases, hasMore, loading, onMore, caseHref }: CaseList
 /** One case; reached only from an answered read, so a refused read draws nothing of it. */
 export function CaseDetail({ item, backHref }: { readonly item: SupportCaseView; readonly backHref: string }): ReactElement {
   return (
-    <section aria-labelledby="support-case">
+    <section className="kauro-ledger-item kauro-case" aria-labelledby="support-case">
       <h2 id="support-case">{message(`screen.support.category.${item.category}`)}</h2>
-      <CaseFacts item={item} />
-      <p>{message("screen.support.case.commitment.body")}</p>
       <h3>{message("screen.support.case.summary.label")}</h3>
-      <p>{item.summary}</p>
+      <p className="kauro-case-text">{item.summary}</p>
+      <CaseFacts item={item} />
+      <p className="kauro-ledger-note">{message("screen.support.case.commitment.body")}</p>
       <LinkButton href={backHref} variant="secondary">
         {message("screen.support.case.back.cta")}
       </LinkButton>
@@ -114,7 +117,7 @@ export interface CaseFormProps {
 
 export function CaseForm({ category, summary, onCategory, onSummary, onSubmit, submitting, summaryProblem, refusal }: CaseFormProps): ReactElement {
   return (
-    <section aria-labelledby="support-form">
+    <section className="kauro-screen-section" aria-labelledby="support-form">
       <h2 id="support-form">{message("screen.support.form.heading")}</h2>
       <Banner tone="warning" title={message("screen.support.form.warning.title")}>
         <p>{message("screen.support.form.warning.body")}</p>
@@ -132,6 +135,7 @@ export function CaseForm({ category, summary, onCategory, onSummary, onSubmit, s
         </Banner>
       )}
       <form
+        className="kauro-panel-form"
         onSubmit={(event) => {
           event.preventDefault();
           if (!submitting) onSubmit();

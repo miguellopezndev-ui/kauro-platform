@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { message } from "../../../../../../../copy/en.ts";
 import { QuoteScreen } from "../../../../../../../screens/payments/containers.tsx";
 import { idOrNull } from "../../../../../../../screens/shared/params.ts";
+import { ProjectHeader } from "../../../../../../../screens/shared/project-header.tsx";
 
 // UI23 Quote (design D-ROUTE-1): the project and the agency come from the path, the quote from `?quote=`.
 export default async function Page({ params, searchParams }: { readonly params: Promise<{ agencyId: string; id: string }>; readonly searchParams: Promise<{ quote?: string | string[] }> }) {
@@ -12,7 +13,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
   if (agency === null || project === null || (quote !== undefined && idOrNull(quote) === null)) notFound();
   return (
     <>
-      <h1>{message("screen.quote.title")}</h1>
+      <ProjectHeader stage="purchase" title={message("screen.quote.title")} lead={message("screen.quote.lead.body")} />
       <QuoteScreen agencyId={agency} projectId={project} quoteId={idOrNull(quote)} />
     </>
   );

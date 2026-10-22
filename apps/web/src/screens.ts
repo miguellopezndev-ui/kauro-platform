@@ -97,6 +97,12 @@ export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(Object.v
 export interface NavigationEntry {
   readonly screen: string;
   readonly label: MessageId;
+  /** A heading the entry sits under; an entry without one is in the menu's first group. "nav.group.help.label" is drawn at the foot. */
+  readonly group?: MessageId;
+  /** The path of a proposed page no registry route holds yet; the entry appears only where that page exists (the review draws it). */
+  readonly proposedPath?: string;
+  /** In a narrowed (seller's) menu only: the owner reaches the same page through another entry. */
+  readonly sellerOnly?: true;
 }
 
 /** The agency-level entries of the shell, in order (reference "Agency context stays visible through Projects, Clients, Team, Billing, Settings"). */
@@ -106,8 +112,107 @@ export const AGENCY_NAVIGATION: readonly NavigationEntry[] = [
   { screen: "UI31", label: "nav.team.label" },
   { screen: "UI30", label: "nav.billing.label" },
   { screen: "UI32", label: "nav.settings.label" },
-  { screen: "UI52", label: "nav.support.label" },
+  { screen: "UI52", label: "nav.support.label", group: "nav.group.help.label" },
 ];
+
+/**
+ * The operations entries (Order 11, round 2: owner-console.md §10.2). The owner's menu is grouped by what the owner counts, each a noun with
+ * one home: Today; Money (Finance, Payouts); Customers; Sellers (Sellers, Claims); Sales work (Prospects, Outreach, Resources); Operations
+ * (Support cases first, for its deadlines, then Jobs, Incidents, Deletion); Company (Operating review, Releases, Owner actions, Settings).
+ * Customers is a group of one, so it carries no heading that would repeat its only entry. A person sees the entries their capabilities
+ * allow (the server refuses everything else in any case); a seller's are Today, Prospects, Outreach, Commissions and Resources, in the
+ * order of their work (seller-portal.md §12.1). Sellers, Payouts, Customers, Claims and Settings are proposals: they appear only where
+ * their page exists.
+ */
+export const OPS_NAVIGATION: readonly NavigationEntry[] = [
+  { screen: "UI33", label: "nav.ops.home.label" },
+  { screen: "UI39", label: "nav.ops.finance.label", group: "nav.group.money.label" },
+  { screen: "P-22", label: "nav.ops.payouts.label", group: "nav.group.money.label", proposedPath: "/ops/money/payouts" },
+  { screen: "P-23", label: "nav.ops.customers.label", proposedPath: "/ops/customers" },
+  { screen: "P-21", label: "nav.ops.sellers.label", group: "nav.group.sellers.label", proposedPath: "/ops/sales/sellers" },
+  { screen: "P-24", label: "nav.ops.claims.label", group: "nav.group.sellers.label", proposedPath: "/ops/sales/claims" },
+  { screen: "UI34", label: "nav.ops.prospects.label", group: "nav.group.sales-work.label" },
+  { screen: "UI54", label: "nav.ops.outreach.label", group: "nav.group.sales-work.label" },
+  { screen: "UI36", label: "nav.ops.commissions.label", group: "nav.group.sales-work.label", sellerOnly: true },
+  { screen: "UI53", label: "nav.ops.resources.label", group: "nav.group.sales-work.label" },
+  { screen: "UI55", label: "nav.ops.support.label", group: "nav.group.operations.label" },
+  { screen: "UI40", label: "nav.ops.jobs.label", group: "nav.group.operations.label" },
+  { screen: "UI42", label: "nav.ops.incidents.label", group: "nav.group.operations.label" },
+  { screen: "UI41", label: "nav.ops.deletion.label", group: "nav.group.operations.label" },
+  { screen: "UI44", label: "nav.ops.reviews.label", group: "nav.group.company.label" },
+  { screen: "UI43", label: "nav.ops.releases.label", group: "nav.group.company.label" },
+  { screen: "UI38", label: "nav.ops.owner-actions.label", group: "nav.group.company.label" },
+  { screen: "P-04", label: "nav.ops.settings.label", group: "nav.group.company.label", proposedPath: "/ops/settings" },
+];
+
+/** A menu this short reads without headings (seller-portal.md §12.1: five items need no groups). */
+const UNGROUPED_MAXIMUM = 7;
+
+export type ServiceMode = "CLEAN" | "HUBSPOT" | "SALESFORCE";
+
+/** One area of a project in the menu: the screens it holds, the first of which it opens, and the services that have it. */
+export interface ProjectAreaEntry {
+  readonly key: "overview" | "files" | "destination" | "check" | "plan" | "purchase" | "preparation" | "delivery" | "import" | "activity" | "data";
+  readonly label: MessageId;
+  /** The screens of this area; the first is where the area's link goes. An id that is not a built screen (a proposal) hides the area. */
+  readonly screens: readonly string[];
+  /** The services that have this area; absent, every service. */
+  readonly modes?: readonly ServiceMode[];
+  /** Drawn apart, after the project's work: the record of what happened and the data it keeps. */
+  readonly apart?: true;
+  /** The path of a proposed area that no registry route holds yet, after the project's path. */
+  readonly proposedPath?: string;
+}
+
+/**
+ * The areas of a project (Order 11, the owner's decision of 2026-10-20, kept in round 2): places for the real tasks, in the order the work
+ * meets them, adapted to the service (a destination and an import exist for HubSpot and Salesforce, never for "Clean your data"); Activity
+ * and the data kept are reachable and never a step. The areas nest under Projects in the menu; the project's progress is drawn once, in the
+ * project's header, as a path that does not navigate. Round 2 (research agency-workspace.md §1.2: the menu and the progress said the same
+ * thing "in different words, with different counts"): every stage area carries its stage's own short name (Quote and payment, not
+ * Purchase), and the preparation is its own area, so each of the six stages has one place and the delivery is no longer "step 5" twice.
+ */
+export const PROJECT_AREAS: readonly ProjectAreaEntry[] = [
+  { key: "overview", label: "nav.project.overview.label", screens: ["UI13"] },
+  { key: "files", label: "nav.project.files.label", screens: ["UI14", "UI15", "UI16"] },
+  { key: "destination", label: "nav.project.destination.label", screens: ["UI17"], modes: ["HUBSPOT", "SALESFORCE"] },
+  { key: "check", label: "nav.project.check.label", screens: ["UI18"] },
+  { key: "plan", label: "nav.project.plan.label", screens: ["UI19", "UI20", "UI21", "UI22"] },
+  { key: "purchase", label: "nav.project.purchase.label", screens: ["UI23"] },
+  { key: "preparation", label: "nav.project.preparation.label", screens: ["UI25"] },
+  { key: "delivery", label: "nav.project.delivery.label", screens: ["UI26"] },
+  { key: "import", label: "nav.project.import.label", screens: ["UI27", "UI28"], modes: ["HUBSPOT", "SALESFORCE"] },
+  { key: "activity", label: "nav.project.activity.label", screens: ["P-08"], apart: true, proposedPath: "/activity" },
+  { key: "data", label: "nav.project.data.label", screens: ["UI29"], apart: true },
+];
+
+/** The project a pathname is inside, when it is a project's page of an agency. */
+export function projectOfPathname(pathname: string): { readonly agencyId: string; readonly projectId: string } | null {
+  const proposed = /^\/agencies\/([^/]+)\/projects\/([^/]+)\/activity$/.exec(pathname);
+  if (proposed !== null) return { agencyId: proposed[1] ?? "", projectId: proposed[2] ?? "" };
+  const match = matchRoute(pathname);
+  const agencyId = match?.params["agencyId"];
+  const projectId = match?.params["id"];
+  return match !== null && match.screen.tenant && agencyId !== undefined && projectId !== undefined && match.screen.route.includes("/projects/{id}") ? { agencyId, projectId } : null;
+}
+
+/** The areas of one project for its service, each with its link and whether the pathname is inside it. */
+export function projectAreasFor(
+  pathname: string,
+  mode: ServiceMode,
+  implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS,
+): readonly { readonly key: ProjectAreaEntry["key"]; readonly label: MessageId; readonly href: string; readonly current: boolean; readonly apart: boolean }[] {
+  const project = projectOfPathname(pathname);
+  if (project === null) return [];
+  const here = matchRoute(pathname)?.screen.id;
+  const base = pathOf("UI13", { agencyId: project.agencyId, id: project.projectId });
+  return PROJECT_AREAS.filter((area) => (area.modes === undefined || area.modes.includes(mode)) && area.screens[0] !== undefined && implemented.has(area.screens[0])).map((area) => {
+    const first = area.screens[0] as string;
+    const href = area.proposedPath !== undefined ? base + area.proposedPath : pathOf(first, { agencyId: project.agencyId, id: project.projectId });
+    const current = area.proposedPath !== undefined ? pathname === href : here !== undefined && area.screens.includes(here);
+    return { key: area.key, label: area.label, href, current, apart: area.apart === true };
+  });
+}
 
 const SEGMENT = /^[A-Za-z0-9_-]{1,128}$/;
 const PARAMETER = /^\{([A-Za-z][A-Za-z0-9]*)\}$/;
@@ -176,7 +281,8 @@ export const AGENCY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-
 
 /** The agency a pathname is in, or null for a path outside an agency (or one whose agency segment is not an agency id). */
 export function agencyOfPathname(pathname: string): string | null {
-  const agency = matchRoute(pathname)?.params["agencyId"];
+  // a project's proposed Activity area (P-08) lives under its project's path before a registry route holds it: it is in the same agency
+  const agency = matchRoute(pathname)?.params["agencyId"] ?? projectOfPathname(pathname)?.agencyId;
   return agency !== undefined && AGENCY_ID.test(agency) ? agency : null;
 }
 
@@ -186,8 +292,18 @@ export function originOfPath(pathname: string): Origin | null {
 }
 
 /** The navigation entries of an agency, for the screens that exist. Each link is a plain path (the shell renders it without prefetch). */
-export function navigationFor(agencyId: string, implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS): readonly { readonly screen: string; readonly label: MessageId; readonly href: string }[] {
+export function navigationFor(agencyId: string, implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS): readonly { readonly screen: string; readonly label: MessageId; readonly href: string; readonly group?: MessageId }[] {
   return AGENCY_NAVIGATION.filter((entry) => implemented.has(entry.screen)).map((entry) => ({ ...entry, href: pathOf(entry.screen, { agencyId }) }));
+}
+
+/**
+ * The operations entries whose pages exist in this build and that this person may open (all of them when the caller does not narrow it).
+ * A narrowed menu (a seller's) also holds its own entries, and loses its headings when it is short enough to read without them.
+ */
+export function opsNavigationFor(implemented: ReadonlySet<string> = IMPLEMENTED_SCREENS, allowed?: ReadonlySet<string>): readonly { readonly screen: string; readonly label: MessageId; readonly href: string; readonly group?: MessageId }[] {
+  const entries = OPS_NAVIGATION.filter((entry) => implemented.has(entry.screen) && (allowed === undefined ? entry.sellerOnly !== true : allowed.has(entry.screen)));
+  const flat = allowed !== undefined && entries.length <= UNGROUPED_MAXIMUM;
+  return entries.map(({ screen, label, group, proposedPath }) => ({ screen, label, href: proposedPath ?? pathOf(screen), ...(group === undefined || flat ? {} : { group }) }));
 }
 
 const MAX_RETURN_PATH = 512;

@@ -1,0 +1,3355 @@
+/* Pages of the private application (Order 11), each in its own block, in the order the owner reviews them. */
+
+/* ===== UI09 Agency setup: the account done, then four numbered parts (revision of 2026-10-20) ===== */
+.kauro-main .kauro-setup-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-5);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-setup-done bdi {
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
+.kauro-setup-done-mark {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 50%;
+  background: var(--kauro-color-success-text);
+}
+.kauro-setup-done-mark::after {
+  content: "\2713";
+  color: var(--kauro-color-success-surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.kauro-main .kauro-setup-form {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 44rem;
+}
+.kauro-main .kauro-setup-part {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-setup-part > * {
+  margin: 0;
+}
+.kauro-main .kauro-setup-part legend {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  float: left;
+  inline-size: 100%;
+  margin-block-end: var(--kauro-space-3);
+  padding: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+.kauro-main .kauro-setup-part legend + * {
+  clear: both;
+}
+.kauro-setup-number {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-main .kauro-setup-part .kauro-choice,
+.kauro-main .kauro-setup-part .kauro-confirm,
+.kauro-main .kauro-setup-part .kauro-field,
+.kauro-main .kauro-setup-part .kauro-documents {
+  margin: 0;
+}
+.kauro-main .kauro-setup-explain {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-setup-error {
+  color: var(--kauro-color-danger-text);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-setup-form > .kauro-actions {
+  margin: var(--kauro-space-2) 0 0;
+}
+.kauro-documents {
+  display: grid;
+  margin: var(--kauro-space-2) 0 var(--kauro-space-4);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-documents li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-documents a {
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+}
+.kauro-documents span {
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-setup-join {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* ===== UI10 Agency switcher: each workspace is one row, and the row is the way in ===== */
+.kauro-workspaces {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-workspaces > li {
+  max-inline-size: none;
+}
+.kauro-main .kauro-workspace {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--kauro-space-3) var(--kauro-space-4);
+  align-items: center;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+a.kauro-workspace {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+a.kauro-workspace:hover {
+  border-color: var(--kauro-color-primary);
+  box-shadow: 0 1.25rem 2rem -1.75rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent);
+  transform: translateY(-0.125rem);
+}
+@media (prefers-reduced-motion: reduce) {
+  a.kauro-workspace,
+  a.kauro-workspace:hover {
+    transition: none;
+    transform: none;
+  }
+}
+.kauro-workspaces > li.is-here .kauro-workspace {
+  border-color: var(--kauro-color-primary);
+  box-shadow: inset 0.25rem 0 0 var(--kauro-color-primary);
+}
+.kauro-workspaces > li.is-suspended .kauro-monogram {
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-workspace-main {
+  display: grid;
+  gap: 0.125rem;
+  min-inline-size: 0;
+}
+.kauro-workspace-name {
+  font-family: var(--kauro-display-family);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+.kauro-workspace-role {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-workspace-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-3);
+  grid-column: 2;
+}
+.kauro-here {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kauro-workspace-go {
+  grid-column: 2;
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+}
+a.kauro-workspace .kauro-workspace-go::after {
+  content: "\2192";
+  margin-inline-start: var(--kauro-space-2);
+}
+.is-suspended .kauro-workspace-go {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-workspace {
+    grid-template-columns: auto minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  }
+  .kauro-workspace-state,
+  .kauro-workspace-go {
+    grid-column: auto;
+  }
+  .kauro-workspace-go {
+    justify-self: end;
+  }
+}
+.kauro-main .kauro-switch-new {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-switching {
+  display: grid;
+  justify-items: center;
+  gap: var(--kauro-space-2);
+  padding-block: clamp(3rem, 12vw, 7rem);
+  text-align: center;
+}
+.kauro-switching .kauro-monogram {
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-switching p:first-of-type {
+  margin: var(--kauro-space-3) 0 0;
+  font-family: var(--kauro-display-family);
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+/* ===== UI31 Team: the people, one quiet menu per row, the roles as a grid ===== */
+.kauro-main .kauro-team-panel {
+  margin-block-end: var(--kauro-space-6);
+}
+.kauro-team-invite-fields {
+  display: grid;
+  gap: 0 var(--kauro-space-5);
+}
+@media (min-width: 48rem) {
+  .kauro-team-invite-fields {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.kauro-main .kauro-team-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-person {
+  display: block;
+  font-weight: 650;
+}
+.kauro-person-sub {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+}
+.kauro-team-table tr.is-self th {
+  box-shadow: inset 0.1875rem 0 0 var(--kauro-color-primary);
+}
+.kauro-team-table tr.is-muted :is(th, td) {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-row-manage {
+  text-align: end;
+  white-space: nowrap;
+}
+/* a row's actions: one quiet disclosure, a small card under it */
+.kauro-menu {
+  position: relative;
+  display: inline-block;
+  text-align: start;
+}
+.kauro-menu summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-block-size: var(--kauro-target-size);
+  padding: 0 0.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+.kauro-menu summary::-webkit-details-marker {
+  display: none;
+}
+.kauro-menu summary::after {
+  content: "";
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  margin-block-start: -0.25rem;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.kauro-menu summary:hover,
+.kauro-menu[open] summary {
+  border-color: var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+.kauro-menu ul {
+  position: absolute;
+  z-index: 5;
+  inset-block-start: calc(100% + 0.25rem);
+  inset-inline-end: 0;
+  display: grid;
+  min-inline-size: 13rem;
+  margin: 0;
+  padding: 0.375rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1.25rem 2.5rem -1.5rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent);
+  list-style: none;
+}
+.kauro-main .kauro-menu li {
+  max-inline-size: none;
+}
+.kauro-menu li button {
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--kauro-target-size);
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--kauro-radius);
+  background: none;
+  color: var(--kauro-color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.kauro-menu li button:hover {
+  background: var(--kauro-color-surface);
+}
+.kauro-menu li button.is-danger {
+  color: var(--kauro-color-danger-text);
+}
+.kauro-main .kauro-team-alone {
+  margin-block-start: var(--kauro-space-4);
+}
+.kauro-main .kauro-team-roles,
+.kauro-main .kauro-team-ownership {
+  margin-block-start: var(--kauro-space-7);
+}
+.kauro-team-roles ul {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: var(--kauro-space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-team-roles li {
+  display: grid;
+  gap: 0.25rem;
+  max-inline-size: none;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+}
+.kauro-team-roles li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+@media (min-width: 48rem) {
+  .kauro-team-roles ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* on a phone each person is a card: the name, then each value beside its column's name */
+@media (max-width: 47.99rem) {
+  .kauro-team-table,
+  .kauro-team-table tbody,
+  .kauro-team-table tr,
+  .kauro-team-table th,
+  .kauro-team-table td {
+    display: block;
+  }
+  .kauro-team-table thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-team-table tbody tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-team-table tbody :is(th, td) {
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+  }
+  .kauro-team-table td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--kauro-space-3);
+  }
+  .kauro-team-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-row-manage {
+    padding-block-start: var(--kauro-space-2);
+    text-align: start;
+  }
+  .kauro-menu ul {
+    inset-inline-end: auto;
+    inset-inline-start: 0;
+  }
+  .kauro-team-table tr.is-self th {
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 48rem) {
+  .kauro-team-table :is(th, td) {
+    vertical-align: middle;
+  }
+}
+
+/* ===== Settings pages (P-01 to P-04): split sections, the heading beside its content, as on the public site ===== */
+.kauro-main .kauro-settings-split > section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-2) var(--kauro-space-7);
+  margin: 0;
+  padding-block: var(--kauro-space-6);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-settings-split > section:first-child {
+  border-block-start: 0;
+  padding-block-start: 0;
+}
+.kauro-main .kauro-settings-split > section > h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-settings-split > section > :is(dl, ul, fieldset, form):first-of-type {
+  margin-block-start: 0;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-settings-split > section {
+    grid-template-columns: minmax(12rem, 0.6fr) minmax(0, 1.4fr);
+    align-items: start;
+  }
+  .kauro-main .kauro-settings-split > section > h2 {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .kauro-main .kauro-settings-split > section > :not(h2) {
+    grid-column: 2;
+  }
+}
+.kauro-main .kauro-settings-split dl {
+  margin-block: 0 var(--kauro-space-3);
+}
+.kauro-main .kauro-settings-split .kauro-proposed,
+.kauro-main .kauro-settings-split > section > .kauro-button,
+.kauro-main .kauro-settings-split > section > a {
+  justify-self: start;
+}
+
+/* P-01 appearance: two miniatures of the product window */
+.kauro-appearance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-appearance-option {
+  position: relative;
+  display: grid;
+  gap: var(--kauro-space-2);
+  cursor: pointer;
+}
+.kauro-appearance-option input {
+  position: absolute;
+  opacity: 0;
+}
+.kauro-appearance-preview {
+  display: grid;
+  gap: 0.5rem;
+  inline-size: 10rem;
+  padding: 0 0 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.625rem;
+}
+.kauro-appearance-option--light .kauro-appearance-preview {
+  background: #f8f6f3;
+}
+.kauro-appearance-option--dark .kauro-appearance-preview {
+  background: #2d2c2f;
+}
+.kauro-appearance-bar {
+  padding: 0.375rem 0.625rem;
+  background: #242426;
+  color: #f8f6f3;
+  font-family: var(--kauro-display-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-appearance-option--dark .kauro-appearance-bar {
+  background: #1d1d1f;
+}
+.kauro-appearance-line {
+  block-size: 0.375rem;
+  margin-inline: 0.625rem;
+  border-radius: 1rem;
+  background: #ddd5cc;
+}
+.kauro-appearance-option--dark .kauro-appearance-line {
+  background: #45434a;
+}
+.kauro-appearance-line--short {
+  inline-size: 55%;
+}
+.kauro-appearance-ring {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  margin-inline: 0.625rem;
+  border-radius: 50%;
+  background: #653a46;
+}
+.kauro-appearance-option--dark .kauro-appearance-ring {
+  background: #c4a693;
+}
+.kauro-appearance-name {
+  font-weight: 600;
+}
+.kauro-appearance-option:has(input:checked) .kauro-appearance-preview {
+  outline: 2px solid var(--kauro-color-primary);
+  outline-offset: 3px;
+}
+.kauro-appearance-option:has(input:checked) .kauro-appearance-name::after {
+  content: " · in use";
+  color: var(--kauro-color-primary);
+  font-weight: 400;
+}
+.kauro-appearance-option:has(input:focus-visible) .kauro-appearance-preview {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+
+/* ===== Settings pages: notices, branding, providers ===== */
+.kauro-notice-form fieldset,
+fieldset.kauro-notice-form {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-3);
+  padding: 0;
+  border: 0;
+}
+.kauro-notice-form legend {
+  margin-block-end: var(--kauro-space-2);
+  font-weight: 600;
+}
+.kauro-check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  min-block-size: var(--kauro-target-size);
+  cursor: pointer;
+}
+.kauro-check-row input {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0;
+  accent-color: var(--kauro-color-primary);
+}
+.kauro-saved {
+  color: var(--kauro-color-success-text);
+  font-weight: 600;
+}
+.kauro-brand-form {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 40rem;
+}
+.kauro-logo-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--kauro-space-4);
+}
+.kauro-logo-preview {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-wine);
+  color: var(--kauro-color-on-wine);
+  font-family: var(--kauro-display-family);
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+/* ---- providers: name, state and what it means, never a secret ---- */
+.kauro-provider-list {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: var(--kauro-space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-provider-list > li {
+  display: grid;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  align-items: center;
+  max-inline-size: none;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-provider-list p {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+/* the provider, its state and its way in on one line; what the state means under them, across the row */
+@media (min-width: 40rem) {
+  .kauro-provider-list > li {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .kauro-provider-list > li > :first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .kauro-provider-list > li > .kauro-status-badge {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .kauro-provider-list > li > .kauro-button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .kauro-main .kauro-provider-list > li > p {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* A form laid out as a grid takes the width it is given, never the width of its widest control (a long select or a file input would
+   otherwise push the page wider than a phone). */
+
+/* ===== UI10 with no workspace: the welcome of a new account ===== */
+.kauro-welcome {
+  display: grid;
+  gap: var(--kauro-space-7);
+  align-items: start;
+}
+@media (min-width: 62rem) {
+  .kauro-welcome {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
+  }
+}
+.kauro-main .kauro-welcome-start h2 {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-welcome-steps {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  list-style: none;
+  counter-reset: welcome;
+}
+.kauro-main .kauro-welcome-steps li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: none;
+  padding-inline-start: 2.75rem;
+  counter-increment: welcome;
+}
+.kauro-welcome-steps li::before {
+  content: counter(welcome);
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.875rem;
+  block-size: 1.875rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-welcome-steps span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-welcome-promises {
+  margin-block: var(--kauro-space-6) 0;
+  padding-block-start: var(--kauro-space-5);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-welcome-example-go {
+  margin-block-start: var(--kauro-space-5);
+}
+
+/* the two sides of the welcome are not two sections of a page: no rule between them */
+.kauro-main .kauro-welcome > section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* the example's stages: each fact under its name, so the stage names never break */
+.kauro-welcome-example .kauro-ring {
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: start;
+  padding-block: 0.3125rem;
+}
+.kauro-welcome-example .kauro-ring::before,
+.kauro-welcome-example .kauro-ring::after {
+  margin-block-start: 0.125rem;
+}
+.kauro-welcome-example .kauro-ring--done::after {
+  margin-block-start: 0.3125rem;
+}
+.kauro-welcome-example .kauro-ring-fact {
+  grid-column: 2;
+  grid-row: 2;
+  text-align: start;
+}
+
+/* ===== UI11 Projects: groups by who must act, one row a project with its one next step ===== */
+.kauro-board-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin-block-end: var(--kauro-space-6);
+}
+.kauro-board-tools .kauro-filter {
+  margin: 0;
+}
+.kauro-filter-chip {
+  min-block-size: 2.75rem;
+  padding: 0 var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 62.5rem;
+  background: color-mix(in srgb, var(--kauro-color-primary) 6%, var(--kauro-color-raised));
+  color: var(--kauro-color-primary);
+  font: inherit;
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-board-repeat {
+  flex: 1 1 18rem;
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  text-align: end;
+}
+.kauro-main .kauro-board-repeat strong {
+  color: var(--kauro-color-text);
+}
+.kauro-main .kauro-board-group {
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 0;
+}
+.kauro-board-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  margin-block-end: var(--kauro-space-3);
+}
+.kauro-main .kauro-board-group-head h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-board-group-head p {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-board-count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-inline-start: var(--kauro-space-1);
+  padding-inline: 0.375rem;
+  border-radius: 62.5rem;
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  vertical-align: 0.125rem;
+}
+.kauro-main .kauro-board-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  list-style: none;
+  overflow: hidden;
+}
+.kauro-main .kauro-board-row {
+  max-inline-size: none;
+}
+.kauro-main .kauro-board-row + .kauro-board-row {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-board-link {
+  display: grid;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  align-items: center;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-board-link:hover {
+  background: color-mix(in srgb, var(--kauro-color-primary) 4%, var(--kauro-color-raised));
+}
+.kauro-board-link:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: calc(var(--kauro-focus-width) * -1);
+}
+@media (min-width: 62rem) {
+  .kauro-board-link {
+    grid-template-columns: minmax(11rem, 1.1fr) minmax(13rem, 1.3fr) minmax(10.5rem, 0.9fr) minmax(11rem, auto);
+  }
+}
+.kauro-board-client {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-3);
+  min-inline-size: 0;
+  font-weight: 650;
+}
+.kauro-board-client bdi {
+  overflow-wrap: anywhere;
+}
+.kauro-board-mode {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.kauro-board-example {
+  padding: 0.0625rem 0.5rem;
+  border: 1px dashed var(--kauro-color-accent);
+  border-radius: 62.5rem;
+  color: var(--kauro-color-accent-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.kauro-board-stage {
+  display: grid;
+  gap: 0.375rem;
+}
+.kauro-board-stage-name {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-stage-marks {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  max-inline-size: 12rem;
+}
+.kauro-stage-marks > span {
+  block-size: 0.3125rem;
+  border-radius: 1rem;
+  background: var(--kauro-color-border);
+}
+.kauro-stage-marks > .is-done {
+  background: var(--kauro-color-primary);
+}
+.kauro-stage-marks > .is-current {
+  background: color-mix(in srgb, var(--kauro-color-primary) 45%, var(--kauro-color-border));
+}
+.kauro-board-stopped {
+  justify-self: start;
+  padding: 0 0.5rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-danger-surface);
+  color: var(--kauro-color-danger-text);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-board-when {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-board-next {
+  color: var(--kauro-color-primary);
+  font-weight: 650;
+  font-size: 0.9375rem;
+}
+@media (min-width: 62rem) {
+  .kauro-board-next {
+    justify-self: end;
+    text-align: end;
+  }
+}
+.kauro-board-row--yours .kauro-board-link {
+  box-shadow: inset 3px 0 0 var(--kauro-color-primary);
+}
+.kauro-board-row--kauro .kauro-board-next,
+.kauro-board-row--others .kauro-board-next,
+.kauro-board-row--delivered .kauro-board-next {
+  color: var(--kauro-color-text);
+  font-weight: 500;
+}
+.kauro-board-row--others .kauro-board-next .kauro-go::after,
+.kauro-board-row--kauro .kauro-board-next .kauro-go::after {
+  content: none;
+}
+.kauro-board-row--example .kauro-board-link {
+  background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--kauro-color-accent) 7%, transparent) 10px 11px);
+}
+/* the first visit: the first project offered beside the example */
+.kauro-main .kauro-board-first {
+  display: grid;
+  gap: var(--kauro-space-5);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-board-first-start {
+  display: grid;
+  gap: var(--kauro-space-3);
+  justify-items: start;
+  max-inline-size: 40rem;
+}
+.kauro-main .kauro-board-first-start > :is(h2, p) {
+  margin: 0;
+}
+/* starting a project, on the board */
+.kauro-main .kauro-board-start {
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1.5rem 3rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
+}
+.kauro-main .kauro-board-start .kauro-form {
+  gap: var(--kauro-space-4);
+  max-inline-size: 48rem;
+}
+.kauro-main .kauro-board-start h2 {
+  margin: 0;
+}
+.kauro-main .kauro-board-start p {
+  margin: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-choice--row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--kauro-space-3);
+  }
+  .kauro-choice--row legend {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ===== UI13 Overview: where the project is, its next step, its facts and what happened ===== */
+.kauro-main .kauro-project-head h1 {
+  margin-block: var(--kauro-space-2) var(--kauro-space-4);
+}
+.kauro-main .kauro-next {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-7);
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  box-shadow: 0 1.5rem 3rem -2.5rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent);
+}
+.kauro-main .kauro-next > :is(h2, p) {
+  margin: 0;
+}
+.kauro-main .kauro-next h2 {
+  font-size: clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem);
+}
+.kauro-main .kauro-next-label {
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-next-who {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-next-who span {
+  font-weight: 600;
+}
+.kauro-main .kauro-next .kauro-actions {
+  margin: var(--kauro-space-2) 0 0;
+}
+.kauro-project-grid {
+  display: grid;
+  gap: var(--kauro-space-6) var(--kauro-space-7);
+  margin-block-end: var(--kauro-space-6);
+}
+@media (min-width: 62rem) {
+  .kauro-project-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.kauro-main .kauro-project-grid > section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-project-grid h2 {
+  margin-block: 0 var(--kauro-space-3);
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-activity {
+  position: relative;
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0 0 0 var(--kauro-space-5);
+  list-style: none;
+}
+.kauro-main .kauro-activity::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.5rem;
+  inset-inline-start: 0.3125rem;
+  border-inline-start: 1.5px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-activity li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: none;
+}
+.kauro-main .kauro-activity li::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.375rem;
+  inset-inline-start: calc(var(--kauro-space-5) * -1);
+  box-sizing: border-box;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-activity li:first-child::before {
+  background: var(--kauro-color-primary);
+}
+.kauro-activity-when {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== UI12 Clients: one card a client, its projects and its authority; archiving shows its impact first ===== */
+.kauro-main .kauro-clients {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-client {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--kauro-space-3) var(--kauro-space-4);
+  box-sizing: border-box;
+  max-inline-size: none;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-client {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+.kauro-main .kauro-client--archived {
+  background: transparent;
+  border-style: dashed;
+}
+.kauro-client-main {
+  display: grid;
+  gap: 0.25rem;
+  min-inline-size: 0;
+}
+.kauro-main .kauro-client-main h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-client-main p {
+  margin: 0;
+}
+.kauro-client-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-client-authority {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+.kauro-client-authority code {
+  color: var(--kauro-color-text);
+  overflow-wrap: anywhere;
+}
+.kauro-client-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  grid-column: 1 / -1;
+}
+@media (min-width: 48rem) {
+  .kauro-client-actions {
+    grid-column: auto;
+  }
+}
+.kauro-main .kauro-client-impact {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-client-impact h3 {
+  margin: 0;
+}
+.kauro-main .kauro-client-impact ul {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+.kauro-main .kauro-client-impact .kauro-actions {
+  margin: 0;
+}
+.kauro-main .kauro-clients-archived {
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-main .kauro-clients-archived summary {
+  display: flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  margin-block-end: var(--kauro-space-3);
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.kauro-main .kauro-clients-company {
+  display: grid;
+  gap: var(--kauro-space-3);
+  justify-items: start;
+  max-inline-size: 40rem;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-clients-company > :is(h2, p) {
+  margin: 0;
+}
+/* a banner at the top of a page keeps its distance from what follows */
+.kauro-main > .kauro-banner {
+  margin-block-end: var(--kauro-space-5);
+}
+
+/* ===== UI17 Target setup: how to give the settings, what Kauro read, what is not known ===== */
+.kauro-main .kauro-target-steps {
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-target-steps h2 {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-main .kauro-target-steps ol {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: target;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-target-steps ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.kauro-main .kauro-target-steps li {
+  position: relative;
+  display: grid;
+  gap: var(--kauro-space-1);
+  max-inline-size: none;
+  padding: var(--kauro-space-4) var(--kauro-space-4) var(--kauro-space-4) 3.25rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  counter-increment: target;
+}
+.kauro-target-steps li::before {
+  content: counter(target);
+  position: absolute;
+  inset-block-start: var(--kauro-space-4);
+  inset-inline-start: var(--kauro-space-4);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.625rem;
+  block-size: 1.625rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.kauro-target-steps li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-unknown {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 48rem;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px dashed var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-unknown p {
+  margin: 0;
+}
+.kauro-unknown-tag {
+  margin-inline-end: var(--kauro-space-2);
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-text);
+  color: var(--kauro-color-warning-surface);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ===== The plan (UI19 to UI22): its parts as a task list, then each part's page ===== */
+.kauro-main .kauro-plan-tasks {
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-plan-tasks ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: plan;
+}
+.kauro-main .kauro-plan-task {
+  max-inline-size: none;
+  margin: 0;
+  counter-increment: plan;
+}
+.kauro-plan-task a {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  block-size: 100%;
+  box-sizing: border-box;
+  padding: var(--kauro-space-3) var(--kauro-space-4) var(--kauro-space-3) 2.75rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-plan-task a:hover {
+  border-color: var(--kauro-color-control-border);
+}
+.kauro-plan-task a::before {
+  content: counter(plan);
+  position: absolute;
+  inset-block-start: var(--kauro-space-3);
+  inset-inline-start: var(--kauro-space-3);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  border: 1.5px solid var(--kauro-color-control-border);
+  border-radius: 50%;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-plan-task--done a::before {
+  content: "\2713";
+  border-color: var(--kauro-color-success-text);
+  background: var(--kauro-color-success-text);
+  color: var(--kauro-color-success-surface);
+}
+.kauro-plan-task--blocked a::before {
+  content: "!";
+  border-color: var(--kauro-color-danger-text);
+  color: var(--kauro-color-danger-text);
+}
+.kauro-plan-task.is-current a {
+  border-color: var(--kauro-color-primary);
+  box-shadow: inset 0 -3px 0 var(--kauro-color-primary);
+}
+.kauro-plan-task.is-current a::before {
+  border-color: var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+}
+.kauro-plan-task--done.is-current a::before {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-plan-task-name {
+  font-weight: 600;
+}
+.kauro-plan-task-state {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-plan-task--done .kauro-plan-task-state {
+  color: var(--kauro-color-success-text);
+}
+.kauro-plan-task--blocked .kauro-plan-task-state {
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+
+/* UI19: the files as tabs, one row a source column */
+.kauro-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-1);
+  margin: 0 0 var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-tab {
+  display: grid;
+  gap: 0.125rem;
+  margin-block-end: -1px;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border: 0;
+  border-block-end: 3px solid transparent;
+  background: none;
+  color: var(--kauro-color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+.kauro-tab span {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 400;
+}
+.kauro-tab[aria-selected="true"] {
+  border-block-end-color: var(--kauro-color-primary);
+  color: var(--kauro-color-text);
+}
+.kauro-tab:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+.kauro-main .kauro-mapping th[scope="row"] {
+  min-inline-size: 13rem;
+  font-weight: 400;
+}
+.kauro-mapping-column {
+  display: flex;
+  align-items: center;
+  gap: var(--kauro-space-2);
+  font-weight: 600;
+}
+.kauro-mapping-position {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.5rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.kauro-mapping-samples {
+  display: block;
+  max-inline-size: 15rem;
+  overflow: hidden;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kauro-mapping-flag,
+.kauro-mapping-error {
+  display: inline-block;
+  margin-block-start: var(--kauro-space-1);
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.kauro-mapping-flag {
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-mapping-error {
+  display: block;
+  inline-size: fit-content;
+  background: var(--kauro-color-danger-surface);
+  color: var(--kauro-color-danger-text);
+}
+.kauro-mapping select {
+  min-inline-size: 11rem;
+  min-block-size: 2.5rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+}
+.kauro-mapping td.kauro-table-end {
+  white-space: nowrap;
+}
+.kauro-mapping tr.is-left-out :is(th, td) {
+  background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
+}
+.kauro-mapping tr.is-left-out td:not(:has(select)) {
+  color: var(--kauro-color-text-muted);
+}
+
+/* UI20 and UI21: the counts as a row of figures */
+.kauro-main .kauro-identity-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-6);
+}
+.kauro-main .kauro-identity-counts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0.125rem;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-identity-counts dt {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-identity-counts dd {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-identity-counts dd:first-of-type {
+  color: var(--kauro-color-text);
+  font-size: clamp(1.5rem, 1.3rem + 0.6vw, 1.875rem);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+/* UI20: one group, its proof, its records side by side, the decision */
+.kauro-main .kauro-group {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-group > * {
+  margin: 0;
+}
+.kauro-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-3);
+}
+.kauro-main .kauro-group-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-group-proof code {
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-group-consent {
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-inline-start: 3px solid var(--kauro-color-warning-text);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-main .kauro-group .kauro-table-region {
+  background: var(--kauro-color-background);
+}
+.kauro-group-choice {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+.kauro-group-choice legend {
+  grid-column: 1 / -1;
+}
+.kauro-compare-keep {
+  margin-inline-start: var(--kauro-space-1);
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-success-surface);
+  color: var(--kauro-color-success-text);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-compare td:last-child {
+  font-weight: 600;
+}
+.kauro-compare-empty {
+  color: var(--kauro-color-text-muted);
+  font-style: italic;
+}
+.kauro-compare tr.is-conflict th {
+  box-shadow: inset 3px 0 0 var(--kauro-color-warning-text);
+}
+
+/* on a phone, each field of the comparison is a card: the field, then each row's value and the unified record, labelled, so nothing is
+   cropped and no region needs scrolling sideways */
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-group .kauro-table-region:has(.kauro-compare) {
+    overflow: visible;
+  }
+  .kauro-main .kauro-compare,
+  .kauro-compare tbody,
+  .kauro-compare tr,
+  .kauro-compare :is(th, td) {
+    display: block;
+  }
+  .kauro-compare thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-compare tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-compare tbody tr:last-child {
+    border-block-end: 0;
+  }
+  /* a field whose values disagree marks its whole card, not the heading's text */
+  .kauro-main .kauro-compare tr.is-conflict {
+    box-shadow: inset 3px 0 0 var(--kauro-color-warning-text);
+  }
+  .kauro-main .kauro-compare tr.is-conflict th {
+    box-shadow: none;
+  }
+  .kauro-main .kauro-compare :is(th, td) {
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow-wrap: anywhere;
+  }
+  .kauro-main .kauro-compare th[scope="row"] {
+    margin-block-end: var(--kauro-space-2);
+  }
+  .kauro-main .kauro-compare td + td {
+    margin-block-start: var(--kauro-space-2);
+  }
+  .kauro-compare td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-style: normal;
+  }
+}
+
+/* P-09: the billing overview, its figures then one line a quote or order; on a phone each line is a card */
+.kauro-main .kauro-billing-figures {
+  margin-block-end: var(--kauro-space-5);
+}
+.kauro-main .kauro-billing-figures dd:first-of-type {
+  white-space: nowrap;
+}
+@media (max-width: 29.99rem) {
+  .kauro-main .kauro-billing-figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.kauro-orders-sub,
+.kauro-orders-when {
+  display: block;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.kauro-main .kauro-orders th[scope="row"] a {
+  font-weight: 600;
+}
+.kauro-main .kauro-orders td.kauro-table-end {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-orders,
+  .kauro-orders tbody,
+  .kauro-orders tr,
+  .kauro-orders :is(th, td) {
+    display: block;
+  }
+  .kauro-orders thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-orders tr {
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-orders tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main .kauro-orders :is(th, td) {
+    min-inline-size: 0;
+    padding: var(--kauro-space-1) 0;
+    border: 0;
+    background: none;
+    text-align: start;
+    white-space: normal;
+  }
+  .kauro-main .kauro-orders td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--kauro-space-3);
+  }
+  .kauro-orders td[data-label]::before {
+    content: attr(data-label);
+    color: var(--kauro-color-text-muted);
+    font-size: var(--kauro-font-size-dense);
+    font-weight: 600;
+  }
+  .kauro-orders .kauro-orders-when {
+    display: none;
+  }
+}
+@media (min-width: 48rem) {
+  .kauro-orders .kauro-orders-when {
+    display: inline;
+  }
+}
+
+/* UI36: a line is asked about from its own row */
+.kauro-main .kauro-statement-ask {
+  text-align: end;
+  white-space: nowrap;
+}
+.kauro-main .kauro-text-button {
+  min-block-size: var(--kauro-target-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-link, var(--kauro-color-primary));
+  font: inherit;
+  font-size: var(--kauro-font-size-dense);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.kauro-main .kauro-text-button:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-main .kauro-statement-lines tr.is-asked :is(th, td) {
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-statement-asked {
+  margin: 0 0 var(--kauro-space-3);
+}
+@media (max-width: 47.99rem) {
+  .kauro-main .kauro-statement-ask {
+    text-align: start;
+  }
+}
+
+/* UI36 seen by the owner: whose statements these are */
+.kauro-main .kauro-statement-of {
+  margin: 0 0 var(--kauro-space-4);
+  color: var(--kauro-color-text-muted);
+}
+
+/* UI21: companies and contacts joined by their links */
+.kauro-main .kauro-links > h2 {
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-links-map {
+  display: grid;
+  grid-template-columns: auto minmax(4rem, 1fr) auto;
+  align-items: center;
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-5);
+}
+.kauro-links-node {
+  display: grid;
+  justify-items: center;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-links-node strong {
+  color: var(--kauro-color-text);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-links-edge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  block-size: 2px;
+  background: var(--kauro-color-primary);
+}
+.kauro-links-edge span {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-import-order {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding-inline-start: 1.5rem;
+}
+
+/* UI22: the plan read back, part by part, each with its way to change it */
+.kauro-main .kauro-answers {
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-answers-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-answers-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-answers-part {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+}
+.kauro-answers-part + .kauro-answers-part {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-answers-part h3 {
+  margin: 0;
+  font-family: var(--kauro-font-family);
+  font-size: 1rem;
+}
+.kauro-answers-part ul {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  padding-inline-start: 1.125rem;
+}
+.kauro-answers-part > a {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  font-weight: 600;
+}
+@media (min-width: 48rem) {
+  .kauro-answers-part {
+    grid-template-columns: 11rem minmax(0, 1fr) auto;
+  }
+  .kauro-answers-part ul {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .kauro-answers-part > a {
+    grid-column: 3;
+  }
+}
+.kauro-answers-part--out {
+  border-end-start-radius: var(--kauro-radius-large);
+  border-end-end-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-surface);
+}
+.kauro-answers-part--out ul {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-approve {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-approve > * {
+  margin: 0;
+}
+.kauro-main .kauro-approve > .kauro-button,
+.kauro-approve-code .kauro-button {
+  justify-self: start;
+}
+.kauro-approve-code {
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-approve-code .kauro-field {
+  margin: 0;
+}
+.kauro-main .kauro-approved {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  max-inline-size: 48rem;
+  margin: 0;
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-success-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-approved > :is(h2, p) {
+  margin: 0;
+}
+.kauro-main .kauro-approved > h2 {
+  padding-inline-end: 7rem;
+}
+.kauro-main .kauro-approved .kauro-stamp {
+  position: absolute;
+  inset-block-start: var(--kauro-space-5);
+  inset-inline-end: var(--kauro-space-5);
+  transform: rotate(-4deg);
+}
+@media (max-width: 40rem) {
+  .kauro-main .kauro-approved > h2 {
+    padding-inline-end: 0;
+  }
+  .kauro-main .kauro-approved .kauro-stamp {
+    position: static;
+    transform: none;
+  }
+}
+
+/* a note under a table, and a choice after a section, keep their distance */
+.kauro-main .kauro-table-region + .kauro-muted {
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-main .kauro-screen-choice {
+  margin-block: var(--kauro-space-6) var(--kauro-space-5);
+}
+
+/* until the four columns fit beside the menu (under 72rem: phones, tablets, small laptops), each source column of the mapping is a card:
+   the column, its destination, then what changes */
+@media (max-width: 71.99rem) {
+  .kauro-main .kauro-mapping,
+  .kauro-mapping tbody,
+  .kauro-mapping tr,
+  .kauro-mapping :is(th, td) {
+    display: block;
+  }
+  .kauro-mapping thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .kauro-mapping tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main .kauro-mapping tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main .kauro-mapping :is(th, td) {
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .kauro-main .kauro-mapping th[scope="row"] {
+    grid-column: 1 / -1;
+    min-inline-size: 0;
+    margin-block-end: var(--kauro-space-3);
+  }
+  .kauro-mapping td:has(select) {
+    grid-column: 1 / -1;
+    margin-block-end: var(--kauro-space-3);
+  }
+  .kauro-mapping select {
+    inline-size: 100%;
+  }
+  .kauro-mapping td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .kauro-mapping td:has(select)::before {
+    margin-block-end: var(--kauro-space-1);
+  }
+  .kauro-main .kauro-mapping td.kauro-table-end {
+    padding-inline-start: var(--kauro-space-3);
+  }
+  .kauro-mapping-samples {
+    max-inline-size: 100%;
+  }
+  .kauro-main .kauro-mapping tr.is-left-out :is(th, td) {
+    background: none;
+  }
+  .kauro-main .kauro-mapping tr.is-left-out {
+    background: color-mix(in srgb, var(--kauro-color-surface) 70%, transparent);
+  }
+}
+
+/* a column heading over numbers never breaks inside its word */
+.kauro-main .kauro-table thead th.kauro-table-end {
+  white-space: nowrap;
+}
+
+/* ===== UI26 Delivery: the package as one verified version, its files, the way to download ===== */
+.kauro-main .kauro-package {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-success-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-package > * {
+  margin: 0;
+}
+.kauro-package-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-package-head :is(h2, p) {
+  margin: 0;
+}
+.kauro-main .kauro-package-head .kauro-stamp {
+  transform: rotate(-4deg);
+}
+.kauro-package-checks {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-package-checks li {
+  position: relative;
+  max-inline-size: 60rem;
+  padding-inline-start: 1.75rem;
+}
+.kauro-package-checks li::before {
+  content: "\2713";
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--kauro-color-success-text);
+  font-weight: 700;
+}
+.kauro-main .kauro-package-deadline {
+  display: grid;
+  gap: 0.125rem;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+}
+.kauro-package-deadline span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-package-files th[scope="row"] {
+  font-weight: 400;
+}
+.kauro-package-name {
+  display: block;
+  font-family: var(--kauro-mono-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.kauro-package-role {
+  display: block;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-package-pick {
+  inline-size: 2.5rem;
+}
+.kauro-package-pick input {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--kauro-color-primary);
+}
+.kauro-main .kauro-package-files td code {
+  white-space: nowrap;
+}
+.kauro-main .kauro-links-issued {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: 40rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-links-issued > * {
+  margin: 0;
+}
+.kauro-links-issued ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-links-issued li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  padding-block-end: var(--kauro-space-2);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-links-issued li a {
+  font-weight: 600;
+}
+.kauro-links-issued li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-links-issued > .kauro-button {
+  justify-self: start;
+}
+.kauro-main .kauro-approve + .kauro-next,
+.kauro-main .kauro-links-issued + .kauro-next {
+  margin-block-start: var(--kauro-space-7);
+}
+
+/* ===== UI27 Import steps: the prerequisite, then the stages in order ===== */
+.kauro-main .kauro-import-before {
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-import-before h2 {
+  margin: 0 0 var(--kauro-space-3);
+}
+.kauro-main .kauro-import-before ul {
+  margin: 0 0 var(--kauro-space-4);
+}
+.kauro-import-stages {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-import-stage {
+  display: grid;
+  gap: var(--kauro-space-3);
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-import-stage > * {
+  margin: 0;
+}
+.kauro-import-stage--released,
+.kauro-import-stage--waiting {
+  border-color: var(--kauro-color-primary);
+  box-shadow: inset 4px 0 0 var(--kauro-color-primary);
+}
+.kauro-main .kauro-import-stage--locked {
+  background: transparent;
+  border-style: dashed;
+}
+.kauro-import-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+}
+.kauro-main .kauro-import-stage-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-import-stage-number {
+  margin-inline-end: var(--kauro-space-1);
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-font-family);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.kauro-import-stage-state {
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-import-stage--released .kauro-import-stage-state {
+  color: var(--kauro-color-primary);
+}
+.kauro-import-stage--waiting .kauro-import-stage-state {
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-import-stage--verified .kauro-import-stage-state {
+  color: var(--kauro-color-success-text);
+}
+.kauro-import-stage--locked .kauro-import-stage-state,
+.kauro-import-stage--locked h2 {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-import-stage-file {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-import-stage-file code {
+  color: var(--kauro-color-text);
+}
+.kauro-main .kauro-import-stage-settings {
+  padding-inline-start: 1.125rem;
+}
+.kauro-main .kauro-import-stage .kauro-actions {
+  align-items: center;
+}
+
+/* ===== UI28 Import results: prepared beside what HubSpot holds ===== */
+.kauro-main .kauro-result-stage {
+  margin: 0 0 var(--kauro-space-5);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-result-stage strong {
+  color: var(--kauro-color-text);
+}
+.kauro-result-counts > .is-good {
+  border-block-start: 3px solid var(--kauro-color-success-text);
+}
+.kauro-result-counts > .is-bad {
+  border-block-start: 3px solid var(--kauro-color-danger-text);
+}
+.kauro-main .kauro-result-counts + .kauro-approved {
+  margin-block-start: 0;
+}
+
+/* ===== UI29 Data lifecycle: each kind of data, its date, its state ===== */
+.kauro-main .kauro-lifecycle th[scope="row"] {
+  font-weight: 400;
+}
+.kauro-lifecycle-what {
+  display: block;
+  font-weight: 600;
+}
+.kauro-lifecycle-holds,
+.kauro-lifecycle-rule {
+  display: block;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-main .kauro-lifecycle-actions {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: var(--kauro-space-6) 0;
+  padding: 0;
+  border: 0;
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-lifecycle-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-lifecycle-card {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-lifecycle-card > * {
+  margin: 0;
+}
+.kauro-main .kauro-lifecycle-card h2 {
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-lifecycle-card .kauro-actions {
+  margin: 0;
+}
+
+/* on a phone, the package and lifecycle tables are cards: each value under its column's name */
+@media (max-width: 47.99rem) {
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle),
+  :is(.kauro-package-files, .kauro-lifecycle) tbody,
+  :is(.kauro-package-files, .kauro-lifecycle) :is(th, td) {
+    display: block;
+  }
+  :is(.kauro-package-files, .kauro-lifecycle) thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  :is(.kauro-package-files, .kauro-lifecycle) tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--kauro-space-2) var(--kauro-space-3);
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle) tbody tr:last-child {
+    border-block-end: 0;
+  }
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle) :is(th, td) {
+    padding: 0;
+    border: 0;
+    text-align: start;
+  }
+  .kauro-main :is(.kauro-package-files, .kauro-lifecycle) :is(th, td):not(.kauro-package-pick) {
+    grid-column: 2;
+  }
+  .kauro-main .kauro-package-files .kauro-package-pick {
+    grid-row: 1;
+    inline-size: auto;
+  }
+  .kauro-main .kauro-lifecycle :is(th, td) {
+    grid-column: 1 / -1;
+  }
+  :is(.kauro-package-files, .kauro-lifecycle) td[data-label]::before {
+    content: attr(data-label) " ";
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .kauro-lifecycle td[data-label]::before {
+    display: block;
+  }
+}
+
+/* an action section after a table section keeps its distance */
+.kauro-main .kauro-screen-section + :is(.kauro-approve, .kauro-links-issued) {
+  margin-block-start: var(--kauro-space-6);
+}
+
+/* the state of a kind of data is one word, never broken */
+.kauro-main .kauro-lifecycle td:last-child {
+  inline-size: 1%;
+  white-space: nowrap;
+}
+
+.kauro-result-stage code {
+  white-space: nowrap;
+}
+@media (max-width: 47.99rem) {
+  .kauro-lifecycle tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ===== P-07 Health check results: one sentence, the findings, then the price ===== */
+.kauro-main .kauro-verdict {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 52rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5) var(--kauro-space-6);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-verdict > * {
+  margin: 0;
+}
+.kauro-main .kauro-verdict h2 {
+  font-size: clamp(1.375rem, 1.2rem + 0.6vw, 1.75rem);
+}
+.kauro-findings {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-4);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-finding {
+  display: grid;
+  gap: var(--kauro-space-3) var(--kauro-space-6);
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+@media (min-width: 48rem) {
+  .kauro-main .kauro-finding {
+    grid-template-columns: 11rem minmax(0, 1fr);
+  }
+}
+.kauro-finding-figure {
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+}
+.kauro-finding-figure strong {
+  font-size: clamp(1.75rem, 1.5rem + 0.8vw, 2.25rem);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.kauro-finding-figure span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-finding-body {
+  display: grid;
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-finding-body > * {
+  margin: 0;
+}
+.kauro-main .kauro-finding-body h3 {
+  font-family: var(--kauro-font-family);
+  font-size: 1.125rem;
+}
+.kauro-finding-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-2);
+}
+.kauro-finding-examples span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+/* an example is a value from the file or a setting, as a quiet chip */
+.kauro-finding-example {
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+  font-size: var(--kauro-font-size-dense);
+  overflow-wrap: anywhere;
+}
+.kauro-main .kauro-finding-body dl {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-finding-body dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kauro-main .kauro-finding-body dl > div {
+  display: grid;
+  align-content: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-finding-body dt {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-finding-body dd {
+  margin: 0;
+}
+.kauro-main .kauro-offer {
+  display: grid;
+  gap: var(--kauro-space-4) var(--kauro-space-7);
+  margin: var(--kauro-space-6) 0 var(--kauro-space-4);
+  padding: var(--kauro-space-6);
+  border: 0;
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-ink);
+  color: var(--kauro-color-on-ink);
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-offer {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .kauro-main .kauro-offer > .kauro-actions {
+    grid-column: 1 / -1;
+  }
+}
+.kauro-main .kauro-offer :is(h2, p) {
+  margin: 0;
+  color: inherit;
+}
+.kauro-main .kauro-offer > div:first-child {
+  display: grid;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-offer h2 {
+  font-size: clamp(2rem, 1.6rem + 1.2vw, 2.75rem);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-main .kauro-offer .kauro-next-label {
+  color: var(--kauro-color-ink-accent);
+}
+.kauro-main .kauro-offer p:not(.kauro-next-label) {
+  color: var(--kauro-color-ink-muted);
+}
+.kauro-main .kauro-offer ul {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-offer li {
+  position: relative;
+  padding-inline-start: 1.5rem;
+}
+.kauro-offer li::before {
+  content: "\2713";
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--kauro-color-ink-accent);
+  font-weight: 700;
+}
+.kauro-main .kauro-offer .kauro-actions {
+  margin: 0;
+}
+
+/* ===== Operations (UI33 to UI55): tiles, a list with one item opened, statements, letters, steps ===== */
+/* UI33: each area as a tile, its figure, its one fact and the way in */
+.kauro-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-tiles > li {
+  display: grid;
+  align-content: start;
+  gap: 0.125rem;
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-tiles > li.is-attention {
+  border-block-start: 3px solid var(--kauro-color-warning-text);
+}
+.kauro-tile-label {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-tiles strong {
+  font-size: clamp(1.375rem, 1.2rem + 0.5vw, 1.625rem);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+.kauro-tile-fact {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-tiles a {
+  margin-block-start: var(--kauro-space-2);
+  font-weight: 600;
+}
+.kauro-main .kauro-screen-section > .kauro-tiles {
+  margin-block-end: 0;
+}
+
+/* a list whose rows open one item below it */
+.kauro-row-open {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.kauro-row-open[aria-expanded="true"] {
+  color: var(--kauro-color-text);
+  text-decoration: none;
+}
+.kauro-row-open:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: 2px;
+}
+.kauro-main .kauro-prospects th[scope="row"] {
+  font-weight: 400;
+}
+.kauro-main .kauro-prospects th[scope="row"] .kauro-muted-text {
+  display: block;
+}
+.kauro-main .kauro-table tr.is-open :is(th, td) {
+  background: color-mix(in srgb, var(--kauro-color-primary) 6%, transparent);
+}
+.kauro-main .kauro-table tr.is-open th {
+  box-shadow: inset 3px 0 0 var(--kauro-color-primary);
+}
+.kauro-main .kauro-prospect {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: var(--kauro-space-5) 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-prospect > * {
+  margin: 0;
+}
+.kauro-main > .kauro-page-head + .kauro-prospect,
+.kauro-main > header + .kauro-prospect {
+  margin-block-start: 0;
+}
+.kauro-prospect-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+}
+.kauro-main .kauro-prospect-head :is(h2, h3) {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-prospect-facts {
+  margin: 0;
+}
+.kauro-main .kauro-prospect-facts > div:last-child {
+  border-block-end: 0;
+}
+.kauro-main .kauro-prospect .kauro-next {
+  max-inline-size: none;
+  margin: 0;
+  box-shadow: none;
+}
+.kauro-main .kauro-prospect .kauro-next h3 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-prospect .kauro-approve,
+.kauro-main .kauro-approve h3 {
+  margin: 0;
+}
+.kauro-main .kauro-prospect .kauro-approve {
+  max-inline-size: none;
+  padding-block-start: var(--kauro-space-4);
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-main .kauro-prospect .kauro-banner {
+  margin: 0;
+}
+
+/* UI36: a statement a month */
+.kauro-main .kauro-statement-rules {
+  max-inline-size: 52rem;
+  margin: 0 0 var(--kauro-space-5);
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+}
+.kauro-main .kauro-statement-rules p {
+  margin: 0;
+}
+.kauro-main .kauro-statement {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0 0 var(--kauro-space-5);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-statement > * {
+  margin: 0;
+}
+.kauro-main .kauro-statement > .kauro-button {
+  justify-self: start;
+}
+.kauro-statement-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-statement-head h2 {
+  margin: 0;
+  font-size: 1.375rem;
+}
+.kauro-main .kauro-statement-sum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0;
+}
+.kauro-main .kauro-statement-sum > div {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-statement-sum dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-statement-proof {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-statement .kauro-table-region {
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-statement-lines th[scope="row"] {
+  font-weight: 400;
+}
+.kauro-statement-agency {
+  display: block;
+  font-weight: 600;
+}
+.kauro-main .kauro-statement-lines .kauro-muted-text {
+  display: block;
+}
+.kauro-statement-hold {
+  display: block;
+  inline-size: fit-content;
+  margin-block-start: var(--kauro-space-1);
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* UI53: resources as cards */
+.kauro-resources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0 0 var(--kauro-space-5);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-resource {
+  display: grid;
+  align-content: start;
+  gap: var(--kauro-space-2);
+  max-inline-size: none;
+  margin: 0;
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-resource > * {
+  margin: 0;
+}
+.kauro-resource-head {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-1);
+}
+.kauro-main .kauro-resource-head :is(h2, h3) {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.kauro-main .kauro-resource.is-superseded {
+  border-style: dashed;
+  background: transparent;
+}
+.kauro-main .kauro-resource .kauro-actions {
+  margin: var(--kauro-space-2) 0 0;
+}
+
+/* UI54: the message exactly as it leaves */
+.kauro-main .kauro-letter {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 52rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-letter > * {
+  margin: 0;
+}
+.kauro-letter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-letter-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-letter-facts {
+  margin: 0;
+}
+.kauro-letter-body {
+  display: grid;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+}
+.kauro-main .kauro-letter-body p {
+  margin: 0;
+}
+.kauro-letter-subject {
+  font-weight: 600;
+}
+.kauro-letter-foot {
+  padding-block-start: var(--kauro-space-3);
+  border-block-start: 1px solid var(--kauro-color-border);
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* UI35 and UI37: who, terms, history, steps */
+.kauro-main .kauro-relationship-who {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.kauro-relationship-terms {
+  display: grid;
+  gap: var(--kauro-space-1);
+  margin: 0;
+  padding-inline-start: 1.125rem;
+}
+.kauro-main .kauro-relationship-ends {
+  margin: 0;
+}
+.kauro-history {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-history li {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: var(--kauro-space-3);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-2);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-history li span {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+  font-variant-numeric: tabular-nums;
+}
+.kauro-seller-steps,
+.kauro-incident-duties {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0 0 var(--kauro-space-6);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main :is(.kauro-seller-steps, .kauro-incident-duties) li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: 52rem;
+  padding: var(--kauro-space-3) var(--kauro-space-4) var(--kauro-space-3) 3rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+:is(.kauro-seller-steps, .kauro-incident-duties) li::before {
+  content: "";
+  position: absolute;
+  inset-block-start: var(--kauro-space-3);
+  inset-inline-start: var(--kauro-space-4);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+:is(.kauro-seller-steps, .kauro-incident-duties) li.is-done::before {
+  content: "\2713";
+  border-color: var(--kauro-color-success-text);
+  background: var(--kauro-color-success-text);
+  color: var(--kauro-color-success-surface);
+}
+.kauro-main :is(.kauro-seller-steps, .kauro-incident-duties) li.is-current {
+  border-color: var(--kauro-color-primary);
+}
+:is(.kauro-seller-steps, .kauro-incident-duties) li span {
+  color: var(--kauro-color-text-muted);
+}
+
+/* UI38: a prepared personal action */
+.kauro-main .kauro-owner-action {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 56rem;
+  margin: 0 0 var(--kauro-space-5);
+  padding: var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-border);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-raised);
+}
+.kauro-main .kauro-owner-action > * {
+  margin: 0;
+}
+.kauro-main .kauro-owner-action.is-not-ready {
+  border-inline-start-color: var(--kauro-color-border);
+  border-style: dashed;
+  background: transparent;
+}
+.kauro-owner-action-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-owner-action-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.kauro-main .kauro-owner-action-facts {
+  margin: 0;
+}
+.kauro-owner-action-facts code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.kauro-owner-action-facts .kauro-muted-text {
+  display: block;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-main .kauro-owner-fields caption {
+  padding-block-end: var(--kauro-space-2);
+  font-weight: 600;
+  text-align: start;
+}
+.kauro-main .kauro-owner-action-done {
+  color: var(--kauro-color-success-text);
+  font-weight: 600;
+}
+
+/* UI41: a class still held */
+.kauro-main .kauro-deletion tr.is-attention :is(th, td) {
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-deletion tr.is-attention td:last-child {
+  color: var(--kauro-color-warning-text);
+  font-weight: 600;
+}
+.kauro-main .kauro-table-region + .kauro-banner,
+.kauro-main .kauro-table-region + .kauro-approve {
+  margin-block-start: var(--kauro-space-5);
+}
+
+/* UI43: identities in full */
+.kauro-release-ids code {
+  overflow-wrap: anywhere;
+}
+
+/* UI44: the funnel as bars over the first count */
+.kauro-funnel {
+  display: grid;
+  gap: var(--kauro-space-2);
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-3);
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-funnel li {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  max-inline-size: none;
+}
+.kauro-funnel-label {
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-funnel-bar {
+  display: block;
+  block-size: 0.75rem;
+  border-radius: 999px;
+  background: var(--kauro-color-surface);
+  overflow: hidden;
+}
+.kauro-funnel-bar span {
+  display: block;
+  block-size: 100%;
+  border-radius: 999px;
+  background: var(--kauro-color-primary);
+}
+.kauro-funnel strong {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 40rem) {
+  .kauro-main .kauro-funnel li {
+    grid-template-columns: minmax(0, 1fr) 3rem;
+  }
+  .kauro-funnel-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* UI55: what the customer wrote */
+.kauro-main .kauro-case-quote {
+  margin: 0;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-inline-start: 3px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+  font-size: 1.0625rem;
+}
+
+/* on a phone, list tables with one item to open are cards */
+@media (max-width: 47.99rem) {
+  .kauro-main :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion),
+  :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion) tbody,
+  :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion) :is(th, td) {
+    display: block;
+  }
+  :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion) thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion) tr {
+    display: grid;
+    gap: var(--kauro-space-2);
+    padding: var(--kauro-space-3) var(--kauro-space-4);
+    border-block-end: 1px solid var(--kauro-color-border);
+  }
+  .kauro-main :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion) :is(th, td) {
+    padding: 0;
+    border: 0;
+    text-align: start;
+  }
+  :is(.kauro-prospects, .kauro-statement-lines, .kauro-deletion) td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--kauro-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .kauro-main .kauro-table tr.is-open th {
+    box-shadow: none;
+  }
+  .kauro-main .kauro-history li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  /* the opened row is one band, not a band a cell */
+  .kauro-main .kauro-table tr.is-open {
+    background: color-mix(in srgb, var(--kauro-color-primary) 6%, transparent);
+  }
+  .kauro-main .kauro-table tr.is-open :is(th, td) {
+    background: none;
+  }
+  /* a statement line: its agency across, then its four amounts two by two */
+  .kauro-statement-lines tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kauro-main .kauro-statement-lines th[scope="row"] {
+    grid-column: 1 / -1;
+  }
+}
+
+/* on a phone, tiles go two by two so the day reads in one screen */
+@media (max-width: 40rem) {
+  .kauro-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--kauro-space-2);
+  }
+  .kauro-main .kauro-tiles > li {
+    padding: var(--kauro-space-3);
+  }
+}
+
+/* one proposal note for a whole page, under its head (design decisions 2.4) */
+.kauro-main .kauro-proposed--page {
+  display: inline-block;
+  margin: calc(var(--kauro-space-3) * -1) 0 var(--kauro-space-6);
+}
+
+/* UI09: the two answers to "who buys" share the part's width */
+.kauro-main .kauro-setup-part .kauro-choice--row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--kauro-space-3);
+}
+.kauro-main .kauro-setup-part .kauro-choice--row label {
+  margin: 0;
+}
+
+/* P-07: the estimate on the dark sheet, what sets it, and the three moments to a purchase */
+.kauro-main .kauro-offer-figure {
+  display: grid;
+  gap: var(--kauro-space-2);
+}
+.kauro-main .kauro-offer-facts {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+}
+.kauro-main .kauro-offer-facts > div {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.125rem;
+  padding: 0;
+  border: 0;
+}
+.kauro-main .kauro-offer-facts dt {
+  color: var(--kauro-color-ink-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-main .kauro-offer-facts dd {
+  margin: 0;
+  color: var(--kauro-color-on-ink);
+}
+.kauro-main .kauro-moments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: moment;
+}
+@media (min-width: 62rem) {
+  .kauro-main .kauro-moments {
+    grid-column: 1 / -1;
+  }
+}
+.kauro-main .kauro-moments li {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  max-inline-size: none;
+  padding: var(--kauro-space-3) var(--kauro-space-3) var(--kauro-space-3) 2.75rem;
+  border: 1px solid var(--kauro-color-ink-border);
+  border-radius: var(--kauro-radius);
+  counter-increment: moment;
+}
+.kauro-moments li::before {
+  content: counter(moment);
+  position: absolute;
+  inset-block-start: var(--kauro-space-3);
+  inset-inline-start: var(--kauro-space-3);
+  display: grid;
+  place-items: center;
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  border: 1.5px solid var(--kauro-color-ink-accent);
+  border-radius: 50%;
+  color: var(--kauro-color-ink-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-moments li.is-current {
+  border-color: var(--kauro-color-ink-accent);
+}
+.kauro-moments li.is-current::before {
+  background: var(--kauro-color-ink-accent);
+  color: var(--kauro-color-ink);
+}
+.kauro-moments strong {
+  color: var(--kauro-color-on-ink);
+}
+.kauro-moments span {
+  color: var(--kauro-color-ink-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+/* UI19 for "Clean your data": optional output preferences */
+.kauro-main .kauro-output-prefs {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: var(--kauro-space-6) 0 var(--kauro-space-4);
+  padding: var(--kauro-space-5);
+  border: 1px dashed var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius-large);
+}
+.kauro-main .kauro-output-prefs > * {
+  margin: 0;
+}
+.kauro-main .kauro-output-prefs h2 {
+  font-size: 1.125rem;
+}
+.kauro-output-prefs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--kauro-space-4);
+}
+.kauro-main .kauro-output-prefs-grid .kauro-choice {
+  margin: 0;
+}
+
+/* UI13: what is in the way */
+.kauro-main .kauro-blockers {
+  max-inline-size: 48rem;
+  margin: 0 0 var(--kauro-space-6);
+  padding: var(--kauro-space-4) var(--kauro-space-5);
+  border: 1px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius-large);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-main .kauro-blockers h2 {
+  margin: 0 0 var(--kauro-space-2);
+  color: var(--kauro-color-warning-text);
+  font-size: 1rem;
+}
+.kauro-main .kauro-blockers ul {
+  margin: 0;
+  padding-inline-start: 1.125rem;
+  color: var(--kauro-color-text);
+}
+
+/* P-08: the project's record, newest first */
+.kauro-main .kauro-activity-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  margin: 0 0 var(--kauro-space-5);
+}
+.kauro-main .kauro-activity-filters label {
+  display: grid;
+  gap: var(--kauro-space-1);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-main .kauro-activity-filters select {
+  min-block-size: 2.5rem;
+  min-inline-size: 12rem;
+  padding: 0 var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+  font-weight: 400;
+}
+.kauro-timeline {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-main .kauro-timeline li {
+  display: grid;
+  grid-template-columns: 11rem 7.5rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--kauro-space-1) var(--kauro-space-4);
+  max-inline-size: none;
+  padding-block: var(--kauro-space-3);
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-timeline-when,
+.kauro-timeline-who {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-timeline-area {
+  justify-self: start;
+  padding: 0 0.375rem;
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.kauro-timeline-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-2);
+  justify-content: flex-end;
+  text-align: end;
+}
+.kauro-timeline-who code {
+  font-size: 0.75rem;
+}
+@media (max-width: 61.99rem) {
+  .kauro-main .kauro-timeline li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .kauro-timeline-what {
+    grid-column: 1 / -1;
+  }
+  .kauro-timeline-who {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    text-align: start;
+  }
+}
+
+/* UI19 from 72rem: what a choice changes is the reason to read the row; it keeps room for a short sentence, and the samples give way */
+@media (min-width: 72rem) {
+  .kauro-main .kauro-mapping td[data-label="What changes"] {
+    min-inline-size: 11rem;
+  }
+}
