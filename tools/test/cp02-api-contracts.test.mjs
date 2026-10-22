@@ -113,10 +113,10 @@ test("procedure: CP-02 follows the ChangeProposal procedure and the four classes
     return () => checkProcedure(s, d);
   };
   mustFail(broken((s) => { s.items[0].class = "ADOPTED"; }), /class/, "an item claiming adoption");
-  mustFail(broken((s, d) => { s.items[8].class = "APPROVED_AWAITING_REISSUE"; s.items[8].pending = []; s.items[8].blockers = []; d.items[8].status = "APPROVED_AWAITING_REISSUE"; }), /lists CP-02.09 with its class/, "a class the change record does not show");
+  mustFail(broken((s, d) => { s.items[19].class = "APPROVED_AWAITING_REISSUE"; s.items[19].pending = []; s.items[19].blockers = []; d.items[19].status = "APPROVED_AWAITING_REISSUE"; }), /lists CP-02.20 with its class/, "a class the change record does not show");
   mustFail(broken((s) => { s.items[1].pending = ["something"]; }), /nothing open/, "an approved item with an open point");
   mustFail(broken((s) => { s.items[16].blockers = s.items[16].blockers.filter((b) => b.kind !== "EXTERNAL"); }), /external/, "BLOCKED_EXTERNAL without an external blocker");
-  mustFail(broken((s) => { delete s.items[8].whyNotYet; }), /unlocks it/, "a conditional item without its reason");
+  mustFail(broken((s) => { delete s.items[19].whyNotYet; }), /unlocks it/, "a conditional item without its reason");
   mustFail(broken((s) => { s.items[1].dependsOn = ["CP-02.09"]; }), /earlier item/, "a dependency on a later item");
   mustFail(broken((s) => { s.items[3].acceptance = s.items[3].acceptance.filter((a) => a.kind !== "ADVERSARIAL"); }), /adversarial/, "an item without an adversarial case");
   mustFail(broken((s, d) => { d.items[20].patch["commands.json"].splice(1, 1); }), /tested right before/, "a replace without its test");
@@ -235,7 +235,7 @@ test("authority: every cited decision exists with its words; approved items cite
     return () => checkAuthority(s, cp01);
   };
   mustFail(broken((s) => { s.items[1].basis.push("F-33"); }), /only approved decisions/, "an approved item citing a proposal");
-  mustFail(broken((s) => { s.items[1].requires.push("CP-01.04"); }), /not approved/, "an approved item requiring a conditional CP-01 item");
+  mustFail(broken((s) => { s.items[1].requires.push("CP-01.11"); }), /not approved/, "an approved item requiring a conditional CP-01 item");
   mustFail(broken((s) => { s.items[2].rules.push("As decided in F-99."); }), /no record or proposal defines/, "a decision nobody recorded");
   mustFail(broken((s) => { s.authorities["F-24"].anchor = "## F-24. The five dates may be added"; }), /cited words/, "words the record does not say");
   mustFail(broken((s) => { s.items[7].dependsOn = ["CP-02.09"]; s.items[7].dependsOn = ["CP-02.07"]; s.items[6].class = "CONDITIONAL"; }), /not approved/, "an approved item depending on a conditional one");
@@ -458,7 +458,7 @@ function checkOpenapi(s, doc, served, bndl) {
   const sa = doc.components.schemas.RecordConsentRequest.properties;
   assert.deepEqual(sa.documentVersion, served.components.schemas.StartAuditRequest.properties.auditPolicyVersion, "label is the served label");
   assert.deepEqual(doc.components.schemas.WithdrawConsentRequest.properties.expectedVersion, served.components.schemas.ArchiveClientRequest.properties.expectedVersion, "version is the served version");
-  assert.deepEqual(doc.components.schemas.ApplyDemonstratedBatchRequest.properties.previewHash, served.components.schemas.ApprovePlanRequest.properties.planHash, "hash is the served hash");
+  assert.deepEqual(doc.components.schemas.ApplyProvenIdentityRequest.properties.previewHash, served.components.schemas.ApprovePlanRequest.properties.planHash, "hash is the served hash");
   assert.deepEqual(doc.components.schemas.RefuseAttributionRequest.properties.evidenceRef, served.components.schemas.StartAuditRequest.properties.targetContractId, "id is the served id");
 }
 

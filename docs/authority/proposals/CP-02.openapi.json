@@ -19,7 +19,7 @@
         "requirements.json": "3bd812bb80ce7daac35283060916c1dfdd3de30d7566f62b5dd037be63066ae1",
         "program.json": "24d14cd0dcd20762f7a725fb54e334389dbaf22a9117f71f5c06a9543ad02144"
       },
-      "cp01": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a"
+      "cp01": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a"
     }
   },
   "x-kauro-status": "PROPOSED_NOT_ADOPTED",
@@ -1931,7 +1931,7 @@
         "summary": "The four figures per seller and the total row.",
         "x-kauro-read": true,
         "x-kauro-cp02-item": "CP-02.09",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "KAURO_OWNER",
         "x-kauro-audience": "KAURO_OWNER",
         "x-kauro-standard-outcomes": "READ",
@@ -2303,7 +2303,7 @@
             }
           },
           "409": {
-            "description": "Problem: the 4 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
+            "description": "Problem: the 5 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2335,6 +2335,12 @@
                 "reason": "AMOUNT_OR_REFERENCE_MISMATCH",
                 "layer": "COMMAND",
                 "meaning": "amount or reference differs from the order"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "OWNER_REVIEW_REQUIRED",
+                "layer": "COMMAND",
+                "meaning": "the organisation already has two holds ended unpaid in the rolling 90 days: the third needs the owner's review"
               }
             ]
           }
@@ -2345,7 +2351,7 @@
       "post": {
         "operationId": "UndoBatch",
         "summary": "CMD076 UndoBatch",
-        "description": "Precondition: The plan is not approved and the batch is its latest applied one.\n\nEffect: Return the batch's groups to their prior decisions; the trace keeps both.\n\nFailure: An approved plan or a superseded batch rejects.",
+        "description": "Precondition: The plan is not approved and the batch is its latest applied one.\n\nEffect: Return the batch's groups to their prior decisions; the record keeps both.\n\nFailure: An approved plan or a superseded batch rejects.",
         "x-kauro-command": "CMD076",
         "x-kauro-idempotency": "REQUIRED",
         "x-kauro-gate": "G-IC-KERNEL",
@@ -2355,7 +2361,7 @@
           "CMD076-RACE"
         ],
         "x-kauro-cp02-item": "CP-02.15",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "AGENCY_OPERATOR",
         "x-kauro-audience": "AGENCY",
         "x-kauro-standard-outcomes": "COMMAND",
@@ -2417,7 +2423,7 @@
         },
         "responses": {
           "200": {
-            "description": "COMPLETED: Return the batch's groups to their prior decisions; the trace keeps both.",
+            "description": "COMPLETED: Return the batch's groups to their prior decisions; the record keeps both.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2456,10 +2462,10 @@
     "/api/v1/plans/{planId}/decision-preview": {
       "get": {
         "operationId": "GetDecisionPreview",
-        "summary": "The exact effects a batch would apply.",
+        "summary": "The exact effects an apply or a bulk decision would have.",
         "x-kauro-read": true,
         "x-kauro-cp02-item": "CP-02.15",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "AGENCY_READER",
         "x-kauro-audience": "AGENCY",
         "x-kauro-standard-outcomes": "READ",
@@ -2486,12 +2492,25 @@
             "$ref": "#/components/parameters/AgencySelector"
           },
           {
+            "name": "evidenceClass",
+            "in": "query",
+            "required": true,
+            "description": "Which groups.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROVEN_IDENTITY",
+                "CANDIDATE"
+              ]
+            }
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
           }
         ],
         "responses": {
           "200": {
-            "description": "The exact effects a batch would apply.",
+            "description": "The exact effects an apply or a bulk decision would have.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2507,7 +2526,7 @@
       "post": {
         "operationId": "DecideMany",
         "summary": "CMD074 DecideMany",
-        "description": "Precondition: A person decides at most identityResolution.decideManyMaximumGroups PROBABLE groups shown in the preview.\n\nEffect: Record one decision per group by the person, as one batch.\n\nFailure: More groups than the cap, a BLOCKED group, or a stale preview rejects.",
+        "description": "Precondition: A person decides at most identityResolution.candidateDecision.maximumGroupsPerDecision CANDIDATE groups of the exact preview, with explicit approval.\n\nEffect: Record one decision per group by the person, as one batch, with its decision record.\n\nFailure: More groups than the cap, a BLOCKED or PROVEN_IDENTITY group, a stale preview or a missing approval rejects.",
         "x-kauro-command": "CMD074",
         "x-kauro-idempotency": "REQUIRED",
         "x-kauro-gate": "G-IC-KERNEL",
@@ -2517,7 +2536,7 @@
           "CMD074-RACE"
         ],
         "x-kauro-cp02-item": "CP-02.15",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "AGENCY_OPERATOR",
         "x-kauro-audience": "AGENCY",
         "x-kauro-standard-outcomes": "COMMAND",
@@ -2569,7 +2588,7 @@
         },
         "responses": {
           "200": {
-            "description": "COMPLETED: Record one decision per group by the person, as one batch.",
+            "description": "COMPLETED: Record one decision per group by the person, as one batch, with its decision record.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2595,7 +2614,7 @@
                   "RANGE"
                 ],
                 "layer": "COMMAND",
-                "meaning": "more groups than the cap"
+                "meaning": "more groups than identityResolution.candidateDecision.maximumGroupsPerDecision"
               }
             ]
           },
@@ -2630,7 +2649,7 @@
       "post": {
         "operationId": "ChangeDecision",
         "summary": "CMD075 ChangeDecision",
-        "description": "Precondition: The plan is not approved.\n\nEffect: Change one group's decision.\n\nFailure: An approved plan needs a new revision.",
+        "description": "Precondition: The plan is not approved; a CANDIDATE group is unified only by this person's decision.\n\nEffect: Change one group's decision, recorded.\n\nFailure: An approved plan needs a new revision; a BLOCKED group cannot be unified.",
         "x-kauro-command": "CMD075",
         "x-kauro-idempotency": "REQUIRED",
         "x-kauro-gate": "G-IC-KERNEL",
@@ -2640,7 +2659,7 @@
           "CMD075-RACE"
         ],
         "x-kauro-cp02-item": "CP-02.15",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "AGENCY_OPERATOR",
         "x-kauro-audience": "AGENCY",
         "x-kauro-standard-outcomes": "COMMAND",
@@ -2702,7 +2721,7 @@
         },
         "responses": {
           "200": {
-            "description": "COMPLETED: Change one group's decision.",
+            "description": "COMPLETED: Change one group's decision, recorded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2712,7 +2731,7 @@
             }
           },
           "409": {
-            "description": "Problem: the outcome this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
+            "description": "Problem: the 2 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2726,17 +2745,149 @@
                 "reason": "PLAN_NOT_EDITABLE",
                 "layer": "COMMAND",
                 "meaning": "the plan is approved: a change is a new revision (F-26)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "GROUP_BLOCKED",
+                "layer": "COMMAND",
+                "meaning": "a BLOCKED group cannot be unified"
               }
             ]
           }
         }
       }
     },
-    "/api/v1/plans/{planId}/demonstrated-batches": {
+    "/api/v1/plans/{planId}/identity-decisions": {
+      "get": {
+        "operationId": "ListIdentityDecisionRecords",
+        "summary": "Every identity decision with evidence, person, version and effect.",
+        "x-kauro-read": true,
+        "x-kauro-cp02-item": "CP-02.15",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
+        "x-kauro-role": "AGENCY_READER",
+        "x-kauro-audience": "AGENCY",
+        "x-kauro-standard-outcomes": "READ",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "description": "Path id, resolved with server-owned tenant scope.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AgencySelector"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          },
+          {
+            "$ref": "#/components/parameters/PageCursor"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every identity decision with evidence, person, version and effect.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIdentityDecisionRecordsReply"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plans/{planId}/identity-groups": {
+      "get": {
+        "operationId": "ListIdentityGroups",
+        "summary": "Identity groups with evidence class, proving key, signals and conflicts, paged.",
+        "x-kauro-read": true,
+        "x-kauro-cp02-item": "CP-02.15",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
+        "x-kauro-role": "AGENCY_READER",
+        "x-kauro-audience": "AGENCY",
+        "x-kauro-standard-outcomes": "READ",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "description": "Path id, resolved with server-owned tenant scope.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AgencySelector"
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          },
+          {
+            "$ref": "#/components/parameters/PageCursor"
+          },
+          {
+            "name": "evidenceClass",
+            "in": "query",
+            "required": false,
+            "description": "Filter.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROVEN_IDENTITY",
+                "CANDIDATE",
+                "BLOCKED"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Identity groups with evidence class, proving key, signals and conflicts, paged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIdentityGroupsReply"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plans/{planId}/proven-identities": {
       "post": {
-        "operationId": "ApplyDemonstratedBatch",
-        "summary": "CMD073 ApplyDemonstratedBatch",
-        "description": "Precondition: An adopted identityResolution rule classes the groups DEMONSTRATED without blocking conflicts, and the preview hash is current.\n\nEffect: Apply UNIFY to exactly the previewed groups as one batch, before approval, traced.\n\nFailure: A stale preview, a group without an adopted rule or with a blocking conflict rejects; nothing is applied partially.",
+        "operationId": "ApplyProvenIdentity",
+        "summary": "CMD073 ApplyProvenIdentity",
+        "description": "Precondition: The groups of the preview are PROVEN_IDENTITY by a proving key of Migration Core (an authoritative external id only once the core verifies it) and have no blocking conflict; the preview hash is current; the plan is not approved.\n\nEffect: Unify exactly the previewed groups as one batch, recorded with decidedBy PROVEN_IDENTITY_RULE.\n\nFailure: A stale preview, a CANDIDATE or BLOCKED group, an unverified external id or an approved plan rejects; nothing is applied partially.",
         "x-kauro-command": "CMD073",
         "x-kauro-idempotency": "REQUIRED",
         "x-kauro-gate": "G-IC-KERNEL",
@@ -2746,7 +2897,7 @@
           "CMD073-RACE"
         ],
         "x-kauro-cp02-item": "CP-02.15",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "AGENCY_OPERATOR",
         "x-kauro-audience": "AGENCY",
         "x-kauro-standard-outcomes": "COMMAND",
@@ -2791,24 +2942,24 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ApplyDemonstratedBatchRequest"
+                "$ref": "#/components/schemas/ApplyProvenIdentityRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "COMPLETED: Apply UNIFY to exactly the previewed groups as one batch, before approval, traced.",
+            "description": "COMPLETED: Unify exactly the previewed groups as one batch, recorded with decidedBy PROVEN_IDENTITY_RULE.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApplyDemonstratedBatchCompleted"
+                  "$ref": "#/components/schemas/ApplyProvenIdentityCompleted"
                 }
               }
             }
           },
           "409": {
-            "description": "Problem: the 2 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
+            "description": "Problem: the 4 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2825,81 +2976,23 @@
               },
               {
                 "code": "PRECONDITION_FAILED",
-                "reason": "NO_ADOPTED_EVIDENCE_RULE",
+                "reason": "NOT_PROVEN_IDENTITY",
                 "layer": "COMMAND",
-                "meaning": "no identityResolution rule is in force: nothing is DEMONSTRATED"
+                "meaning": "a group is a candidate or blocked: e-mail and name never prove identity"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "EXTERNAL_ID_NOT_VERIFIED",
+                "layer": "COMMAND",
+                "meaning": "an external id declared authoritative is not verified by the core: it proves nothing on its own"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PLAN_NOT_EDITABLE",
+                "layer": "COMMAND",
+                "meaning": "the plan is approved: a change is a new revision (F-26)"
               }
             ]
-          }
-        }
-      }
-    },
-    "/api/v1/plans/{planId}/identity-groups": {
-      "get": {
-        "operationId": "ListIdentityGroups",
-        "summary": "Identity groups with evidence class, paged.",
-        "x-kauro-read": true,
-        "x-kauro-cp02-item": "CP-02.15",
-        "x-kauro-class": "CONDITIONAL",
-        "x-kauro-role": "AGENCY_READER",
-        "x-kauro-audience": "AGENCY",
-        "x-kauro-standard-outcomes": "READ",
-        "security": [
-          {
-            "bearerAuth": []
-          },
-          {
-            "sessionCookie": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "planId",
-            "in": "path",
-            "required": true,
-            "description": "Path id, resolved with server-owned tenant scope.",
-            "schema": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-            }
-          },
-          {
-            "$ref": "#/components/parameters/AgencySelector"
-          },
-          {
-            "$ref": "#/components/parameters/PageLimit"
-          },
-          {
-            "$ref": "#/components/parameters/PageCursor"
-          },
-          {
-            "name": "evidenceClass",
-            "in": "query",
-            "required": false,
-            "description": "Filter.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "DEMONSTRATED",
-                "PROBABLE",
-                "BLOCKED"
-              ]
-            }
-          },
-          {
-            "$ref": "#/components/parameters/CorrelationId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Identity groups with evidence class, paged.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListIdentityGroupsReply"
-                }
-              }
-            }
           }
         }
       }
@@ -3498,7 +3591,7 @@
           "CMD072-RACE"
         ],
         "x-kauro-cp02-item": "CP-02.14",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "KAURO_OWNER",
         "x-kauro-audience": "KAURO_OWNER",
         "x-kauro-standard-outcomes": "COMMAND",
@@ -3693,7 +3786,7 @@
       "post": {
         "operationId": "RefuseAttribution",
         "summary": "CMD071 RefuseAttribution",
-        "description": "Precondition: The claim is SUBMITTED or DISPUTED; the code belongs to the list version in force; OTHER carries a note.\n\nEffect: Move the claim to REJECTED with a ClaimRefusal; the seller reads the code's neutral message.\n\nFailure: An unknown code or stale list version, OTHER without a note, or an ACCEPTED claim rejects without effect; a refusal never deletes historical rights.",
+        "description": "Precondition: The claim is SUBMITTED or DISPUTED; the code belongs to the list version in force; evidence is given; OTHER carries a note; OWNER_RULE names a versioned rule that was in force when the claimed facts happened.\n\nEffect: Move the claim to REJECTED with a ClaimRefusal; the seller reads the code's neutral message.\n\nFailure: An unknown code or stale list version, OTHER without a note, OWNER_RULE without a rule in force (or with one that entered into force after the facts), or an ACCEPTED claim rejects without effect; a refusal never deletes historical rights.",
         "x-kauro-command": "CMD071",
         "x-kauro-idempotency": "REQUIRED",
         "x-kauro-gate": "G-COMMERCIAL",
@@ -3703,7 +3796,7 @@
           "CMD071-RACE"
         ],
         "x-kauro-cp02-item": "CP-02.14",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "KAURO_OWNER",
         "x-kauro-audience": "KAURO_OWNER",
         "x-kauro-standard-outcomes": "COMMAND",
@@ -3756,7 +3849,7 @@
             }
           },
           "400": {
-            "description": "Problem: the outcome this operation adds at 400; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
+            "description": "Problem: the 2 outcomes this operation adds at 400; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3773,11 +3866,20 @@
                 ],
                 "layer": "COMMAND",
                 "meaning": "OTHER needs a note"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "OWNER_RULE_REFERENCE_REQUIRED",
+                "fieldCodes": [
+                  "REQUIRED"
+                ],
+                "layer": "COMMAND",
+                "meaning": "OWNER_RULE names no ownerRuleRef"
               }
             ]
           },
           "409": {
-            "description": "Problem: the 4 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
+            "description": "Problem: the 5 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3808,6 +3910,12 @@
                 "code": "STALE_VERSION",
                 "layer": "COMMAND",
                 "meaning": "the claim changed"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "OWNER_RULE_NOT_IN_FORCE",
+                "layer": "COMMAND",
+                "meaning": "the named rule version is unknown, not in force at the decision, or entered into force after the claimed facts (never retroactive)"
               }
             ]
           }
@@ -3952,7 +4060,7 @@
         "summary": "The seller's own four figures.",
         "x-kauro-read": true,
         "x-kauro-cp02-item": "CP-02.09",
-        "x-kauro-class": "CONDITIONAL",
+        "x-kauro-class": "APPROVED_AWAITING_REISSUE",
         "x-kauro-role": "OWN_SELLER_ANY_STATE",
         "x-kauro-audience": "SELLER",
         "x-kauro-standard-outcomes": "READ",
@@ -4929,6 +5037,16 @@
             {
               "op": "addEnumValue",
               "property": "reason",
+              "value": "OWNER_RULE_REFERENCE_REQUIRED"
+            },
+            {
+              "op": "addEnumValue",
+              "property": "reason",
+              "value": "OWNER_RULE_NOT_IN_FORCE"
+            },
+            {
+              "op": "addEnumValue",
+              "property": "reason",
               "value": "REVIEW_NOT_OPEN"
             },
             {
@@ -4939,7 +5057,17 @@
             {
               "op": "addEnumValue",
               "property": "reason",
-              "value": "NO_ADOPTED_EVIDENCE_RULE"
+              "value": "NOT_PROVEN_IDENTITY"
+            },
+            {
+              "op": "addEnumValue",
+              "property": "reason",
+              "value": "EXTERNAL_ID_NOT_VERIFIED"
+            },
+            {
+              "op": "addEnumValue",
+              "property": "reason",
+              "value": "PLAN_NOT_EDITABLE"
             },
             {
               "op": "addEnumValue",
@@ -4950,11 +5078,6 @@
               "op": "addEnumValue",
               "property": "reason",
               "value": "GROUP_BLOCKED"
-            },
-            {
-              "op": "addEnumValue",
-              "property": "reason",
-              "value": "PLAN_NOT_EDITABLE"
             },
             {
               "op": "addEnumValue",
@@ -4985,6 +5108,11 @@
               "op": "addEnumValue",
               "property": "reason",
               "value": "AMOUNT_OR_REFERENCE_MISMATCH"
+            },
+            {
+              "op": "addEnumValue",
+              "property": "reason",
+              "value": "OWNER_REVIEW_REQUIRED"
             },
             {
               "op": "addEnumValue",
@@ -5465,18 +5593,22 @@
                   "REFUSAL_LIST_VERSION_STALE",
                   "NOTE_REQUIRED",
                   "CLAIM_NOT_REFUSABLE",
+                  "OWNER_RULE_REFERENCE_REQUIRED",
+                  "OWNER_RULE_NOT_IN_FORCE",
                   "REVIEW_NOT_OPEN",
                   "PREVIEW_STALE",
-                  "NO_ADOPTED_EVIDENCE_RULE",
+                  "NOT_PROVEN_IDENTITY",
+                  "EXTERNAL_ID_NOT_VERIFIED",
+                  "PLAN_NOT_EDITABLE",
                   "BATCH_TOO_LARGE",
                   "GROUP_BLOCKED",
-                  "PLAN_NOT_EDITABLE",
                   "BATCH_NOT_LATEST",
                   "NOTICE_NOT_PENDING",
                   "PROOF_REQUIRED",
                   "HOLD_ALREADY_USED",
                   "CEILING_REACHED",
                   "AMOUNT_OR_REFERENCE_MISMATCH",
+                  "OWNER_REVIEW_REQUIRED",
                   "EFFECTIVE_DATE_IN_PAST",
                   "ID_NOT_IN_EVIDENCE",
                   "PROCESSING_AUTHORIZATION_MISSING",
@@ -5791,6 +5923,12 @@
             "pattern": "Z$",
             "description": "When the condition began."
           },
+          "lastMaterialProgressAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "INACTIVE: the latest act of alerts.relevantProgress.counts."
+          },
           "otherConditions": {
             "type": "array",
             "items": {
@@ -5877,7 +6015,7 @@
           }
         }
       },
-      "ApplyDemonstratedBatchCompleted": {
+      "ApplyProvenIdentityCompleted": {
         "title": "CMD073 COMPLETED",
         "type": "object",
         "additionalProperties": false,
@@ -5906,7 +6044,7 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:CMD073"
       },
-      "ApplyDemonstratedBatchRequest": {
+      "ApplyProvenIdentityRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -6629,7 +6767,7 @@
       "ClaimRefusal": {
         "title": "ClaimRefusal",
         "type": "object",
-        "description": "The code is one of commission.claimRefusalReasons of listVersion; OTHER needs a note; the seller message derives from the code, never from the note. (owner manual 17)",
+        "description": "The code is one of commission.claimRefusalReasons of listVersion; evidence on every refusal; OTHER needs a note; OWNER_RULE names a versioned rule in force when the claimed facts happened, never a later one; the seller message derives from the code, never from the note. (owner manual 17)",
         "properties": {
           "refusalId": {
             "type": "string",
@@ -6660,6 +6798,12 @@
             "minLength": 1,
             "maxLength": 128,
             "description": "Owner's evidence."
+          },
+          "ownerRuleRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "OWNER_RULE: the rule id and version in force at the decision."
           },
           "note": {
             "type": "string",
@@ -7413,7 +7557,8 @@
           "expectedVersion",
           "groupIds",
           "decision",
-          "previewHash"
+          "previewHash",
+          "approval"
         ],
         "properties": {
           "expectedVersion": {
@@ -7440,6 +7585,12 @@
           "previewHash": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "approval": {
+            "type": "string",
+            "enum": [
+              "EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW"
+            ]
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD074"
@@ -8092,10 +8243,137 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:read:GetSellerSchedule"
       },
+      "IdentityDecisionRecord": {
+        "title": "IdentityDecisionRecord",
+        "type": "object",
+        "description": "Records decision, evidence, responsible person, version and effect (identityResolution.decisionRecord); append-only. (owner manual 06)",
+        "properties": {
+          "decisionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Record."
+          },
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Plan."
+          },
+          "planVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Plan version decided on."
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Group."
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "UNDECIDED",
+              "UNIFY",
+              "KEEP_SEPARATE"
+            ],
+            "description": "Decision."
+          },
+          "evidenceClass": {
+            "type": "string",
+            "enum": [
+              "PROVEN_IDENTITY",
+              "CANDIDATE",
+              "BLOCKED"
+            ],
+            "description": "Evidence class at the decision."
+          },
+          "evidenceHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Hash of the evidence the decision saw."
+          },
+          "decidedBy": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "PROVEN_IDENTITY_RULE"
+            ],
+            "description": "Who."
+          },
+          "responsibleMembershipId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The person (PERSON), or the member who applied the proven rule."
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "MERGE_IN_PLAN",
+              "KEEP_SEPARATE_IN_PLAN",
+              "RETURNED_TO_UNDECIDED"
+            ],
+            "description": "Effect in the plan (Kauro never writes to a CRM)."
+          },
+          "batchId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Batch."
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "Time."
+          }
+        },
+        "required": [
+          "decisionId",
+          "planId",
+          "planVersion",
+          "groupId",
+          "decision",
+          "evidenceClass",
+          "evidenceHash",
+          "decidedBy",
+          "effect",
+          "decidedAt"
+        ],
+        "additionalProperties": false,
+        "x-kauro-schema-id": "urn:kauro:r2:contracts#/$defs/IdentityDecisionRecord"
+      },
+      "IdentityDecisionRecordPage": {
+        "title": "IdentityDecisionRecordPage",
+        "description": "A page of IdentityDecisionRecord, newest first.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/IdentityDecisionRecord"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,512}\\.[A-Za-z0-9_-]{43}$",
+            "maxLength": 600,
+            "description": "The cursor of the next page, when there may be one (opaque, bound to the caller, the agency, the filter and this order)."
+          }
+        }
+      },
       "IdentityGroupView": {
         "title": "IdentityGroupView",
         "type": "object",
-        "description": "DEMONSTRATED only under policy.identityResolution in force; without it every group is PROBABLE or BLOCKED; nothing is merged without a person's decision or an adopted rule. (owner manual 06)",
+        "description": "PROVEN_IDENTITY only from Migration Core's proving keys without a blocking conflict; same normalized e-mail and full name is a CANDIDATE, never proof; nothing is folded to manufacture a proof; a CANDIDATE is unified only by a person. (owner manual 06)",
         "properties": {
           "groupId": {
             "type": "string",
@@ -8112,17 +8390,29 @@
           "evidenceClass": {
             "type": "string",
             "enum": [
-              "DEMONSTRATED",
-              "PROBABLE",
+              "PROVEN_IDENTITY",
+              "CANDIDATE",
               "BLOCKED"
             ],
-            "description": "Class."
+            "description": "Class (identityResolution)."
           },
-          "memberCount": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991,
-            "description": "Records in the group."
+          "provingKey": {
+            "type": "string",
+            "enum": [
+              "SOURCE_RECORD_ID_WITHIN_ONE_IDENTITY_SPACE",
+              "AUTHORITATIVE_EXTERNAL_ID_VERIFIED",
+              "NONE"
+            ],
+            "description": "The proving key, for PROVEN_IDENTITY; NONE otherwise."
+          },
+          "candidateSignals": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40000
+            },
+            "maxItems": 10000,
+            "description": "Signals of a candidate, e.g. SAME_NORMALIZED_EMAIL, SAME_NORMALIZED_FULL_NAME."
           },
           "conflictCodes": {
             "type": "array",
@@ -8132,6 +8422,12 @@
             },
             "maxItems": 10000,
             "description": "Blocking conflicts (identityResolution.blockingConflicts)."
+          },
+          "memberCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Records in the group."
           },
           "decision": {
             "type": "string",
@@ -8146,7 +8442,7 @@
             "type": "string",
             "enum": [
               "PERSON",
-              "ADOPTED_RULE",
+              "PROVEN_IDENTITY_RULE",
               "NOBODY"
             ],
             "description": "Who decided."
@@ -8162,8 +8458,10 @@
           "groupId",
           "objectScope",
           "evidenceClass",
-          "memberCount",
+          "provingKey",
+          "candidateSignals",
           "conflictCodes",
+          "memberCount",
           "decision",
           "decidedBy"
         ],
@@ -8400,6 +8698,25 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:read:ListDeletionRecords"
+      },
+      "ListIdentityDecisionRecordsReply": {
+        "title": "ListIdentityDecisionRecords READ",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "READ"
+          },
+          "data": {
+            "$ref": "#/components/schemas/IdentityDecisionRecordPage"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:read:ListIdentityDecisionRecords"
       },
       "ListIdentityGroupsReply": {
         "title": "ListIdentityGroups READ",
@@ -9055,13 +9372,21 @@
       "PlanDecisionPreview": {
         "title": "PlanDecisionPreview",
         "type": "object",
-        "description": "The apply binds previewHash; any change in the groups makes it stale. (owner manual 06)",
+        "description": "The apply or the decision binds previewHash; any change in the groups makes it stale. (owner manual 06)",
         "properties": {
           "planId": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
             "description": "Plan."
+          },
+          "evidenceClass": {
+            "type": "string",
+            "enum": [
+              "PROVEN_IDENTITY",
+              "CANDIDATE"
+            ],
+            "description": "Which groups the preview covers."
           },
           "previewHash": {
             "type": "string",
@@ -9089,6 +9414,7 @@
         },
         "required": [
           "planId",
+          "evidenceClass",
           "previewHash",
           "groupCount",
           "excludedCount",
@@ -9701,18 +10027,22 @@
               "REFUSAL_LIST_VERSION_STALE",
               "NOTE_REQUIRED",
               "CLAIM_NOT_REFUSABLE",
+              "OWNER_RULE_REFERENCE_REQUIRED",
+              "OWNER_RULE_NOT_IN_FORCE",
               "REVIEW_NOT_OPEN",
               "PREVIEW_STALE",
-              "NO_ADOPTED_EVIDENCE_RULE",
+              "NOT_PROVEN_IDENTITY",
+              "EXTERNAL_ID_NOT_VERIFIED",
+              "PLAN_NOT_EDITABLE",
               "BATCH_TOO_LARGE",
               "GROUP_BLOCKED",
-              "PLAN_NOT_EDITABLE",
               "BATCH_NOT_LATEST",
               "NOTICE_NOT_PENDING",
               "PROOF_REQUIRED",
               "HOLD_ALREADY_USED",
               "CEILING_REACHED",
               "AMOUNT_OR_REFERENCE_MISMATCH",
+              "OWNER_REVIEW_REQUIRED",
               "EFFECTIVE_DATE_IN_PAST",
               "ID_NOT_IN_EVIDENCE",
               "PROCESSING_AUTHORIZATION_MISSING",
@@ -10647,6 +10977,12 @@
             "minLength": 1,
             "maxLength": 4000,
             "pattern": "^(?=[\\s\\S]*\\S)[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f]+$"
+          },
+          "ownerRuleRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD071"
@@ -11237,7 +11573,7 @@
       "SellerMoneySummary": {
         "title": "SellerMoneySummary",
         "type": "object",
-        "description": "Collections, never invoices; net of refunds; tax excluded; split shares applied once; one capture is counted for one period once; pending is as of computedAt, the others are of the period. (owner manual 17)",
+        "description": "Collections, never invoices: a collection counts in the month its capture was confirmed and a refund in the month it happened, never rewriting an earlier period; tax excluded; one capture counted once and split shares applied once; earned, held, payable and paid kept apart; pending = held + payable as of computedAt. (owner manual 17)",
         "properties": {
           "sellerId": {
             "type": "string",
@@ -11260,17 +11596,27 @@
           "netAttributableRevenueCents": {
             "type": "string",
             "pattern": "^(0|[1-9][0-9]*)$",
-            "description": "What attributed customers paid for the service in the period, net of refunds of the period, tax excluded; never Kauro's revenue."
+            "description": "What attributed customers paid for the service, collections confirmed in the period net of refunds that happened in the period, tax excluded; never Kauro's revenue."
           },
           "commissionGeneratedCents": {
             "type": "string",
             "pattern": "^(0|[1-9][0-9]*)$",
-            "description": "Commission accrued on that revenue, after offsets."
+            "description": "Commission earned on that revenue in the period, after offsets."
           },
           "commissionPendingCents": {
             "type": "string",
             "pattern": "^(0|[1-9][0-9]*)$",
-            "description": "Accrued not yet paid, as of computedAt."
+            "description": "Earned not yet paid, as of computedAt: held plus payable."
+          },
+          "commissionHeldCents": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$",
+            "description": "Held, as of computedAt."
+          },
+          "commissionPayableCents": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$",
+            "description": "Payable, as of computedAt."
           },
           "commissionPaidCents": {
             "type": "string",
@@ -11286,13 +11632,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "commission.collectionPeriod in force."
+            "description": "commission.collectionPeriod in force (MONTH_OF_CONFIRMED_CAPTURE)."
           },
           "refundPeriodRule": {
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "commission.refundPeriod in force."
+            "description": "commission.refundPeriod in force (MONTH_IN_WHICH_THE_REFUND_HAPPENED)."
           },
           "currency": {
             "type": "string",
@@ -11314,6 +11660,8 @@
           "netAttributableRevenueCents",
           "commissionGeneratedCents",
           "commissionPendingCents",
+          "commissionHeldCents",
+          "commissionPayableCents",
           "commissionPaidCents",
           "refundOffsetCents",
           "collectionPeriodRule",
@@ -12183,7 +12531,7 @@
       "TransferProof": {
         "title": "TransferProof",
         "type": "object",
-        "description": "Not payment; once per quote and per sealed set; never renewed; never added to the extension; never authorizes preparation (F-23). (owner manual 15)",
+        "description": "Not payment; proof of a transfer already sent, exact amount and reference; once per quote and per sealed set; never renewed; with an extension the later date applies within the ceiling, never the sum; the effective end is the earlier of five US banking days (FedACH calendar) from the accepted proof and 24 days from sealing, and that is the date the customer sees; never authorizes preparation (F-23). (owner manual 15)",
         "properties": {
           "proofId": {
             "type": "string",
@@ -12240,7 +12588,7 @@
             "type": "string",
             "format": "date-time",
             "pattern": "Z$",
-            "description": "Hold end once ACCEPTED."
+            "description": "Effective end once ACCEPTED: the earlier of five US banking days from acceptance and 24 days from sealing."
           },
           "refusalCode": {
             "type": "string",

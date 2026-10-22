@@ -6,10 +6,12 @@
   "note": "Source of CP-02. tools/cp02.mjs generates CP-02.registry-delta.json, CP-02.openapi.json and CP-02.compatibility.json from this file and the vendored registry; tools/test/cp02-api-contracts.test.mjs proves them. Nothing here is authority until the owner signs an item and the authority re-issue adopts it together with CP-01.",
   "complementOf": {
     "proposal": "CP-01",
+    "revision": 2,
     "pr": 122,
-    "commit": "16ee3d4b2e3128e75464fee4c7a52f71dc33d965",
+    "commit": "f5422605936254e6317defb2da1fbb15cd15ad97",
     "delta": "docs/authority/proposals/CP-01.registry-delta.json",
-    "sha256": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a"
+    "sha256": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a",
+    "previous": { "revision": 1, "commit": "16ee3d4b2e3128e75464fee4c7a52f71dc33d965", "sha256": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a" }
   },
   "classes": {
     "APPROVED_AWAITING_REISSUE": "Substance decided by the owner, the authority or the law (or a read under the owner's standing delegation of design decisions); every CP-01 item it requires is itself approved. Waits only for the re-issue that adopts CP-01 and CP-02 together.",
@@ -20,6 +22,57 @@
   "statusOfClass": { "APPROVED_AWAITING_REISSUE": "APPROVED_AWAITING_REISSUE", "CONDITIONAL": "CONDITIONAL", "PROPOSED": "PROPOSED", "BLOCKED_EXTERNAL": "CONDITIONAL" },
   "authorities": {
     "F-01": { "record": "docs/design/ORDER11-DESIGN-DECISIONS.md", "anchor": "7. **\"Clean your data\" [O].** No destination step", "standing": "APPROVED", "by": "owner", "date": "2026-10-20" },
+    "CP01-RES": {
+      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "anchor": "# Owner resolution on ChangeProposal CP-01 (2026-10-22)",
+      "standing": "APPROVED",
+      "by": "owner",
+      "date": "2026-10-22"
+    },
+    "CP01-RES-04": {
+      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "anchor": "| CP-01.04 | **Content approved; legal effect conditional.**",
+      "standing": "APPROVED",
+      "by": "owner",
+      "date": "2026-10-22"
+    },
+    "CP01-RES-07": {
+      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "anchor": "| CP-01.07 | **Approved with modification.** Not every persisted command resets inactivity.",
+      "standing": "APPROVED",
+      "by": "owner",
+      "date": "2026-10-22"
+    },
+    "CP01-RES-11": {
+      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "anchor": "| CP-01.11 | **Parameters approved; activation blocked by PV1.**",
+      "standing": "EXTERNAL",
+      "by": "owner",
+      "date": "2026-10-22",
+      "waitsFor": "Wise Business, the PV1 evidence, implementation, abuse controls and legal review (LR-02) before any adoption or activation"
+    },
+    "CP01-RES-12": {
+      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "anchor": "| CP-01.12 | **Approved with a security modification.**",
+      "standing": "APPROVED",
+      "by": "owner",
+      "date": "2026-10-22"
+    },
+    "CP01-RES-13": {
+      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "anchor": "| CP-01.13 | **Approved.** A collection belongs to the period in which the money was captured and confirmed",
+      "standing": "APPROVED",
+      "by": "owner",
+      "date": "2026-10-22"
+    },
+    "O16-R2": {
+      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "anchor": "### 13.4 Contract changes unblocked for CP-02",
+      "standing": "APPROVED",
+      "by": "authority",
+      "date": "2026-10-22",
+      "note": "Order 16's handoff after the owner resolution"
+    },
     "F-03": {
       "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
       "anchor": "## F-03. Self-serve free check from the public site (changes A3 §3.2)",
@@ -65,18 +118,19 @@
     "F-12": {
       "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
       "anchor": "## F-12. Seller money in four categories, each collection counted once",
-      "standing": "CONDITIONAL",
+      "standing": "APPROVED",
       "by": "owner",
-      "date": "2026-10-21",
-      "waitsFor": "CP-01.13: the owner's confirmation of the collection and refund periods"
+      "date": "2026-10-22",
+      "resolvedBy": "CP01-RES"
     },
     "F-13": {
       "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
       "anchor": "## F-13. A closed list of claim refusal reasons, with evidence",
-      "standing": "CONDITIONAL",
+      "standing": "APPROVED",
       "by": "owner",
-      "date": "2026-10-21",
-      "waitsFor": "CP-01.04: the owner's confirmation of the code names and of three seller messages"
+      "date": "2026-10-22",
+      "resolvedBy": "CP01-RES",
+      "note": "Content approved 2026-10-22; legal effect on sellers PENDING_COUNSEL (CP-01.14, L-19)"
     },
     "F-14": {
       "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
@@ -85,7 +139,14 @@
       "by": "owner",
       "date": "2026-10-21"
     },
-    "F-15": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-15. Alerts computed from real data", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
+    "F-15": {
+      "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
+      "anchor": "## F-15. Alerts computed from real data",
+      "standing": "APPROVED",
+      "by": "owner",
+      "date": "2026-10-22",
+      "resolvedBy": "CP01-RES"
+    },
     "F-16": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-16. The retainer: zero by default", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
     "F-17": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-17. Offsets after a refund, shown on the statement", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
     "F-18": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-18. \"Pending legal review\" on contractual rules", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
@@ -105,14 +166,7 @@
       "date": "2026-10-21",
       "waitsFor": "the PV1 qualification of the Wise route and its evidence (Payments V1 §2), then the owner's values (CP-01.11)"
     },
-    "F-22": {
-      "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
-      "anchor": "## F-22. Abuse limits of the hold",
-      "standing": "CONDITIONAL",
-      "by": "owner",
-      "date": "2026-10-21",
-      "waitsFor": "CP-01.11 values"
-    },
+    "F-22": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-22. Abuse limits of the hold", "standing": "APPROVED", "by": "owner", "date": "2026-10-22", "resolvedBy": "CP01-RES" },
     "F-23": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-23. Preparation never starts on a hold", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
     "F-24": {
       "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
@@ -121,14 +175,7 @@
       "by": "owner",
       "date": "2026-10-21"
     },
-    "F-25": {
-      "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
-      "anchor": "## F-25. Batch unification",
-      "standing": "CONDITIONAL",
-      "by": "owner",
-      "date": "2026-10-21",
-      "waitsFor": "CP-01.12: the definition of a demonstrated identity, accents and the cap"
-    },
+    "F-25": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-25. Batch unification", "standing": "APPROVED", "by": "owner", "date": "2026-10-22", "resolvedBy": "CP01-RES" },
     "F-26": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-26. A change after approval is a new plan revision", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
     "F-27": { "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md", "anchor": "## F-27. Adversarial identity tests", "standing": "APPROVED", "by": "owner", "date": "2026-10-21" },
     "F-28": {
@@ -328,6 +375,12 @@
       "standing": "PROPOSED",
       "waitsFor": "the owner (B-09)"
     },
+    "LR-01": {
+      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "anchor": "## LR-01. The free check's extension, to 17 days from sealing",
+      "standing": "EXTERNAL",
+      "waitsFor": "competent legal review (L-20)"
+    },
     "LR-02": {
       "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
       "anchor": "## LR-02. The pending-payment hold, and five dates named alike",
@@ -345,6 +398,12 @@
       "anchor": "## LR-06. Who tells the customer a refund decision, and when (F-33)",
       "standing": "EXTERNAL",
       "waitsFor": "competent legal review (L-20)"
+    },
+    "L-12": {
+      "record": "docs/legal/LAWYER_LATER.md",
+      "anchor": "| L-12 | **Seller (independent sales collaborator) relationship**",
+      "standing": "EXTERNAL",
+      "waitsFor": "competent legal review of the seller relationship"
     },
     "L-19": {
       "record": "pr122:docs/legal/LAWYER_LATER.md",
@@ -478,7 +537,7 @@
       "gaps": ["F-01"],
       "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-20", "record": "docs/design/ORDER11-DESIGN-DECISIONS.md" },
-      "basis": ["F-01", "O16-HANDOFF"],
+      "basis": ["F-01", "O16-HANDOFF", "CP01-RES"],
       "requires": ["CP-01.01"],
       "dependsOn": [],
       "pending": [],
@@ -575,7 +634,8 @@
           "change": "targetContractId is absent for CLEAN (the key stays allowlisted; a CLEAN audit omits it and carries targetContractHash = CLEAN_ONLY_TARGET_HASH)",
           "breaking": false
         }
-      ]
+      ],
+      "activation": ["the StartAudit, CreatePlan, ApprovePlan and CreateQuote handlers take the CLEAN branch with the canonical CLEAN binding and their tests (C4), CP-01.01's activation"]
     },
     {
       "id": "CP-02.02",
@@ -695,7 +755,8 @@
           "expected": "404 NOT_FOUND as an id nobody holds in both cases; no date, rule or state of B is returned or timed differently."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the dates read built from the quote, retention and extension journals with its tests (C4, C6); the hold's entry stays NOT_APPLICABLE until CP-02.17 is active"]
     },
     {
       "id": "CP-02.03",
@@ -1149,7 +1210,8 @@
           "expected": "GetProjectSummary names each stage and who acts; GetBoardSummary counts 1 PLAN and 1 PAYMENT; ListBillingDocuments lists the quote (QUOTE_PRICE_VALIDITY) and the order (TRANSFER_DUE); GetPackage counts the rejected rows; the support case and the deletion are listed; every list pages with a cursor."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the reads served with their tenant tests (C4); the roles of AGENCY_BILLING_READER mapped by Order 15"]
     },
     {
       "id": "CP-02.04",
@@ -1158,7 +1220,7 @@
       "gaps": ["F-19", "F-20"],
       "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md" },
-      "basis": ["F-19", "F-20", "WS-1", "O16-HANDOFF"],
+      "basis": ["F-19", "F-20", "WS-1", "O16-HANDOFF", "CP01-RES"],
       "requires": ["CP-01.02"],
       "dependsOn": [],
       "pending": [],
@@ -1317,7 +1379,8 @@
         }
       ],
       "events": [],
-      "eventPayloadChanges": [{ "eventType": "retention_record.extended.v1", "change": "unchanged keys; retentionClass now also takes UNPAID", "breaking": false }]
+      "eventPayloadChanges": [{ "eventType": "retention_record.extended.v1", "change": "unchanged keys; retentionClass now also takes UNPAID", "breaking": false }],
+      "activation": ["CP-01.02's activation: the UNPAID soft deadline written, deletion, restoration, SQL policies and the dates read implemented and tested, the legal wording through LR-01 (C6)"]
     },
     {
       "id": "CP-02.05",
@@ -1560,7 +1623,8 @@
           "payload": { "consentId": "id", "userId": "id", "kind": "token", "channel": "token" },
           "consumers": ["AUTHORITY_JOURNAL"]
         }
-      ]
+      ],
+      "activation": ["the identity order (C8) serves the commands with the registration flow; no DATA_PROCESSING_AUTHORIZATION is recorded before the Policy is published (CP-01.10, LR-05)"]
     },
     {
       "id": "CP-02.06",
@@ -1698,7 +1762,8 @@
           "payload": { "userId": "id", "disabledOptionalCount": "count" },
           "consumers": ["NOTIFICATIONS"]
         }
-      ]
+      ],
+      "activation": ["the notifications consumer reads the preferences before each optional send (C8)"]
     },
     {
       "id": "CP-02.07",
@@ -1867,7 +1932,7 @@
       ],
       "modified": [],
       "rules": [
-        "The owner decides a review with DecideClaimReview (CP-02.14, conditional on CP-01.04). Until then a review stays REQUESTED and the owner may still accept the claim with AcceptAttribution (CMD047), which the history records.",
+        "The owner decides a review with DecideClaimReview (CP-02.14). The owner may also accept the claim with AcceptAttribution (CMD047), which the history records.",
         "An e-mail to the seller with a review's outcome (F-14) is a NOTIFICATIONS send; under D10-EVT-1 there is no domain event, so the backend order sends it from the commercial transition in the same transaction's outbox (handoff C4)."
       ],
       "acceptance": [
@@ -1908,7 +1973,8 @@
           "expected": "CLAIM_NOT_REVIEWABLE for both; nothing recorded."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the commercial transitions and the seller's e-mail of the outcome from the same transaction (C4); the seller role mapped by Order 15"]
     },
     {
       "id": "CP-02.08",
@@ -2154,40 +2220,46 @@
           "expected": "ListSellers shows rates and the retainer; ListCustomers shows buyer type, channel and sellers; ListStatementsByPeriod lists two rows; ListClaimsAcrossSellers filters open reviews; GetSellerSchedule shows a seller only their own claims and dates."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the owner's cross-workspace scope and its RLS (Order 15); the reads served (C4)"]
     },
     {
       "id": "CP-02.09",
       "o17": ["O17-04"],
-      "title": "Seller money in four figures, each collection counted once",
+      "title": "Seller money in four figures, each collection counted once, amounts earned, held, payable and paid kept apart",
       "gaps": ["F-12"],
-      "class": "CONDITIONAL",
+      "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-OPS.md" },
-      "basis": ["F-12", "OPS-1", "O16-HANDOFF"],
+      "basis": ["F-12", "OPS-1", "CP01-RES-13", "O16-R2"],
       "requires": ["CP-01.13"],
       "dependsOn": [],
-      "pending": ["CP-01.13 adopted: the owner's confirmation that a collection counts in the month of capture and a refund in the month of the refund"],
-      "blockers": [{ "kind": "OWNER", "ref": "CP-01.13", "what": "periods of collections and refunds" }],
-      "unlock": "The owner signs CP-01.13 (or changes the periods; this contract then takes the signed values from commission.collectionPeriod and commission.refundPeriod).",
-      "whyNotYet": "The four figures are decided, but which month a refund reduces is not confirmed: the same refund could lower October's or November's figures. Publishing the read before that would show figures the owner has not agreed.",
+      "pending": [],
+      "blockers": [],
       "component": "C4",
       "contracts": [
         {
           "name": "SellerMoneySummary",
           "owner": "17",
           "flow": "Captures, refunds and commission lines → Sellers (P-21), Seller (UI37), seller home",
-          "invariant": "Collections, never invoices; net of refunds; tax excluded; split shares applied once; one capture is counted for one period once; pending is as of computedAt, the others are of the period.",
+          "invariant": "Collections, never invoices: a collection counts in the month its capture was confirmed and a refund in the month it happened, never rewriting an earlier period; tax excluded; one capture counted once and split shares applied once; earned, held, payable and paid kept apart; pending = held + payable as of computedAt.",
           "fields": [
             ["sellerId", "id", false, "Seller; absent on the total row."],
             ["periodStart", "utc", true, "Inclusive."],
             ["periodEnd", "utc", true, "Exclusive."],
-            ["netAttributableRevenueCents", "money", true, "What attributed customers paid for the service in the period, net of refunds of the period, tax excluded; never Kauro's revenue."],
-            ["commissionGeneratedCents", "money", true, "Commission accrued on that revenue, after offsets."],
-            ["commissionPendingCents", "money", true, "Accrued not yet paid, as of computedAt."],
+            [
+              "netAttributableRevenueCents",
+              "money",
+              true,
+              "What attributed customers paid for the service, collections confirmed in the period net of refunds that happened in the period, tax excluded; never Kauro's revenue."
+            ],
+            ["commissionGeneratedCents", "money", true, "Commission earned on that revenue in the period, after offsets."],
+            ["commissionPendingCents", "money", true, "Earned not yet paid, as of computedAt: held plus payable."],
+            ["commissionHeldCents", "money", true, "Held, as of computedAt."],
+            ["commissionPayableCents", "money", true, "Payable, as of computedAt."],
             ["commissionPaidCents", "money", true, "Paid in the period."],
             ["refundOffsetCents", "money", true, "Offsets applied in the period."],
-            ["collectionPeriodRule", "label", true, "commission.collectionPeriod in force."],
-            ["refundPeriodRule", "label", true, "commission.refundPeriod in force."],
+            ["collectionPeriodRule", "label", true, "commission.collectionPeriod in force (MONTH_OF_CONFIRMED_CAPTURE)."],
+            ["refundPeriodRule", "label", true, "commission.refundPeriod in force (MONTH_IN_WHICH_THE_REFUND_HAPPENED)."],
             ["currency", "enum:USD", true, "Currency."],
             ["computedAt", "utc", true, "Database time."]
           ]
@@ -2232,7 +2304,7 @@
         }
       ],
       "modified": [],
-      "rules": ["A capture split between two sellers counts once in total and by its shares per seller (commission.splitRemainder)."],
+      "rules": ["A capture split between two sellers counts once in total and by its shares per seller (commission.splitRemainder).", "Tax is never in the base (commission.base EXCLUDING_TAX)."],
       "acceptance": [
         {
           "tag": "ONCE",
@@ -2257,12 +2329,13 @@
           "kind": "POSITIVE",
           "gate": "G-COMMERCIAL",
           "template": "ledger",
-          "title": "A refund reduces the period of the refund",
-          "scenario": "Capture in October, refund completed in November.",
-          "expected": "October unchanged; November's net revenue and generated commission reduced (MONTH_OF_REFUND)."
+          "title": "A refund lowers the month it happened, linked to its line",
+          "scenario": "Capture confirmed in October, refund completed in November.",
+          "expected": "October unchanged (never rewritten); November's net revenue and generated commission reduced (MONTH_IN_WHICH_THE_REFUND_HAPPENED); the offset names the October line it adjusts."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the figures computed from captures, refunds and lines under CP-01.13's periods, with the double-count tests (C4)"]
     },
     {
       "id": "CP-02.10",
@@ -2397,7 +2470,8 @@
       "rules": [
         "The retainer accrues monthly from the agreement's start while the engagement lasts, prorated only if the signed agreement says so; with commission.retainerDefaultCentsPerMonth 0 no item appears.",
         "An offset is applied only under the agreement in force and the applicable rules (OPS-4), never presented as automatic beyond that; one refund offsets a line once.",
-        "RETAINER items carry the retainer accrual's statement line as lineId, so StatementBalanceItemView.lineId stays required (no break for readers)."
+        "RETAINER items carry the retainer accrual's statement line as lineId, so StatementBalanceItemView.lineId stays required (no break for readers).",
+        "A signed amount prevails under its dates and terms; an obligation already accrued is never removed (CP-01.05 as the owner approved it)."
       ],
       "acceptance": [
         {
@@ -2435,9 +2509,19 @@
           "title": "One refund never offsets twice",
           "scenario": "The refund's completion is delivered twice and a period is re-closed.",
           "expected": "One OFFSET; the corrected statement references the same adjustment."
+        },
+        {
+          "tag": "ACCRUED-KEPT",
+          "kind": "ADVERSARIAL",
+          "gate": "G-COMMERCIAL",
+          "template": "ledger",
+          "title": "An accrued retainer is never removed",
+          "scenario": "A retainer accrued in October; the agreement is amended to USD 0.00 from November; October's statement is re-closed.",
+          "expected": "October keeps its RETAINER item; November has none."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the statement close accrues the retainer and records offsets with their basis; the web client regenerated with the server (C4, C9)"]
     },
     {
       "id": "CP-02.11",
@@ -2446,14 +2530,11 @@
       "gaps": ["F-15"],
       "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-OPS.md" },
-      "basis": ["F-15", "OPS-3", "O16-HANDOFF"],
-      "requires": ["CP-01.06"],
+      "basis": ["F-15", "OPS-3", "CP01-RES-07", "O16-R2"],
+      "requires": ["CP-01.06", "CP-01.07"],
       "dependsOn": [],
       "pending": [],
       "blockers": [],
-      "conditionalBehaviour": [
-        { "what": "the INACTIVE kind is not emitted", "until": "CP-01.07", "why": "\"relevant progress\" is a PROPOSED definition; until the owner decides it, no project is flagged inactive" }
-      ],
       "component": "C4",
       "contracts": [
         {
@@ -2481,6 +2562,7 @@
             ["conditionCode", "label", true, "Trigger of the main kind."],
             ["dueAt", "utc", false, "The date concerned."],
             ["since", "utc", true, "When the condition began."],
+            ["lastMaterialProgressAt", "utc", false, "INACTIVE: the latest act of alerts.relevantProgress.counts."],
             ["otherConditions", "list:AlertCondition", true, "The second line."],
             ["policyVersion", "text", true, "Edition of the alerts policy applied."]
           ]
@@ -2515,7 +2597,11 @@
         }
       ],
       "modified": [],
-      "rules": ["Seller alerts concern subjectKind CLAIM of the seller's own claims only; agencyId is absent on them."],
+      "rules": [
+        "Seller alerts concern subjectKind CLAIM of the seller's own claims only; agencyId is absent on them.",
+        "INACTIVE counts from the latest act of alerts.relevantProgress.counts only (CP-01.07 as the owner modified it): a material, verifiable change of the project or its deliverables; the acts of neverCounts never reset it.",
+        "Progress affects the inactivity alert only: no alert, read or progress moves a retention, legal or quote-validity date."
+      ],
       "acceptance": [
         {
           "tag": "ONCE-MOST-URGENT",
@@ -2536,15 +2622,6 @@
           "expected": "DEADLINE_SOON CLAIM_END at each threshold (alerts.claimEndAlertDays); never another seller's claim."
         },
         {
-          "tag": "NO-INACTIVE-YET",
-          "kind": "NEGATIVE",
-          "gate": "G-COMMERCIAL",
-          "template": "projections",
-          "title": "No inactivity alert before relevant progress is defined",
-          "scenario": "A project without commits for 20 days while CP-01.07 is not adopted.",
-          "expected": "No INACTIVE alert; other kinds still computed."
-        },
-        {
           "tag": "SELLER-SCOPE",
           "kind": "ADVERSARIAL",
           "gate": "G-COMMERCIAL",
@@ -2552,9 +2629,19 @@
           "title": "A seller's alerts are their own claims only",
           "scenario": "Seller A has a claim ending in 3 days; seller B's claim ends tomorrow; a project of A's customer is blocked.",
           "expected": "ListMyAlerts for A shows only A's claim; no project alert, no agencyId, nothing of B."
+        },
+        {
+          "tag": "NON-MATERIAL-ACTS",
+          "kind": "NEGATIVE",
+          "gate": "G-COMMERCIAL",
+          "template": "projections",
+          "title": "Only material progress resets inactivity",
+          "scenario": "A project idle for 13 days receives, one at a time, a read, a download, a sign-in, a reminder, an ordinary support message, a command without material effect, a failed retry and a repeated action without state change; then a new sealed revision.",
+          "expected": "Day 14 raises INACTIVE whatever the non-material acts; the sealed revision resets the clock; no retention, legal or quote date moved."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the alerts computed under CP-01.06 and CP-01.07 with the progress tests of Order 16 §13.6.1 (C4)"]
     },
     {
       "id": "CP-02.12",
@@ -2563,7 +2650,7 @@
       "gaps": ["F-18"],
       "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-OPS.md" },
-      "basis": ["F-18", "OPS-2", "O16-HANDOFF"],
+      "basis": ["F-18", "OPS-2", "O16-HANDOFF", "CP01-RES"],
       "requires": ["CP-01.14"],
       "dependsOn": [],
       "pending": [],
@@ -2631,7 +2718,8 @@
           "expected": "Refused; the seller's own screens show no legal status (SELLER visibility)."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the read served from policy.legalStatus (C4)"]
     },
     {
       "id": "CP-02.13",
@@ -2894,35 +2982,35 @@
             ["version", "version", true, "Version."]
           ]
         }
-      ]
+      ],
+      "activation": ["the CSV and PDF exports and the request commands served (C4); the PDF renderer outside packages/reports"]
     },
     {
       "id": "CP-02.14",
       "o17": ["O17-05"],
-      "title": "Refusing a claim with a closed reason code, and deciding a review",
+      "title": "Refusing a claim with a closed reason code, evidence and, for OWNER_RULE, a versioned rule in force; deciding a review",
       "gaps": ["F-13", "F-14"],
-      "class": "CONDITIONAL",
+      "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-OPS.md" },
-      "basis": ["F-13", "F-14", "OPS-2", "L-19", "D10-EVT-1", "O16-HANDOFF"],
+      "basis": ["F-13", "F-14", "OPS-2", "CP01-RES-04", "D10-EVT-1", "O16-R2"],
       "requires": ["CP-01.04", "CP-01.14"],
       "dependsOn": ["CP-02.07"],
-      "pending": ["CP-01.04 adopted: the owner's confirmation of the code names and of the seller messages of the three own-claim reasons"],
-      "blockers": [{ "kind": "OWNER", "ref": "CP-01.04", "what": "the closed list of refusal reasons" }],
-      "unlock": "The owner signs CP-01.04 (the list may be adopted before counsel's validation, with legalStatus PENDING_COUNSEL, CP-01.14). Counsel's validation (L-19) does not block the contract: it is shown as PENDING_COUNSEL.",
-      "whyNotYet": "The reasonCode members are validated against commission.claimRefusalReasons, which exists only after CP-01.04; a refusal contract without its closed list would be the free-text label it replaces.",
+      "pending": [],
+      "blockers": [],
       "component": "C4",
       "contracts": [
         {
           "name": "ClaimRefusal",
           "owner": "17",
           "flow": "RefuseAttribution → claim history and the seller's neutral message",
-          "invariant": "The code is one of commission.claimRefusalReasons of listVersion; OTHER needs a note; the seller message derives from the code, never from the note.",
+          "invariant": "The code is one of commission.claimRefusalReasons of listVersion; evidence on every refusal; OTHER needs a note; OWNER_RULE names a versioned rule in force when the claimed facts happened, never a later one; the seller message derives from the code, never from the note.",
           "fields": [
             ["refusalId", "id", true, "Refusal."],
             ["claimId", "id", true, "Claim."],
             ["reasonCode", "label", true, "Closed code."],
             ["listVersion", "label", true, "commission.claimRefusalListVersion."],
             ["evidenceRef", "id", true, "Owner's evidence."],
+            ["ownerRuleRef", "label", false, "OWNER_RULE: the rule id and version in force at the decision."],
             ["note", "text", false, "Required for OTHER."],
             ["sellerMessage", "label", true, "Derived from the code."],
             ["refusedAt", "utc", true, "Database time."]
@@ -2938,10 +3026,10 @@
           "path": "/api/v1/sales/claims/{claimId}/refuse",
           "role": "KAURO_OWNER",
           "owner": "17",
-          "fields": [["expectedVersion", "version"], ["reasonCode", "label"], ["listVersion", "label"], ["evidenceRef", "id"], ["note", "text"]],
-          "precondition": "The claim is SUBMITTED or DISPUTED; the code belongs to the list version in force; OTHER carries a note.",
+          "fields": [["expectedVersion", "version"], ["reasonCode", "label"], ["listVersion", "label"], ["evidenceRef", "id"], ["note", "text"], ["ownerRuleRef", "label"]],
+          "precondition": "The claim is SUBMITTED or DISPUTED; the code belongs to the list version in force; evidence is given; OTHER carries a note; OWNER_RULE names a versioned rule that was in force when the claimed facts happened.",
           "effect": "Move the claim to REJECTED with a ClaimRefusal; the seller reads the code's neutral message.",
-          "failure": "An unknown code or stale list version, OTHER without a note, or an ACCEPTED claim rejects without effect; a refusal never deletes historical rights.",
+          "failure": "An unknown code or stale list version, OTHER without a note, OWNER_RULE without a rule in force (or with one that entered into force after the facts), or an ACCEPTED claim rejects without effect; a refusal never deletes historical rights.",
           "gate": "G-COMMERCIAL",
           "idempotency": "REQUIRED",
           "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION",
@@ -2983,7 +3071,15 @@
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "REFUSAL_LIST_VERSION_STALE", "layer": "COMMAND", "meaning": "listVersion is not commission.claimRefusalListVersion" },
             { "status": 400, "code": "INVALID_REQUEST", "reason": "NOTE_REQUIRED", "layer": "COMMAND", "fieldCodes": ["REQUIRED"], "meaning": "OTHER needs a note" },
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "CLAIM_NOT_REFUSABLE", "layer": "COMMAND", "meaning": "the claim is not SUBMITTED or DISPUTED" },
-            { "status": 409, "code": "STALE_VERSION", "reason": null, "layer": "COMMAND", "meaning": "the claim changed" }
+            { "status": 409, "code": "STALE_VERSION", "reason": null, "layer": "COMMAND", "meaning": "the claim changed" },
+            { "status": 400, "code": "INVALID_REQUEST", "reason": "OWNER_RULE_REFERENCE_REQUIRED", "layer": "COMMAND", "fieldCodes": ["REQUIRED"], "meaning": "OWNER_RULE names no ownerRuleRef" },
+            {
+              "status": 409,
+              "code": "PRECONDITION_FAILED",
+              "reason": "OWNER_RULE_NOT_IN_FORCE",
+              "layer": "COMMAND",
+              "meaning": "the named rule version is unknown, not in force at the decision, or entered into force after the claimed facts (never retroactive)"
+            }
           ]
         },
         {
@@ -3029,7 +3125,10 @@
         }
       ],
       "modified": [],
-      "rules": ["Today a claim is refused only through a competing allocation (machines.ts) with a free label; this command replaces that path for refusals that are not competing allocations."],
+      "rules": [
+        "Today a claim is refused only through a competing allocation (machines.ts) with a free label; this command replaces that path for refusals that are not competing allocations.",
+        "Legal effect on sellers waits for competent review (L-12, L-19); policy.legalStatus says PENDING_COUNSEL and the owner's screens show it (CP-02.12)."
+      ],
       "acceptance": [
         {
           "tag": "CLOSED-LIST",
@@ -3057,56 +3156,87 @@
           "title": "A refusal, a review and an upheld decision",
           "scenario": "The owner refuses a claim INSUFFICIENT_OWN_WORK_EVIDENCE with evidence; the seller asks for a review; the owner upholds it.",
           "expected": "Claim REJECTED with a ClaimRefusal; ClaimReview UPHELD; the history lists REFUSED, REVIEW_REQUESTED, REVIEW_UPHELD; the seller read the message of that code."
+        },
+        {
+          "tag": "OWNER-RULE",
+          "kind": "ADVERSARIAL",
+          "gate": "G-COMMERCIAL",
+          "template": "ledger",
+          "title": "OWNER_RULE needs a rule in force, never a later one",
+          "scenario": "OWNER_RULE without a rule; with an unknown version; with a rule that entered into force after the claim's facts; OTHER with a note but no evidence.",
+          "expected": "OWNER_RULE_REFERENCE_REQUIRED; OWNER_RULE_NOT_IN_FORCE twice; the closed schema refuses the missing evidence; the claim unchanged."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": [
+        "legal effect on sellers only after competent review (L-12, L-19): policy.legalStatus commission.claimRules stays PENDING_COUNSEL (CP-01.14) and every owner screen and seller agreement says so",
+        "the commands and their tests (C4)"
+      ]
     },
     {
       "id": "CP-02.15",
       "o17": ["O17-09"],
-      "title": "The plan read with evidence classes, bulk identity decisions, undo and the revision that withdraws the quote",
+      "title": "The plan's identity groups: proven identity only from the core's proving keys, candidates decided by a person in bulk, the decision record, undo, and the revision that withdraws the quote",
       "gaps": ["F-25", "F-26", "F-27"],
-      "class": "CONDITIONAL",
+      "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md" },
-      "basis": ["F-25", "F-26", "F-27", "WS-2", "O16-HANDOFF"],
+      "basis": ["F-25", "F-26", "F-27", "WS-2", "CP01-RES-12", "O16-R2"],
       "requires": ["CP-01.12"],
       "dependsOn": [],
-      "pending": [
-        "CP-01.12 adopted: the owner's definition of a demonstrated identity, accents and the cap",
-        "the cores (C7): evidence classification, detection of existing CRM record IDs and shared addresses, a deterministic kept-record rule; RevisePlan wired (today inert, CORE_SERVICES_UNAVAILABLE)"
-      ],
-      "blockers": [{ "kind": "OWNER", "ref": "CP-01.12", "what": "the evidence rule" }, { "kind": "COMPONENT", "ref": "C7", "what": "the cores" }],
-      "unlock": "The owner signs CP-01.12 and the cores' order delivers the evidence classes; then the commands below are adopted and the backend wires them.",
-      "whyNotYet": "Without an approved evidence rule nothing may be classed DEMONSTRATED: matching name and e-mail is not, by itself, consent or proof that two records are one person, and an automatic merge on it is exactly what F-25 forbids. The commands only make sense over the cores' classification.",
+      "pending": [],
+      "blockers": [],
       "component": "C7",
       "contracts": [
         {
           "name": "IdentityGroupView",
           "owner": "06",
           "flow": "Plan identities and the core's evidence classification → plan page (UI20)",
-          "invariant": "DEMONSTRATED only under policy.identityResolution in force; without it every group is PROBABLE or BLOCKED; nothing is merged without a person's decision or an adopted rule.",
+          "invariant": "PROVEN_IDENTITY only from Migration Core's proving keys without a blocking conflict; same normalized e-mail and full name is a CANDIDATE, never proof; nothing is folded to manufacture a proof; a CANDIDATE is unified only by a person.",
           "fields": [
             ["groupId", "id", true, "Group."],
             ["objectScope", "label", true, "Object."],
-            ["evidenceClass", "enum:DEMONSTRATED,PROBABLE,BLOCKED", true, "Class."],
-            ["memberCount", "count", true, "Records in the group."],
+            ["evidenceClass", "enum:PROVEN_IDENTITY,CANDIDATE,BLOCKED", true, "Class (identityResolution)."],
+            ["provingKey", "enum:SOURCE_RECORD_ID_WITHIN_ONE_IDENTITY_SPACE,AUTHORITATIVE_EXTERNAL_ID_VERIFIED,NONE", true, "The proving key, for PROVEN_IDENTITY; NONE otherwise."],
+            ["candidateSignals", "listText", true, "Signals of a candidate, e.g. SAME_NORMALIZED_EMAIL, SAME_NORMALIZED_FULL_NAME."],
             ["conflictCodes", "listText", true, "Blocking conflicts (identityResolution.blockingConflicts)."],
+            ["memberCount", "count", true, "Records in the group."],
             ["decision", "enum:UNDECIDED,UNIFY,KEEP_SEPARATE", true, "Current decision."],
-            ["decidedBy", "enum:PERSON,ADOPTED_RULE,NOBODY", true, "Who decided."],
+            ["decidedBy", "enum:PERSON,PROVEN_IDENTITY_RULE,NOBODY", true, "Who decided."],
             ["batchId", "id", false, "Batch that applied it."]
           ]
         },
         {
           "name": "PlanDecisionPreview",
           "owner": "06",
-          "flow": "A batch's exact effects → apply must match",
-          "invariant": "The apply binds previewHash; any change in the groups makes it stale.",
+          "flow": "A batch's exact effects → apply or decide must match",
+          "invariant": "The apply or the decision binds previewHash; any change in the groups makes it stale.",
           "fields": [
             ["planId", "id", true, "Plan."],
+            ["evidenceClass", "enum:PROVEN_IDENTITY,CANDIDATE", true, "Which groups the preview covers."],
             ["previewHash", "hash", true, "Hash of the exact effects."],
             ["groupCount", "count", true, "Groups affected."],
             ["excludedCount", "count", true, "Excluded by conflicts."],
             ["computedAt", "utc", true, "Time."]
+          ]
+        },
+        {
+          "name": "IdentityDecisionRecord",
+          "owner": "06",
+          "flow": "Every identity decision → plan history and approval disclosures",
+          "invariant": "Records decision, evidence, responsible person, version and effect (identityResolution.decisionRecord); append-only.",
+          "fields": [
+            ["decisionId", "id", true, "Record."],
+            ["planId", "id", true, "Plan."],
+            ["planVersion", "version", true, "Plan version decided on."],
+            ["groupId", "id", true, "Group."],
+            ["decision", "enum:UNDECIDED,UNIFY,KEEP_SEPARATE", true, "Decision."],
+            ["evidenceClass", "enum:PROVEN_IDENTITY,CANDIDATE,BLOCKED", true, "Evidence class at the decision."],
+            ["evidenceHash", "hash", true, "Hash of the evidence the decision saw."],
+            ["decidedBy", "enum:PERSON,PROVEN_IDENTITY_RULE", true, "Who."],
+            ["responsibleMembershipId", "id", false, "The person (PERSON), or the member who applied the proven rule."],
+            ["effect", "enum:MERGE_IN_PLAN,KEEP_SEPARATE_IN_PLAN,RETURNED_TO_UNDECIDED", true, "Effect in the plan (Kauro never writes to a CRM)."],
+            ["batchId", "id", false, "Batch."],
+            ["decidedAt", "utc", true, "Time."]
           ]
         }
       ],
@@ -3114,15 +3244,15 @@
       "commands": [
         {
           "id": "CMD073",
-          "name": "ApplyDemonstratedBatch",
+          "name": "ApplyProvenIdentity",
           "method": "POST",
-          "path": "/api/v1/plans/{planId}/demonstrated-batches",
+          "path": "/api/v1/plans/{planId}/proven-identities",
           "role": "AGENCY_OPERATOR",
           "owner": "06",
           "fields": [["expectedVersion", "version"], ["previewHash", "hash"]],
-          "precondition": "An adopted identityResolution rule classes the groups DEMONSTRATED without blocking conflicts, and the preview hash is current.",
-          "effect": "Apply UNIFY to exactly the previewed groups as one batch, before approval, traced.",
-          "failure": "A stale preview, a group without an adopted rule or with a blocking conflict rejects; nothing is applied partially.",
+          "precondition": "The groups of the preview are PROVEN_IDENTITY by a proving key of Migration Core (an authoritative external id only once the core verifies it) and have no blocking conflict; the preview hash is current; the plan is not approved.",
+          "effect": "Unify exactly the previewed groups as one batch, recorded with decidedBy PROVEN_IDENTITY_RULE.",
+          "failure": "A stale preview, a CANDIDATE or BLOCKED group, an unverified external id or an approved plan rejects; nothing is applied partially.",
           "gate": "G-IC-KERNEL",
           "idempotency": "REQUIRED",
           "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_AND_PREVIEW_HASH",
@@ -3136,10 +3266,16 @@
           "path": "/api/v1/plans/{planId}/decisions",
           "role": "AGENCY_OPERATOR",
           "owner": "06",
-          "fields": [["expectedVersion", "version"], ["groupIds", "listText"], ["decision", "enum:UNIFY,KEEP_SEPARATE"], ["previewHash", "hash"]],
-          "precondition": "A person decides at most identityResolution.decideManyMaximumGroups PROBABLE groups shown in the preview.",
-          "effect": "Record one decision per group by the person, as one batch.",
-          "failure": "More groups than the cap, a BLOCKED group, or a stale preview rejects.",
+          "fields": [
+            ["expectedVersion", "version"],
+            ["groupIds", "listText"],
+            ["decision", "enum:UNIFY,KEEP_SEPARATE"],
+            ["previewHash", "hash"],
+            ["approval", "enum:EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW"]
+          ],
+          "precondition": "A person decides at most identityResolution.candidateDecision.maximumGroupsPerDecision CANDIDATE groups of the exact preview, with explicit approval.",
+          "effect": "Record one decision per group by the person, as one batch, with its decision record.",
+          "failure": "More groups than the cap, a BLOCKED or PROVEN_IDENTITY group, a stale preview or a missing approval rejects.",
           "gate": "G-IC-KERNEL",
           "idempotency": "REQUIRED",
           "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_AND_PREVIEW_HASH",
@@ -3154,9 +3290,9 @@
           "role": "AGENCY_OPERATOR",
           "owner": "06",
           "fields": [["expectedVersion", "version"], ["decision", "enum:UNDECIDED,UNIFY,KEEP_SEPARATE"]],
-          "precondition": "The plan is not approved.",
-          "effect": "Change one group's decision.",
-          "failure": "An approved plan needs a new revision.",
+          "precondition": "The plan is not approved; a CANDIDATE group is unified only by this person's decision.",
+          "effect": "Change one group's decision, recorded.",
+          "failure": "An approved plan needs a new revision; a BLOCKED group cannot be unified.",
           "gate": "G-IC-KERNEL",
           "idempotency": "REQUIRED",
           "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION",
@@ -3172,7 +3308,7 @@
           "owner": "06",
           "fields": [["expectedVersion", "version"]],
           "precondition": "The plan is not approved and the batch is its latest applied one.",
-          "effect": "Return the batch's groups to their prior decisions; the trace keeps both.",
+          "effect": "Return the batch's groups to their prior decisions; the record keeps both.",
           "failure": "An approved plan or a superseded batch rejects.",
           "gate": "G-IC-KERNEL",
           "idempotency": "REQUIRED",
@@ -3191,8 +3327,8 @@
           "audience": "AGENCY",
           "scope": "AGENCY_HEADER",
           "response": { "contract": "IdentityGroupView", "list": true },
-          "query": [{ "name": "evidenceClass", "enum": ["DEMONSTRATED", "PROBABLE", "BLOCKED"], "description": "Filter." }],
-          "summary": "Identity groups with evidence class, paged.",
+          "query": [{ "name": "evidenceClass", "enum": ["PROVEN_IDENTITY", "CANDIDATE", "BLOCKED"], "description": "Filter." }],
+          "summary": "Identity groups with evidence class, proving key, signals and conflicts, paged.",
           "outcomes": []
         },
         {
@@ -3204,7 +3340,22 @@
           "audience": "AGENCY",
           "scope": "AGENCY_HEADER",
           "response": { "contract": "PlanDecisionPreview" },
-          "summary": "The exact effects a batch would apply.",
+          "query": [
+            { "name": "evidenceClass", "enum": ["PROVEN_IDENTITY", "CANDIDATE"], "required": true, "description": "Which groups." }
+          ],
+          "summary": "The exact effects an apply or a bulk decision would have.",
+          "outcomes": []
+        },
+        {
+          "operationId": "ListIdentityDecisionRecords",
+          "kind": "read",
+          "method": "GET",
+          "path": "/api/v1/plans/{planId}/identity-decisions",
+          "role": "AGENCY_READER",
+          "audience": "AGENCY",
+          "scope": "AGENCY_HEADER",
+          "response": { "contract": "IdentityDecisionRecord", "list": true },
+          "summary": "Every identity decision with evidence, person, version and effect.",
           "outcomes": []
         },
         {
@@ -3218,7 +3369,15 @@
           "events": ["plan_decision_batch.applied.v1"],
           "outcomes": [
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PREVIEW_STALE", "layer": "COMMAND", "meaning": "the preview hash is not current" },
-            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "NO_ADOPTED_EVIDENCE_RULE", "layer": "COMMAND", "meaning": "no identityResolution rule is in force: nothing is DEMONSTRATED" }
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "NOT_PROVEN_IDENTITY", "layer": "COMMAND", "meaning": "a group is a candidate or blocked: e-mail and name never prove identity" },
+            {
+              "status": 409,
+              "code": "PRECONDITION_FAILED",
+              "reason": "EXTERNAL_ID_NOT_VERIFIED",
+              "layer": "COMMAND",
+              "meaning": "an external id declared authoritative is not verified by the core: it proves nothing on its own"
+            },
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PLAN_NOT_EDITABLE", "layer": "COMMAND", "meaning": "the plan is approved: a change is a new revision (F-26)" }
           ]
         },
         {
@@ -3227,11 +3386,18 @@
           "audience": "AGENCY",
           "scope": "AGENCY_HEADER",
           "assurance": "SESSION",
-          "request": { "required": ["expectedVersion", "groupIds", "decision", "previewHash"], "overrides": { "groupIds": { "items": "id", "minItems": 1, "maxItems": 100 } } },
+          "request": { "required": ["expectedVersion", "groupIds", "decision", "previewHash", "approval"], "overrides": { "groupIds": { "items": "id", "minItems": 1, "maxItems": 100 } } },
           "response": { "status": 200, "contract": "PlanDecisionPreview" },
           "events": ["plan_decision_batch.applied.v1"],
           "outcomes": [
-            { "status": 400, "code": "INVALID_REQUEST", "reason": "BATCH_TOO_LARGE", "layer": "COMMAND", "fieldCodes": ["RANGE"], "meaning": "more groups than the cap" },
+            {
+              "status": 400,
+              "code": "INVALID_REQUEST",
+              "reason": "BATCH_TOO_LARGE",
+              "layer": "COMMAND",
+              "fieldCodes": ["RANGE"],
+              "meaning": "more groups than identityResolution.candidateDecision.maximumGroupsPerDecision"
+            },
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "GROUP_BLOCKED", "layer": "COMMAND", "meaning": "a BLOCKED group is never decided in bulk" },
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PREVIEW_STALE", "layer": "COMMAND", "meaning": "the preview hash is not current" }
           ]
@@ -3246,7 +3412,8 @@
           "response": { "status": 200, "contract": "IdentityGroupView" },
           "events": ["plan_decision_batch.applied.v1"],
           "outcomes": [
-            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PLAN_NOT_EDITABLE", "layer": "COMMAND", "meaning": "the plan is approved: a change is a new revision (F-26)" }
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PLAN_NOT_EDITABLE", "layer": "COMMAND", "meaning": "the plan is approved: a change is a new revision (F-26)" },
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "GROUP_BLOCKED", "layer": "COMMAND", "meaning": "a BLOCKED group cannot be unified" }
           ]
         },
         {
@@ -3267,35 +3434,63 @@
       "modified": [],
       "rules": [
         "Who may decide (owner, admin, operator) is Order 15's; the registry role AGENCY_OPERATOR is the floor, as for CMD023.",
+        "Normalization never folds accents, plus-addressing or other characters to manufacture a proof (identityResolution.normalization).",
         "A revision after approval supersedes the plan (registry Plan machine APPROVED → SUPERSEDED) and withdraws the open quote with its reason: quote.withdrawn.v1 gains withdrawalCode PLAN_REVISED (event payload change, handoff C4)."
       ],
       "acceptance": [
         {
-          "tag": "NO-AUTO-MERGE",
+          "tag": "PROVING-KEY",
+          "kind": "POSITIVE",
+          "gate": "G-IC-KERNEL",
+          "template": "kernel",
+          "title": "A proving key merges without a person",
+          "scenario": "Two rows with the same source record id within one identity space and no blocking conflict; ApplyProvenIdentity on the exact preview.",
+          "expected": "Unified as one batch; the record says PROVEN_IDENTITY_RULE, the evidence, the member who applied it, the version and MERGE_IN_PLAN."
+        },
+        {
+          "tag": "NAME-EMAIL-CANDIDATE",
           "kind": "ADVERSARIAL",
           "gate": "G-IC-KERNEL",
           "template": "kernel",
-          "title": "Same name and e-mail never merges without an adopted rule",
-          "scenario": "Two records with identical normalized name and e-mail while CP-01.12 is not adopted; ApplyDemonstratedBatch is called.",
-          "expected": "The group is PROBABLE; NO_ADOPTED_EVIDENCE_RULE; nothing unified."
+          "title": "Name and e-mail never prove identity",
+          "scenario": "Two records with identical normalized name and e-mail; also José/Jose and ana+crm@ / ana@; ApplyProvenIdentity is called on them.",
+          "expected": "CANDIDATE groups (or two groups when only folding would match); NOT_PROVEN_IDENTITY; nothing unified until a person decides them with DecideMany."
+        },
+        {
+          "tag": "UNVERIFIED-EXTERNAL-ID",
+          "kind": "ADVERSARIAL",
+          "gate": "G-IC-KERNEL",
+          "template": "kernel",
+          "title": "A declared external id proves nothing until the core verifies it",
+          "scenario": "Two rows sharing an external id declared authoritative but not verified by the core.",
+          "expected": "EXTERNAL_ID_NOT_VERIFIED on ApplyProvenIdentity; the group is a CANDIDATE."
         },
         {
           "tag": "BLOCKING-CONFLICTS",
           "kind": "ADVERSARIAL",
           "gate": "G-IC-KERNEL",
           "template": "kernel",
-          "title": "Shared addresses, distinct CRM IDs, consent conflicts and chains block",
-          "scenario": "info@ shared by two people; two distinct existing CRM record IDs; a consent conflict; a chain of three with one probable link; accents José/Jose; plus-addressing.",
-          "expected": "BLOCKED or PROBABLE as CP-01.12 says; never DEMONSTRATED; never decided in bulk when BLOCKED."
+          "title": "Each blocking conflict refuses",
+          "scenario": "Distinct CRM record ids not safely unifiable; info@ shared by two people; a consent conflict; a chain of matches that proves nothing; a contradiction on the surviving record.",
+          "expected": "BLOCKED; GROUP_BLOCKED on any decision; never unified."
+        },
+        {
+          "tag": "CAP-PREVIEW-APPROVAL",
+          "kind": "NEGATIVE",
+          "gate": "G-IC-KERNEL",
+          "template": "kernel",
+          "title": "Bulk decisions need the cap, the exact preview and explicit approval",
+          "scenario": "DecideMany with 101 groups; with a stale preview hash; without the approval member.",
+          "expected": "BATCH_TOO_LARGE; PREVIEW_STALE; the closed schema refuses the missing approval; nothing decided."
         },
         {
           "tag": "STALE-AND-RACE",
           "kind": "ADVERSARIAL",
           "gate": "G-IC-KERNEL",
           "template": "kernel",
-          "title": "Stale previews and concurrent batches",
-          "scenario": "A batch applied on a stale preview; the same batch twice concurrently; undo then re-apply.",
-          "expected": "PREVIEW_STALE; one logical batch; the trace keeps apply, undo and re-apply."
+          "title": "Concurrent batches and undo",
+          "scenario": "The same batch twice concurrently; undo then re-apply.",
+          "expected": "One logical batch; the decision records keep apply, undo and re-apply."
         },
         {
           "tag": "REVISION-WITHDRAWS-QUOTE",
@@ -3305,15 +3500,6 @@
           "title": "A revision after approval withdraws the quote",
           "scenario": "A decision changed after approval through RevisePlan.",
           "expected": "A new plan revision needs validation and approval; the open quote is WITHDRAWN with PLAN_REVISED; no approval carries over."
-        },
-        {
-          "tag": "CAP",
-          "kind": "NEGATIVE",
-          "gate": "G-IC-KERNEL",
-          "template": "kernel",
-          "title": "Bulk decisions are capped",
-          "scenario": "DecideMany with 101 groups; with a BLOCKED group among 10.",
-          "expected": "BATCH_TOO_LARGE; GROUP_BLOCKED; nothing decided."
         }
       ],
       "events": [
@@ -3333,7 +3519,10 @@
           "consumers": []
         }
       ],
-      "eventPayloadChanges": [{ "eventType": "quote.withdrawn.v1", "change": "add withdrawalCode (token, e.g. PLAN_REVISED)", "breaking": false }]
+      "eventPayloadChanges": [{ "eventType": "quote.withdrawn.v1", "change": "add withdrawalCode (token, e.g. PLAN_REVISED)", "breaking": false }],
+      "activation": [
+        "the core intervention (C7): evidence classes from Migration Core's proving keys, the verification of a declared authoritative external id, CRM IDs and shared addresses; RevisePlan wired; adversarial fixtures (F-27, C11)"
+      ]
     },
     {
       "id": "CP-02.16",
@@ -3451,7 +3640,8 @@
       "events": [
         { "type": "refund_notice.sent.v1", "aggregateKind": "refund_notice", "producer": "CMD077", "payload": { "refundId": "id", "agencyId": "id", "channel": "token" }, "consumers": [] }
       ],
-      "subscriptions": [{ "eventType": "refund.approved.v1", "consumer": "NOTIFICATIONS" }, { "eventType": "refund.rejected.v1", "consumer": "NOTIFICATIONS" }]
+      "subscriptions": [{ "eventType": "refund.approved.v1", "consumer": "NOTIFICATIONS" }, { "eventType": "refund.rejected.v1", "consumer": "NOTIFICATIONS" }],
+      "activation": ["the owner's decision B-07, then the NOTIFICATIONS subscription and the notice record (C5)"]
     },
     {
       "id": "CP-02.17",
@@ -3460,23 +3650,24 @@
       "gaps": ["F-21", "F-22", "F-23"],
       "class": "BLOCKED_EXTERNAL",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md" },
-      "basis": ["F-21", "F-22", "WS-1", "PV1", "B-15", "O16-HANDOFF"],
+      "basis": ["F-21", "F-22", "WS-1", "PV1", "B-15", "CP01-RES-11", "O16-R2"],
       "requires": ["CP-01.11"],
       "dependsOn": [],
       "pending": [
-        "the PV1 qualification of the Wise route: which evidence a sent ACH or wire really gives (Payments V1 §2 (a)-(f))",
-        "CP-01.11 adopted: the owner's values (5 business days, 24 days from sealing, the review threshold, the calendar) and step-up"
+        "Wise Business enabled and the PV1 qualification of the ACH route and of the evidence a sent transfer really gives (Payments V1 §2 (a)-(f))",
+        "real, verifiable evidence a proof can be checked against",
+        "implementation, abuse controls and competent legal review (LR-02) before adoption; CP-01.11 itself stays CONDITIONAL"
       ],
       "blockers": [{ "kind": "EXTERNAL", "ref": "PV1", "what": "Wise route qualification" }, { "kind": "OWNER", "ref": "CP-01.11", "what": "hold values" }],
-      "unlock": "Wise is opened and qualified (PV1 §2), the owner signs CP-01.11, and counsel reviews LR-02.",
-      "whyNotYet": "The proof is checked against the route's evidence; until the route is qualified nobody knows which evidence exists, so the matching rule (and AMOUNT_OR_REFERENCE_MISMATCH) would be invented.",
+      "unlock": "Wise Business is enabled and the ACH route qualified with real evidence (PV1 §2), CP-01.11's pending points hold, and counsel reviews LR-02. The values are already the owner's (2026-10-22).",
+      "whyNotYet": "The owner decided the values but blocked activation on PV1: the proof is checked against evidence the route has not shown yet, so the matching rule (AMOUNT_OR_REFERENCE_MISMATCH) would be invented.",
       "component": "C5",
       "contracts": [
         {
           "name": "TransferProof",
           "owner": "15",
           "flow": "The customer's proof of a sent transfer → owner review → pending-payment hold",
-          "invariant": "Not payment; once per quote and per sealed set; never renewed; never added to the extension; never authorizes preparation (F-23).",
+          "invariant": "Not payment; proof of a transfer already sent, exact amount and reference; once per quote and per sealed set; never renewed; with an extension the later date applies within the ceiling, never the sum; the effective end is the earlier of five US banking days (FedACH calendar) from the accepted proof and 24 days from sealing, and that is the date the customer sees; never authorizes preparation (F-23).",
           "fields": [
             ["proofId", "id", true, "Proof."],
             ["orderId", "id", true, "Payment order."],
@@ -3486,7 +3677,7 @@
             ["artifactSha256", "hash", true, "The bank's confirmation document."],
             ["sentOn", "utc", true, "Date the bank sent it."],
             ["state", "enum:SUBMITTED,ACCEPTED,REFUSED,MATCHED,ENDED_UNPAID", true, "State."],
-            ["holdEndsAt", "utc", false, "Hold end once ACCEPTED."],
+            ["holdEndsAt", "utc", false, "Effective end once ACCEPTED: the earlier of five US banking days from acceptance and 24 days from sealing."],
             ["refusalCode", "label", false, "Why refused."]
           ]
         }
@@ -3525,7 +3716,14 @@
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PROOF_REQUIRED", "layer": "COMMAND", "meaning": "the artifact is not an admitted bank confirmation" },
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "HOLD_ALREADY_USED", "layer": "COMMAND", "meaning": "a hold was used for this quote or sealed set" },
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "CEILING_REACHED", "layer": "COMMAND", "meaning": "the files are at the hold's ceiling from sealing" },
-            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "AMOUNT_OR_REFERENCE_MISMATCH", "layer": "COMMAND", "meaning": "amount or reference differs from the order" }
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "AMOUNT_OR_REFERENCE_MISMATCH", "layer": "COMMAND", "meaning": "amount or reference differs from the order" },
+            {
+              "status": 409,
+              "code": "PRECONDITION_FAILED",
+              "reason": "OWNER_REVIEW_REQUIRED",
+              "layer": "COMMAND",
+              "meaning": "the organisation already has two holds ended unpaid in the rolling 90 days: the third needs the owner's review"
+            }
           ]
         }
       ],
@@ -3556,8 +3754,17 @@
           "gate": "G-PAYMENT",
           "template": "payment",
           "title": "An exact proof starts one bounded hold",
-          "scenario": "A proof for the exact amount and reference of an awaiting order on day 13 from sealing.",
-          "expected": "A PENDING_PAYMENT_HOLD record ending 5 business days later, never past 24 days from sealing; the dates read shows it beside the free-check retention, never added to it."
+          "scenario": "A proof for the exact amount and reference of an awaiting ACH order, accepted on day 13 from sealing, the following Monday a Federal Reserve holiday.",
+          "expected": "A PENDING_PAYMENT_HOLD record whose end is the earlier of five US banking days (the holiday skipped) and 24 days from sealing; the dates read shows that date beside the free-check retention, never added to it."
+        },
+        {
+          "tag": "THIRD-UNPAID",
+          "kind": "NEGATIVE",
+          "gate": "G-PAYMENT",
+          "template": "payment",
+          "title": "The third unpaid hold needs the owner",
+          "scenario": "An organisation with two holds ended unpaid in the last 90 days presents a third proof.",
+          "expected": "OWNER_REVIEW_REQUIRED; no hold until the owner reviews."
         }
       ],
       "events": [
@@ -3568,6 +3775,10 @@
           "payload": { "proofId": "id", "orderId": "id", "agencyId": "id", "amountCents": "count" },
           "consumers": ["NOTIFICATIONS"]
         }
+      ],
+      "activation": [
+        "never adopted or activated before every pending point holds (CP-01.11)",
+        "a proof or a declared transfer never confirms payment, starts preparation or creates a commercial authorization (F-23 tests)"
       ]
     },
     {
@@ -3669,7 +3880,8 @@
           "expected": "The seller is refused; the owner gets STEP_UP_MISSING; nothing changes."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the owner's decision B-06, then the command and its ledger tests (C4)"]
     },
     {
       "id": "CP-02.19",
@@ -3810,7 +4022,8 @@
           "payload": { "stageId": "id", "projectId": "id", "agencyId": "id", "sourceKeyHash": "hash" },
           "consumers": []
         }
-      ]
+      ],
+      "activation": ["the tool facts verified and the reconciliation engine in the cores (C7)"]
     },
     {
       "id": "CP-02.20",
@@ -3955,7 +4168,8 @@
           "payload": { "eligibilityId": "id", "userId": "id", "buyerType": "token", "service": "token", "eligible": "bool" },
           "consumers": []
         }
-      ]
+      ],
+      "activation": ["the A3 §3.2 amendment signed, then the public route and screen (C9) and the command (C8)"]
     },
     {
       "id": "CP-02.21",
@@ -4046,7 +4260,8 @@
           "expected": "BILLING_PROFILE_MISMATCH; nothing reveals the other profile."
         }
       ],
-      "events": []
+      "events": [],
+      "activation": ["the owner's decision B-09, then CMD002 and CMD027 changed with their tests (C4)"]
     }
   ],
   "compatibility": [
@@ -4628,7 +4843,8 @@
           "expectedVersion": 4,
           "groupIds": ["0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c"],
           "decision": "KEEP_SEPARATE",
-          "previewHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "previewHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "approval": "EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW"
         }
       ],
       "invalid": [
@@ -4740,15 +4956,38 @@
               "0190a1b2-c3d4-7e5f-8a9b-000000000100"
             ],
             "decision": "UNIFY",
-            "previewHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "previewHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "approval": "EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW"
           },
           "error": { "field": "groupIds", "code": "RANGE" }
+        },
+        {
+          "why": "a bulk decision without explicit approval",
+          "value": {
+            "expectedVersion": 4,
+            "groupIds": ["0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"],
+            "decision": "UNIFY",
+            "previewHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "error": { "field": "approval", "code": "REQUIRED" }
+        },
+        {
+          "why": "approval is one exact statement, never a flag",
+          "value": {
+            "expectedVersion": 4,
+            "groupIds": ["0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c"],
+            "decision": "KEEP_SEPARATE",
+            "previewHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "approval": true
+          },
+          "error": { "field": "approval", "code": "TYPE" }
         }
       ]
     },
     "request:RefuseAttributionRequest": {
       "valid": [
-        { "expectedVersion": 2, "reasonCode": "OTHER", "listVersion": "CLAIM-REFUSAL-1", "evidenceRef": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "note": "Agreed with the seller in writing." }
+        { "expectedVersion": 2, "reasonCode": "OTHER", "listVersion": "CLAIM-REFUSAL-1", "evidenceRef": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "note": "Agreed with the seller in writing." },
+        { "expectedVersion": 2, "reasonCode": "OWNER_RULE", "listVersion": "CLAIM-REFUSAL-1", "evidenceRef": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "ownerRuleRef": "OWNER-RULE-3@2026-09-01" }
       ],
       "invalid": [
         { "why": "the evidence is required", "value": { "expectedVersion": 2, "reasonCode": "OWNER_RULE", "listVersion": "CLAIM-REFUSAL-1" }, "error": { "field": "evidenceRef", "code": "REQUIRED" } }

@@ -15,7 +15,7 @@
       "program.json": "24d14cd0dcd20762f7a725fb54e334389dbaf22a9117f71f5c06a9543ad02144"
     },
     "openapi": "deb1ada0e685c6cbc14ca00528485664a454117ac638e5622b4917e4c27dfdd8",
-    "cp01": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a"
+    "cp01": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a"
   },
   "classes": {
     "ADDITIVE": "No current consumer changes: a new contract, command, operation, case, policy key, or a relaxed request member.",
@@ -379,7 +379,7 @@
       "subject": "contracts.json:SellerMoneySummary",
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
-      "detail": "12 fields",
+      "detail": "14 fields",
       "source": "CP-02.09"
     },
     {
@@ -415,7 +415,7 @@
       "subject": "contracts.json:Alert",
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
-      "detail": "10 fields",
+      "detail": "11 fields",
       "source": "CP-02.11"
     },
     {
@@ -460,7 +460,7 @@
       "subject": "contracts.json:ClaimRefusal",
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
-      "detail": "8 fields",
+      "detail": "9 fields",
       "source": "CP-02.14"
     },
     {
@@ -469,7 +469,7 @@
       "subject": "contracts.json:IdentityGroupView",
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
-      "detail": "8 fields",
+      "detail": "10 fields",
       "source": "CP-02.15"
     },
     {
@@ -478,7 +478,16 @@
       "subject": "contracts.json:PlanDecisionPreview",
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
-      "detail": "5 fields",
+      "detail": "6 fields",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:contracts.json:IdentityDecisionRecord:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:IdentityDecisionRecord",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "12 fields",
       "source": "CP-02.15"
     },
     {
@@ -685,7 +694,7 @@
       "subject": "commands.json:CMD073",
       "change": "COMMAND_ADDED",
       "class": "ADDITIVE",
-      "detail": "ApplyDemonstratedBatch POST /api/v1/plans/{planId}/demonstrated-batches",
+      "detail": "ApplyProvenIdentity POST /api/v1/plans/{planId}/proven-identities",
       "source": "CP-02.15"
     },
     {
@@ -792,7 +801,7 @@
       "subject": "cases.json",
       "change": "RECORDS_ADDED",
       "class": "ADDITIVE",
-      "detail": "+127",
+      "detail": "+132",
       "source": "CP-02.01 + CP-02.02 + CP-02.03 + CP-02.04 + CP-02.05 + CP-02.06 + CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.15 + CP-02.16 + CP-02.17 + CP-02.18 + CP-02.19 + CP-02.20 + CP-02.21"
     },
     {
@@ -819,7 +828,7 @@
       "subject": "requirements.json",
       "change": "RECORDS_ADDED",
       "class": "ADDITIVE",
-      "detail": "+127",
+      "detail": "+132",
       "source": "CP-02.01 + CP-02.02 + CP-02.03 + CP-02.04 + CP-02.05 + CP-02.06 + CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.15 + CP-02.16 + CP-02.17 + CP-02.18 + CP-02.19 + CP-02.20 + CP-02.21"
     },
     {
@@ -828,7 +837,7 @@
       "subject": "gates.json:G-IC-KERNEL",
       "change": "CASES_ADDED_TO_GATE",
       "class": "ADDITIVE",
-      "detail": "+22",
+      "detail": "+24",
       "source": "CP-02.01 + CP-02.15"
     },
     {
@@ -873,7 +882,7 @@
       "subject": "gates.json:G-PAYMENT",
       "change": "CASES_ADDED_TO_GATE",
       "class": "ADDITIVE",
-      "detail": "+13",
+      "detail": "+14",
       "source": "CP-02.03 + CP-02.16 + CP-02.17"
     },
     {
@@ -882,7 +891,7 @@
       "subject": "gates.json:G-COMMERCIAL",
       "change": "CASES_ADDED_TO_GATE",
       "class": "ADDITIVE",
-      "detail": "+49",
+      "detail": "+51",
       "source": "CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.18"
     },
     {
@@ -976,6 +985,15 @@
       "source": "CP-01"
     },
     {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.route:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.route",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
       "key": "REGISTRY:policy.json:retention.pendingPaymentHold.businessDaysFromAcceptedProof:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:retention.pendingPaymentHold.businessDaysFromAcceptedProof",
@@ -997,6 +1015,24 @@
       "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ceilingDaysFromSeal:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:retention.pendingPaymentHold.ceilingDaysFromSeal",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.effectiveEnd:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.effectiveEnd",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.customerSeesEffectiveEnd:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.customerSeesEffectiveEnd",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1039,6 +1075,42 @@
       "source": "CP-01"
     },
     {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.withExtension:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.withExtension",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.proof:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.proof",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.stepUpRequired:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.stepUpRequired",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.isPayment:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.isPayment",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
       "key": "REGISTRY:policy.json:retention.pendingPaymentHold.authorizesExecution:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:retention.pendingPaymentHold.authorizesExecution",
@@ -1048,27 +1120,54 @@
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.endedUnpaidReviewThreshold:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.endedUnpaid:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:retention.pendingPaymentHold.endedUnpaidReviewThreshold",
+      "subject": "policy.json:retention.pendingPaymentHold.endedUnpaid",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.endedUnpaidReviewThreshold.count:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.lateCredit:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:retention.pendingPaymentHold.endedUnpaidReviewThreshold.count",
+      "subject": "policy.json:retention.pendingPaymentHold.lateCredit",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.endedUnpaidReviewThreshold.windowDays:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:retention.pendingPaymentHold.endedUnpaidReviewThreshold.windowDays",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview.fromEndedUnpaidHold:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview.fromEndedUnpaidHold",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview.rollingWindowDays:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview.rollingWindowDays",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview.scope:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview.scope",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1102,6 +1201,78 @@
       "source": "CP-01"
     },
     {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerSees:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerSees",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.sellerSees:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.sellerSees",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.sellerMayRequestReview:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.sellerMayRequestReview",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule.mustNameARuleInForce:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule.mustNameARuleInForce",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule.mustBeVersioned:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule.mustBeVersioned",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule.retroactive:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule.retroactive",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
       "key": "REGISTRY:policy.json:commission.retainerDefaultCentsPerMonth:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:commission.retainerDefaultCentsPerMonth",
@@ -1123,6 +1294,33 @@
       "key": "REGISTRY:policy.json:commission.refundPeriod:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:commission.refundPeriod",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.refundRewritesEarlierPeriods:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.refundRewritesEarlierPeriods",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.captureCountedOnce:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.captureCountedOnce",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.amountStates:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.amountStates",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1184,9 +1382,27 @@
       "source": "CP-01"
     },
     {
+      "key": "REGISTRY:policy.json:alerts.otherConditionsShownOnTheSameAlert:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.otherConditionsShownOnTheSameAlert",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
       "key": "REGISTRY:policy.json:alerts.relevantProgress:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:alerts.relevantProgress",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.rule:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.rule",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1202,9 +1418,36 @@
       "source": "CP-01"
     },
     {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.equivalentActCountsOnlyIf:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.equivalentActCountsOnlyIf",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
       "key": "REGISTRY:policy.json:alerts.relevantProgress.neverCounts:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
       "subject": "policy.json:alerts.relevantProgress.neverCounts",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.affects:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.affects",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.neverExtends:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.neverExtends",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1220,36 +1463,126 @@
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:identityResolution.demonstrated:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:identityResolution.demonstrated",
+      "subject": "policy.json:identityResolution.deterministicMerge",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:identityResolution.demonstrated.allOf:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge.onlyProvenIdentityKeys:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:identityResolution.demonstrated.allOf",
+      "subject": "policy.json:identityResolution.deterministicMerge.onlyProvenIdentityKeys",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:identityResolution.demonstrated.emailNormalization:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge.authority:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:identityResolution.demonstrated.emailNormalization",
+      "subject": "policy.json:identityResolution.deterministicMerge.authority",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:identityResolution.demonstrated.nameNormalization:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge.humanConfirmation:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:identityResolution.demonstrated.nameNormalization",
+      "subject": "policy.json:identityResolution.deterministicMerge.humanConfirmation",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.strongCandidateSignals:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.strongCandidateSignals",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidatesProveIdentity:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidatesProveIdentity",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization.email:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization.email",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization.fullName:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization.fullName",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization.foldingToManufactureProof:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization.foldingToManufactureProof",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision.maximumGroupsPerDecision:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision.maximumGroupsPerDecision",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision.exactPreview:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision.exactPreview",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision.explicitHumanApproval:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision.explicitHumanApproval",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1265,9 +1598,9 @@
       "source": "CP-01"
     },
     {
-      "key": "REGISTRY:policy.json:identityResolution.decideManyMaximumGroups:POLICY_KEY_ADDED",
+      "key": "REGISTRY:policy.json:identityResolution.decisionRecord:POLICY_KEY_ADDED",
       "layer": "REGISTRY",
-      "subject": "policy.json:identityResolution.decideManyMaximumGroups",
+      "subject": "policy.json:identityResolution.decisionRecord",
       "change": "POLICY_KEY_ADDED",
       "class": "ADDITIVE",
       "detail": "",
@@ -1567,7 +1900,7 @@
       "subject": "GET /api/v1/ops/sales/money",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "ListSellerMoney (CP-02.09, CONDITIONAL)",
+      "detail": "ListSellerMoney (CP-02.09, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.09"
     },
     {
@@ -1621,7 +1954,7 @@
       "subject": "POST /api/v1/plans/{planId}/batches/{batchId}/undo",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "UndoBatch (CP-02.15, CONDITIONAL)",
+      "detail": "UndoBatch (CP-02.15, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.15"
     },
     {
@@ -1630,7 +1963,7 @@
       "subject": "GET /api/v1/plans/{planId}/decision-preview",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "GetDecisionPreview (CP-02.15, CONDITIONAL)",
+      "detail": "GetDecisionPreview (CP-02.15, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.15"
     },
     {
@@ -1639,7 +1972,7 @@
       "subject": "POST /api/v1/plans/{planId}/decisions",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "DecideMany (CP-02.15, CONDITIONAL)",
+      "detail": "DecideMany (CP-02.15, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.15"
     },
     {
@@ -1648,16 +1981,16 @@
       "subject": "POST /api/v1/plans/{planId}/decisions/{groupId}",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "ChangeDecision (CP-02.15, CONDITIONAL)",
+      "detail": "ChangeDecision (CP-02.15, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.15"
     },
     {
-      "key": "OPENAPI:POST /api/v1/plans/{planId}/demonstrated-batches:OPERATION_ADDED",
+      "key": "OPENAPI:GET /api/v1/plans/{planId}/identity-decisions:OPERATION_ADDED",
       "layer": "OPENAPI",
-      "subject": "POST /api/v1/plans/{planId}/demonstrated-batches",
+      "subject": "GET /api/v1/plans/{planId}/identity-decisions",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "ApplyDemonstratedBatch (CP-02.15, CONDITIONAL)",
+      "detail": "ListIdentityDecisionRecords (CP-02.15, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.15"
     },
     {
@@ -1666,7 +1999,16 @@
       "subject": "GET /api/v1/plans/{planId}/identity-groups",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "ListIdentityGroups (CP-02.15, CONDITIONAL)",
+      "detail": "ListIdentityGroups (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/plans/{planId}/proven-identities:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/plans/{planId}/proven-identities",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ApplyProvenIdentity (CP-02.15, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.15"
     },
     {
@@ -1756,7 +2098,7 @@
       "subject": "POST /api/v1/sales/claim-reviews/{reviewId}/decide",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "DecideClaimReview (CP-02.14, CONDITIONAL)",
+      "detail": "DecideClaimReview (CP-02.14, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.14"
     },
     {
@@ -1783,7 +2125,7 @@
       "subject": "POST /api/v1/sales/claims/{claimId}/refuse",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "RefuseAttribution (CP-02.14, CONDITIONAL)",
+      "detail": "RefuseAttribution (CP-02.14, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.14"
     },
     {
@@ -1801,7 +2143,7 @@
       "subject": "GET /api/v1/sales/money",
       "change": "OPERATION_ADDED",
       "class": "ADDITIVE",
-      "detail": "GetMyMoney (CP-02.09, CONDITIONAL)",
+      "detail": "GetMyMoney (CP-02.09, APPROVED_AWAITING_REISSUE)",
       "source": "CP-02.09"
     },
     {
@@ -2249,7 +2591,7 @@
       "subject": "components/Problem.reason",
       "change": "ENUM_WIDENED",
       "class": "COORDINATED",
-      "detail": "adds AUDIT_NOT_FINISHED, UNITS_OUTSIDE_PUBLISHED_BANDS, DOCUMENT_VERSION_NOT_PUBLISHED, CONSENT_CHANNEL_INVALID, CONSENT_NOT_WITHDRAWABLE_HERE, ESSENTIAL_NOT_OPTIONAL, DUPLICATE_CHOICE, REVIEW_ALREADY_REQUESTED, DRAFT_SUPERSEDED, REQUEST_ALREADY_OPEN, REQUEST_NOT_OPEN, REFUSAL_REASON_UNKNOWN, REFUSAL_LIST_VERSION_STALE, NOTE_REQUIRED, CLAIM_NOT_REFUSABLE, REVIEW_NOT_OPEN, PREVIEW_STALE, NO_ADOPTED_EVIDENCE_RULE, BATCH_TOO_LARGE, GROUP_BLOCKED, PLAN_NOT_EDITABLE, BATCH_NOT_LATEST, NOTICE_NOT_PENDING, PROOF_REQUIRED, HOLD_ALREADY_USED, CEILING_REACHED, AMOUNT_OR_REFERENCE_MISMATCH, EFFECTIVE_DATE_IN_PAST, ID_NOT_IN_EVIDENCE, PROCESSING_AUTHORIZATION_MISSING, TARGET_CONTRACT_REQUIRED, TARGET_NOT_APPLICABLE",
+      "detail": "adds AUDIT_NOT_FINISHED, UNITS_OUTSIDE_PUBLISHED_BANDS, DOCUMENT_VERSION_NOT_PUBLISHED, CONSENT_CHANNEL_INVALID, CONSENT_NOT_WITHDRAWABLE_HERE, ESSENTIAL_NOT_OPTIONAL, DUPLICATE_CHOICE, REVIEW_ALREADY_REQUESTED, DRAFT_SUPERSEDED, REQUEST_ALREADY_OPEN, REQUEST_NOT_OPEN, REFUSAL_REASON_UNKNOWN, REFUSAL_LIST_VERSION_STALE, NOTE_REQUIRED, CLAIM_NOT_REFUSABLE, OWNER_RULE_REFERENCE_REQUIRED, OWNER_RULE_NOT_IN_FORCE, REVIEW_NOT_OPEN, PREVIEW_STALE, NOT_PROVEN_IDENTITY, EXTERNAL_ID_NOT_VERIFIED, PLAN_NOT_EDITABLE, BATCH_TOO_LARGE, GROUP_BLOCKED, BATCH_NOT_LATEST, NOTICE_NOT_PENDING, PROOF_REQUIRED, HOLD_ALREADY_USED, CEILING_REACHED, AMOUNT_OR_REFERENCE_MISMATCH, OWNER_REVIEW_REQUIRED, EFFECTIVE_DATE_IN_PAST, ID_NOT_IN_EVIDENCE, PROCESSING_AUTHORIZATION_MISSING, TARGET_CONTRACT_REQUIRED, TARGET_NOT_APPLICABLE",
       "source": "CP-02 (every item that adds a reason)",
       "consumers": [
         "apps/api/test/outcome-catalogue.test.ts",
