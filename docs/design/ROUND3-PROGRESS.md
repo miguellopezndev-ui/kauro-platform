@@ -33,7 +33,7 @@ both from the first line to the last. Then this ledger.
 | Foundations 6: "before" captures | Done: 71 screens × 1280 and 375, 0 failures | Kauro.archive/…/research/round3-before |
 | Foundations 7: Home DNA | Drafted (colour, type, space, vocabulary, audit) | HOME-DNA.md |
 | Foundations 8: L1 concepts and the vertical slice | Research done (owner consoles, multi-role systems); slice brief and canon content written; 4 concepts being built (c0 incumbent, c1 quiet tool, c2 paper on rock, c3 ledger) | research/round3-slice (SLICE-BRIEF.md, content/, concepts/) |
-| Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
+| Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
 | Foundations 9: the kit, frozen | Pending | ROUND3-KIT.md |
 | Owner console | Pending | — |
 | Agency/company workspace | Pending | — |
