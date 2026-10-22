@@ -34,8 +34,8 @@ both from the first line to the last. Then this ledger.
 | Foundations 7: Home DNA | Drafted (colour, type, space, vocabulary, audit) | HOME-DNA.md |
 | Foundations 8: L1 concepts and the vertical slice | **Done.** System chosen: c4 "one ledger with four mastheads" (300 blind judgements; 60 of 60 in its final round; gates pass) | research/round3-slice/AUDITIONS.md; PD-05 |
 | Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
-| Foundations 9: the kit, frozen | In progress: component inventory running; base = c4 system.css; early report sent to the owner | research/round3-kit |
-| Owner console | L2 brief written (18 pages, 3 inventory options, 4 nav versions); nav versions being built | research/round3-owner |
+| Foundations 9: the kit, frozen | Inventory done (42 families); auditions of 17 families: group A (states, inline status, dialogs and step-up, buttons) being judged (144 judgements); groups B, C, D being built | research/round3-kit |
+| Owner console | **L2 decided** (54 blind judgements): nav V1 (domain groups, counts on pages that wait) and inventory I-A (18 pages, Refunds added). L3 Today: brief and 4 compositions being built | research/round3-owner (L2-BRIEF.md, NAV-DECISION.md, today/) |
 | Agency/company workspace | Pending | — |
 | Seller portal | Pending | — |
 | Public site | Pending | — |
