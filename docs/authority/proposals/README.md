@@ -12,22 +12,33 @@ recorded provenance until an item is adopted.
 - `CP-xx-<NAME>.md`: the change record (the A3 §2 fields), one section per item, the owner's signature block.
 - `CP-xx.registry-delta.json`: each item's exact change as a subset of JSON Patch (RFC 6902: `test`, `add`, `replace`), written against
   the registry bytes named in `base`. `tools/test/change-proposals.test.mjs` checks that the base is the vendored registry, that every
-  replaced value is proved by a `test` first, that nothing is removed or overwritten, that no path is changed by two items, that each
-  item has a closed status and a traceable approval, and that the resulting registry is still accepted by the contracts generator.
+  replaced value is proved by a `test` first, that nothing is removed or overwritten, that no path is changed by two items (of the
+  same or of another proposal), that each item has a closed status and a traceable approval, and that the resulting registry, of each
+  proposal and of all of them together, is still accepted by the contracts generator.
 
 ## Status of an item
 
 | Status | Meaning |
 |---|---|
-| `APPROVED_AWAITING_REISSUE` | The substance was decided by the owner, or is already stated by the authority or the law. It waits only for adoption. |
+| `APPROVED_AWAITING_REISSUE` | The substance was decided by the owner, or is already stated by the authority or the law. It waits for adoption, and takes effect only with its `activation`. |
 | `CONDITIONAL` | The principle is decided; a value, a fact or a professional check listed in `pending` is missing. Not adoptable yet. |
 | `PROPOSED` | A recommendation. It needs the owner's decision; writing it here decides nothing. |
 
 `ADOPTED` is not used until the first adoption (below); the test refuses it.
 
+Each item also carries:
+
+- `approval`: who decided, when, the record, and since the CP-01 owner resolution the `decision` in the owner's terms (`APPROVED`,
+  `APPROVED_WITH_CHANGES`, `CONTENT_APPROVED_LEGAL_EFFECT_CONDITIONAL`, `DESIGN_APPROVED_PUBLICATION_CONDITIONAL`,
+  `PARAMETERS_APPROVED_ACTIVATION_BLOCKED`) and its `basis` (earlier records).
+- `deferred` (only on a `PROPOSED` item): the owner postponed it; the current registry text stays.
+- `activation`: what must be implemented, tested or published by its own procedure before the adopted item takes effect. An approved
+  item is adopted in the coordinated re-issue only together with its activation; a business authorization is not a deployment.
+
 ## Adoption
 
-1. The owner signs the items to adopt in the proposal's signature block (date and words), or rejects them.
+1. The owner decides the items in the proposal's decision block (date and words, with the decision record in
+   `docs/authority/decisions/`), or rejects them. A formal external signature is added only where a procedure requires one.
 2. The authority re-issue applies the signed items' operations to the registry, sets the new edition label, and records the new hashes
    and the proposal in `PROVENANCE.json` (`source`). This is the step the generator's message calls "re-vendor from the authority and
    record the new hash"; it is never a silent edit.

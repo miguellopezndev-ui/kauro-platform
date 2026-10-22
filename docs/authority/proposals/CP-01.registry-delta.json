@@ -2,6 +2,26 @@
   "proposal": "CP-01",
   "document": "docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md",
   "preparedBy": "Order 16, 2026-10-22",
+  "revision": 2,
+  "revisions": [
+    {
+      "revision": 1,
+      "date": "2026-10-22",
+      "by": "Order 16",
+      "note": "Prepared; delivered at 16ee3d4b2e3128e75464fee4c7a52f71dc33d965."
+    },
+    {
+      "revision": 2,
+      "date": "2026-10-22",
+      "by": "Order 16, owner resolution",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "note": "Owner decisions recorded; CP-01.07, CP-01.12 and CP-01.11 corrected; nothing adopted."
+    }
+  ],
+  "ownerResolution": {
+    "date": "2026-10-22",
+    "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md"
+  },
   "base": {
     "edition": "KAVO-2026.09-R2",
     "files": {
@@ -14,9 +34,9 @@
     }
   },
   "statuses": {
-    "APPROVED_AWAITING_REISSUE": "The substance was decided by the owner or is already stated by the authority. The vendored registry is not edited: the delta enters only through the authority re-issue (README, adoption).",
-    "CONDITIONAL": "The principle is decided; a value, a fact or a professional check named in `pending` is still missing. Not adoptable until `pending` is empty.",
-    "PROPOSED": "A recommendation of Order 16. It needs the owner's decision; nothing here makes it a decision."
+    "APPROVED_AWAITING_REISSUE": "The owner decided the substance. The vendored registry is not edited: the delta enters only through the authority re-issue coordinated with CP-02 (README, adoption), and never before the conditions in `activation` hold.",
+    "CONDITIONAL": "The owner decided what is recorded in `approval.decision`; a value, a fact, a provider or a professional check named in `pending` is still missing. Not adoptable until `pending` is empty.",
+    "PROPOSED": "Not approved. A deferred item (`deferred`) keeps the current registry text; nothing here makes the proposal a decision."
   },
   "items": [
     {
@@ -28,10 +48,17 @@
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-20",
-        "record": "docs/design/ORDER11-DESIGN-DECISIONS.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-DESIGN-DECISIONS.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "StartAudit, CreatePlan, ApprovePlan and CreateQuote bind CLEAN_ONLY_TARGET_HASH for CLEAN, implemented and tested (O17-01, C4); no artificial CRM target"
+      ],
       "dependsOn": [],
       "patch": {
         "commands.json": [
@@ -149,10 +176,18 @@
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "deletion at the extended date, restoration that never revives expired data, SQL checks and row policies (with Order 15), dates read and the UNPAID soft deadline implemented and tested (C6, O17-14)",
+        "compatible legal documentation through its own procedure (LR-01)"
+      ],
       "dependsOn": [],
       "patch": {
         "policy.json": [
@@ -298,11 +333,19 @@
       ],
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
-        "source": "authority",
-        "date": "2026-09-25",
-        "record": "docs/COMMERCIAL_AMENDMENT_A3.md"
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/COMMERCIAL_AMENDMENT_A3.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "the pause reads the budget actually funded (money.actualAvailableFunding); no additional spending is authorised",
+        "the public Terms change only through their amendment procedure (LR-11); adopting the value does not change them"
+      ],
       "dependsOn": [],
       "patch": {
         "policy.json": [
@@ -320,15 +363,21 @@
       "gaps": [
         "F-13"
       ],
-      "status": "CONDITIONAL",
+      "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "CONTENT_APPROVED_LEGAL_EFFECT_CONDITIONAL",
+        "basis": [
+          "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
       },
-      "pending": [
-        "owner confirmation of the code names (Order 16's) and of the seller messages of the three own-claim reasons, taken from the review prototype (tools/review/private/prototypes/sales.ts)",
-        "competent review of the claim rules (LAWYER_LATER L-19); the list may be adopted before it, with legalStatus PENDING_COUNSEL (CP-01.14)"
+      "pending": [],
+      "activation": [
+        "legal effect on sellers only after competent review (LAWYER_LATER L-12, L-19); until then legalStatus commission.claimRules stays PENDING_COUNSEL (CP-01.14)",
+        "RefuseAttribution, RequestClaimReview and their tests (O17-05)"
       ],
       "dependsOn": [],
       "patch": {
@@ -345,39 +394,67 @@
               {
                 "code": "CUSTOMER_OR_DIRECT_CONTACT",
                 "sellerMessage": "Not available to claim",
-                "noteRequired": false
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
               },
               {
                 "code": "OTHER_SELLER_LIVE_CLAIM",
                 "sellerMessage": "Not available to claim",
-                "noteRequired": false
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
               },
               {
                 "code": "OWNER_RULE",
                 "sellerMessage": "Not available to claim",
-                "noteRequired": false
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": true
               },
               {
                 "code": "INSUFFICIENT_OWN_WORK_EVIDENCE",
                 "sellerMessage": "Not enough evidence of your own work",
-                "noteRequired": false
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
               },
               {
                 "code": "OUTSIDE_SELLER_AGREEMENT",
                 "sellerMessage": "Outside your seller agreement",
-                "noteRequired": false
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
               },
               {
                 "code": "DUPLICATE_OWN_CLAIM",
                 "sellerMessage": "Duplicate of a claim you already made",
-                "noteRequired": false
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
               },
               {
                 "code": "OTHER",
                 "sellerMessage": "Not available to claim",
-                "noteRequired": true
+                "noteRequired": true,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
               }
             ]
+          },
+          {
+            "op": "add",
+            "path": "/commission/claimRefusalRules",
+            "value": {
+              "ownerSees": "CODE_NOTE_AND_EVIDENCE",
+              "sellerSees": "SELLER_MESSAGE_ONLY",
+              "sellerMayRequestReview": true,
+              "ownerRule": {
+                "mustNameARuleInForce": true,
+                "mustBeVersioned": true,
+                "retroactive": false
+              }
+            }
           }
         ]
       }
@@ -391,10 +468,17 @@
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "a signed agreement with another amount prevails under its dates and terms; an accrued obligation is never removed (statement item kind RETAINER, O17-06)"
+      ],
       "dependsOn": [],
       "patch": {
         "policy.json": [
@@ -415,10 +499,17 @@
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "the alerts read and its tests (O17-07)"
+      ],
       "dependsOn": [],
       "patch": {
         "policy.json": [
@@ -439,7 +530,8 @@
                 "DEADLINE_SOON",
                 "INACTIVE"
               ],
-              "oneItemOnce": true
+              "oneItemOnce": true,
+              "otherConditionsShownOnTheSameAlert": true
             }
           }
         ]
@@ -451,10 +543,17 @@
       "gaps": [
         "F-15"
       ],
-      "status": "PROPOSED",
-      "approval": null,
-      "pending": [
-        "owner decision on the definition (CP-01 section 3.7)"
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED_WITH_CHANGES",
+        "basis": []
+      },
+      "pending": [],
+      "activation": [
+        "the alerts read computes inactivity from these acts only, with tests that a read, a sign-in, a reminder, a support message, a command without material effect, a failed retry or a repeated action does not reset it, and that progress moves no retention, legal or quote date (O17-07)"
       ],
       "dependsOn": [
         "CP-01.06"
@@ -465,16 +564,36 @@
             "op": "add",
             "path": "/alerts/relevantProgress",
             "value": {
+              "rule": "MATERIAL_VERIFIABLE_CHANGE_OF_THE_STATE_OF_THE_PROJECT_OR_ITS_DELIVERABLES",
               "counts": [
-                "STATE_TRANSITION_OF_THE_PROJECT_OR_ITS_CHILDREN",
-                "COMMAND_COMMITTED_BY_A_PERSON_OR_KAURO_ON_THE_PROJECT"
+                "NEW_SEALED_REVISION",
+                "CHECK_CONCLUDED",
+                "PLAN_DECISION_EFFECTIVE",
+                "APPROVAL_GIVEN",
+                "QUOTE_ISSUED",
+                "PAYMENT_RECONCILED",
+                "PREPARATION_COMPLETED",
+                "DELIVERY_MADE",
+                "IMPORT_RECORDED"
               ],
+              "equivalentActCountsOnlyIf": "IT_LEGITIMATELY_CHANGES_THE_COURSE_OF_THE_PROJECT",
               "neverCounts": [
-                "READ_OR_DOWNLOAD",
+                "READ",
+                "DOWNLOAD",
                 "SIGN_IN",
-                "REMINDER_OR_NOTIFICATION_SENT",
-                "SUPPORT_MESSAGE",
-                "RETRY_OF_A_FAILED_ATTEMPT"
+                "REMINDER_OR_NOTIFICATION",
+                "ORDINARY_SUPPORT_MESSAGE",
+                "COMMAND_WITHOUT_MATERIAL_EFFECT",
+                "FAILED_ATTEMPT_OR_RETRY",
+                "REPEATED_ACTION_WITHOUT_STATE_CHANGE"
+              ],
+              "affects": [
+                "INACTIVITY_ALERT"
+              ],
+              "neverExtends": [
+                "RETENTION",
+                "LEGAL_DEADLINES",
+                "QUOTE_VALIDITY"
               ]
             }
           }
@@ -490,10 +609,17 @@
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-PUBLIC.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-PUBLIC.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "the web's AMENDED_PRIMARY_COPY rows for UI03 and UI07 are removed in the same re-issue (apps/web/test/support/registry.ts)"
+      ],
       "dependsOn": [],
       "patch": {
         "screens.json": [
@@ -538,9 +664,16 @@
       ],
       "status": "PROPOSED",
       "approval": null,
+      "deferred": {
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "until": "the final visual review before the second audit",
+        "currentTextStays": true
+      },
       "pending": [
-        "owner confirmation of the wording: R2-3 approved removing the version line, not this sentence"
+        "owner decision at the final visual review before the second audit; the current UI03 action text stays until then (R2-3 removed the version line, not this sentence)"
       ],
+      "activation": [],
       "dependsOn": [],
       "patch": {
         "screens.json": [
@@ -565,13 +698,22 @@
       ],
       "status": "CONDITIONAL",
       "approval": {
-        "source": "law",
-        "date": "2026-10-06",
-        "record": "docs/legal/CHECKLIST.md"
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "DESIGN_APPROVED_PUBLICATION_CONDITIONAL",
+        "basis": [
+          "docs/legal/CHECKLIST.md"
+        ]
       },
       "pending": [
-        "owner approval of the screen's primary copy (Order 16 wording)",
-        "publication of the Policy itself: operator facts (CHECKLIST A-08) and competent review (D-31)"
+        "real company data of the controller (CHECKLIST A-08); never invented",
+        "competent review of the Policy (D-31)",
+        "verification that the Policy reflects the processing actually carried out"
+      ],
+      "activation": [
+        "the versioned publication mechanism and the consent record, keeping essential obligations apart from optional commercial authorisations (O17-12, O17-13)",
+        "no incomplete, false or unreviewed policy is published (LR-05)"
       ],
       "dependsOn": [],
       "patch": {
@@ -587,7 +729,7 @@
               "primaryCopy": "Read how Kauro handles personal data.",
               "information": "Actual controller, version/date, databases and purposes, rights and their procedure, responsible area, retention and changes.",
               "actions": "Read the accessible version history; send a query or claim to the responsible area.",
-              "exceptions": "No invented entity details; the authorization recorded at registration names the exact version shown.",
+              "exceptions": "No invented entity details; no version is published before its company data are real, it is reviewed and it reflects the processing actually carried out; the authorization recorded at registration names the exact version shown, and essential obligations stay apart from optional commercial authorizations.",
               "status": "DESIGN_NOT_RENDERED_PRODUCT"
             }
           }
@@ -605,16 +747,54 @@
       "status": "CONDITIONAL",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "PARAMETERS_APPROVED_ACTIVATION_BLOCKED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        ]
       },
       "pending": [
-        "PV1 qualification of the route and of the evidence it really gives (Payments V1 section 2 (a)-(f))",
-        "owner decision on the values: 5 business days, 24 days from sealing, the review threshold (Order 16 recommends 2 holds ended unpaid in 90 days)",
-        "owner decision on the counting calendar and its holidays (Order 16 recommends the published support calendar, America/Bogota)",
-        "owner decision on step-up for the proof (Order 16 recommends yes)",
-        "competent review of the terms (LR-02)"
+        "Wise Business enabled and the PV1 qualification of the ACH route and of the evidence it really gives (Payments V1 section 2 (a)-(f))",
+        "real, verifiable evidence that a proof can be checked against",
+        "implementation and tests: proof intake with step-up, effective end, one hold per quote and per sealed set, deletion when it ends unpaid, late-credit review and refund (C5, C6)",
+        "abuse controls: hold uniqueness in the database and the owner review from the third hold ended unpaid in 90 days (C10)",
+        "competent review of the terms (LR-02)",
+        "the implementing order fixes the time zone and cut-off of the banking-day count against the sources in `evidence.calendar`, with tests"
       ],
+      "activation": [
+        "not adopted into the operating registry nor activated before every `pending` point holds",
+        "a declared transfer or a proof is never confirmed payment, starts no preparation and creates no commercial authorisation (F-23 tests)"
+      ],
+      "evidence": {
+        "calendar": {
+          "appliesTo": "US ACH (FedACH) only; no other route, international or domestic, is presumed to follow it",
+          "rule": "Banking days are Monday to Friday except Federal Reserve holidays. A holiday on Saturday: Reserve Banks open the preceding Friday. A holiday on Sunday: closed the following Monday.",
+          "retrieved": "2026-10-22",
+          "sources": [
+            {
+              "name": "Board of Governors of the Federal Reserve System, Federal Reserve holidays (k8)",
+              "url": "https://www.federalreserve.gov/aboutthefed/k8.htm"
+            },
+            {
+              "name": "Federal Reserve Financial Services, Holiday Schedules (FedACH processing ends and resumes)",
+              "url": "https://www.frbservices.org/about/holiday-schedules"
+            },
+            {
+              "name": "Federal Reserve Financial Services, FedACH Processing Schedule",
+              "url": "https://www.frbservices.org/resources/resource-centers/same-day-ach/fedach-processing-schedule.html"
+            },
+            {
+              "name": "Federal Reserve Financial Services, 2026 holiday schedule for FedACH Services",
+              "url": "https://www.frbservices.org/news/fed360/issues/121625/ach-2026-holiday-schedule"
+            },
+            {
+              "name": "5 U.S.C. 6103, legal public holidays (the list; the Reserve Banks' Saturday rule differs from the federal-employee rule)",
+              "url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title5-section6103&num=0&edition=prelim"
+            }
+          ]
+        }
+      },
       "dependsOn": [],
       "patch": {
         "policy.json": [
@@ -622,17 +802,27 @@
             "op": "add",
             "path": "/retention/pendingPaymentHold",
             "value": {
+              "route": "ACH",
               "businessDaysFromAcceptedProof": 5,
-              "calendar": "support",
+              "calendar": "US_FEDERAL_RESERVE_BANKING_DAYS",
               "ceilingDaysFromSeal": 24,
+              "effectiveEnd": "EARLIER_OF_BUSINESS_DAYS_END_AND_CEILING",
+              "customerSeesEffectiveEnd": true,
               "perQuote": 1,
               "perSealedSet": 1,
               "renewable": false,
               "addsToExtension": false,
+              "withExtension": "LATER_DATE_WITHIN_CEILING",
+              "proof": "TRANSFER_ALREADY_SENT_EXACT_AMOUNT_AND_REFERENCE",
+              "stepUpRequired": true,
+              "isPayment": false,
               "authorizesExecution": false,
-              "endedUnpaidReviewThreshold": {
-                "count": 2,
-                "windowDays": 90
+              "endedUnpaid": "DELETE",
+              "lateCredit": "REVIEW_AND_REFUND_NO_DATA_REVIVAL",
+              "ownerReview": {
+                "fromEndedUnpaidHold": 3,
+                "rollingWindowDays": 90,
+                "scope": "ORGANIZATION"
               }
             }
           }
@@ -658,20 +848,26 @@
     },
     {
       "id": "CP-01.12",
-      "title": "Demonstrated identity, blocking conflicts and the size of a bulk decision",
+      "title": "Proven identity, duplicate candidates, blocking conflicts and the size of a bulk decision",
       "gaps": [
         "F-25",
         "F-27"
       ],
-      "status": "CONDITIONAL",
+      "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED_WITH_CHANGES",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        ]
       },
-      "pending": [
-        "owner decision on the definition and on accents (Order 16 recommends: accents are not folded)",
-        "owner decision on the cap (Order 16 recommends the existing api.batchItems, 100 groups)"
+      "pending": [],
+      "activation": [
+        "the core intervention (component C7) keeps deterministic merges to the proving keys of Migration Core (cores/kauro-migration-core/src/domain/identity.ts PROVING_KEY_KINDS; identity/resolve-identity.ts); this proposal does not change the core",
+        "the plan contract and bulk decisions with exact preview and explicit human approval, and the decision record (O17-09)",
+        "adversarial identity fixtures (F-27, C11)"
       ],
       "dependsOn": [],
       "patch": {
@@ -680,21 +876,45 @@
             "op": "add",
             "path": "/identityResolution",
             "value": {
-              "demonstrated": {
-                "allOf": [
+              "deterministicMerge": {
+                "onlyProvenIdentityKeys": [
+                  "SOURCE_RECORD_ID_WITHIN_ONE_IDENTITY_SPACE",
+                  "AUTHORITATIVE_EXTERNAL_ID_VERIFIED"
+                ],
+                "authority": "MIGRATION_CORE_PROVING_KEYS",
+                "humanConfirmation": "NOT_REQUIRED_ONLY_FOR_PROVEN_IDENTITY_WITHOUT_A_BLOCKING_CONFLICT"
+              },
+              "strongCandidateSignals": [
+                [
                   "SAME_NORMALIZED_EMAIL",
                   "SAME_NORMALIZED_FULL_NAME"
-                ],
-                "emailNormalization": "TRIM_LOWERCASE_NFC_NO_PLUS_STRIPPING",
-                "nameNormalization": "TRIM_COLLAPSE_SPACES_CASEFOLD_NFC_ACCENTS_KEPT"
+                ]
+              ],
+              "candidatesProveIdentity": false,
+              "normalization": {
+                "email": "TRIM_LOWERCASE_NFC_NO_PLUS_STRIPPING",
+                "fullName": "TRIM_COLLAPSE_SPACES_CASEFOLD_NFC_ACCENTS_KEPT",
+                "foldingToManufactureProof": false
+              },
+              "candidateDecision": {
+                "maximumGroupsPerDecision": 100,
+                "exactPreview": true,
+                "explicitHumanApproval": true
               },
               "blockingConflicts": [
-                "DISTINCT_EXISTING_CRM_RECORD_IDS",
-                "SHARED_OR_ROLE_ADDRESS",
+                "DISTINCT_CRM_RECORD_IDS_NOT_SAFELY_UNIFIABLE",
+                "GENERIC_OR_SHARED_ADDRESS",
                 "CONSENT_CONFLICT",
-                "CHAIN_OF_THREE_OR_MORE_WITH_A_NON_DEMONSTRATED_LINK"
+                "CHAIN_OF_MATCHES_NOT_PROVING_IDENTITY",
+                "MATERIAL_CONTRADICTION_ON_IDENTITY_OR_SURVIVING_RECORD"
               ],
-              "decideManyMaximumGroups": 100
+              "decisionRecord": [
+                "DECISION",
+                "EVIDENCE",
+                "RESPONSIBLE_PERSON",
+                "VERSION",
+                "EFFECT"
+              ]
             }
           }
         ]
@@ -706,14 +926,20 @@
       "gaps": [
         "F-12"
       ],
-      "status": "CONDITIONAL",
+      "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
       },
-      "pending": [
-        "owner confirmation of the periods: FG F-12 records them as part of the decision, ORDER11-ROUND2-OPS does not, and F-12's own needs list asks for the refund period to be defined"
+      "pending": [],
+      "activation": [
+        "statements and their tests: a capture counted once, refunds and adjustments in the period they happen linked to their originals, earlier periods never rewritten, signed agreements respected (O17-04, O17-06, C4)"
       ],
       "dependsOn": [],
       "patch": {
@@ -721,12 +947,32 @@
           {
             "op": "add",
             "path": "/commission/collectionPeriod",
-            "value": "MONTH_OF_CAPTURE"
+            "value": "MONTH_OF_CONFIRMED_CAPTURE"
           },
           {
             "op": "add",
             "path": "/commission/refundPeriod",
-            "value": "MONTH_OF_REFUND"
+            "value": "MONTH_IN_WHICH_THE_REFUND_HAPPENED"
+          },
+          {
+            "op": "add",
+            "path": "/commission/refundRewritesEarlierPeriods",
+            "value": false
+          },
+          {
+            "op": "add",
+            "path": "/commission/captureCountedOnce",
+            "value": true
+          },
+          {
+            "op": "add",
+            "path": "/commission/amountStates",
+            "value": [
+              "EARNED",
+              "HELD",
+              "PAYABLE",
+              "PAID"
+            ]
           }
         ]
       }
@@ -740,10 +986,17 @@
       "status": "APPROVED_AWAITING_REISSUE",
       "approval": {
         "source": "owner",
-        "date": "2026-10-21",
-        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
       },
       "pending": [],
+      "activation": [
+        "the state changes from PENDING_COUNSEL only with the evidence of the competent review recorded in `validation`"
+      ],
       "dependsOn": [],
       "patch": {
         "policy.json": [

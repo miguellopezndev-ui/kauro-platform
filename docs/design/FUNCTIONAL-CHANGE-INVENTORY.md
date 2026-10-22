@@ -157,7 +157,7 @@ The order follows the dependencies; within one intervention every item opening t
 | Step | Intervention | Items | Needs first |
 |---|---|---|---|
 | 1 | Owner decisions still open, counsel's checks, and the three tool checks | F-02, F-09, F-22 threshold, F-25 batch cap, F-07 provider; F-13, F-18 (**counsel**); F-28 to F-30 (**to verify**) | — |
-| 2 | Policy, registry and legal texts, as one ChangeProposal and one legal procedure (prepared in Order 16: CP-01, LR-01 to LR-11; adoption waits for the owner's signature and the re-issue) | C1, C2 | step 1 |
+| 2 | Policy, registry and legal texts, as one ChangeProposal and one legal procedure (prepared in Order 16: CP-01, LR-01 to LR-11; owner resolution 2026-10-22, CP-01 revision 2; adoption in one re-issue with CP-02, each item with its activation conditions) | C1, C2 | step 1 |
 | 3 | The api contract version: every read and command of C3 in one contract change | C3 | step 2 |
 | 4 | Cores, each repository opened once | C7 | steps 2, 3 |
 | 5 | Backend domain and application, with deletion, retention and restoration in the same change | C4, C6 | steps 3, 4 |

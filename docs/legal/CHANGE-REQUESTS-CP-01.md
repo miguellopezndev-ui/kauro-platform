@@ -31,25 +31,32 @@ No company data (NIT, address, phone, effective date) is filled in here: they st
 
 - **Today.** ToS §6.2 (price validity and data availability shown separately), §8.2 (paid only on a reconciled credit), §10.5,
   §13.1 (no hold class). DPA Annex IV (no hold).
-- **Proposed.** A new §13.2A "Hold while a transfer is confirmed": "When an authorised user gives proof that a bank transfer for the
-  exact amount of an Order, with its reference, has already been sent, Kauro keeps the data of that Quote for up to five (5) business
-  days of the published support calendar from the accepted proof, and never more than twenty-four (24) days from sealing. There is one
-  hold per Quote and per sealed set of Files; it is not renewed and is not added to an extension: the data stays until the later of the
-  two dates, never their sum. A hold is not payment and does not start any work (section 8.2). If the credit is not reconciled before
-  the hold ends, the data is deleted; a later credit is reviewed and returned under section 10." The §13.1 table gains the row.
+- **Proposed (revision 2, owner parameters of 2026-10-22).** A new §13.2A "Hold while a transfer is confirmed": "When an authorised
+  user, after additional verification of their identity, gives proof that an ACH bank transfer for the exact amount of an Order, with
+  its reference, has already been sent, Kauro keeps the data of that Quote until the earlier of five (5) United States banking days
+  after it accepts the proof and twenty-four (24) days from sealing. The Platform shows the actual end date. There is one hold per
+  Quote and per sealed set of Files; it is not renewed and is not added to an extension: the data stays until the later of the two
+  dates, never their sum, and never past twenty-four (24) days from sealing. A declared transfer or a proof is not payment, does not
+  start any work and creates no commercial authorisation (section 8.2). If the credit is not reconciled before the hold ends, the data
+  is deleted; a later credit is reviewed and returned under section 10 and does not restore the data." The §13.1 table gains the row.
+  "United States banking days" are those of the Federal Reserve's FedACH calendar (sources in CP-01 §3.10); another payment route is
+  not described by this paragraph.
   §6.2, §8 and §13 name the five dates with the same words: "the Quote's price validity", "the free check's retention", "the
   extension", "the hold while a transfer is confirmed", "the paid project's retention". DPA Annex IV: the row and its purpose
   (completing a purchase the Customer has already paid for).
-- **Blocked until.** PV1 qualification and the evidence the route really gives; the owner's values (CP-01.11); implementation and
-  tests; competent review, including §25 if consumer rules ever applied (D-30 keeps consumers out of V1).
+- **Blocked until.** Wise Business enabled, the PV1 qualification and the evidence the route really gives; implementation, abuse
+  controls and tests; competent review, including §25 if consumer rules ever applied (D-30 keeps consumers out of V1). The owner's
+  values were decided on 2026-10-22 (CP-01.11).
 
-## LR-03. "Demonstrated" identity is a technical class, not a guarantee (F-25; CP-01.12)
+## LR-03. Proven identity is a technical class, not a guarantee (F-25; CP-01.12)
 
 - **Today.** ToS §3.7: "A duplicate candidate is not a confirmed merge; Kauro merges duplicates only with the Customer's approval".
-- **Proposed.** Add: "Some candidates are marked demonstrated when they meet a published technical rule (for example the same email
-  address and the same name). Demonstrated is a class of evidence, not a guarantee that two records describe the same person; the
-  Customer's approval still decides, and Kauro writes to no CRM."
-- **Blocked until.** CP-01.12 decided and adopted; competent review.
+- **Proposed (revision 2, after the owner's security modification of 2026-10-22).** Add: "Records are combined without a separate
+  decision only when they share an identifier that proves they are one record: the same source record identifier within one identity
+  space, or an external identifier the Customer declared authoritative and that was verified. The same email address and the same name
+  are a strong sign of a possible duplicate, not proof: those candidates are decided by a person, with a preview, in groups of at most
+  one hundred (100). Kauro writes to no CRM." Revision 1's example (same email and same name as "demonstrated") is withdrawn.
+- **Blocked until.** CP-01.12 adopted with the core intervention that implements it; competent review.
 
 ## LR-04. Salesforce record IDs and import error messages (F-28, F-29)
 
@@ -65,7 +72,9 @@ No company data (NIT, address, phone, effective date) is filled in here: they st
   register X-38).
 - **Proposed.** Publish POL at the route of UI56 with its version label (same versioning as `templates.ts`); the registration and the
   contact form record user, document version, date and time; marketing consent stays separate (POL §8.3; CHECKLIST A-14).
-- **Blocked until.** Operator facts (A-08); competent review; CP-02 consent fields.
+- **Blocked until.** Operator facts (A-08); competent review; verification that the Policy reflects the processing actually carried
+  out; CP-02 consent fields keeping essential obligations apart from optional commercial authorisations. The owner approved the screen
+  and the versioned publication mechanism on 2026-10-22 (CP-01.10); no incomplete, false or unreviewed policy is published.
 
 ## LR-06. Who tells the customer a refund decision, and when (F-33)
 
@@ -112,5 +121,6 @@ files. No change to the texts.
 - **Proposed.** "a pause on new free reviews once ninety percent (90%) of the budget funded for free reviews is used". It follows the
   authority (A3, manual 14) and CP-01.03, but it lets Kauro pause earlier than the current draft says, so it narrows what the Customer
   is told and is not applied as an alignment.
-- **Blocked until.** The owner confirms the 90% rule for the Terms and counsel reviews the wording.
+- **Blocked until.** Counsel reviews the wording through the Terms' amendment procedure. The owner approved the 90% internal threshold
+  on 2026-10-22 (CP-01.03) and required that the public Terms are not changed automatically by it.
 

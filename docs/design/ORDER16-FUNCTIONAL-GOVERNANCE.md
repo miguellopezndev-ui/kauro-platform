@@ -48,20 +48,20 @@ on money, retention, legal text, authorization or a customer promise needs the o
 | F-09 | Output preferences for CLEAN | PROP | — | Recommendation: **not for V1** | CP-01 §4; owner |
 | F-10 | Quotes and orders list | APPR | Delegated design (read of existing data) | Read | O17-02 |
 | F-11 | Owner reads (sellers, customers, statements, claims) | APPR | Owner (OWN-01) | Reads; owner-only cross-workspace scope | O17-04; Order 15 |
-| F-12 | Seller money, four figures | APPR, PROP | Owner 2026-10-21 (figures); periods recorded only in FG | Period definitions to confirm; read | CP-01.13; O17-04 |
-| F-13 | Claim refusal reasons | APPR, EXT | Owner 2026-10-21 (list in FG F-13); counsel pending | Policy list (code names and three messages to confirm); refusal code | CP-01.04; O17-05; L-19 |
+| F-12 | Seller money, four figures | APPR | Owner 2026-10-21 (figures); owner 2026-10-22 (periods, CP-01.13) | Read | CP-01.13; O17-04 |
+| F-13 | Claim refusal reasons | APPR, EXT | Owner 2026-10-21; content approved 2026-10-22 (CP-01.04); counsel pending | Refusal code and messages in the contract; legal effect after L-19 | CP-01.04; O17-05; L-19 |
 | F-14 | Seller review request, decision history | APPR | Owner 2026-10-21 | Commands and history read; seller role | O17-05; Order 15 |
-| F-15 | Alerts | APPR, PROP | Owner 2026-10-21 (thresholds) | Thresholds in policy; "relevant progress" undefined (proposed) | CP-01.06, CP-01.07; O17-07 |
+| F-15 | Alerts | APPR | Owner 2026-10-21 (thresholds); 2026-10-22 (relevant progress, modified) | Thresholds and progress in policy; read | CP-01.06, CP-01.07; O17-07 |
 | F-16 | Retainer | APPR | Owner 2026-10-21 | Default in policy; statement item kind `RETAINER` | CP-01.05; O17-06 |
 | F-17 | Offsets on the statement | APPR | Owner 2026-10-21 | Item fields (refund, line, clause), balance | O17-06 |
 | F-18 | "Pending legal review" per rule group | APPR | Owner 2026-10-21 | `legalStatus` in policy; read | CP-01.14; O17-08 |
 | F-19 | Extension also for the free check | APPR | Owner 2026-10-21; registry and ToS §13.2 already allow it | Implementation only: UNPAID soft deadline never written; paid-only restriction in SQL and row policies | O17-14; C4/C6; Order 15 (row policies); LR-01 for public words |
 | F-20 | 17-day exceptional ceiling | APPR, CONTRA | Owner 2026-10-21 | Policy key, CMD060 and its cases, UI29, RetentionRecord, ToS §13, DPA Annex IV say 14 | CP-01.02; O17-14; LR-01; C6 |
-| F-21 | Pending-payment hold | APPR, EXT | Owner 2026-10-21 (principle) | Values, PV1 evidence, proof command | CP-01.11; LR-02; C5 |
-| F-22 | Abuse limits of the hold | APPR, PROP, EXT | Owner 2026-10-21 (limits) | Ceiling 24 and threshold (recommended 2 in 90 days); DB uniqueness | CP-01.11; C10 |
+| F-21 | Pending-payment hold | APPR, EXT | Owner 2026-10-21 (principle); 2026-10-22 (parameters) | PV1 evidence, Wise Business, proof command; activation blocked | CP-01.11; LR-02; C5 |
+| F-22 | Abuse limits of the hold | APPR, EXT | Owner 2026-10-21 (limits); 2026-10-22 (24 days; review from the third in 90 days) | DB uniqueness; counter | CP-01.11; C10 |
 | F-23 | No preparation on a hold | IMPL | Owner 2026-10-21 | Tests once the hold exists (listed under CP-01.11) | C11 |
 | F-24 | Five dates kept apart | APPR | Owner 2026-10-21 | Project dates read; same names in the Terms | O17-03; LR-02 |
-| F-25 | Batch unification | APPR, PROP | Owner 2026-10-21 (principle) | Definition, accents, cap (recommended) | CP-01.12; O17-09; C7 |
+| F-25 | Batch unification | APPR | Owner 2026-10-21 (principle); 2026-10-22 (proven identity = the core's proving keys; 100 groups) | Contract; core intervention | CP-01.12; O17-09; C7 |
 | F-26 | A change after approval is a new revision | APPR | Owner 2026-10-21 | RevisePlan wired; revision event; quote withdrawn | O17-09 (conditional on CP-01.12); C4, C7 |
 | F-27 | Adversarial identity tests | APPR | Owner 2026-10-21 | Synthetic fixture set; cases follow CP-01.12's definition | CP-01.12; C7, C11 |
 | F-28 | Salesforce route per object | APPR, EXT | Owner 2026-10-21 | Tool facts to verify (Upsert related-object step) | O17-17; C7; LR-04 |
@@ -154,10 +154,10 @@ drafted but not adopted until its condition holds.
 | O17-01 | StartAudit: `targetContractId` required unless the project's mode is CLEAN; CLEAN with a target `422 TARGET_NOT_APPLICABLE`; the audit, plan, approval and quote of a CLEAN project bind `CLEAN_ONLY_TARGET_HASH` and lock no target row. Tests: CP-01 §3.1 | F-01, CP-01.01 |
 | O17-02 | Tenant-scoped reads, existing authorization only: findings (count, population, examples within the plan's privacy class), estimate (units, policy price, `scheduleVersion`, `estimate: true`, reserves nothing), activity (typed events with actor, time, reference), project (name, client, service, stage), board and client summaries, billing profile and paid-project count, quotes and payment orders list (state, amount, key date, fiscal document number; billing readers), package read, workspace support cases, deletion records, refunds list | F-04, F-05, F-06, F-10, G-03–G-07, G-10, G-14 |
 | O17-03 | Project dates read: one entry per date kind `QUOTE_PRICE_VALIDITY`, `FREE_CHECK_RETENTION`, `EXTENSION`, `PENDING_PAYMENT_HOLD` (absent until CP-01.11), `PAID_RETENTION`; each with date, rule, state and who may act; never a sum; Quote and order views link to it. The existing `SourceRevisionView.retention[]` stays | F-24 |
-| O17-04 | Owner reads: sellers with the four figures (`MONTH_OF_CAPTURE`, `MONTH_OF_REFUND`, tax excluded, split shares once), one seller's record, customers with buyer type and channel, statements by period, claims across sellers; seller home: claims with end dates, next eligible and next payment dates; a won customer's first-payment and completion dates. Owner-only scope across workspaces is Order 15's | F-11, F-12, G-11, G-13 |
-| O17-05 | Claims: `RefuseAttribution` (owner; `reasonCode` from `commission.claimRefusalReasons`, `evidenceRef`, `note` required for `OTHER`); the seller-facing view shows only `sellerMessage`; `RequestClaimReview` (seller, optional note); `DecideClaimReview` (owner, `UPHOLD` or `CHANGE` with a reason code); an append-only decision history read; events for each | F-13, F-14, CP-01.04 |
+| O17-04 | Owner reads: sellers with the four figures (`MONTH_OF_CONFIRMED_CAPTURE`, `MONTH_IN_WHICH_THE_REFUND_HAPPENED`, earlier periods never rewritten, tax excluded, each capture once, split shares once; amounts earned, held, payable and paid kept apart), one seller's record, customers with buyer type and channel, statements by period, claims across sellers; seller home: claims with end dates, next eligible and next payment dates; a won customer's first-payment and completion dates. Owner-only scope across workspaces is Order 15's | F-11, F-12, G-11, G-13 |
+| O17-05 | Claims: `RefuseAttribution` (owner; `reasonCode` from `commission.claimRefusalReasons`, `evidenceRef` always, `note` required for `OTHER`, a versioned `ruleRef` in force at the decision required for `OWNER_RULE`); the seller-facing view shows only `sellerMessage`; `RequestClaimReview` (seller, optional note); `DecideClaimReview` (owner, `UPHOLD` or `CHANGE` with a reason code); an append-only decision history read; events for each | F-13, F-14, CP-01.04 |
 | O17-06 | Statements: item kind `RETAINER`; offset items with `refundId`, `adjustedLineId`, `clauseRef`; a balance (earned, held, offsets, retainer, payable) | F-16, F-17 |
-| O17-07 | Alerts read for the owner and for a seller's claims: kinds and precedence from `alerts`; one item once with its other conditions as a second line. The inactivity kind depends on CP-01.07 (proposed) | F-15 |
+| O17-07 | Alerts read for the owner and for a seller's claims: kinds and precedence from `alerts`; one item once with its other conditions as a second line. Inactivity measured from `alerts.relevantProgress` only (CP-01.07 as modified by the owner, 2026-10-22): excluded acts never reset it, and progress moves no retention, legal or quote date | F-15, CP-01.06, CP-01.07 |
 | O17-08 | `legalStatus` in the owner's settings read | F-18 |
 | O17-11 | Statement PDF and CSV; a seller command asking the owner to authorise a draft | G-12 |
 | O17-12 | Registration consent record: Policy version, Privacy Notice version, user, time; marketing consent separate per channel (POL §8.3, A-14) | F-08 |
@@ -168,9 +168,9 @@ drafted but not adopted until its condition holds.
 
 | Id | Contract change | Condition |
 |---|---|---|
-| O17-09 | Plan read (evidence class, paging, preview hash); `ApplyDemonstratedBatch`, `DecideMany` (≤ 100 groups), `ChangeDecision`, `UndoBatch`; `PlanRevised` naming its changes; the open quote withdrawn with its reason | CP-01.12 decided; RevisePlan needs the cores (C7) |
+| O17-09 | Plan read (evidence class, paging, preview hash); `ApplyProvenIdentity` (only the core's proving keys, no blocking conflict), `DecideMany` (candidates, ≤ 100 groups, exact preview hash, explicit human approval), `ChangeDecision`, `UndoBatch`; decision record (decision, evidence, person, version, effect); `PlanRevised` naming its changes; the open quote withdrawn with its reason | CP-01.12 decided 2026-10-22 (contract may be specified now); RevisePlan and the evidence classes need the core intervention (C7) |
 | O17-10 | Refund: notification responsibility, due time and send state in the review packet and the refund view; approval never implies a message | Owner decision on F-33 (LR-06) |
-| O17-15 | `RecordTransferProof` (owner or billing, step-up recommended), refusals `PROOF_REQUIRED`, `HOLD_ALREADY_USED`, `CEILING_REACHED`, `AMOUNT_OR_REFERENCE_MISMATCH`; events; the hold in order and retention views | CP-01.11 (PV1, values) |
+| O17-15 | `RecordTransferProof` (owner or billing, step-up required; proof of a transfer already sent, exact amount and reference), refusals `PROOF_REQUIRED`, `HOLD_ALREADY_USED`, `CEILING_REACHED`, `AMOUNT_OR_REFERENCE_MISMATCH`; events; the hold in order and retention views with its effective end (earlier of five US banking days and 24 days from sealing) | CP-01.11: values decided 2026-10-22; may be drafted, never adopted or activated before Wise Business, PV1 evidence, implementation, abuse controls and legal review |
 | O17-16 | Direct service by Kauro (`AssignDirectService` or a `KAURO_DIRECT` value in CMD048), acquisition rights kept | Owner decision on F-34 |
 | O17-17 | Import stage read (parent links, generated flag, blocked rows with reason and action, held-back counts); CMD041 releasing generated stages; choosing the ID to keep for a key imported twice | F-28 to F-30 tool checks |
 | O17-18 | Eligibility step before real files; public "Check a file free" route | A3 §3.2 amendment signed (F-03) |
@@ -199,11 +199,11 @@ superseded). Dependencies are therefore given by the FCI component each later or
 
 | # | Question | Who | Order 16's recommendation |
 |---|---|---|---|
-| B-01 | Sign or reject each CP-01 item | Owner | Adopt the seven approved items (CP-01.01, .02, .03, .05, .06, .08, .14) with CP-02 in one re-issue |
-| B-02 | CP-01.07 relevant progress; CP-01.09 UI03 wording; CP-01.04 code names and three seller messages; CP-01.13 periods | Owner | As proposed |
+| B-01 | Sign or reject each CP-01 item | Owner | **Resolved 2026-10-22** (section 13) |
+| B-02 | CP-01.07 relevant progress; CP-01.09 UI03 wording; CP-01.04 code names and three seller messages; CP-01.13 periods | Owner | **Resolved 2026-10-22**: .04 and .13 approved; .07 approved with modification; .09 deferred to the final visual review |
 | B-03 | A3 §3.2 amendment for the self-serve free check (F-03) | Owner | Amend: "Check a file free" opens the free-check page; account creation before upload; the fit form stays as "Ask a question first"; pause at 90% kept |
-| B-04 | Hold values, review threshold, step-up (F-21, F-22) | Owner, after PV1 | 5 business days; 24 days; 2 in 90 days; step-up yes |
-| B-05 | Demonstrated identity, accents, cap (F-25) | Owner | Email and name; accents not folded; 100 groups |
+| B-04 | Hold values, review threshold, step-up (F-21, F-22) | Owner, after PV1 | **Values resolved 2026-10-22**: 5 US banking days (FedACH), 24 days, owner review from the third in 90 days per organisation, step-up required; activation still blocked by PV1 |
+| B-05 | Demonstrated identity, accents, cap (F-25) | Owner | **Resolved 2026-10-22** with a security modification: only the core's proving keys merge; email and name stay candidates; nothing folded; 100 groups |
 | B-06 | Serving a customer directly (F-34) | Owner | Allow it as an owner-only assignment to Kauro that ends the seller's service compensation and keeps acquisition, commission and residual rights |
 | B-07 | Refund decision message (F-33) | Owner, counsel | Kauro, within 2 business days, send state recorded |
 | B-08 | F-02, F-09 | Owner | Reject both for V1 |
@@ -228,7 +228,7 @@ superseded). Dependencies are therefore given by the FCI component each later or
 Changed files: `docs/authority/proposals/*` (new), `docs/legal/CHANGE-REQUESTS-CP-01.md` (new), `docs/legal/TERMS_OF_SERVICE.md`,
 `docs/legal/CHECKLIST.md`, `docs/legal/LAWYER_LATER.md`, `docs/design/LEGAL-CORRECTION-REQUESTS.md`,
 `docs/design/FUNCTIONAL-CHANGE-INVENTORY.md`, `docs/design/ORDER11-FUNCTIONAL-GAPS.md` (notes only, after PR #120), this file,
-`tools/test/change-proposals.test.mjs` (new) and `tools/test/owned-cleanup.test.mjs` (the recursive-delete census counts the new
+`tools/test/change-proposals.test.mjs` (new), `docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md` (new, owner resolution) and `tools/test/owned-cleanup.test.mjs` (the recursive-delete census counts the new
 test's one owned delete).
 
 ## 11. Corrections applied to ORDER11-FUNCTIONAL-GAPS.md (after PR #120 merged)
@@ -250,3 +250,85 @@ test's one owned delete).
   the PR: each rule fails on a deliberately broken copy of the delta.
 - Existing verifiers run on this branch: `@kauro/contracts` (registry provenance), the web policy-snapshot drift test, the tools tests,
   `pnpm run arch`. Results in the PR.
+- Revision 2 (owner resolution): the test also enforces the owner's decisions on CP-01 (every item cites the resolution; CP-01.09
+  deferred; CP-01.07 progress; CP-01.12 proven identity read against Migration Core's `PROVING_KEY_KINDS`; CP-01.11 parameters and
+  official calendar sources; CP-01.02 to .05 and .14 values) and that none of it is in the vendored registry yet; path ownership is
+  checked across proposals and the generator runs on all proposals together. Red proof: revision 1's CP-01.07, CP-01.12 and CP-01.11
+  values make the new tests fail; a CP-02 delta touching a CP-01 path fails the cross-proposal rule.
+
+## 13. Owner resolution (2026-10-22) and handoff to Order 17 (CP-02)
+
+The owner resolved CP-01 on 2026-10-22 (`docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md`). Order 16 recorded it in the
+proposal (revision 2) and the delta, corrected the two items the owner modified, fixed the hold's parameters and calendar sources, and
+adopted nothing: `packages/contracts/registry/` is byte-identical to its provenance and the authority is not re-issued. This section
+is the handoff Order 17 needs; it supersedes the "proposed" and "conditional" wording of sections 3, 7 and 9 where they differ.
+
+### 13.1 Source and version to integrate
+
+- **Source:** `docs/authority/proposals/CP-01.registry-delta.json` and `CP-01-FUNCTIONAL-GOVERNANCE.md` on `main` after PR #122 merges,
+  **revision 2** (`"revision": 2` in the delta). Read them from `main`; do not copy them into the Order 17 branch or restate their
+  operations in CP-02. CP-02 cites CP-01 items by id and adds only its own operations.
+- **Base:** both proposals are written against registry edition `KAVO-2026.09-R2` (the base hashes in the delta). Put CP-02's delta
+  beside CP-01's as `docs/authority/proposals/CP-02.registry-delta.json`: `tools/test/change-proposals.test.mjs` checks every delta in
+  the folder by the same rules and now also **across** them: no registry path may be changed by an item of CP-01 and an item of CP-02
+  (cite the CP-01 item instead), and the generator must accept the registry produced by **all** proposals applied together, in file
+  order, as the coordinated re-issue will apply them.
+
+### 13.2 Approved (adoptable at the coordinated re-issue, each with its `activation`)
+
+CP-01.01, CP-01.02, CP-01.03, CP-01.04 (legal effect conditional, through CP-01.14), CP-01.05, CP-01.06, CP-01.07 (modified),
+CP-01.08, CP-01.12 (modified), CP-01.13, CP-01.14.
+
+### 13.3 Corrected in revision 2
+
+| Item | Revision 1 | Revision 2 (owner) |
+|---|---|---|
+| CP-01.07 | Any committed command counts as progress | Only a material, verifiable change of the state of the project or its deliverables (nine named acts, or an equivalent that legitimately changes the course); eight kinds of act never count; progress affects the inactivity alert only and never extends retention, legal deadlines or a quote's validity |
+| CP-01.12 | Same normalised email and full name = demonstrated | Deterministic merge only on the core's proving keys (source record id within one identity space; authoritative, verified external id); email and name are candidates decided by a person, at most 100 groups, exact preview, explicit approval; five blocking conflicts; no folding; decision record |
+| CP-01.11 | Support calendar (America/Bogota); review after 2 in 90 days per workspace; step-up recommended | Five US banking days (FedACH calendar, official sources fixed), the earlier of that and 24 days from sealing, the customer sees the real date; review from the third in a rolling 90 days per organisation; step-up required; activation blocked |
+| CP-01.04 | Code names and three messages to confirm | Confirmed; evidence on every refusal; note and evidence for `OTHER`; a versioned rule in force for `OWNER_RULE`, never retroactive; the seller sees the message only and may ask for a review |
+| CP-01.13 | Periods to confirm | Month of confirmed capture; month the refund happened; earlier periods never rewritten; a capture counted once; earned, held, payable, paid kept apart |
+| CP-01.10 | Screen copy and publication pending | Design approved; publication only with real company data, competent review and verification of the actual processing |
+
+### 13.4 Contract changes unblocked for CP-02
+
+O17-01 (CLEAN binding for StartAudit, CreatePlan, ApprovePlan, CreateQuote), O17-04 (periods and amount states as in 13.3), O17-05
+(refusal codes, evidence, rule reference, seller view, review request), O17-06 (retainer default 0; a signed amount prevails; accrued
+obligations kept), O17-07 (alerts with the corrected progress), O17-08 (`legalStatus`), O17-09 (the contract may now be specified
+with the corrected identity rule; RevisePlan and the evidence classes still need the core, C7), O17-12 and O17-13 (consent and
+preferences, essential apart from optional), O17-14 (CMD060 for UNPAID up to 17 days from sealing). The other accepted rows of
+section 7 are unchanged.
+
+### 13.5 Still conditional
+
+- CP-01.09: deferred to the final visual review before the second audit; the current UI03 action text stays. Not to be carried into
+  CP-02 as approved.
+- CP-01.10: no Policy published before real company data, competent review and the check of the actual processing (LR-05).
+- CP-01.11 and O17-15: may be drafted; never adopted into the operating registry or activated before Wise Business, PV1 evidence,
+  implementation, abuse controls and legal review (LR-02). No calendar other than ACH's is presumed for another route.
+- Legal effect of the claim rules (CP-01.04, CP-01.14): `PENDING_COUNSEL` until competent review (L-12, L-19).
+- Every legal text (LR-01 to LR-06, LR-11): its own procedure; the public Terms do not change because a value is adopted.
+- O17-10, O17-16, O17-17, O17-18, O17-19: unchanged (their own owner decisions or tool checks).
+
+### 13.6 Tests CP-02 needs
+
+1. **Progress (O17-07).** For each `neverCounts` kind (read, download, sign-in, reminder or notification, ordinary support message,
+   command without material effect, failed attempt or retry, repeated action without state change) the inactivity clock is unchanged;
+   for each `counts` kind it resets; no act moves a retention, legal or quote-validity date.
+2. **Identity (O17-09).** A merge without human confirmation is accepted only for a proving key without a blocking conflict; email and
+   name matches are refused as proof and offered as candidates; accents, plus-addressing or other characters never make a proof; each
+   blocking conflict refuses; a bulk decision over 100 groups is refused; a decision without the exact preview hash or explicit approval
+   is refused; the decision record carries decision, evidence, person, version and effect.
+3. **Claims (O17-05).** `OTHER` without a note or evidence refused; `OWNER_RULE` without a versioned rule in force at the decision
+   refused, and a rule dated after the claim refused as retroactive; the seller view never shows the code, note or evidence.
+4. **CLEAN (O17-01).** A CLEAN project reaches audit, plan, approval and quote without a target contract and binds the canonical hash;
+   a target given for CLEAN is refused with nothing written; HUBSPOT and SALESFORCE unchanged.
+5. **Extension (O17-14).** UNPAID: 14 days without extension, at most 17 with it, one per project across classes; refusals as CP-01
+   §3.2.
+6. **Statements (O17-04, O17-06).** A refund in a later month changes that month only and links to its original line; a capture is
+   counted once; tax never in the base; retainer 0 unless a signed agreement says otherwise, and an accrued amount is never removed.
+7. **Hold (O17-15, drafted only).** Effective end = the earlier of five US banking days (with the Federal Reserve's Saturday and Sunday
+   holiday rules) and 24 days from sealing; the shown date is that end; a second hold on the same quote or sealed set refused; a proof
+   never authorises execution.
+8. **Joint check.** Already in `tools/test/change-proposals.test.mjs` once CP-02's delta is in the folder (cross-proposal path ownership
+   and the joint generator run); CP-02 adds its own item-level assertions beside the CP-01 ones there, without editing CP-01's.
