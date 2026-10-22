@@ -53,14 +53,18 @@ export function writeManifest(files: Map<string, Uint8Array>, manifest: unknown)
 
 /** Replaces one file and re-declares it in the manifest (length, hash and, for CSV, record count). */
 export function forge(files: Map<string, Uint8Array>, path: string, content: string): void {
-  const bytes = bytesOf(content);
+  forgeBytes(files, path, bytesOf(content), path.endsWith(".csv") ? content.split("\n").filter((l) => l.length > 0).length - 1 : null);
+}
+
+/** `forge` for bytes built outside the JavaScript heap (a large table), with the record count the caller knows. */
+export function forgeBytes(files: Map<string, Uint8Array>, path: string, bytes: Uint8Array, rowCount: number | null): void {
   files.set(path, bytes);
   const manifest = manifestOf(files);
   const entry = manifest.artifacts.find((a) => a["path"] === path);
   if (entry === undefined) throw new Error(`no manifest entry for ${path}`);
   entry["byteLength"] = bytes.byteLength;
   entry["sha256"] = createHash("sha256").update(bytes).digest("hex");
-  if (path.endsWith(".csv")) entry["rowCount"] = content.split("\n").filter((l) => l.length > 0).length - 1;
+  if (rowCount !== null) entry["rowCount"] = rowCount;
   writeManifest(files, manifest);
 }
 
