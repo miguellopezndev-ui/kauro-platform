@@ -1,7 +1,7 @@
 # Round 3: progress ledger
 
 Read first, every time a session starts or after any compaction:
-1. [ORDER11-ROUND3-MASTER-PLAN.md](ORDER11-ROUND3-MASTER-PLAN.md) (version 7);
+1. [ORDER11-ROUND3-MASTER-PLAN.md](ORDER11-ROUND3-MASTER-PLAN.md) (version 8);
 2. [ORDER11-ROUND3-DELIVERABLES-PLAN.md](ORDER11-ROUND3-DELIVERABLES-PLAN.md);
 
 both from the first line to the last. Then this ledger.
@@ -21,6 +21,25 @@ both from the first line to the last. Then this ledger.
   - Claude agreed on 2026-10-22, about 00:15.
 
 ## State
+
+### Continuation authorised on Oct 22, 2026
+
+The owner supplied `ROUND3-HANDOFF.md` as the resume instruction: continue version 8 to its full end condition, implement, then deliver.
+The historical stopped state below remains evidence of the interruption; it is no longer an instruction to pause.
+
+- **HD-1 / HD-2:** reproduced seller Commissions changing to the owner when a `review-as=seller` preview followed a plain link.
+  Review links now retain their persona, existing object queries and fragments. Both the route and shell refuse owner-only previews
+  to sellers. No product authorisation or backend code changed. The owner knows of no other specific failed link and asked for the
+  audit to identify the rest. Edge audit: **302 checks, zero failures**, across all 11 personas, project navigation for all seven
+  workspace roles and all three services, shell/account destinations, two real Commissions clicks and 12 owner-route denials.
+  Evidence: `Kauro.archive/Deliveries/Visual/order11/research/round3-link-audit/audit.json`; repeatable harness in
+  `tools/round3/audit-review-links.mjs` in that archive. Review server running on `127.0.0.1:4400`.
+  Validation: review typecheck and inventory/link unit checks passed; web and UI unit suites passed; **47 public browser tests passed
+  in installed Edge**, including the public navigation walk. The TLS harness used the already installed Git OpenSSL on the test
+  process PATH; no installation or system setting changed.
+- **Interrupted fixes resumed:** Refunds, Claims and Customers continue from their existing builders and decisions. Their new
+  evidence is reviewed before each step is called done. Sellers final is next, followed by Support cases and Owner actions.
+
 
 | Step | Status | Record |
 |---|---|---|

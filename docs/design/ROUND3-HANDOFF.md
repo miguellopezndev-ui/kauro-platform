@@ -74,6 +74,12 @@ in `ORDER11-ROUND3-MASTER-PLAN.md`, and every record is the page's `AUDITIONS.md
 
 ## 3. Defects the owner found, recorded and not fixed (owner: "do not stop to fix anything")
 
+**Continuation, Oct 22, 2026:** HD-1 is fixed in the local review sources. A URL-selected preview lost its persona on navigation;
+shell and prototype links now keep it, and seller previews cannot render owner-only screens. HD-2: the owner knows of no other
+specific failed link; the audit is the builder's responsibility. The 302-check Edge audit found no remaining shell destination or
+role-retention failure in the covered routes. See the current continuation in `ROUND3-PROGRESS.md` and archive
+`research/round3-link-audit/audit.json`. The table below preserves the original findings.
+
 | Id | Where | What | Seen |
 |---|---|---|---|
 | HD-1 | Review screens, seller session | From the seller's session, **Commissions** opens the owner's session (a link crosses from the seller portal into the owner console). This is a link or route defect in the review environment (`tools/review/private`), and possibly a role-separation defect. Check the seller nav's Commissions link target, and that the review shell keeps the role. | Owner, 2026-10-22 |

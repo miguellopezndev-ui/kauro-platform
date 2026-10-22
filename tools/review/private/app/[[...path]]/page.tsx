@@ -7,7 +7,7 @@ import { matchRoute } from "@web/screens.ts";
 import { AGENCY_ID, COMPANY_ID, CONTEXTS, type ContextKey } from "@review/lib/contexts.ts";
 import { FrameHost } from "@review/lib/frame-host.tsx";
 import { screenOf } from "@review/lib/inventory.ts";
-import { AS_COOKIE } from "@review/lib/links.ts";
+import { AS_COOKIE, mayPreviewOps } from "@review/lib/links.ts";
 import { realPage } from "@review/lib/real-pages.tsx";
 
 type Query = Readonly<Record<string, string | string[] | undefined>>;
@@ -48,6 +48,7 @@ export default async function Experience({ params, searchParams }: { readonly pa
   if (found === null) notFound();
   const screen = screenOf(found.id);
   if (screen === undefined) notFound();
+  if (screen.origin === "OPS" && !mayPreviewOps(person, found.id)) notFound();
   const agencyId = found.params["agencyId"] ?? (person === "company" ? COMPANY_ID : AGENCY_ID);
   const plain: Record<string, string> = {};
   for (const [key, value] of Object.entries(query)) if (one(value) !== undefined && !key.startsWith("review-")) plain[key] = one(value) as string;
