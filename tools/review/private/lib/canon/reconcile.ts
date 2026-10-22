@@ -5,7 +5,8 @@
 import { bogotaDay, dayPlus, earliest, ms, nextMonth, nthBusinessDay, plusBusinessDays, plusDays, plusHours } from "./calendar.ts";
 import { sellerFigures } from "./figures.ts";
 import { bandIndexOf, COMMISSION, ofBps, POLICY_SNAPSHOT, priceOf, PROPOSED, repeatPercent } from "./policy.ts";
-import { type Matters, type ObjectKind, type Project, type Role, STEPS, type Step, type World } from "./types.ts";
+import { ADAPTER, associationPath, CORE_VERSION, fileName, importPath, PACKAGE_PATH } from "./engine.ts";
+import { type Matters, type ObjectKind, type PackageFile, type Project, type Role, STEPS, type Step, type World } from "./types.ts";
 
 const R = POLICY_SNAPSHOT.retention;
 const sum = (values: readonly number[]): number => values.reduce((total, one) => total + one, 0);
@@ -181,7 +182,76 @@ export function checkPeople(world: World): readonly string[] {
 const sourceRows = (project: Project, object: ObjectKind): number => sum(project.sources.filter((one) => one.selected && one.object === object).map((one) => one.rows ?? 0));
 const unifiedOf = (project: Project, object: ObjectKind): number => project.duplicates.find((one) => one.object === object)?.unifiedRows ?? 0;
 
-/** Units are the rows of the sealed, selected files; delivered rows are source rows less unified rows; unified rows come from the groups. */
+const rowsOf = (files: readonly PackageFile[], path: string): number | null | undefined => files.find((one) => one.path === path)?.rows;
+
+/**
+ * A package as Migration Core 3.0.0 writes it: every file under the core's own name for the project's service (PACKAGE_PATH), one import
+ * file per selected source object and none for an object 3.0.0 cannot write, relationship files whose edges add up, and, for a project the
+ * engine ran, a file list whose exception and traceability rows agree with the outputs (isolated = held back, rejected-input = not
+ * readable, unresolved-associations = unresolved, import-crosswalk = delivered, source-lineage = units).
+ */
+export function checkPackage(project: Project, name: string): readonly string[] {
+  const problems: Problems = [];
+  const adapter = ADAPTER[project.service];
+  const own = (path: string): boolean => PACKAGE_PATH.test(path) && (!path.startsWith("01_IMPORT/") || path.startsWith(`01_IMPORT/${adapter}/`)) && (!path.startsWith("04_DOCUMENTATION/data-view/") || path.startsWith(`04_DOCUMENTATION/data-view/${adapter}/`));
+  const named = [...project.outputs.map((one) => one.path), ...project.associations.map((one) => one.path), ...project.importStages.map((one) => one.path), ...(project.engine?.files.map((one) => one.path) ?? [])];
+  for (const path of new Set(named)) if (!own(path)) problems.push(`${name}: ${path} is not a name Migration Core ${CORE_VERSION} writes for ${project.service}`);
+  for (const output of project.outputs) {
+    const path = importPath(project.service, output.object);
+    if (output.path !== path || output.name !== fileName(output.path)) problems.push(`${name}: ${output.object} is delivered as ${output.path}, the core writes ${path ?? "no such file"}`);
+  }
+  if (new Set(project.outputs.map((one) => one.path)).size !== project.outputs.length) problems.push(`${name}: one import file per object`);
+  if (project.outputs.length > 0) {
+    const selected = new Set(project.sources.filter((one) => one.selected).map((one) => one.object));
+    const delivered = new Set(project.outputs.map((one) => one.object));
+    if (selected.size !== delivered.size || [...selected].some((one) => !delivered.has(one))) problems.push(`${name}: the package has one import file for each selected object (${[...selected].join(", ")}), it has ${[...delivered].join(", ")}`);
+  }
+  if (project.associations.length > 0 && project.outputs.length === 0) problems.push(`${name}: relationship files come with the package`);
+  for (const one of project.associations) {
+    const path = associationPath(project.service, one.kind);
+    if (one.path !== path || one.name !== fileName(one.path)) problems.push(`${name}: ${one.kind} is delivered as ${one.path}, the core writes ${path ?? "no relationship file"}`);
+    if (!project.outputs.some((output) => output.object === one.child) || !project.outputs.some((output) => output.object === one.parent)) problems.push(`${name}: ${one.name} links objects the package delivers`);
+    if (![one.sourceEdges, one.rows, one.deduplicated, one.unresolved].every((value) => Number.isSafeInteger(value) && value >= 0)) problems.push(`${name}: ${one.name} counts are whole, non-negative numbers`);
+    if (one.sourceEdges !== one.rows + one.deduplicated + one.unresolved) problems.push(`${name}: ${one.name} source edges ${one.sourceEdges} are not delivered ${one.rows} + deduplicated ${one.deduplicated} + unresolved ${one.unresolved}`);
+  }
+  const engine = project.engine;
+  if (engine === null) return problems;
+  if (project.outputs.length === 0) problems.push(`${name}: an engine run with no import file`);
+  const files = engine.files;
+  if (new Set(files.map((one) => one.path)).size !== files.length) problems.push(`${name}: a package file listed twice`);
+  const imports = files.filter((one) => one.path.startsWith("01_IMPORT/"));
+  const expected = [...project.outputs.map((one): [string, number] => [one.path, one.rows]), ...project.associations.map((one): [string, number] => [one.path, one.rows])];
+  if (imports.length !== expected.length) problems.push(`${name}: the engine wrote ${imports.length} import files, the project names ${expected.length}`);
+  for (const [path, rows] of expected) {
+    const file = imports.find((one) => one.path === path);
+    if (file === undefined || file.kind !== "MACHINE_IMPORT_CSV" || file.rows !== rows) problems.push(`${name}: ${path} holds ${file?.rows ?? "no"} rows in the engine's package, the project says ${rows}`);
+  }
+  const total = (values: readonly number[]): number => sum(values);
+  const agree: readonly (readonly [string, number])[] = [
+    ["02_EXCEPTIONS/isolated.csv", total(project.outputs.map((one) => one.heldBackRows))],
+    ["02_EXCEPTIONS/rejected-input.csv", total(project.outputs.map((one) => one.unreadableRows))],
+    ["02_EXCEPTIONS/leftovers.csv", 0],
+    ["02_EXCEPTIONS/unresolved-associations.csv", total(project.associations.map((one) => one.unresolved))],
+    ["03_TRACEABILITY/associations.csv", total(project.associations.map((one) => one.sourceEdges))],
+    ["03_TRACEABILITY/import-crosswalk.csv", total(project.outputs.map((one) => one.rows))],
+    ["03_TRACEABILITY/source-lineage.csv", project.units ?? -1],
+  ];
+  for (const [path, rows] of agree) if (rowsOf(files, path) !== rows) problems.push(`${name}: the engine's ${path} holds ${rowsOf(files, path) ?? "no"} rows, the project gives ${rows}`);
+  for (const file of files) {
+    const document = file.kind === "DOCUMENT";
+    if (document !== (file.rows === null) || document !== /\.(?:md|json)$/.test(file.path)) problems.push(`${name}: ${file.path} is a document exactly when it has no row count`);
+    if (file.path.startsWith("04_DOCUMENTATION/data-view/")) {
+      const of = `01_IMPORT/${file.path.slice("04_DOCUMENTATION/data-view/".length)}`;
+      if (rowsOf(files, of) !== file.rows) problems.push(`${name}: ${file.path} is a view of ${of} and holds its rows`);
+    }
+  }
+  const unreadable = total(project.outputs.map((one) => one.unreadableRows));
+  if ((engine.reportVariant !== null) !== unreadable > 0) problems.push(`${name}: the report comes from a variant exactly when a row is not readable (the platform reader refuses those packages)`);
+  if (engine.reportVariant !== null && engine.reportVariant.sourceRows !== (project.units ?? 0) - unreadable) problems.push(`${name}: the report variant reads ${engine.reportVariant.sourceRows} rows, the units less the lines not readable are ${(project.units ?? 0) - unreadable}`);
+  return problems;
+}
+
+/** Units are the rows of the sealed, selected files; delivered rows are source rows less unified, held-back and unreadable rows; unified rows come from the groups. */
 export function checkCounts(world: World): readonly string[] {
   const problems: Problems = [];
   for (const project of world.projects) {
@@ -212,13 +282,22 @@ export function checkCounts(world: World): readonly string[] {
       const rows = sourceRows(project, output.object);
       if (output.sourceRows !== rows) problems.push(`${name}: ${output.name} names ${output.sourceRows} source rows, the sources hold ${rows}`);
       if (output.unifiedRows !== unifiedOf(project, output.object)) problems.push(`${name}: ${output.name} unified rows differ from the plan`);
-      if (output.rows !== output.sourceRows - output.unifiedRows) problems.push(`${name}: ${output.name} rows ${output.rows} are not source ${output.sourceRows} less unified ${output.unifiedRows}`);
+      if (![output.heldBackRows, output.unreadableRows, output.rows].every((value) => Number.isSafeInteger(value) && value >= 0)) problems.push(`${name}: ${output.name} counts are whole, non-negative numbers`);
+      // Migration Core 3.0.0's reconciliation, per object: source = delivered + unified + held back + not readable (no leftover in the canon)
+      if (output.sourceRows !== output.rows + output.unifiedRows + output.heldBackRows + output.unreadableRows) problems.push(`${name}: ${output.name} rows ${output.rows} are not source ${output.sourceRows} less unified ${output.unifiedRows}, held back ${output.heldBackRows} and not readable ${output.unreadableRows}`);
     }
+    problems.push(...checkPackage(project, name));
     if (project.mapping !== null && project.mapping.mapped > project.mapping.columns) problems.push(`${name}: more columns mapped than exist`);
     if (project.service === "CLEAN" && project.importStages.length > 0) problems.push(`${name}: Clean your data has no import`);
+    const importFiles = [...project.outputs.map((one) => ({ path: one.path, object: one.object as string, rows: one.rows })), ...project.associations.map((one) => ({ path: one.path, object: one.kind as string, rows: one.rows }))];
+    if (project.importStages.length > 0) {
+      for (const file of importFiles) if (project.importStages.filter((one) => one.path === file.path).length !== 1) problems.push(`${name}: import file ${file.path} is loaded by exactly one import stage`);
+      const orders = project.importStages.map((one) => one.order).sort((a, b) => a - b);
+      if (orders.some((order, index) => order !== index + 1)) problems.push(`${name}: import stages are numbered 1 to ${orders.length}`);
+    }
     for (const stage of project.importStages) {
-      const output = project.outputs.find((one) => one.object === stage.object);
-      if (output === undefined || output.rows !== stage.rows) problems.push(`${name}: import stage ${stage.order} rows are not the delivered ${stage.object} rows`);
+      const file = importFiles.find((one) => one.path === stage.path);
+      if (file === undefined || file.object !== stage.object || file.rows !== stage.rows) problems.push(`${name}: import stage ${stage.order} rows are not the delivered rows of ${stage.path} (${stage.object})`);
       if (stage.state === "WAITING") {
         if (stage.succeeded !== null || stage.failed !== null || stage.returnedAt !== null) problems.push(`${name}: a waiting import stage has no result`);
         continue;
@@ -324,7 +403,7 @@ export function checkProjects(world: World): readonly string[] {
     if (!reached(project, "PROCESSING") || project.example) want(payment === undefined, "no payment");
     if (!reached(project, "PROCESSING")) want(d.preparationStartedAt === null, "no preparation before payment");
     if (reached(project, "DELIVERY")) want(d.packageReadyAt !== null && project.outputs.length > 0, "a package with its files");
-    if (!reached(project, "DELIVERY")) want(d.packageReadyAt === null && project.outputs.length === 0, "no package before delivery");
+    if (!reached(project, "DELIVERY")) want(d.packageReadyAt === null && project.outputs.length === 0 && project.associations.length === 0 && project.engine === null, "no package before delivery");
     if (reached(project, "IMPORT") && project.step !== "RETENTION") want(project.service !== "CLEAN" && project.importStages.length > 0, "a CRM service with import stages");
     if (project.step === "RECEIPT") want(d.importTerminalAt !== null, "the import reported finished");
     if (project.step === "RETENTION") want(d.deletedAt !== null && d.completedAt !== null, "completed, then deleted");

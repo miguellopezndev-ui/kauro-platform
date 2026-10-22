@@ -114,17 +114,74 @@ export interface Relationships {
   readonly unlinked: number;
 }
 
+/** A package import file, as Migration Core 3.0.0 names it, and how its rows reconcile with the source rows of its object. */
 export interface OutputFile {
+  /** The file's path in the package: 01_IMPORT/<hubspot|salesforce|clean-only>/<the adapter's fixed name> (engine.ts). */
+  readonly path: string;
+  /** The path's last part ("contacts.csv", "Account.csv"). */
   readonly name: string;
   readonly object: ObjectKind;
   readonly sourceRows: number;
+  /** Rows absorbed into another row by a proven merge (MERGED_PROVEN). */
   readonly unifiedRows: number;
+  /** Rows set aside and not delivered (ISOLATED: a required field missing, a value the plan refuses, a merge whose rows disagree). */
+  readonly heldBackRows: number;
+  /** Rows the reader could not read (REJECTED_INPUT, e.g. a line with one column too many). */
+  readonly unreadableRows: number;
+  /** Delivered rows: source less unified, held back and not readable. */
   readonly rows: number;
+}
+
+/** The relationship kinds Migration Core 3.0.0 can write as an import file (Salesforce refuses CONTACT_TO_DEAL). */
+export type AssociationKind = "CONTACT_TO_COMPANY" | "COMPANY_TO_DEAL";
+
+/** A package's relationship import file and how its edges reconcile: source edges = delivered + deduplicated + unresolved. */
+export interface AssociationFile {
+  /** 01_IMPORT/<hubspot|salesforce>/associations/<kind in lower case>.csv */
+  readonly path: string;
+  readonly name: string;
+  readonly kind: AssociationKind;
+  readonly child: ObjectKind;
+  readonly parent: ObjectKind;
+  /** Relationships the source rows state. */
+  readonly sourceEdges: number;
+  /** Relationships delivered: the import file's rows. */
+  readonly rows: number;
+  /** Relationships that became the same edge after a merge. */
+  readonly deduplicated: number;
+  /** Relationships whose other end is missing or not delivered. */
+  readonly unresolved: number;
+}
+
+/** A file of a Migration Core package other than manifest.json, with its data rows (null for a document). */
+export interface PackageFile {
+  readonly path: string;
+  readonly kind: "MACHINE_IMPORT_CSV" | "MACHINE_EXCEPTION_CSV" | "MACHINE_EVIDENCE_CSV" | "HUMAN_VIEW_CSV" | "DOCUMENT";
+  readonly rows: number | null;
+}
+
+/** What Migration Core produced when it actually ran on this project's synthetic input (CANON-PACKAGES.md); the package is the truth. */
+export interface EngineRun {
+  readonly coreVersion: "3.0.0";
+  readonly runId: string;
+  readonly manifestSha256: string;
+  /** The checks `verify` passed on the package. */
+  readonly checksPassed: number;
+  /** Every artifact of the package, in the core's order: import files, exceptions, traceability, documentation. */
+  readonly files: readonly PackageFile[];
+  /**
+   * The run whose report PDF the platform rendered, when it is not this one: the platform's reader refuses a package holding a row not
+   * readable (functional gap F-31), so the report was rendered from the same input without those lines. Null when this run's own report
+   * rendered.
+   */
+  readonly reportVariant: { readonly runId: string; readonly sourceRows: number } | null;
 }
 
 export interface ImportStage {
   readonly order: number;
-  readonly object: ObjectKind;
+  /** The import file the stage loads: an output's or an association file's path. */
+  readonly path: string;
+  readonly object: ObjectKind | AssociationKind;
   readonly rows: number;
   readonly state: "WAITING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
   /** Rows the destination accepted and refused, once the team returns its result; null while waiting. */
@@ -177,7 +234,11 @@ export interface Project {
   readonly duplicates: readonly DuplicateResult[];
   readonly relationships: Relationships | null;
   readonly outputs: readonly OutputFile[];
+  /** The package's relationship import files; empty where the plan declares no relationship. */
+  readonly associations: readonly AssociationFile[];
   readonly importStages: readonly ImportStage[];
+  /** Migration Core's own run of this project, for the projects that were run (public sample, …7221, …7212); null for the others. */
+  readonly engine: EngineRun | null;
   readonly dates: ProjectDates;
   readonly matters: Matters | null;
 }

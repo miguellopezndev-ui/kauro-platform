@@ -4,7 +4,8 @@ Master plan §2.1, deliverables plan §1.3. One world that every screen and ever
 money and dates on the owner console, the workspace, the seller portal, the public sample and the PDF.
 
 - **Module:** `tools/review/private/lib/canon/` (typed, deeply frozen, no clock, no randomness). Entry point `index.ts` (`CANON`,
-  `STRESS_WORLDS`, `projectView`, `sellerFigures`, `kauroFigures`, `computeAlerts`); checks in `reconcile.ts`.
+  `STRESS_WORLDS`, `projectView`, `sellerFigures`, `kauroFigures`, `computeAlerts`); checks in `reconcile.ts`; Migration Core 3.0.0's
+  file names and the figures of the three projects it ran in `engine.ts`.
 - **JSON export:** `world.json`, written by `node tools/review/private/lib/canon/export.mjs` (`--check` fails when stale). Node 24 runs
   the `.ts` files with its built-in type stripping, so there is no build step.
 - **Test:** `node --test tools/test/canon.test.mjs`. **Typecheck:** `npx tsc --noEmit -p tools/review/private/tsconfig.json`.
@@ -80,7 +81,15 @@ money and dates on the owner console, the workspace, the seller portal, the publ
 2. **Counts.**
    - Units are the rows of the sealed, selected files.
    - Unified rows are the approved pairs plus two for each approved triple.
-   - Delivered rows are source rows less unified rows.
+   - Per object, source rows = delivered + unified + held back + not readable (Migration Core's own equation, with no leftover rows in
+     the canon).
+   - Package files carry the core's own names: every path matches `PACKAGE_PATH` (`engine.ts`) under the project's service folder, each
+     selected source object has exactly one import file, and an object 3.0.0 cannot write (contact roles) has none.
+   - Relationship files add up: source edges = delivered + deduplicated + unresolved, and both ends are delivered objects.
+   - Each import file is loaded by exactly one import stage (when a project has stages), with the file's delivered rows.
+   - For a project the engine ran, its file list agrees with its outputs: `isolated.csv` = held back, `rejected-input.csv` = not
+     readable, `unresolved-associations.csv` = unresolved, `import-crosswalk.csv` = delivered, `source-lineage.csv` = units, and each
+     data-view copy holds its import file's rows. The report comes from a variant exactly when a row is not readable.
    - Linked plus unlinked rows equal the child rows after unification.
    - Import results add up: accepted plus refused rows equal the rows sent.
 3. **Steps and dates.**
@@ -119,7 +128,78 @@ money and dates on the owner console, the workspace, the seller portal, the publ
      matches the project's deletion date.
    - Defect reports are made within 30 days of completion.
 
-The test also breaks the world on purpose, in 15 different ways, and requires the reconciliation to name each break.
+The test also breaks the world on purpose, in 22 different ways, and requires the reconciliation to name each break.
+
+## Aligned with Migration Core 3.0.0 (2026-10-22)
+
+Migration Core 3.0.0 ran on synthetic input built from this world
+(`Kauro.archive/Deliveries/Visual/order11/research/round3-docs-canon/CANON-PACKAGES.md`). **The engine is the truth for every package
+figure**, so the canon now states what the packages hold. Money did not change: every quote, payment, commission and alert is as before.
+
+- **New fields, because the canon could not say what the engine does** (`types.ts`).
+  - Each import file (`OutputFile`) now has `path` (the core's path) and `name` (its last part), `heldBackRows` (ISOLATED) and
+    `unreadableRows` (REJECTED_INPUT). The rule "delivered = source − unified" became **source = delivered + unified + held back + not
+    readable, per object**, the core's own reconciliation (D3, D4: a merge whose rows disagree is held back, and its absorbed rows still
+    count as unified).
+  - `Project.associations`: the relationship import files (`01_IMPORT/<service>/associations/contact_to_company.csv`) with source
+    edges, delivered, deduplicated and unresolved (D2).
+  - `Project.engine`: for the three projects the engine ran, its run id, manifest hash, checks passed, every package file with its kind
+    and rows (exceptions and traceability included), and, where the platform's reader refused the package, the variant run its report was
+    rendered from. Null for every other project.
+  - `ImportStage.path`: the file a stage loads, so a relationship file can be a stage of its own.
+- **Public sample, "Example project" (…7e01).** Its figures matched and are unchanged: they still come from
+  `apps/web/src/public/sample-data.ts`, which was not touched.
+  - Output names changed from `contacts-clean.csv` / `companies-clean.csv` to `01_IMPORT/hubspot/contacts.csv` and
+    `01_IMPORT/hubspot/companies.csv` (D1). `sample-data.ts` still says `contacts-clean.csv`; renaming it there is a public-site change
+    outside this work.
+  - Added the relationship file the package carries: 11,343 source edges = 11,129 delivered + 214 deduplicated + 0 unresolved.
+  - Added the run: `run_3b9567f72e0bba6cb9ef7b89`, 24 files, 65 checks; its own report rendered.
+- **"Accounts and contacts" (…7221, Salesforce).** The run included rows held back and rows not readable, so delivered fell.
+  - Accounts 9,980 = 9,761 delivered + 212 unified + 4 held back (no Account Name) + 3 not readable (was 9,768 delivered).
+  - Contacts 61,400 = 59,654 + 1,734 + 7 held back (6 without a Last Name, 1 merge whose rows disagree on Title) + 5 not readable (was
+    59,666).
+  - Files `accounts-salesforce.csv` / `contacts-salesforce.csv` became `01_IMPORT/salesforce/Account.csv` / `Contact.csv`, the Data
+    Loader names the adapter fixes.
+  - Relationships: 57,675 = 56,009 delivered + 1,613 deduplicated + 53 unresolved, in
+    `01_IMPORT/salesforce/associations/contact_to_company.csv`.
+  - Import stages went from two to three: Account.csv 9,761, Contact.csv 59,654, then the relationship file 56,009 (the package's import
+    guide; the relationship file fills the Contact's account lookup). All returned in full, as before.
+  - Run `run_d5ec68c7e07cb8f7c90fb377`, 25 files, 65 checks. Its report was rendered from `run_325c19a659493c1e8468f588`, the same input
+    without the 8 unreadable lines (71,372 rows), because the platform's reader refuses a package with a row not readable (F-31).
+  - The refund story ("1,240 contacts were linked to the wrong account") is kept: a later platform defect a package cannot show.
+- **"Dealer list" (…7212, Clean your data).**
+  - 3,980 = 3,917 delivered + 57 unified + 4 held back (3 employee counts that are not a number, 1 merge whose rows disagree on Phone) +
+    2 not readable (was 3,923 delivered).
+  - `dealers-clean.csv` became `01_IMPORT/clean-only/companies.csv`: the clean-only adapter names files by object. No relationship file.
+  - Run `run_b04e17cbf39f3809cebee937`, 22 files, 60 checks; report from `run_25f889238c3b90ec5ddd5973` (3,978 rows), as for …7221.
+  - The refund story ("412 dealer names lost their accents") is kept, for the same reason.
+- **The other projects with a package** (never run): only the names changed, the counts already satisfied the new rule with 0 held
+  back and 0 not readable.
+  - "Q4 contacts" (…7222), Tidewell "Contacts" (…7207), Fjordline "Contacts" (…7251): `contacts-hubspot.csv` /
+    `companies-hubspot.csv` became `01_IMPORT/hubspot/contacts.csv` / `companies.csv`.
+  - "Opportunities" (…7205): `opportunities-salesforce.csv` became `01_IMPORT/salesforce/Opportunity.csv`.
+  - They have no relationship file: the canon never says their contacts name a company, and the core writes a relationship file only
+    for a relationship the plan declares. Adding one would invent figures. If the owner wants D2 applied to them, they need a run (or
+    owner-given counts).
+- **"Opportunities" (…7205): the contact-roles file and its import stage are removed** (D7).
+  - 3.0.0 has no contact-role object, and Salesforce mode refuses `CONTACT_TO_DEAL` because OpportunityContactRole is outside the
+    envelope (contract §0 and §9). A contact-roles sheet would end as LEFTOVER rows, never as an import file, so
+    `contact-roles-salesforce.csv` (2,310 rows) and stage 2 `CONTACT_ROLES` could not exist.
+  - The `contact-roles.csv` export stays in the project's files, **not selected**: the team left it out because the service cannot load
+    it. Units are therefore 1,840 (was 4,150) and quote Q-2026-0119 states 1,840 units. Both are in the first band, so the price,
+    discount, payment and seller figures are unchanged.
+  - With one import file, the project stays at the IMPORT step with that single stage **waiting** for the team's result (it was "stage 1
+    returned, stage 2 waiting"). Its staged-package date, the open incident and the queued import read-back are unchanged.
+- **Stress `partialRun`:** its file is `01_IMPORT/hubspot/contacts.csv`, with 0 held back and 0 not readable.
+- **Reconciliation and test.** `reconcile.ts` checks the new rule and the package naming (see rule 2 above). `canon.test.mjs` checks
+  every package path in the canon and the stress worlds against `PACKAGE_PATH`, the three run projects' figures as literals, and, when
+  the archive is on this machine, each run project against its `summary.json` (run id, manifest hash, verify line, every disposition,
+  delivered rows per object, unreadable lines per source file, unified rows per object from the merge sizes, relationship dispositions,
+  every file's path, kind and rows, and the report variant). Without the archive (CI) that one test skips; the figures live in
+  `engine.ts` and `projects.ts`.
+- **Still not modelled from the packages:** "pairs", "triples" and "contacts in groups" stay canon figures (the engine splits them into
+  proven merges and candidates, D5); the sample's "3 target settings" has no package counterpart (D6); the reports' counts are UNBOUND
+  (D8). These are document questions, not world figures.
 
 ## How screens and documents read it
 

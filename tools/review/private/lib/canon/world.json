@@ -548,7 +548,9 @@
         "duplicates": [],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "UPLOAD",
           "at": "2026-10-23T13:05:00Z"
@@ -605,7 +607,9 @@
         "duplicates": [],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "UPLOAD",
           "at": "2026-10-23T09:00:00Z"
@@ -650,7 +654,9 @@
         "duplicates": [],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "UPLOAD",
           "at": "2026-10-23T10:00:00Z"
@@ -707,7 +713,9 @@
         "duplicates": [],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-11-04T16:00:00Z"
@@ -756,7 +764,9 @@
         "duplicates": [],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "RESULTS",
           "at": "2026-10-23T13:30:00Z"
@@ -820,7 +830,9 @@
         "duplicates": [],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-10-27T16:10:00Z"
@@ -891,7 +903,9 @@
         ],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-10-27T16:40:00Z"
@@ -979,7 +993,9 @@
           "unlinked": 818
         },
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-10-26T15:20:00Z"
@@ -1067,7 +1083,9 @@
           "unlinked": 465
         },
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-10-26T15:10:00Z"
@@ -1132,7 +1150,9 @@
         ],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-10-24T12:00:00Z"
@@ -1208,7 +1228,9 @@
         ],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "FILES",
           "at": "2026-10-27T10:58:00Z"
@@ -1284,7 +1306,9 @@
         ],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "HOLD",
           "at": "2026-10-27T15:00:00Z"
@@ -1349,7 +1373,9 @@
         ],
         "relationships": null,
         "outputs": [],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": null,
         "id": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7241",
         "workspaceId": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fd1",
@@ -1423,21 +1449,29 @@
         "relationships": null,
         "outputs": [
           {
-            "name": "contacts-hubspot.csv",
+            "path": "01_IMPORT/hubspot/contacts.csv",
+            "name": "contacts.csv",
             "object": "CONTACTS",
             "sourceRows": 22640,
             "unifiedRows": 611,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 22029
           },
           {
-            "name": "companies-hubspot.csv",
+            "path": "01_IMPORT/hubspot/companies.csv",
+            "name": "companies.csv",
             "object": "COMPANIES",
             "sourceRows": 4075,
             "unifiedRows": 96,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 3979
           }
         ],
+        "associations": [],
         "importStages": [],
+        "engine": null,
         "matters": {
           "ends": "PACKAGE",
           "at": "2026-10-28T15:00:00Z"
@@ -1479,10 +1513,10 @@
             "name": "contact-roles.csv",
             "object": "CONTACT_ROLES",
             "rows": 2310,
-            "selected": true
+            "selected": false
           }
         ],
-        "units": 4150,
+        "units": 1840,
         "check": {
           "state": "READY",
           "deadline": "2026-10-15T10:35:00Z",
@@ -1497,50 +1531,35 @@
             "object": "OPPORTUNITIES",
             "groups": null,
             "unifiedRows": 0
-          },
-          {
-            "object": "CONTACT_ROLES",
-            "groups": null,
-            "unifiedRows": 0
           }
         ],
         "relationships": null,
         "outputs": [
           {
-            "name": "opportunities-salesforce.csv",
+            "path": "01_IMPORT/salesforce/Opportunity.csv",
+            "name": "Opportunity.csv",
             "object": "OPPORTUNITIES",
             "sourceRows": 1840,
             "unifiedRows": 0,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 1840
-          },
-          {
-            "name": "contact-roles-salesforce.csv",
-            "object": "CONTACT_ROLES",
-            "sourceRows": 2310,
-            "unifiedRows": 0,
-            "rows": 2310
           }
         ],
+        "associations": [],
         "importStages": [
           {
             "order": 1,
+            "path": "01_IMPORT/salesforce/Opportunity.csv",
             "object": "OPPORTUNITIES",
             "rows": 1840,
-            "state": "SUCCEEDED",
-            "succeeded": 1840,
-            "failed": 0,
-            "returnedAt": "2026-10-19T16:00:00Z"
-          },
-          {
-            "order": 2,
-            "object": "CONTACT_ROLES",
-            "rows": 2310,
             "state": "WAITING",
             "succeeded": null,
             "failed": null,
             "returnedAt": null
           }
         ],
+        "engine": null,
         "matters": {
           "ends": "STAGED_PACKAGE",
           "at": "2026-11-06T20:00:00Z"
@@ -1617,23 +1636,31 @@
         "relationships": null,
         "outputs": [
           {
-            "name": "contacts-hubspot.csv",
+            "path": "01_IMPORT/hubspot/contacts.csv",
+            "name": "contacts.csv",
             "object": "CONTACTS",
             "sourceRows": 10350,
             "unifiedRows": 188,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 10162
           },
           {
-            "name": "companies-hubspot.csv",
+            "path": "01_IMPORT/hubspot/companies.csv",
+            "name": "companies.csv",
             "object": "COMPANIES",
             "sourceRows": 1602,
             "unifiedRows": 41,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 1561
           }
         ],
+        "associations": [],
         "importStages": [
           {
             "order": 1,
+            "path": "01_IMPORT/hubspot/companies.csv",
             "object": "COMPANIES",
             "rows": 1561,
             "state": "WAITING",
@@ -1643,6 +1670,7 @@
           },
           {
             "order": 2,
+            "path": "01_IMPORT/hubspot/contacts.csv",
             "object": "CONTACTS",
             "rows": 10162,
             "state": "WAITING",
@@ -1651,6 +1679,7 @@
             "returnedAt": null
           }
         ],
+        "engine": null,
         "matters": {
           "ends": "RECEIPT",
           "at": "2026-10-23T21:00:00Z"
@@ -1717,40 +1746,208 @@
         "relationships": null,
         "outputs": [
           {
-            "name": "accounts-salesforce.csv",
+            "path": "01_IMPORT/salesforce/Account.csv",
+            "name": "Account.csv",
             "object": "ACCOUNTS",
             "sourceRows": 9980,
             "unifiedRows": 212,
-            "rows": 9768
+            "heldBackRows": 4,
+            "unreadableRows": 3,
+            "rows": 9761
           },
           {
-            "name": "contacts-salesforce.csv",
+            "path": "01_IMPORT/salesforce/Contact.csv",
+            "name": "Contact.csv",
             "object": "CONTACTS",
             "sourceRows": 61400,
             "unifiedRows": 1734,
-            "rows": 59666
+            "heldBackRows": 7,
+            "unreadableRows": 5,
+            "rows": 59654
+          }
+        ],
+        "associations": [
+          {
+            "path": "01_IMPORT/salesforce/associations/contact_to_company.csv",
+            "name": "contact_to_company.csv",
+            "kind": "CONTACT_TO_COMPANY",
+            "child": "CONTACTS",
+            "parent": "ACCOUNTS",
+            "sourceEdges": 57675,
+            "rows": 56009,
+            "deduplicated": 1613,
+            "unresolved": 53
           }
         ],
         "importStages": [
           {
             "order": 1,
+            "path": "01_IMPORT/salesforce/Account.csv",
             "object": "ACCOUNTS",
-            "rows": 9768,
+            "rows": 9761,
             "state": "SUCCEEDED",
-            "succeeded": 9768,
+            "succeeded": 9761,
             "failed": 0,
             "returnedAt": "2026-08-28T10:00:00Z"
           },
           {
             "order": 2,
+            "path": "01_IMPORT/salesforce/Contact.csv",
             "object": "CONTACTS",
-            "rows": 59666,
+            "rows": 59654,
             "state": "SUCCEEDED",
-            "succeeded": 59666,
+            "succeeded": 59654,
+            "failed": 0,
+            "returnedAt": "2026-08-28T18:00:00Z"
+          },
+          {
+            "order": 3,
+            "path": "01_IMPORT/salesforce/associations/contact_to_company.csv",
+            "object": "CONTACT_TO_COMPANY",
+            "rows": 56009,
+            "state": "SUCCEEDED",
+            "succeeded": 56009,
             "failed": 0,
             "returnedAt": "2026-08-28T18:00:00Z"
           }
         ],
+        "engine": {
+          "coreVersion": "3.0.0",
+          "runId": "run_d5ec68c7e07cb8f7c90fb377",
+          "manifestSha256": "581d2ea5c8e0f1d31d08faee7c844cb4d06b1adad3901af8d21cd94fd6c2f0d2",
+          "checksPassed": 65,
+          "files": [
+            {
+              "path": "01_IMPORT/salesforce/Account.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 9761
+            },
+            {
+              "path": "01_IMPORT/salesforce/Contact.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 59654
+            },
+            {
+              "path": "01_IMPORT/salesforce/associations/contact_to_company.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 56009
+            },
+            {
+              "path": "02_EXCEPTIONS/destination-conflicts.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 10
+            },
+            {
+              "path": "02_EXCEPTIONS/formula-risk.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 60404
+            },
+            {
+              "path": "02_EXCEPTIONS/isolated.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 11
+            },
+            {
+              "path": "02_EXCEPTIONS/leftovers.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/rejected-input.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 8
+            },
+            {
+              "path": "02_EXCEPTIONS/unmapped-fields.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 42553
+            },
+            {
+              "path": "02_EXCEPTIONS/unresolved-associations.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 53
+            },
+            {
+              "path": "03_TRACEABILITY/associations.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 57675
+            },
+            {
+              "path": "03_TRACEABILITY/changes.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 61707
+            },
+            {
+              "path": "03_TRACEABILITY/config.normalized.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/destination-matching.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/flags.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/import-crosswalk.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 69415
+            },
+            {
+              "path": "03_TRACEABILITY/instance-verification.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 7
+            },
+            {
+              "path": "03_TRACEABILITY/merges.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/reconciliation.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/source-lineage.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 71380
+            },
+            {
+              "path": "04_DOCUMENTATION/audit.md",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "04_DOCUMENTATION/data-view/salesforce/Account.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 9761
+            },
+            {
+              "path": "04_DOCUMENTATION/data-view/salesforce/Contact.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 59654
+            },
+            {
+              "path": "04_DOCUMENTATION/import-instructions.md",
+              "kind": "DOCUMENT",
+              "rows": null
+            }
+          ],
+          "reportVariant": {
+            "runId": "run_325c19a659493c1e8468f588",
+            "sourceRows": 71372
+          }
+        },
         "matters": null,
         "id": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7221",
         "workspaceId": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc1",
@@ -1814,23 +2011,31 @@
         "relationships": null,
         "outputs": [
           {
-            "name": "contacts-hubspot.csv",
+            "path": "01_IMPORT/hubspot/contacts.csv",
+            "name": "contacts.csv",
             "object": "CONTACTS",
             "sourceRows": 28700,
             "unifiedRows": 720,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 27980
           },
           {
-            "name": "companies-hubspot.csv",
+            "path": "01_IMPORT/hubspot/companies.csv",
+            "name": "companies.csv",
             "object": "COMPANIES",
             "sourceRows": 6010,
             "unifiedRows": 133,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 5877
           }
         ],
+        "associations": [],
         "importStages": [
           {
             "order": 1,
+            "path": "01_IMPORT/hubspot/companies.csv",
             "object": "COMPANIES",
             "rows": 5877,
             "state": "SUCCEEDED",
@@ -1840,6 +2045,7 @@
           },
           {
             "order": 2,
+            "path": "01_IMPORT/hubspot/contacts.csv",
             "object": "CONTACTS",
             "rows": 27980,
             "state": "PARTIAL",
@@ -1848,6 +2054,7 @@
             "returnedAt": "2026-09-10T09:00:00Z"
           }
         ],
+        "engine": null,
         "matters": null,
         "id": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7251",
         "workspaceId": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fc5",
@@ -1900,14 +2107,140 @@
         "relationships": null,
         "outputs": [
           {
-            "name": "dealers-clean.csv",
+            "path": "01_IMPORT/clean-only/companies.csv",
+            "name": "companies.csv",
             "object": "COMPANIES",
             "sourceRows": 3980,
             "unifiedRows": 57,
-            "rows": 3923
+            "heldBackRows": 4,
+            "unreadableRows": 2,
+            "rows": 3917
           }
         ],
+        "associations": [],
         "importStages": [],
+        "engine": {
+          "coreVersion": "3.0.0",
+          "runId": "run_b04e17cbf39f3809cebee937",
+          "manifestSha256": "a5bc2e830a1b0071d897928a9222ed8175d908533cb3e75761a19cca50efb81a",
+          "checksPassed": 60,
+          "files": [
+            {
+              "path": "01_IMPORT/clean-only/companies.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 3917
+            },
+            {
+              "path": "02_EXCEPTIONS/destination-conflicts.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 4
+            },
+            {
+              "path": "02_EXCEPTIONS/formula-risk.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 3917
+            },
+            {
+              "path": "02_EXCEPTIONS/isolated.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 4
+            },
+            {
+              "path": "02_EXCEPTIONS/leftovers.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/rejected-input.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 2
+            },
+            {
+              "path": "02_EXCEPTIONS/unmapped-fields.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 2649
+            },
+            {
+              "path": "02_EXCEPTIONS/unresolved-associations.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/associations.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/changes.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 4091
+            },
+            {
+              "path": "03_TRACEABILITY/config.normalized.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/destination-matching.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/flags.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 3
+            },
+            {
+              "path": "03_TRACEABILITY/import-crosswalk.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 3917
+            },
+            {
+              "path": "03_TRACEABILITY/instance-verification.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/merges.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/reconciliation.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/source-lineage.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 3980
+            },
+            {
+              "path": "04_DOCUMENTATION/audit.md",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "04_DOCUMENTATION/data-view/clean-only/companies.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 3917
+            },
+            {
+              "path": "04_DOCUMENTATION/import-instructions.md",
+              "kind": "DOCUMENT",
+              "rows": null
+            }
+          ],
+          "reportVariant": {
+            "runId": "run_25f889238c3b90ec5ddd5973",
+            "sourceRows": 3978
+          }
+        },
         "matters": null,
         "id": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7212",
         "workspaceId": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb9",
@@ -1978,21 +2311,169 @@
         "relationships": null,
         "outputs": [
           {
-            "name": "contacts-clean.csv",
+            "path": "01_IMPORT/hubspot/contacts.csv",
+            "name": "contacts.csv",
             "object": "CONTACTS",
             "sourceRows": 12480,
             "unifiedRows": 214,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 12266
           },
           {
-            "name": "companies-clean.csv",
+            "path": "01_IMPORT/hubspot/companies.csv",
+            "name": "companies.csv",
             "object": "COMPANIES",
             "sourceRows": 3204,
             "unifiedRows": 253,
+            "heldBackRows": 0,
+            "unreadableRows": 0,
             "rows": 2951
           }
         ],
+        "associations": [
+          {
+            "path": "01_IMPORT/hubspot/associations/contact_to_company.csv",
+            "name": "contact_to_company.csv",
+            "kind": "CONTACT_TO_COMPANY",
+            "child": "CONTACTS",
+            "parent": "COMPANIES",
+            "sourceEdges": 11343,
+            "rows": 11129,
+            "deduplicated": 214,
+            "unresolved": 0
+          }
+        ],
         "importStages": [],
+        "engine": {
+          "coreVersion": "3.0.0",
+          "runId": "run_3b9567f72e0bba6cb9ef7b89",
+          "manifestSha256": "150eda026057a7ea19ab671a0d0d4d9cf27373d177add49e61b611217ab055c0",
+          "checksPassed": 65,
+          "files": [
+            {
+              "path": "01_IMPORT/hubspot/associations/contact_to_company.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 11129
+            },
+            {
+              "path": "01_IMPORT/hubspot/companies.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 2951
+            },
+            {
+              "path": "01_IMPORT/hubspot/contacts.csv",
+              "kind": "MACHINE_IMPORT_CSV",
+              "rows": 12266
+            },
+            {
+              "path": "02_EXCEPTIONS/destination-conflicts.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 14
+            },
+            {
+              "path": "02_EXCEPTIONS/formula-risk.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 11288
+            },
+            {
+              "path": "02_EXCEPTIONS/isolated.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/leftovers.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/rejected-input.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/unmapped-fields.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "02_EXCEPTIONS/unresolved-associations.csv",
+              "kind": "MACHINE_EXCEPTION_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/associations.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 11343
+            },
+            {
+              "path": "03_TRACEABILITY/changes.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 11688
+            },
+            {
+              "path": "03_TRACEABILITY/config.normalized.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/destination-matching.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 0
+            },
+            {
+              "path": "03_TRACEABILITY/flags.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 191
+            },
+            {
+              "path": "03_TRACEABILITY/import-crosswalk.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 15217
+            },
+            {
+              "path": "03_TRACEABILITY/instance-verification.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 10
+            },
+            {
+              "path": "03_TRACEABILITY/merges.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/reconciliation.json",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "03_TRACEABILITY/source-lineage.csv",
+              "kind": "MACHINE_EVIDENCE_CSV",
+              "rows": 15684
+            },
+            {
+              "path": "04_DOCUMENTATION/audit.md",
+              "kind": "DOCUMENT",
+              "rows": null
+            },
+            {
+              "path": "04_DOCUMENTATION/data-view/hubspot/contacts.csv",
+              "kind": "HUMAN_VIEW_CSV",
+              "rows": 12266
+            },
+            {
+              "path": "04_DOCUMENTATION/import-instructions.md",
+              "kind": "DOCUMENT",
+              "rows": null
+            }
+          ],
+          "reportVariant": null
+        },
         "matters": null,
         "id": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7e01",
         "workspaceId": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fe0",
@@ -2129,7 +2610,7 @@
         "number": "Q-2026-0119",
         "projectId": "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e7205",
         "service": "SALESFORCE",
-        "units": 4150,
+        "units": 1840,
         "band": 0,
         "listMinor": 149500,
         "priorPaidProjects": 1,
@@ -3662,7 +4143,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T08:30:00Z",
               "sealedAt": null,
@@ -3910,7 +4393,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T01:00:00Z",
               "sealedAt": null,
@@ -3955,7 +4440,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T02:00:00Z",
               "sealedAt": null,
@@ -4000,7 +4487,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T03:00:00Z",
               "sealedAt": null,
@@ -4045,7 +4534,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T04:00:00Z",
               "sealedAt": null,
@@ -4090,7 +4581,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T05:00:00Z",
               "sealedAt": null,
@@ -4240,7 +4733,9 @@
             ],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-22T06:00:00Z",
               "sealedAt": "2026-10-22T06:10:00Z",
@@ -4314,7 +4809,9 @@
           "duplicates": [],
           "relationships": null,
           "outputs": [],
+          "associations": [],
           "importStages": [],
+          "engine": null,
           "dates": {
             "uploadStartedAt": "2026-10-22T13:55:00Z",
             "sealedAt": null,
@@ -4366,7 +4863,9 @@
           "duplicates": [],
           "relationships": null,
           "outputs": [],
+          "associations": [],
           "importStages": [],
+          "engine": null,
           "dates": {
             "uploadStartedAt": "2026-10-21T20:20:00Z",
             "sealedAt": "2026-10-21T20:30:00Z",
@@ -4474,7 +4973,9 @@
             "duplicates": [],
             "relationships": null,
             "outputs": [],
+            "associations": [],
             "importStages": [],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-21T09:00:00Z",
               "sealedAt": "2026-10-21T09:20:00Z",
@@ -4635,16 +5136,21 @@
             "relationships": null,
             "outputs": [
               {
-                "name": "contacts-hubspot.csv",
+                "path": "01_IMPORT/hubspot/contacts.csv",
+                "name": "contacts.csv",
                 "object": "CONTACTS",
                 "sourceRows": 10000,
                 "unifiedRows": 0,
+                "heldBackRows": 0,
+                "unreadableRows": 0,
                 "rows": 10000
               }
             ],
+            "associations": [],
             "importStages": [
               {
                 "order": 1,
+                "path": "01_IMPORT/hubspot/contacts.csv",
                 "object": "CONTACTS",
                 "rows": 10000,
                 "state": "PARTIAL",
@@ -4653,6 +5159,7 @@
                 "returnedAt": "2026-10-21T12:00:00Z"
               }
             ],
+            "engine": null,
             "dates": {
               "uploadStartedAt": "2026-10-12T14:00:00Z",
               "sealedAt": "2026-10-12T14:30:00Z",

@@ -1,11 +1,14 @@
 // The canonical world's projects: twenty, so that each of the sixteen steps of the project path is the current step of at least one
 // project, across the three services, and so that the sellers' paid, held and offset commission lines rest on real, finished projects.
-// Every count is a literal; reconcile.ts re-derives each one (units from the sealed files, delivered rows from source rows less unified
-// rows, unified rows from the approved groups, every date that matters from the policy), so a typo fails the check instead of reaching a
-// screen. The public sample project is built from apps/web/src/public/sample-data.ts itself, never retyped.
+// Every count is a literal; reconcile.ts re-derives each one (units from the sealed files, delivered rows from source rows less unified,
+// held-back and unreadable rows, unified rows from the approved groups, every date that matters from the policy), so a typo fails the
+// check instead of reaching a screen. The public sample project's counts come from apps/web/src/public/sample-data.ts itself, never
+// retyped. Package files carry Migration Core 3.0.0's own names (engine.ts), and the three projects the engine ran (the public sample,
+// "Accounts and contacts" …7221, "Dealer list" …7212) carry its figures exactly (aligned 2026-10-22, CANON-PACKAGES.md).
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_GROUPS, SAMPLE_SOURCES } from "../../../../../apps/web/src/public/sample-data.ts";
+import { associationPath, CORE_VERSION, fileName, importPath, RUN_CO_ACCOUNTS, RUN_EXAMPLE, RUN_HO_DEALERS } from "./engine.ts";
 import { CLIENT, uid, WS } from "./people.ts";
-import type { BoardStage, DuplicateResult, ImportStage, Matters, ObjectKind, OutputFile, Project, ProjectDates, Service, SourceFile, Step } from "./types.ts";
+import type { AssociationFile, AssociationKind, BoardStage, DuplicateResult, ImportStage, Matters, ObjectKind, OutputFile, Project, ProjectDates, Service, SourceFile, Step } from "./types.ts";
 
 /** Project ids. The main HubSpot project keeps the web fixtures' PROJECT id (apps/web/test/support/fixtures.ts) and lib/ids.ts IDS.project. */
 export const PRJ = {
@@ -75,8 +78,27 @@ const groups = (object: ObjectKind, pairs: number, triples: number, keptApartPai
   unifiedRows: decided ? pairs - keptApartPairs + 2 * (triples - keptApartTriples) : null,
 });
 const unifiedOnly = (object: ObjectKind, unifiedRows: number): DuplicateResult => ({ object, groups: null, unifiedRows });
-const out = (name: string, object: ObjectKind, sourceRows: number, unifiedRows: number, rows: number): OutputFile => ({ name, object, sourceRows, unifiedRows, rows });
-const stage = (order: number, object: ObjectKind, rows: number, state: ImportStage["state"], succeeded: number | null = null, failed: number | null = null, returnedAt: string | null = null): ImportStage => ({ order, object, rows, state, succeeded, failed, returnedAt });
+/** An import file under the core's own name; held-back and unreadable rows are 0 unless the engine's run says otherwise. */
+const out = (service: Service, object: ObjectKind, sourceRows: number, unifiedRows: number, rows: number, heldBackRows = 0, unreadableRows = 0): OutputFile => {
+  const path = importPath(service, object);
+  if (path === null) throw new Error(`Migration Core ${CORE_VERSION} writes no ${object} file`);
+  return { path, name: fileName(path), object, sourceRows, unifiedRows, heldBackRows, unreadableRows, rows };
+};
+const relationshipFile = (service: Service, kind: AssociationKind, child: ObjectKind, parent: ObjectKind, sourceEdges: number, rows: number, deduplicated: number, unresolved: number): AssociationFile => {
+  const path = associationPath(service, kind);
+  if (path === null) throw new Error(`${service} writes no relationship file`);
+  return { path, name: fileName(path), kind, child, parent, sourceEdges, rows, deduplicated, unresolved };
+};
+const stage = (order: number, file: OutputFile | AssociationFile, rows: number, state: ImportStage["state"], succeeded: number | null = null, failed: number | null = null, returnedAt: string | null = null): ImportStage => ({
+  order,
+  path: file.path,
+  object: "kind" in file ? file.kind : file.object,
+  rows,
+  state,
+  succeeded,
+  failed,
+  returnedAt,
+});
 const at = (ends: Matters["ends"], when: string): Matters => ({ ends, at: when });
 
 interface Base {
@@ -98,7 +120,9 @@ const project = (base: Base, rest: Partial<Omit<Project, keyof Base>>): Project 
   duplicates: [],
   relationships: null,
   outputs: [],
+  associations: [],
   importStages: [],
+  engine: null,
   matters: null,
   ...base,
   ...rest,
@@ -144,12 +168,28 @@ const EXAMPLE_PROJECT = project(
       { object: "CONTACTS", groups: { pairs: SAMPLE_GROUPS.pairs, triples: SAMPLE_GROUPS.triples, keptApartPairs: SAMPLE_GROUPS.pairsKeptApart, keptApartTriples: 0, demonstrated: null, decided: true }, unifiedRows: sampleContacts.unified },
       unifiedOnly("COMPANIES", sampleCompanies.unified),
     ],
+    // the counts are sample-data.ts's; the names are the core's (sample-data.ts still says contacts-clean.csv, a public-site change)
     outputs: [
-      out(sampleContacts.name, "CONTACTS", sampleContacts.source, sampleContacts.unified, sampleContacts.rows),
-      out(sampleCompanies.name, "COMPANIES", sampleCompanies.source, sampleCompanies.unified, sampleCompanies.rows),
+      out("HUBSPOT", "CONTACTS", sampleContacts.source, sampleContacts.unified, sampleContacts.rows),
+      out("HUBSPOT", "COMPANIES", sampleCompanies.source, sampleCompanies.unified, sampleCompanies.rows),
     ],
+    associations: [relationshipFile("HUBSPOT", "CONTACT_TO_COMPANY", "CONTACTS", "COMPANIES", 11_343, 11_129, 214, 0)],
+    engine: RUN_EXAMPLE,
   },
 );
+
+// ---- package files that import stages name --------------------------------------------------------------------------------------------
+
+const OPPORTUNITIES_FILE = out("SALESFORCE", "OPPORTUNITIES", 1_840, 0, 1_840);
+const TIDEWELL_CONTACTS = out("HUBSPOT", "CONTACTS", 10_350, 188, 10_162);
+const TIDEWELL_COMPANIES = out("HUBSPOT", "COMPANIES", 1_602, 41, 1_561);
+// the engine's run of …7221: accounts 9,980 = 9,761 delivered + 212 unified + 4 held back + 3 not readable; contacts 61,400 = 59,654 +
+// 1,734 + 7 + 5; 57,675 contact-to-account relationships = 56,009 delivered + 1,613 deduplicated + 53 unresolved
+const CO_ACCOUNTS = out("SALESFORCE", "ACCOUNTS", 9_980, 212, 9_761, 4, 3);
+const CO_CONTACTS = out("SALESFORCE", "CONTACTS", 61_400, 1_734, 59_654, 7, 5);
+const CO_CONTACT_TO_ACCOUNT = relationshipFile("SALESFORCE", "CONTACT_TO_COMPANY", "CONTACTS", "ACCOUNTS", 57_675, 56_009, 1_613, 53);
+const FJ_CONTACTS = out("HUBSPOT", "CONTACTS", 28_700, 720, 27_980);
+const FJ_COMPANIES = out("HUBSPOT", "COMPANIES", 6_010, 133, 5_877);
 
 // ---- the projects, step by step ---------------------------------------------------------------------------------------------------------
 
@@ -290,22 +330,23 @@ export const PROJECTS: readonly Project[] = [
       check: { state: "READY", deadline: "2026-10-19T14:35:00Z", failure: null },
       mapping: { mapped: 26, columns: 26 },
       duplicates: [groups("CONTACTS", 540, 40, 9, 0, true), unifiedOnly("COMPANIES", 96)],
-      outputs: [out("contacts-hubspot.csv", "CONTACTS", 22_640, 611, 22_029), out("companies-hubspot.csv", "COMPANIES", 4_075, 96, 3_979)],
+      outputs: [out("HUBSPOT", "CONTACTS", 22_640, 611, 22_029), out("HUBSPOT", "COMPANIES", 4_075, 96, 3_979)],
       matters: at("PACKAGE", "2026-10-28T15:00:00Z"),
     },
   ),
-  // IMPORT: a staged Salesforce import; stage 1 returned in full, stage 2 waits for the team
+  // IMPORT: a staged Salesforce package; the team has not yet returned the result of its one import file. The contact-roles export was
+  // left out at selection: Migration Core 3.0.0 has no contact-role object and Salesforce mode refuses CONTACT_TO_DEAL (contract §0, §9)
   project(
     { id: PRJ.nwOpportunities, workspaceId: WS.northwind, clientId: CLIENT.osprey, name: "Opportunities", service: "SALESFORCE", step: "IMPORT", dates: dates({ createdAt: "2026-10-14T09:55:00Z", uploadStartedAt: "2026-10-14T10:00:00Z", sealedAt: "2026-10-14T10:30:00Z", checkStartedAt: "2026-10-14T10:35:00Z", checkReadyAt: "2026-10-14T11:40:00Z", planApprovedAt: "2026-10-15T12:30:00Z", preparationStartedAt: "2026-10-16T15:10:00Z", packageReadyAt: "2026-10-16T20:00:00Z", lastProgressAt: "2026-10-19T16:00:00Z" }) },
     {
       revision: 2,
-      sources: [src("opportunities.csv", "OPPORTUNITIES", 1_840), src("contact-roles.csv", "CONTACT_ROLES", 2_310)],
-      units: 4_150,
+      sources: [src("opportunities.csv", "OPPORTUNITIES", 1_840), src("contact-roles.csv", "CONTACT_ROLES", 2_310, false)],
+      units: 1_840,
       check: { state: "READY", deadline: "2026-10-15T10:35:00Z", failure: null },
       mapping: { mapped: 19, columns: 19 },
-      duplicates: [unifiedOnly("OPPORTUNITIES", 0), unifiedOnly("CONTACT_ROLES", 0)],
-      outputs: [out("opportunities-salesforce.csv", "OPPORTUNITIES", 1_840, 0, 1_840), out("contact-roles-salesforce.csv", "CONTACT_ROLES", 2_310, 0, 2_310)],
-      importStages: [stage(1, "OPPORTUNITIES", 1_840, "SUCCEEDED", 1_840, 0, "2026-10-19T16:00:00Z"), stage(2, "CONTACT_ROLES", 2_310, "WAITING")],
+      duplicates: [unifiedOnly("OPPORTUNITIES", 0)],
+      outputs: [OPPORTUNITIES_FILE],
+      importStages: [stage(1, OPPORTUNITIES_FILE, 1_840, "WAITING")],
       matters: at("STAGED_PACKAGE", "2026-11-06T20:00:00Z"),
     },
   ),
@@ -318,12 +359,13 @@ export const PROJECTS: readonly Project[] = [
       check: { state: "READY", deadline: "2026-10-08T13:35:00Z", failure: null },
       mapping: { mapped: 22, columns: 22 },
       duplicates: [groups("CONTACTS", 170, 9, 0, 0, true), unifiedOnly("COMPANIES", 41)],
-      outputs: [out("contacts-hubspot.csv", "CONTACTS", 10_350, 188, 10_162), out("companies-hubspot.csv", "COMPANIES", 1_602, 41, 1_561)],
-      importStages: [stage(1, "COMPANIES", 1_561, "WAITING"), stage(2, "CONTACTS", 10_162, "WAITING")],
+      outputs: [TIDEWELL_CONTACTS, TIDEWELL_COMPANIES],
+      importStages: [stage(1, TIDEWELL_COMPANIES, 1_561, "WAITING"), stage(2, TIDEWELL_CONTACTS, 10_162, "WAITING")],
       matters: at("RECEIPT", "2026-10-23T21:00:00Z"),
     },
   ),
-  // RETENTION, deleted on the customer's request (receipt DR-2026-0031); a verified defect was later refunded in part
+  // RETENTION, deleted on the customer's request (receipt DR-2026-0031); a verified defect was later refunded in part. Migration Core ran on
+  // it: 4 accounts and 7 contacts held back (a required name missing; one merge whose rows disagree), 3 + 5 lines not readable
   project(
     { id: PRJ.coAccounts, workspaceId: WS.coastline, clientId: CLIENT.atlas, name: "Accounts and contacts", service: "SALESFORCE", step: "RETENTION", dates: dates({ createdAt: "2026-08-24T12:55:00Z", uploadStartedAt: "2026-08-24T13:00:00Z", sealedAt: "2026-08-24T14:00:00Z", checkStartedAt: "2026-08-24T14:05:00Z", checkReadyAt: "2026-08-24T16:00:00Z", planApprovedAt: "2026-08-25T15:00:00Z", preparationStartedAt: "2026-08-26T15:10:00Z", packageReadyAt: "2026-08-26T21:00:00Z", importTerminalAt: "2026-08-28T12:00:00Z", receiptAt: "2026-08-28T18:00:00Z", completedAt: "2026-08-28T18:00:00Z", packageDeletedAt: "2026-08-30T10:40:00Z", deletedAt: "2026-08-30T10:40:00Z", lastProgressAt: "2026-08-30T10:40:00Z" }) },
     {
@@ -331,8 +373,14 @@ export const PROJECTS: readonly Project[] = [
       units: 71_380,
       check: { state: "READY", deadline: "2026-08-25T14:05:00Z", failure: null },
       duplicates: [unifiedOnly("ACCOUNTS", 212), unifiedOnly("CONTACTS", 1_734)],
-      outputs: [out("accounts-salesforce.csv", "ACCOUNTS", 9_980, 212, 9_768), out("contacts-salesforce.csv", "CONTACTS", 61_400, 1_734, 59_666)],
-      importStages: [stage(1, "ACCOUNTS", 9_768, "SUCCEEDED", 9_768, 0, "2026-08-28T10:00:00Z"), stage(2, "CONTACTS", 59_666, "SUCCEEDED", 59_666, 0, "2026-08-28T18:00:00Z")],
+      outputs: [CO_ACCOUNTS, CO_CONTACTS],
+      associations: [CO_CONTACT_TO_ACCOUNT],
+      importStages: [
+        stage(1, CO_ACCOUNTS, 9_761, "SUCCEEDED", 9_761, 0, "2026-08-28T10:00:00Z"),
+        stage(2, CO_CONTACTS, 59_654, "SUCCEEDED", 59_654, 0, "2026-08-28T18:00:00Z"),
+        stage(3, CO_CONTACT_TO_ACCOUNT, 56_009, "SUCCEEDED", 56_009, 0, "2026-08-28T18:00:00Z"),
+      ],
+      engine: RUN_CO_ACCOUNTS,
     },
   ),
   // RETENTION, deleted on schedule; a defect report (case 115) is open and holds Amara Okafor's line
@@ -343,11 +391,12 @@ export const PROJECTS: readonly Project[] = [
       units: 34_710,
       check: { state: "READY", deadline: "2026-09-01T14:35:00Z", failure: null },
       duplicates: [unifiedOnly("CONTACTS", 720), unifiedOnly("COMPANIES", 133)],
-      outputs: [out("contacts-hubspot.csv", "CONTACTS", 28_700, 720, 27_980), out("companies-hubspot.csv", "COMPANIES", 6_010, 133, 5_877)],
-      importStages: [stage(1, "COMPANIES", 5_877, "SUCCEEDED", 5_877, 0, "2026-09-10T09:00:00Z"), stage(2, "CONTACTS", 27_980, "PARTIAL", 27_601, 379, "2026-09-10T09:00:00Z")],
+      outputs: [FJ_CONTACTS, FJ_COMPANIES],
+      importStages: [stage(1, FJ_COMPANIES, 5_877, "SUCCEEDED", 5_877, 0, "2026-09-10T09:00:00Z"), stage(2, FJ_CONTACTS, 27_980, "PARTIAL", 27_601, 379, "2026-09-10T09:00:00Z")],
     },
   ),
-  // RETENTION, deleted on schedule; a Colombian company (IVA 19%), partly refunded after support case 109
+  // RETENTION, deleted on schedule; a Colombian company (IVA 19%), partly refunded after support case 109. Migration Core ran on it: 4
+  // dealers held back (3 employee counts that are not a number, one merge whose rows disagree), 2 lines not readable
   project(
     { id: PRJ.hoDealers, workspaceId: WS.halden, clientId: CLIENT.haldenSelf, name: "Dealer list", service: "CLEAN", step: "RETENTION", dates: dates({ createdAt: "2026-09-24T13:55:00Z", uploadStartedAt: "2026-09-24T14:00:00Z", sealedAt: "2026-09-24T14:30:00Z", checkStartedAt: "2026-09-24T14:35:00Z", checkReadyAt: "2026-09-24T15:30:00Z", planApprovedAt: "2026-09-25T13:00:00Z", preparationStartedAt: "2026-09-26T14:10:00Z", packageReadyAt: "2026-09-26T19:00:00Z", completedAt: "2026-09-26T19:00:00Z", packageDeletedAt: "2026-10-03T19:00:00Z", deletedAt: "2026-10-03T19:00:00Z", lastProgressAt: "2026-10-03T19:00:00Z" }) },
     {
@@ -355,7 +404,8 @@ export const PROJECTS: readonly Project[] = [
       units: 3_980,
       check: { state: "READY", deadline: "2026-09-25T14:35:00Z", failure: null },
       duplicates: [unifiedOnly("COMPANIES", 57)],
-      outputs: [out("dealers-clean.csv", "COMPANIES", 3_980, 57, 3_923)],
+      outputs: [out("CLEAN", "COMPANIES", 3_980, 57, 3_917, 4, 2)],
+      engine: RUN_HO_DEALERS,
     },
   ),
   EXAMPLE_PROJECT,

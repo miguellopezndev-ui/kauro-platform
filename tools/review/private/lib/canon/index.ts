@@ -56,6 +56,7 @@ export const CANON: World = deepFreeze({
 export const STRESS_WORLDS = deepFreeze(STRESS);
 
 export { AS_OF, AS_OF_LOCAL, HOLIDAYS, TIMEZONE } from "./calendar.ts";
+export { ADAPTER, associationPath, CORE_OBJECT, CORE_VERSION, fileName, importPath, PACKAGE_PATH } from "./engine.ts";
 export { computeAlerts, kauroFigures, sellerFigures, type Alert, type KauroFigures, type SellerFigures } from "./figures.ts";
 export { MAIN_ORDER, MAIN_QUOTE } from "./money.ts";
 export { CLIENT, P, SELLER, uid, WS } from "./people.ts";

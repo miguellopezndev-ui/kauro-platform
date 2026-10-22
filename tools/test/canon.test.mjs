@@ -1,9 +1,11 @@
 // Kauro's canonical synthetic world (Order 11 round 3, master plan §2.1; tools/review/private/lib/canon): it reconciles, its stress
 // variants reconcile, it keeps the public sample exactly as the public site states it, it keeps the names and ids the review already
-// uses, its figures follow the owner's money rules, the reconciliation catches a broken world, and world.json is a current export.
+// uses, its figures follow the owner's money rules, its packages are what Migration Core 3.0.0 writes (the core's file names everywhere,
+// and the three projects the engine ran equal to its summary.json, read from the archive when it is present), the reconciliation catches a
+// broken world, and world.json is a current export.
 // Node 24 loads the module's .ts files with its built-in type stripping; nothing is built first.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -11,6 +13,7 @@ const root = join(import.meta.dirname, "..", "..");
 const canonDir = join(root, "tools", "review", "private", "lib", "canon");
 const canon = await import("../review/private/lib/canon/index.ts");
 const { reconcile, missingSteps } = await import("../review/private/lib/canon/reconcile.ts");
+const engine = await import("../review/private/lib/canon/engine.ts");
 const sample = await import("../../apps/web/src/public/sample-data.ts");
 const { CANON, STRESS_WORLDS, PRJ, WS, SELLER, P } = canon;
 
@@ -62,10 +65,12 @@ test("the public sample project is exactly the public site's sample data", () =>
   assert.equal(2 * groups.pairs + 3 * groups.triples, 428, "428 contacts in duplicate candidate groups");
   assert.equal(canon.SAMPLE_IN_GROUPS, 428);
   assert.deepEqual(example.duplicates.map((one) => one.unifiedRows), [214, 253]);
-  assert.deepEqual(example.outputs.map((one) => [one.name, one.sourceRows, one.unifiedRows, one.rows]), [
-    [contacts.name, 12_480, 214, 12_266],
-    [companies.name, 3_204, 253, 2_951],
+  // the counts are the public site's; the file names are the core's (sample-data.ts keeps its own names, a public-site change)
+  assert.deepEqual(example.outputs.map((one) => [one.path, one.sourceRows, one.unifiedRows, one.heldBackRows, one.unreadableRows, one.rows]), [
+    ["01_IMPORT/hubspot/contacts.csv", contacts.source, contacts.unified, 0, 0, contacts.rows],
+    ["01_IMPORT/hubspot/companies.csv", companies.source, companies.unified, 0, 0, companies.rows],
   ]);
+  assert.deepEqual([contacts.source, contacts.unified, contacts.rows, companies.source, companies.unified, companies.rows], [12_480, 214, 12_266, 3_204, 253, 2_951]);
   const quote = CANON.quotes.find((one) => one.projectId === PRJ.example);
   assert.equal(quote.illustrative, true);
   assert.deepEqual([quote.band, quote.listMinor, quote.discountMinor, quote.totalMinor], [0, 129_500, 0, 129_500], "Prepare for HubSpot, USD 1,295, the band up to 50,000 units");
@@ -196,7 +201,14 @@ test("the reconciliation catches a broken world", () => {
   const find = (list, id) => list.find((one) => one.id === id);
   const cases = [
     ["a payment one cent off its quote", (w) => (find(w.payments, "pay-2026-0119").amountMinor += 1), /payment pay-2026-0119/],
-    ["delivered rows that are not source less unified", (w) => (find(w.projects, PRJ.coQ4).outputs[0].rows -= 1), /contacts-hubspot\.csv rows/],
+    ["delivered rows that are not source less unified, held back and not readable", (w) => (find(w.projects, PRJ.coQ4).outputs[0].rows -= 1), /contacts\.csv rows/],
+    ["a held-back row the engine did not set aside", (w) => (find(w.projects, PRJ.hoDealers).outputs[0].heldBackRows += 1), /companies\.csv rows|isolated\.csv/],
+    ["an invented output file name", (w) => (find(w.projects, PRJ.coQ4).outputs[0].path = "01_IMPORT/hubspot/contacts-hubspot.csv"), /not a name Migration Core 3\.0\.0 writes/],
+    ["a file under another service's folder", (w) => (find(w.projects, PRJ.hoDealers).outputs[0].path = "01_IMPORT/hubspot/companies.csv"), /not a name Migration Core 3\.0\.0 writes for CLEAN/],
+    ["relationships that do not add up", (w) => (find(w.projects, PRJ.coAccounts).associations[0].unresolved += 1), /source edges/],
+    ["an engine file whose rows differ from the project", (w) => (find(w.projects, PRJ.coAccounts).engine.files.find((one) => one.path === "02_EXCEPTIONS/rejected-input.csv").rows = 7), /rejected-input\.csv holds 7 rows/],
+    ["a contact-roles file 3.0.0 cannot write", (w) => find(w.projects, PRJ.nwOpportunities).outputs.push({ path: "01_IMPORT/salesforce/contact-roles-salesforce.csv", name: "contact-roles-salesforce.csv", object: "CONTACT_ROLES", sourceRows: 0, unifiedRows: 0, heldBackRows: 0, unreadableRows: 0, rows: 0 }), /contact-roles-salesforce\.csv is not a name|writes no such file/],
+    ["an import file no stage loads", (w) => (find(w.projects, PRJ.coAccounts).importStages = find(w.projects, PRJ.coAccounts).importStages.slice(0, 2)), /loaded by exactly one import stage/],
     ["units that are not the sealed rows", (w) => (find(w.projects, PRJ.juRenewals).units += 10), /units/],
     ["commission counted on a total with tax", (w) => (find(w.commissionLines, "AO-L2").basisMinor = 82_705), /tax is never commissioned/],
     ["an offset whose balance is not basis less applied", (w) => (find(w.offsets, "OF-DK-0007").balanceMinor = 0), /balance is not basis less applied/],
@@ -214,6 +226,129 @@ test("the reconciliation catches a broken world", () => {
   for (const [label, change, pattern] of cases) {
     const problems = broken(change);
     assert.ok(problems.some((one) => pattern.test(one)), `${label}: ${JSON.stringify(problems)}`);
+  }
+});
+
+test("every package file is named as Migration Core 3.0.0 names it, and delivered = source less unified, held back and not readable", () => {
+  const worlds = [CANON, ...Object.values(STRESS_WORLDS)];
+  let checked = 0;
+  for (const world of worlds) {
+    for (const one of world.projects) {
+      const paths = [...one.outputs.map((file) => file.path), ...one.associations.map((file) => file.path), ...one.importStages.map((stage) => stage.path), ...(one.engine?.files.map((file) => file.path) ?? [])];
+      for (const path of paths) {
+        assert.match(path, engine.PACKAGE_PATH, `${one.name}: ${path}`);
+        if (path.startsWith("01_IMPORT/")) assert.ok(path.startsWith(`01_IMPORT/${engine.ADAPTER[one.service]}/`), `${one.name}: ${path} under its service's folder`);
+        checked += 1;
+      }
+      for (const output of one.outputs) assert.equal(output.sourceRows, output.rows + output.unifiedRows + output.heldBackRows + output.unreadableRows, `${one.name}: ${output.path}`);
+      for (const file of one.associations) assert.equal(file.sourceEdges, file.rows + file.deduplicated + file.unresolved, `${one.name}: ${file.path}`);
+    }
+  }
+  assert.ok(checked > 80, "the canon's packages were all checked");
+  assert.doesNotMatch(JSON.stringify(CANON.projects.map((one) => [one.outputs, one.associations, one.importStages])), /-clean\.csv|-hubspot\.csv|-salesforce\.csv/, "no invented output names remain");
+  // only the three projects the engine ran carry its run, and only they hold rows held back or not readable
+  assert.deepEqual(CANON.projects.filter((one) => one.engine !== null).map((one) => one.id).sort(), [PRJ.coAccounts, PRJ.example, PRJ.hoDealers].sort());
+  for (const one of CANON.projects.filter((candidate) => candidate.engine === null)) for (const output of one.outputs) assert.deepEqual([output.heldBackRows, output.unreadableRows], [0, 0], one.name);
+});
+
+test("Opportunities (…7205) has no contact-role file or stage: 3.0.0 cannot produce one", () => {
+  const opportunities = project(PRJ.nwOpportunities);
+  assert.deepEqual(opportunities.outputs.map((one) => [one.path, one.rows]), [["01_IMPORT/salesforce/Opportunity.csv", 1_840]]);
+  assert.deepEqual(opportunities.importStages.map((one) => [one.order, one.path, one.state]), [[1, "01_IMPORT/salesforce/Opportunity.csv", "WAITING"]]);
+  assert.equal(opportunities.sources.find((one) => one.object === "CONTACT_ROLES").selected, false, "the contact-roles export was left out at selection");
+  assert.equal(opportunities.units, 1_840);
+  assert.equal(CANON.quotes.find((one) => one.projectId === PRJ.nwOpportunities).units, 1_840);
+  assert.equal(engine.importPath("SALESFORCE", "CONTACT_ROLES"), null);
+});
+
+test("the three projects Migration Core ran hold its figures, as the canon states them", () => {
+  const figures = (id) => {
+    const one = project(id);
+    return {
+      outputs: one.outputs.map((file) => [file.path, file.sourceRows, file.rows, file.unifiedRows, file.heldBackRows, file.unreadableRows]),
+      associations: one.associations.map((file) => [file.path, file.sourceEdges, file.rows, file.deduplicated, file.unresolved]),
+      stages: one.importStages.map((stage) => [stage.order, stage.path, stage.rows]),
+      run: [one.engine.runId, one.engine.checksPassed, one.engine.files.length, one.engine.reportVariant],
+    };
+  };
+  assert.deepEqual(figures(PRJ.example), {
+    outputs: [["01_IMPORT/hubspot/contacts.csv", 12_480, 12_266, 214, 0, 0], ["01_IMPORT/hubspot/companies.csv", 3_204, 2_951, 253, 0, 0]],
+    associations: [["01_IMPORT/hubspot/associations/contact_to_company.csv", 11_343, 11_129, 214, 0]],
+    stages: [],
+    run: ["run_3b9567f72e0bba6cb9ef7b89", 65, 24, null],
+  });
+  assert.deepEqual(figures(PRJ.coAccounts), {
+    outputs: [["01_IMPORT/salesforce/Account.csv", 9_980, 9_761, 212, 4, 3], ["01_IMPORT/salesforce/Contact.csv", 61_400, 59_654, 1_734, 7, 5]],
+    associations: [["01_IMPORT/salesforce/associations/contact_to_company.csv", 57_675, 56_009, 1_613, 53]],
+    stages: [[1, "01_IMPORT/salesforce/Account.csv", 9_761], [2, "01_IMPORT/salesforce/Contact.csv", 59_654], [3, "01_IMPORT/salesforce/associations/contact_to_company.csv", 56_009]],
+    run: ["run_d5ec68c7e07cb8f7c90fb377", 65, 25, { runId: "run_325c19a659493c1e8468f588", sourceRows: 71_372 }],
+  });
+  assert.deepEqual(figures(PRJ.hoDealers), {
+    outputs: [["01_IMPORT/clean-only/companies.csv", 3_980, 3_917, 57, 4, 2]],
+    associations: [],
+    stages: [],
+    run: ["run_b04e17cbf39f3809cebee937", 60, 22, { runId: "run_25f889238c3b90ec5ddd5973", sourceRows: 3_978 }],
+  });
+});
+
+// the archive exists on the owner's machine only; CI without it still checks the canon's own figures above
+const ARCHIVE = join(root, "..", "Kauro.archive", "Deliveries", "Visual", "order11", "research", "round3-docs-canon", "packages");
+test("the three projects Migration Core ran equal its summary.json (when the archive is present)", (t) => {
+  const ran = CANON.projects.filter((one) => one.engine !== null);
+  const present = ran.filter((one) => existsSync(join(ARCHIVE, engine.RUN_FOLDERS[one.engine.runId].main, "summary.json")));
+  if (present.length === 0) {
+    t.skip(`archive not present: ${ARCHIVE}`);
+    return;
+  }
+  assert.equal(present.length, 3, "all three summaries, or none");
+  const sumOf = (values) => values.reduce((total, one) => total + one, 0);
+  for (const one of present) {
+    const folders = engine.RUN_FOLDERS[one.engine.runId];
+    const summary = JSON.parse(readFileSync(join(ARCHIVE, folders.main, "summary.json"), "utf8"));
+    const label = `${one.name} (${one.id.slice(-4)})`;
+    assert.equal(summary.coreVersion, one.engine.coreVersion, label);
+    assert.equal(summary.runId, one.engine.runId, label);
+    assert.equal(summary.manifestSha256, one.engine.manifestSha256, label);
+    assert.equal(summary.verifyLine, `package verified: ${one.engine.files.length} artifacts, ${one.units} source rows, ${one.engine.checksPassed} checks passed`, label);
+    const rec = summary.reconciliation;
+    assert.deepEqual(rec.sourceRows.byDisposition, {
+      ISOLATED: sumOf(one.outputs.map((file) => file.heldBackRows)),
+      LEFTOVER: 0,
+      MERGED_PROVEN: sumOf(one.outputs.map((file) => file.unifiedRows)),
+      OUTPUT: sumOf(one.outputs.map((file) => file.rows)),
+      REJECTED_INPUT: sumOf(one.outputs.map((file) => file.unreadableRows)),
+    }, label);
+    assert.equal(rec.sourceRows.total, one.units, label);
+    const byObject = { COMPANY: 0, CONTACT: 0, DEAL: 0, LEAD: 0 };
+    for (const file of one.outputs) byObject[engine.CORE_OBJECT[file.object]] += file.rows;
+    assert.deepEqual(rec.records.byObject, byObject, label);
+    // per source file: the rows read, and its lines not readable are its object's
+    for (const input of summary.inputs) {
+      const source = one.sources.find((file) => file.name === input.path);
+      const output = one.outputs.find((file) => file.object === source.object);
+      assert.equal(sumOf(input.sheets.map((sheet) => sheet.readerRowCount)), source.rows, `${label}: ${input.path}`);
+      assert.equal(sumOf(input.sheets.map((sheet) => sheet.rejectedRowCount)), output.unreadableRows, `${label}: ${input.path} not readable`);
+    }
+    // unified rows per object, from the merges' group sizes (a merge of n rows absorbs n - 1)
+    const absorbed = {};
+    for (const [key, count] of Object.entries(summary.merges.groupSizes)) {
+      const [object, size] = key.split(":");
+      absorbed[object] = (absorbed[object] ?? 0) + count * (Number(size) - 1);
+    }
+    for (const file of one.outputs) assert.equal(absorbed[engine.CORE_OBJECT[file.object]] ?? 0, file.unifiedRows, `${label}: ${file.path} unified`);
+    assert.deepEqual(rec.associations.byDisposition, {
+      DEDUPLICATED: sumOf(one.associations.map((file) => file.deduplicated)),
+      LEFTOVER: 0,
+      OUTPUT: sumOf(one.associations.map((file) => file.rows)),
+      UNRESOLVED: sumOf(one.associations.map((file) => file.unresolved)),
+    }, label);
+    assert.deepEqual(summary.artifacts.map((file) => ({ path: file.path, kind: file.kind, rows: file.rows })), one.engine.files, `${label}: every package file, its kind and its rows`);
+    if (folders.variant !== null) {
+      const variant = JSON.parse(readFileSync(join(ARCHIVE, folders.variant, "summary.json"), "utf8"));
+      assert.deepEqual([variant.runId, variant.reconciliation.sourceRows.total], [one.engine.reportVariant.runId, one.engine.reportVariant.sourceRows], `${label}: report variant`);
+      assert.equal(variant.reconciliation.sourceRows.byDisposition.REJECTED_INPUT, 0, `${label}: the variant has no line not readable`);
+      assert.deepEqual(variant.reconciliation.records.byObject, rec.records.byObject, `${label}: the variant delivers the same records`);
+    }
   }
 });
 
