@@ -63,6 +63,7 @@ function checkProcedure(s, delta) {
     assert.ok(STATUSES.has(d.status), `${item.id}: status ${d.status} is CP-01's vocabulary`);
     assert.equal(d.status, s.statusOfClass[item.class], `${item.id}: status follows the class`);
     assert.ok(item.gaps.length > 0 && item.o17.length > 0, `${item.id}: names its gaps and its O17 entries`);
+    assert.ok(Array.isArray(d.activation) && d.activation.length > 0, `${item.id}: lists what must hold before it takes effect (activation)`);
     const external = item.blockers.some((b) => b.kind === "EXTERNAL");
     if (item.class === "PROPOSED") {
       assert.equal(item.approval, null, `${item.id}: a proposal carries no approval`);
@@ -121,6 +122,7 @@ test("procedure: CP-02 follows the ChangeProposal procedure and the four classes
   mustFail(broken((s) => { s.items[3].acceptance = s.items[3].acceptance.filter((a) => a.kind !== "ADVERSARIAL"); }), /adversarial/, "an item without an adversarial case");
   mustFail(broken((s, d) => { d.items[20].patch["commands.json"].splice(1, 1); }), /tested right before/, "a replace without its test");
   mustFail(broken((s, d) => { d.items[0].patch["cases.json"].push({ op: "remove", path: "/0" }); }), /nothing is removed/, "a remove op");
+  mustFail(broken((s, d) => { delete d.items[3].activation; }), /activation/, "an item without its activation");
 });
 
 // --- 2. application ---------------------------------------------------------------------------------------------------------

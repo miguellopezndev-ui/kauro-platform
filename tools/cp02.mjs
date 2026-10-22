@@ -292,6 +292,7 @@ export function buildDelta(spec, registry) {
       blockers: item.blockers,
       requires: item.requires,
       dependsOn: item.dependsOn,
+      activation: item.activation,
       component: item.component,
       patch,
     });

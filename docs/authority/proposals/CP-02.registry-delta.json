@@ -48,6 +48,7 @@
       "blockers": [],
       "requires": ["CP-01.01"],
       "dependsOn": [],
+      "activation": ["the StartAudit, CreatePlan, ApprovePlan and CreateQuote handlers take the CLEAN branch with the canonical CLEAN binding and their tests (C4), CP-01.01's activation"],
       "component": "C4",
       "patch": {
         "cases.json": [
@@ -286,6 +287,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the dates read built from the quote, retention and extension journals with its tests (C4, C6); the hold's entry stays NOT_APPLICABLE until CP-02.17 is active"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -517,6 +519,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the reads served with their tenant tests (C4); the roles of AGENCY_BILLING_READER mapped by Order 15"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -1029,6 +1032,7 @@
       "blockers": [],
       "requires": ["CP-01.02"],
       "dependsOn": [],
+      "activation": ["CP-01.02's activation: the UNPAID soft deadline written, deletion, restoration, SQL policies and the dates read implemented and tested, the legal wording through LR-01 (C6)"],
       "component": "C6",
       "patch": {
         "contracts.json": [
@@ -1302,6 +1306,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the identity order (C8) serves the commands with the registration flow; no DATA_PROCESSING_AUTHORIZATION is recorded before the Policy is published (CP-01.10, LR-05)"],
       "component": "C8",
       "patch": {
         "contracts.json": [
@@ -1867,6 +1872,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the notifications consumer reads the preferences before each optional send (C8)"],
       "component": "C8",
       "patch": {
         "contracts.json": [
@@ -2236,6 +2242,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the commercial transitions and the seller's e-mail of the outcome from the same transaction (C4); the seller role mapped by Order 15"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -2681,6 +2688,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": ["CP-02.07"],
+      "activation": ["the owner's cross-workspace scope and its RLS (Order 15); the reads served (C4)"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -2977,6 +2985,7 @@
       "blockers": [],
       "requires": ["CP-01.13"],
       "dependsOn": [],
+      "activation": ["the figures computed from captures, refunds and lines under CP-01.13's periods, with the double-count tests (C4)"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -3163,6 +3172,7 @@
       "blockers": [],
       "requires": ["CP-01.05"],
       "dependsOn": [],
+      "activation": ["the statement close accrues the retainer and records offsets with their basis; the web client regenerated with the server (C4, C9)"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -3454,6 +3464,7 @@
       "blockers": [],
       "requires": ["CP-01.06", "CP-01.07"],
       "dependsOn": [],
+      "activation": ["the alerts computed under CP-01.06 and CP-01.07 with the progress tests of Order 16 §13.6.1 (C4)"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -3691,6 +3702,7 @@
       "blockers": [],
       "requires": ["CP-01.14"],
       "dependsOn": [],
+      "activation": ["the read served from policy.legalStatus (C4)"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -3863,6 +3875,7 @@
       "blockers": [],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the CSV and PDF exports and the request commands served (C4); the PDF renderer outside packages/reports"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -4473,6 +4486,10 @@
       "blockers": [],
       "requires": ["CP-01.04", "CP-01.14"],
       "dependsOn": ["CP-02.07"],
+      "activation": [
+        "legal effect on sellers only after competent review (L-12, L-19): policy.legalStatus commission.claimRules stays PENDING_COUNSEL (CP-01.14) and every owner screen and seller agreement says so",
+        "the commands and their tests (C4)"
+      ],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -5040,6 +5057,9 @@
       "blockers": [],
       "requires": ["CP-01.12"],
       "dependsOn": [],
+      "activation": [
+        "the core intervention (C7): evidence classes from Migration Core's proving keys, the verification of a declared authoritative external id, CRM IDs and shared addresses; RevisePlan wired; adversarial fixtures (F-27, C11)"
+      ],
       "component": "C7",
       "patch": {
         "contracts.json": [
@@ -6061,6 +6081,7 @@
       "blockers": [{ "kind": "OWNER", "ref": "B-07", "what": "sender and due time" }],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the owner's decision B-07, then the NOTIFICATIONS subscription and the notice record (C5)"],
       "component": "C5",
       "patch": {
         "contracts.json": [
@@ -6394,6 +6415,10 @@
       "blockers": [{ "kind": "EXTERNAL", "ref": "PV1", "what": "Wise route qualification" }, { "kind": "OWNER", "ref": "CP-01.11", "what": "hold values" }],
       "requires": ["CP-01.11"],
       "dependsOn": [],
+      "activation": [
+        "never adopted or activated before every pending point holds (CP-01.11)",
+        "a proof or a declared transfer never confirms payment, starts preparation or creates a commercial authorization (F-23 tests)"
+      ],
       "component": "C5",
       "patch": {
         "contracts.json": [
@@ -6775,6 +6800,7 @@
       "blockers": [{ "kind": "OWNER", "ref": "B-06", "what": "whether and how Kauro serves directly" }],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the owner's decision B-06, then the command and its ledger tests (C4)"],
       "component": "C4",
       "patch": {
         "contracts.json": [
@@ -7107,6 +7133,7 @@
       "blockers": [{ "kind": "EXTERNAL", "ref": "B-14", "what": "CRM tool facts" }, { "kind": "COMPONENT", "ref": "C7", "what": "the cores" }],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the tool facts verified and the reconciliation engine in the cores (C7)"],
       "component": "C7",
       "patch": {
         "contracts.json": [
@@ -7460,6 +7487,7 @@
       "blockers": [{ "kind": "OWNER", "ref": "B-03", "what": "A3 §3.2 amendment" }],
       "requires": ["CP-01.03"],
       "dependsOn": [],
+      "activation": ["the A3 §3.2 amendment signed, then the public route and screen (C9) and the command (C8)"],
       "component": "C9",
       "patch": {
         "contracts.json": [
@@ -7834,6 +7862,7 @@
       "blockers": [{ "kind": "OWNER", "ref": "B-09", "what": "move the billing profile requirement" }],
       "requires": [],
       "dependsOn": [],
+      "activation": ["the owner's decision B-09, then CMD002 and CMD027 changed with their tests (C4)"],
       "component": "C4",
       "patch": {
         "commands.json": [
