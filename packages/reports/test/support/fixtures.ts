@@ -12,7 +12,22 @@ export type CaseName = (typeof CASES)[number];
 const root = fileURLToPath(new URL("../../../test/fixtures/mc-3.0.0/", import.meta.url));
 
 export function loadPackage(name: CaseName): Map<string, Uint8Array> {
-  const dir = join(root, name);
+  return loadDirectory(join(root, name));
+}
+
+/** A package the vendored core 3.0.0 wrote with rows it could not read and rows no mapping covers (mc-3.0.0-rejected/PROVENANCE.json). */
+export const REJECTED_CASE = {
+  dir: fileURLToPath(new URL("../../../test/fixtures/mc-3.0.0-rejected/E-rejected-rows/package/", import.meta.url)),
+  manifestSha256: "7839c079d2cf4c0193f725b3f312117bcaa4e054d46cb8de4417e43a1604be37",
+  packageDigest: "8d58776ea802e309ccb2fe38e75a6f613a642dfb46ca6cce64e924d959ebb14c",
+  files: 30,
+} as const;
+
+export function loadRejectedPackage(): Map<string, Uint8Array> {
+  return loadDirectory(REJECTED_CASE.dir);
+}
+
+function loadDirectory(dir: string): Map<string, Uint8Array> {
   const files = new Map<string, Uint8Array>();
   const walk = (d: string): void => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {

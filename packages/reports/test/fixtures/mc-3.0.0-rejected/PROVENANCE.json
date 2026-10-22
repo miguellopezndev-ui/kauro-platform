@@ -1,0 +1,18 @@
+{
+  "purpose": "Order 14, defect F-31: a verified Migration Core 3.0.0 package that holds rows the core could not read (REJECTED_INPUT) and rows no record mapping covers (LEFTOVER), both written with contribution_kind NONE. None of the core's five acceptance packages has either.",
+  "core": "kauro-migration-core 3.0.0, the vendored tarball vendor/kauro-migration-core-3.0.0.tgz (sha256 2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312), source commit 3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+  "packageFormatVersion": "2.1.0",
+  "cases": {
+    "E-rejected-rows": {
+      "input": "E-rejected-rows/input and E-rejected-rows/config.json: the core's acceptance case A-clean-multi-object (cores/kauro-migration-core/test/fixtures/acceptance/A-clean-multi-object) with three changes: contacts.csv gains a row with one column too many, companies.csv a row with four columns too few, and the configuration names a sixth file, notes.csv, that no record mapping or association covers.",
+      "command": "node <core>/dist/src/cli/main.js run --input input --config config.json --out package --scratch <empty directory>",
+      "runId": "run_e90ca5bd661856dd759ac49c",
+      "coreSummary": "23 source rows -> 19 output, 0 merged, 0 isolated, 2 leftover, 2 rejected; 29 artifacts verified",
+      "coreVerify": "node <core>/dist/src/cli/main.js verify --package package --scratch <empty directory>: package verified: 29 artifacts, 23 source rows, 60 checks passed",
+      "manifestSha256": "7839c079d2cf4c0193f725b3f312117bcaa4e054d46cb8de4417e43a1604be37",
+      "packageDigest": "8d58776ea802e309ccb2fe38e75a6f613a642dfb46ca6cce64e924d959ebb14c",
+      "packageDigestSource": "the core's own packageDigest(packageDir) (kauro-package-digest/1)",
+      "reproduced": "packages/data-plane/test/report-rejected-rows.test.ts runs the core on this input on every test run and compares every file of the package it writes with these bytes"
+    }
+  }
+}

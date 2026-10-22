@@ -1,0 +1,343 @@
+{
+  "artifacts": [
+    {
+      "byteLength": 211,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/associations/company_to_deal.csv",
+      "rowCount": 3,
+      "sha256": "e01b1d0c9cce1b4cd6771dbae01aca3e02a4afd738d593692a334adc7589233b"
+    },
+    {
+      "byteLength": 313,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/associations/contact_to_company.csv",
+      "rowCount": 5,
+      "sha256": "0d2f3dcf5db80e32d300047abf9ec1f50797ae937d03116fcf4b660110813536"
+    },
+    {
+      "byteLength": 262,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/associations/contact_to_deal.csv",
+      "rowCount": 4,
+      "sha256": "d297a5be204e673c4b1d17578bf36a25958840a7742a28c10b963ede1636ad97"
+    },
+    {
+      "byteLength": 423,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/companies.csv",
+      "rowCount": 4,
+      "sha256": "f80bede00aa0b70732f0c3d6caf5e224044a86bf1a35e82b77575a424878e6c2"
+    },
+    {
+      "byteLength": 543,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/contacts.csv",
+      "rowCount": 5,
+      "sha256": "1f509335f2816a12d8789e375cad27b1df246e7ec04112e0afe0556d60d60b4a"
+    },
+    {
+      "byteLength": 337,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/deals.csv",
+      "rowCount": 3,
+      "sha256": "5edc566332da3acb3a8f332163591bb328052140de65bcfa45af43a8ccea8439"
+    },
+    {
+      "byteLength": 310,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/leads.csv",
+      "rowCount": 3,
+      "sha256": "399efa3329d3e9d4334a4c2a9afbc41f301e2888bf7dfddbe8df2bba7d26764e"
+    },
+    {
+      "byteLength": 77,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/destination-conflicts.csv",
+      "rowCount": 0,
+      "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+    },
+    {
+      "byteLength": 157,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+      "rowCount": 0,
+      "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+    },
+    {
+      "byteLength": 1452,
+      "kind": "HUMAN_VIEW_CSV",
+      "path": "02_EXCEPTIONS/formula-risk.csv",
+      "rowCount": 8,
+      "sha256": "23d38891e1197d3cbe7a271468400ba46e40017989acf922309ff2247118304b"
+    },
+    {
+      "byteLength": 145,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/isolated.csv",
+      "rowCount": 0,
+      "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+    },
+    {
+      "byteLength": 640,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/leftovers.csv",
+      "rowCount": 2,
+      "sha256": "b08db733ea0e1298723bd57f7beeb1f81a54f72ad601c5a880a6d03b2c63dcd0"
+    },
+    {
+      "byteLength": 661,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/rejected-input.csv",
+      "rowCount": 2,
+      "sha256": "aceedae41bd337c480a7879a041e85fbcc6763aa18249de57809960f4728bbef"
+    },
+    {
+      "byteLength": 158,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/unmapped-fields.csv",
+      "rowCount": 0,
+      "sha256": "e193b1fb95b588a0f8fec5a42f961b36e4e8c2bfb7f03bd122531811da153106"
+    },
+    {
+      "byteLength": 206,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/unresolved-associations.csv",
+      "rowCount": 0,
+      "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+    },
+    {
+      "byteLength": 5022,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/associations.csv",
+      "rowCount": 12,
+      "sha256": "57da4b7d1bdf866e5b3817721d59db2e5f1da34eaee807feaa17abeb7b4ce2f1"
+    },
+    {
+      "byteLength": 3601,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/changes.csv",
+      "rowCount": 8,
+      "sha256": "27b6e397193d5edabd18c396981cf7cfe2b34f6aa62c94b0bc09d7d89862c2fd"
+    },
+    {
+      "byteLength": 31508,
+      "kind": "DOCUMENT",
+      "path": "03_TRACEABILITY/config.normalized.json",
+      "rowCount": null,
+      "sha256": "0a58a269cff73471e39c06398b4dc04336c36f4c34ac3df25ef5760ec17806cd"
+    },
+    {
+      "byteLength": 109,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/destination-matching.csv",
+      "rowCount": 0,
+      "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+    },
+    {
+      "byteLength": 220,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/flags.csv",
+      "rowCount": 0,
+      "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+    },
+    {
+      "byteLength": 1799,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/import-crosswalk.csv",
+      "rowCount": 15,
+      "sha256": "6b6914d6e79cf0fc3a3b71a333d42aa72aef340808984385d7d719bcac3440b2"
+    },
+    {
+      "byteLength": 36,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/instance-verification.csv",
+      "rowCount": 0,
+      "sha256": "418e6bd6d0d7bad87790f4625e9ae9d5be53da8cc2b9b0f6145cee9eaad57d44"
+    },
+    {
+      "byteLength": 19,
+      "kind": "DOCUMENT",
+      "path": "03_TRACEABILITY/merges.json",
+      "rowCount": null,
+      "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+    },
+    {
+      "byteLength": 1686,
+      "kind": "DOCUMENT",
+      "path": "03_TRACEABILITY/reconciliation.json",
+      "rowCount": null,
+      "sha256": "03b2ee67ea41bb3430cd43413a9782e012db5873ccfc687b06275d7c666dcec5"
+    },
+    {
+      "byteLength": 9708,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/source-lineage.csv",
+      "rowCount": 23,
+      "sha256": "eb6cd9d4446156c6fe82aed84a7abc700d629a42a147ccf00cf105a2efee96e8"
+    },
+    {
+      "byteLength": 4160,
+      "kind": "DOCUMENT",
+      "path": "04_DOCUMENTATION/audit.md",
+      "rowCount": null,
+      "sha256": "179997fb0a5d54012fad949cf3779266f8bbbc0029b103a1bee89f4b97ea9e51"
+    },
+    {
+      "byteLength": 548,
+      "kind": "HUMAN_VIEW_CSV",
+      "path": "04_DOCUMENTATION/data-view/clean-only/contacts.csv",
+      "rowCount": 5,
+      "sha256": "dab8f620d1a42b8da406e1431dc74158e6d04b1cd8fb41433e7c520595a63b40"
+    },
+    {
+      "byteLength": 313,
+      "kind": "HUMAN_VIEW_CSV",
+      "path": "04_DOCUMENTATION/data-view/clean-only/leads.csv",
+      "rowCount": 3,
+      "sha256": "ed1cd7b76248c2de75fa6581ca5014f7b51bacb37a52417c3682056322ddb87c"
+    },
+    {
+      "byteLength": 3630,
+      "kind": "DOCUMENT",
+      "path": "04_DOCUMENTATION/import-instructions.md",
+      "rowCount": null,
+      "sha256": "5c013e494bf72064874a2039829435010d5cf96a2b7f585b4cca01cb7ca3e200"
+    }
+  ],
+  "bundleId": "B-5dba632d0162229b",
+  "configHash": "0a58a269cff73471e39c06398b4dc04336c36f4c34ac3df25ef5760ec17806cd",
+  "coreVersion": "3.0.0",
+  "inputs": [
+    {
+      "byteLength": 535,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-a75de921c085",
+      "format": "CSV",
+      "path": "contacts.csv",
+      "sha256": "a75de921c085d053ccc45380647fe2a497802045c466113046e59c430f2296fc",
+      "sheets": [
+        {
+          "columnCount": 8,
+          "dataRowCount": 5,
+          "hidden": false,
+          "readerRowCount": 6,
+          "rejectedRowCount": 1,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    },
+    {
+      "byteLength": 305,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-8979c7b1f833",
+      "format": "CSV",
+      "path": "companies.csv",
+      "sha256": "8979c7b1f833f746f19f8f8326f7b6230d9b021083a60e11798f2ae80fd10af9",
+      "sheets": [
+        {
+          "columnCount": 6,
+          "dataRowCount": 4,
+          "hidden": false,
+          "readerRowCount": 5,
+          "rejectedRowCount": 1,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    },
+    {
+      "byteLength": 270,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-8e8781cb243c",
+      "format": "CSV",
+      "path": "deals.csv",
+      "sha256": "8e8781cb243c690fe61ebd4d2edbeb874100e551f6e9940dc824b7b488c853e7",
+      "sheets": [
+        {
+          "columnCount": 7,
+          "dataRowCount": 3,
+          "hidden": false,
+          "readerRowCount": 3,
+          "rejectedRowCount": 0,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    },
+    {
+      "byteLength": 51,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-3cdf04929c5b",
+      "format": "CSV",
+      "path": "contact-deals.csv",
+      "sha256": "3cdf04929c5b15ef245c162a66bc1df9dab15d791e7371011d2a3465444185d1",
+      "sheets": [
+        {
+          "columnCount": 2,
+          "dataRowCount": 4,
+          "hidden": false,
+          "readerRowCount": 4,
+          "rejectedRowCount": 0,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    },
+    {
+      "byteLength": 328,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-de04b0a4fefc",
+      "format": "CSV",
+      "path": "leads.csv",
+      "sha256": "de04b0a4fefc2a813bd7137736c59b39ec8895389c5ae5614c0baab02986e5da",
+      "sheets": [
+        {
+          "columnCount": 8,
+          "dataRowCount": 3,
+          "hidden": false,
+          "readerRowCount": 3,
+          "rejectedRowCount": 0,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    },
+    {
+      "byteLength": 50,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-21ded67ecb22",
+      "format": "CSV",
+      "path": "notes.csv",
+      "sha256": "21ded67ecb223b09cee675392ad107e74d4f90bee96c420880ee5ac0dfd150da",
+      "sheets": [
+        {
+          "columnCount": 2,
+          "dataRowCount": 2,
+          "hidden": false,
+          "readerRowCount": 2,
+          "rejectedRowCount": 0,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    }
+  ],
+  "manifestVersion": "2.1.0",
+  "relationshipCandidates": 12,
+  "runId": "run_e90ca5bd661856dd759ac49c",
+  "sourceProfileHash": null,
+  "sourceRegistryVersion": "2026-09-06",
+  "target": {
+    "adapterVersion": "1.0.0",
+    "importMode": "CREATE_ONLY",
+    "mode": "CLEAN_ONLY",
+    "targetContractHash": null
+  }
+}
