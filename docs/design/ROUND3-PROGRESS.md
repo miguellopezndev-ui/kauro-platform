@@ -58,6 +58,8 @@ both from the first line to the last. Then this ledger.
   state of a Clean your data project ("Delivered" proposed), the report's title per service, Home's six step names, and whether the
   registry primaries that conflict with the glossary are amended together. Until answered, screens use the proposals and mark them.
 
+- **Owner console, OQ-C1** (round3-owner/claims/BRIEF.md): should accepting a claim ask for the identity check? The contract says never (step-up: NEVER), but acceptance fixes who earns commission for 90 days. Until answered, the design follows the contract and says so on the slip.
+- **Owner console, OQ-R1 to OQ-R4** (round3-owner/refunds/BRIEF.md §8): may a refund request be decided before counsel answers; who writes what the customer reads after a refusal, and is there a closed list of reasons; does refusing need the identity check; after a refund, is a seller's held commission offset or voided. Until answered, the design shows counsel's state, drafts neutral refusal text as a proposal, asks for the identity check only on approval (money), and leaves the held line as held.
 - **Qualification import (HubSpot association step)** and the **issuer details** shown in documents: both open; the specimens say so.
 - **Codex** is not installed and needs a sign-in. A fresh-context agent plays the outside critic unless the owner sets Codex up.
 - **The engine's documents** (audit summary, importer guides, exception and trace files, manifest, README) are delivered as finished
