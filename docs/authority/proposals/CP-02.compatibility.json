@@ -1,0 +1,3028 @@
+{
+  "proposal": "CP-02",
+  "generatedBy": "tools/cp02.mjs; do not edit",
+  "base": {
+    "registry": {
+      "contracts.json": "9608c2de39ae0dc5e66c537d241a7257a190c581374aba2c63fd4a1c7d2f29d2",
+      "commands.json": "6fa1a124821609a5ac911779304e8876df1a6954c530e895604da107826af0b6",
+      "state_transitions.json": "5d770459eb0ce40148edcc31cd01ed72f07fcd1666853c2d8b3240b11d94a6f5",
+      "gates.json": "3be0a803d118a44351bf11b5d4b2568f7a8fc182e6ae651abc71eb2deb31fc2c",
+      "screens.json": "c9963d7ebe713d88c4f4d2af3ea2b1ad7d44e74c6649fc705f62f49e71a49f80",
+      "policy.json": "5ad638f13153723aa81f4cb49c9dd718c599988257f384858f20141fc6f2d23e",
+      "cases.json": "b0a7960d9c44f4d950ae60cf40f8dd61fd29c41d26713c5d76b96dada66302c1",
+      "additional_scenarios.json": "a0a46d8fc8c41821a1b9728fdd052fd7f59e3fa794b080f3015951e31873b363",
+      "requirements.json": "3bd812bb80ce7daac35283060916c1dfdd3de30d7566f62b5dd037be63066ae1",
+      "program.json": "24d14cd0dcd20762f7a725fb54e334389dbaf22a9117f71f5c06a9543ad02144"
+    },
+    "openapi": "deb1ada0e685c6cbc14ca00528485664a454117ac638e5622b4917e4c27dfdd8",
+    "cp01": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d"
+  },
+  "classes": {
+    "ADDITIVE": "No current consumer changes: a new contract, command, operation, case, policy key, or a relaxed request member.",
+    "TEXT": "Registry prose (precondition, effect, failure, case or requirement text); no shape changes.",
+    "COORDINATED": "A closed shape or vocabulary a current consumer validates gains a member or a value: the generated types, the web client and its guards are regenerated in the same change as the server (one re-issue), never one without the other.",
+    "BREAKING": "A current consumer breaks unless it changes its own logic: allowed only with a declared migration and the decision that accepted it."
+  },
+  "changes": [
+    {
+      "key": "REGISTRY:contracts.json:CommissionStatement.balance:FIELD_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:CommissionStatement.balance",
+      "change": "FIELD_ADDED",
+      "class": "COORDINATED",
+      "detail": "a new member of a closed shape: generated types and validators change with it",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/api/test/cmd051-close-commission-period.test.ts",
+        "apps/api/test/commission-statement-reads.test.ts",
+        "apps/api/test/integration-support.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/statements/index.ts",
+        "packages/application/src/commercial/views.ts",
+        "packages/application/test/commercial-contracts.test.ts",
+        "tools/review/private/prototypes/sales.ts"
+      ],
+      "declared": {
+        "key": "REGISTRY:contracts.json:CommissionStatement.balance:FIELD_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member: statements issued before adoption have none. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "REGISTRY:contracts.json:CommissionStatement.balanceItems:FIELD_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:CommissionStatement.balanceItems",
+      "change": "FIELD_ADDED",
+      "class": "COORDINATED",
+      "detail": "a new member of a closed shape: generated types and validators change with it",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/api/test/cmd051-close-commission-period.test.ts",
+        "apps/api/test/commission-statement-reads.test.ts",
+        "apps/api/test/integration-support.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/statements/index.ts",
+        "packages/application/src/commercial/views.ts",
+        "packages/application/test/commercial-contracts.test.ts",
+        "tools/review/private/prototypes/sales.ts"
+      ],
+      "declared": {
+        "key": "REGISTRY:contracts.json:CommissionStatement.balanceItems:FIELD_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member, as balance. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:Audit.targetContractId",
+      "change": "REQUIRED_TO_OPTIONAL",
+      "class": "BREAKING",
+      "detail": "readers that assume the member break",
+      "source": "CP-01",
+      "consumers": [
+        "apps/api/test/audit-reads.test.ts",
+        "apps/api/test/audit-role-matrix.test.ts",
+        "apps/api/test/audit-support.ts",
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/control/test/b08-end-to-end.test.ts",
+        "apps/web/src/api/generated.ts",
+        "apps/web/src/screens/health-check/model.ts",
+        "apps/web/src/screens/health-check/view.tsx",
+        "apps/web/test/health-check-screen.test.ts",
+        "apps/web/test/support/fixtures.ts",
+        "packages/application/src/audit/contracts.ts",
+        "packages/application/src/audit/handlers/cancel-audit.ts",
+        "packages/application/src/audit/handlers/projections.ts",
+        "packages/application/src/audit/handlers/reads.ts",
+        "packages/application/src/audit/index.ts",
+        "packages/application/src/audit/response-views.ts",
+        "packages/application/src/audit/views.ts",
+        "tools/review/private/lib/fixtures/money-states.ts"
+      ],
+      "declared": {
+        "key": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
+        "class": "BREAKING",
+        "acceptedBy": "F-01",
+        "migration": "CP-01.01. Existing audits all carry a target and keep it; only CLEAN audits started after adoption omit it. No module imports the registry Audit type, but its served projection does follow it: AuditView (GetAudit, CancelAudit) and the web client's AuditView type and guard, changed by CP-02.01 (declared on the served component). The audit records, persistence and every audit.*.v1 payload take it as optional for CLEAN in the backend order (C4), tests first."
+      }
+    },
+    {
+      "key": "REGISTRY:contracts.json:RetentionRecord.class:ENUM_WIDENED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:RetentionRecord.class",
+      "change": "ENUM_WIDENED",
+      "class": "COORDINATED",
+      "detail": "adds PENDING_PAYMENT_HOLD",
+      "source": "CP-01",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/sources/contracts.ts",
+        "packages/application/src/sources/handlers/projections.ts",
+        "packages/application/src/sources/index.ts",
+        "packages/application/src/sources/response-views.ts",
+        "packages/application/src/sources/views.ts",
+        "packages/domain/src/model/source/records.ts",
+        "tools/review/private/prototypes/delivery.ts",
+        "tools/review/private/prototypes/ui29-lifecycle.tsx"
+      ],
+      "declared": {
+        "key": "REGISTRY:contracts.json:RetentionRecord.class:ENUM_WIDENED",
+        "class": "COORDINATED",
+        "migration": "CP-01.11 (conditional). Adopted only with the hold; packages/domain/src/model/source/records.ts and the SQL class checks gain PENDING_PAYMENT_HOLD in the payments order (C5) with the re-issue."
+      }
+    },
+    {
+      "key": "REGISTRY:contracts.json:ProjectDate:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ProjectDate",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "11 fields",
+      "source": "CP-02.02"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ProjectDates:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ProjectDates",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "4 fields",
+      "source": "CP-02.02"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ProjectSummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ProjectSummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "12 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ProjectStageCount:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ProjectStageCount",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "2 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:BoardSummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:BoardSummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "5 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ClientSummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ClientSummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "6 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:FindingExampleRef:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:FindingExampleRef",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "4 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:AuditFindingSummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:AuditFindingSummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:PriceEstimate:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:PriceEstimate",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ActivityEntry:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ActivityEntry",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "8 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:BillingProfileSummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:BillingProfileSummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:BillingDocumentItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:BillingDocumentItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:PackageArtifactItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:PackageArtifactItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:PackageSummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:PackageSummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:DeletionRecordItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:DeletionRecordItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:RefundListItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:RefundListItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:contracts.json:RetentionExtension:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:RetentionExtension",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "14 fields",
+      "source": "CP-02.04"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ConsentRecord:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ConsentRecord",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "12 fields",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ConsentView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ConsentView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "REGISTRY:contracts.json:NotificationPreference:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:NotificationPreference",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "4 fields",
+      "source": "CP-02.06"
+    },
+    {
+      "key": "REGISTRY:contracts.json:NotificationPreferenceChoice:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:NotificationPreferenceChoice",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "3 fields",
+      "source": "CP-02.06"
+    },
+    {
+      "key": "REGISTRY:contracts.json:NotificationPreferences:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:NotificationPreferences",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "3 fields",
+      "source": "CP-02.06"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ClaimReview:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ClaimReview",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerClaimView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerClaimView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ClaimDecisionEntry:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ClaimDecisionEntry",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerClaimDecisionEntry:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerClaimDecisionEntry",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "5 fields",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerListItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerListItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:CustomerListItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:CustomerListItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:StatementPeriodItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:StatementPeriodItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:OwnerClaimItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:OwnerClaimItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerRecordView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerRecordView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "5 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerWonCustomer:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerWonCustomer",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "5 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerSchedule:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerSchedule",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "6 fields",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerMoneySummary:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerMoneySummary",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "14 fields",
+      "source": "CP-02.09"
+    },
+    {
+      "key": "REGISTRY:contracts.json:StatementBalance:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:StatementBalance",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "5 fields",
+      "source": "CP-02.10"
+    },
+    {
+      "key": "REGISTRY:contracts.json:StatementBalanceItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:StatementBalanceItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.10"
+    },
+    {
+      "key": "REGISTRY:contracts.json:AlertCondition:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:AlertCondition",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "3 fields",
+      "source": "CP-02.11"
+    },
+    {
+      "key": "REGISTRY:contracts.json:Alert:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:Alert",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "11 fields",
+      "source": "CP-02.11"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerAlertView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerAlertView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "8 fields",
+      "source": "CP-02.11"
+    },
+    {
+      "key": "REGISTRY:contracts.json:PolicyLegalStatus:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:PolicyLegalStatus",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "5 fields",
+      "source": "CP-02.12"
+    },
+    {
+      "key": "REGISTRY:contracts.json:StatementCsvRow:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:StatementCsvRow",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "14 fields",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "REGISTRY:contracts.json:OutreachAuthorizationRequest:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:OutreachAuthorizationRequest",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerOutreachRequestView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerOutreachRequestView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ClaimRefusal:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ClaimRefusal",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.14"
+    },
+    {
+      "key": "REGISTRY:contracts.json:IdentityGroupView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:IdentityGroupView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:contracts.json:PlanDecisionPreview:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:PlanDecisionPreview",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "6 fields",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:contracts.json:IdentityDecisionRecord:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:IdentityDecisionRecord",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "12 fields",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:contracts.json:RefundDecisionNotice:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:RefundDecisionNotice",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.16"
+    },
+    {
+      "key": "REGISTRY:contracts.json:TransferProof:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:TransferProof",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "10 fields",
+      "source": "CP-02.17"
+    },
+    {
+      "key": "REGISTRY:contracts.json:DirectServiceAssignment:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:DirectServiceAssignment",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "6 fields",
+      "source": "CP-02.18"
+    },
+    {
+      "key": "REGISTRY:contracts.json:BlockedImportRow:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:BlockedImportRow",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "3 fields",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "REGISTRY:contracts.json:ImportStageReconciliation:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:ImportStageReconciliation",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "6 fields",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "REGISTRY:contracts.json:FreeCheckAvailability:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:FreeCheckAvailability",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "2 fields",
+      "source": "CP-02.20"
+    },
+    {
+      "key": "REGISTRY:contracts.json:FreeCheckEligibility:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:FreeCheckEligibility",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "7 fields",
+      "source": "CP-02.20"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD002.precondition:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD002.precondition",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-02.21"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD020.precondition:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD020.precondition",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD020.failure:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD020.failure",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD027.precondition:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD027.precondition",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-02.21"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD041.effect:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD041.effect",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD060.precondition:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD060.precondition",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD060.failure:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD060.failure",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD065:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD065",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordConsent POST /api/v1/me/consents",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD066:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD066",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "WithdrawConsent POST /api/v1/me/consents/{consentId}/withdraw",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD067:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD067",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "SetNotificationPreferences POST /api/v1/me/notification-preferences",
+      "source": "CP-02.06"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD068:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD068",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RequestClaimReview POST /api/v1/sales/claims/{claimId}/review-requests",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD069:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD069",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RequestOutreachAuthorization POST /api/v1/ops/outreach/drafts/{draftId}/authorization-requests",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD070:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD070",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "DeclineOutreachAuthorizationRequest POST /api/v1/ops/outreach/authorization-requests/{requestId}/decline",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD071:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD071",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RefuseAttribution POST /api/v1/sales/claims/{claimId}/refuse",
+      "source": "CP-02.14"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD072:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD072",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "DecideClaimReview POST /api/v1/sales/claim-reviews/{reviewId}/decide",
+      "source": "CP-02.14"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD073:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD073",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ApplyProvenIdentity POST /api/v1/plans/{planId}/proven-identities",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD074:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD074",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "DecideMany POST /api/v1/plans/{planId}/decisions",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD075:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD075",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ChangeDecision POST /api/v1/plans/{planId}/decisions/{groupId}",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD076:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD076",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "UndoBatch POST /api/v1/plans/{planId}/batches/{batchId}/undo",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD077:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD077",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordRefundNoticeSent POST /api/v1/operations/refunds/{refundId}/notices",
+      "source": "CP-02.16"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD078:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD078",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordTransferProof POST /api/v1/payment-orders/{orderId}/transfer-proofs",
+      "source": "CP-02.17"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD079:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD079",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "AssignDirectService POST /api/v1/sales/agencies/{agencyId}/direct-service",
+      "source": "CP-02.18"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD080:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD080",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ChooseKeptRecordId POST /api/v1/projects/{projectId}/import-stages/{stageId}/kept-ids",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "REGISTRY:commands.json:CMD081:COMMAND_ADDED",
+      "layer": "REGISTRY",
+      "subject": "commands.json:CMD081",
+      "change": "COMMAND_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordFreeCheckEligibility POST /api/v1/me/free-check-eligibility",
+      "source": "CP-02.20"
+    },
+    {
+      "key": "REGISTRY:state_transitions.json:OutreachAuthorizationRequest:MACHINE_ADDED",
+      "layer": "REGISTRY",
+      "subject": "state_transitions.json:OutreachAuthorizationRequest",
+      "change": "MACHINE_ADDED",
+      "class": "ADDITIVE",
+      "detail": "3 transitions",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "REGISTRY:state_transitions.json:ClaimReview:MACHINE_ADDED",
+      "layer": "REGISTRY",
+      "subject": "state_transitions.json:ClaimReview",
+      "change": "MACHINE_ADDED",
+      "class": "ADDITIVE",
+      "detail": "2 transitions",
+      "source": "CP-02.14"
+    },
+    { "key": "REGISTRY:screens.json:UI03:TEXT_CHANGED", "layer": "REGISTRY", "subject": "screens.json:UI03", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    { "key": "REGISTRY:screens.json:UI07:TEXT_CHANGED", "layer": "REGISTRY", "subject": "screens.json:UI07", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    { "key": "REGISTRY:screens.json:UI29:TEXT_CHANGED", "layer": "REGISTRY", "subject": "screens.json:UI29", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    { "key": "REGISTRY:screens.json:RECORDS_ADDED", "layer": "REGISTRY", "subject": "screens.json", "change": "RECORDS_ADDED", "class": "ADDITIVE", "detail": "+2", "source": "CP-01 + CP-02.20" },
+    { "key": "REGISTRY:cases.json:CMD020-OK:TEXT_CHANGED", "layer": "REGISTRY", "subject": "cases.json:CMD020-OK", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    { "key": "REGISTRY:cases.json:CMD020-DENY:TEXT_CHANGED", "layer": "REGISTRY", "subject": "cases.json:CMD020-DENY", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    { "key": "REGISTRY:cases.json:CMD060-OK:TEXT_CHANGED", "layer": "REGISTRY", "subject": "cases.json:CMD060-OK", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    { "key": "REGISTRY:cases.json:CMD060-DENY:TEXT_CHANGED", "layer": "REGISTRY", "subject": "cases.json:CMD060-DENY", "change": "TEXT_CHANGED", "class": "TEXT", "detail": "", "source": "CP-01" },
+    {
+      "key": "REGISTRY:cases.json:RECORDS_ADDED",
+      "layer": "REGISTRY",
+      "subject": "cases.json",
+      "change": "RECORDS_ADDED",
+      "class": "ADDITIVE",
+      "detail": "+133",
+      "source": "CP-02.01 + CP-02.02 + CP-02.03 + CP-02.04 + CP-02.05 + CP-02.06 + CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.15 + CP-02.16 + CP-02.17 + CP-02.18 + CP-02.19 + CP-02.20 + CP-02.21"
+    },
+    {
+      "key": "REGISTRY:requirements.json:REQ-CMD020-DENY:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "requirements.json:REQ-CMD020-DENY",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:requirements.json:REQ-CMD060-DENY:TEXT_CHANGED",
+      "layer": "REGISTRY",
+      "subject": "requirements.json:REQ-CMD060-DENY",
+      "change": "TEXT_CHANGED",
+      "class": "TEXT",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:requirements.json:RECORDS_ADDED",
+      "layer": "REGISTRY",
+      "subject": "requirements.json",
+      "change": "RECORDS_ADDED",
+      "class": "ADDITIVE",
+      "detail": "+133",
+      "source": "CP-02.01 + CP-02.02 + CP-02.03 + CP-02.04 + CP-02.05 + CP-02.06 + CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.15 + CP-02.16 + CP-02.17 + CP-02.18 + CP-02.19 + CP-02.20 + CP-02.21"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-IC-KERNEL:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-IC-KERNEL",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+25",
+      "source": "CP-02.01 + CP-02.15"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-IC-PRIVACY:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-IC-PRIVACY",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+1",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-DOMAIN:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-DOMAIN",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+4",
+      "source": "CP-02.03 + CP-02.21"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-TENANT:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-TENANT",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+5",
+      "source": "CP-02.02 + CP-02.03 + CP-02.05 + CP-02.06"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-DELETE:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-DELETE",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+6",
+      "source": "CP-02.02 + CP-02.04"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-PAYMENT:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-PAYMENT",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+14",
+      "source": "CP-02.03 + CP-02.16 + CP-02.17"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-COMMERCIAL:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-COMMERCIAL",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+51",
+      "source": "CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.18"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-UX:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-UX",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+5",
+      "source": "CP-02.20"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-RECOVERY:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-RECOVERY",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+2",
+      "source": "CP-02.04 + CP-02.05"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-SECURITY:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-SECURITY",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+14",
+      "source": "CP-02.05 + CP-02.06 + CP-02.20"
+    },
+    {
+      "key": "REGISTRY:gates.json:G-VENDOR:CASES_ADDED_TO_GATE",
+      "layer": "REGISTRY",
+      "subject": "gates.json:G-VENDOR",
+      "change": "CASES_ADDED_TO_GATE",
+      "class": "ADDITIVE",
+      "detail": "+6",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.policyVersion:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.policyVersion",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.extendHardCapExceptions:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.extendHardCapExceptions",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.extendHardCapExceptions.UNPAID:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.extendHardCapExceptions.UNPAID",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.extendHardCapExceptions.UNPAID.onlyThroughTheProjectExtension:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.extendHardCapExceptions.UNPAID.onlyThroughTheProjectExtension",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.route:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.route",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.businessDaysFromAcceptedProof:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.businessDaysFromAcceptedProof",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.calendar:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.calendar",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ceilingDaysFromSeal:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ceilingDaysFromSeal",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.effectiveEnd:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.effectiveEnd",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.customerSeesEffectiveEnd:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.customerSeesEffectiveEnd",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.perQuote:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.perQuote",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.perSealedSet:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.perSealedSet",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.renewable:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.renewable",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.addsToExtension:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.addsToExtension",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.withExtension:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.withExtension",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.proof:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.proof",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.stepUpRequired:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.stepUpRequired",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.isPayment:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.isPayment",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.authorizesExecution:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.authorizesExecution",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.endedUnpaid:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.endedUnpaid",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.lateCredit:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.lateCredit",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview.fromEndedUnpaidHold:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview.fromEndedUnpaidHold",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview.rollingWindowDays:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview.rollingWindowDays",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:retention.pendingPaymentHold.ownerReview.scope:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:retention.pendingPaymentHold.ownerReview.scope",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:intelligence.freeAuditPauseBps:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:intelligence.freeAuditPauseBps",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalListVersion:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalListVersion",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalReasons:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalReasons",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerSees:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerSees",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.sellerSees:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.sellerSees",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.sellerMayRequestReview:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.sellerMayRequestReview",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule.mustNameARuleInForce:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule.mustNameARuleInForce",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule.mustBeVersioned:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule.mustBeVersioned",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.claimRefusalRules.ownerRule.retroactive:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.claimRefusalRules.ownerRule.retroactive",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.retainerDefaultCentsPerMonth:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.retainerDefaultCentsPerMonth",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.collectionPeriod:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.collectionPeriod",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.refundPeriod:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.refundPeriod",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.refundRewritesEarlierPeriods:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.refundRewritesEarlierPeriods",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.captureCountedOnce:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.captureCountedOnce",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:commission.amountStates:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:commission.amountStates",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    { "key": "REGISTRY:policy.json:alerts:POLICY_KEY_ADDED", "layer": "REGISTRY", "subject": "policy.json:alerts", "change": "POLICY_KEY_ADDED", "class": "ADDITIVE", "detail": "", "source": "CP-01" },
+    {
+      "key": "REGISTRY:policy.json:alerts.inactivityDays:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.inactivityDays",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.deadlineLeadDays:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.deadlineLeadDays",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.claimEndAlertDays:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.claimEndAlertDays",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.pilotReviewLeadDays:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.pilotReviewLeadDays",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.precedence:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.precedence",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.oneItemOnce:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.oneItemOnce",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.otherConditionsShownOnTheSameAlert:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.otherConditionsShownOnTheSameAlert",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.rule:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.rule",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.counts:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.counts",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.equivalentActCountsOnlyIf:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.equivalentActCountsOnlyIf",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.neverCounts:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.neverCounts",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.affects:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.affects",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:alerts.relevantProgress.neverExtends:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:alerts.relevantProgress.neverExtends",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.deterministicMerge",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge.onlyProvenIdentityKeys:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.deterministicMerge.onlyProvenIdentityKeys",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge.authority:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.deterministicMerge.authority",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.deterministicMerge.humanConfirmation:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.deterministicMerge.humanConfirmation",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.strongCandidateSignals:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.strongCandidateSignals",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidatesProveIdentity:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidatesProveIdentity",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization.email:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization.email",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization.fullName:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization.fullName",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.normalization.foldingToManufactureProof:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.normalization.foldingToManufactureProof",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision.maximumGroupsPerDecision:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision.maximumGroupsPerDecision",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision.exactPreview:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision.exactPreview",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.candidateDecision.explicitHumanApproval:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.candidateDecision.explicitHumanApproval",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.blockingConflicts:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.blockingConflicts",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:identityResolution.decisionRecord:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:identityResolution.decisionRecord",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:legalStatus:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:legalStatus",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:legalStatus.commission.claimRules:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:legalStatus.commission.claimRules",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:legalStatus.commission.claimRules.state:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:legalStatus.commission.claimRules.state",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:legalStatus.commission.claimRules.since:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:legalStatus.commission.claimRules.since",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:legalStatus.commission.claimRules.covers:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:legalStatus.commission.claimRules.covers",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "REGISTRY:policy.json:legalStatus.commission.claimRules.validation:POLICY_KEY_ADDED",
+      "layer": "REGISTRY",
+      "subject": "policy.json:legalStatus.commission.claimRules.validation",
+      "change": "POLICY_KEY_ADDED",
+      "class": "ADDITIVE",
+      "detail": "",
+      "source": "CP-01"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/billing-documents:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/billing-documents",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListBillingDocuments (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/billing-profile:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/billing-profile",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetBillingProfileSummary (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/board:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/board",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetBoardSummary (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/client-summaries:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/client-summaries",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListClientSummaries (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/deletion-records:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/deletion-records",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListDeletionRecords (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/refunds:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/refunds",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListRefunds (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/agencies/{agencyId}/support-cases:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/agencies/{agencyId}/support-cases",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListAgencySupportCases (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/audits/{auditId}/estimate:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/audits/{auditId}/estimate",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetPriceEstimate (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/audits/{auditId}/findings:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/audits/{auditId}/findings",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListAuditFindings (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/me/consents:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/me/consents",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordConsent (CP-02.05, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/me/consents:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/me/consents",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListMyConsents (CP-02.05, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/me/consents/{consentId}/withdraw:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/me/consents/{consentId}/withdraw",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "WithdrawConsent (CP-02.05, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/me/free-check-eligibility:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/me/free-check-eligibility",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordFreeCheckEligibility (CP-02.20, CONDITIONAL)",
+      "source": "CP-02.20"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/me/notification-preferences:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/me/notification-preferences",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "SetNotificationPreferences (CP-02.06, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.06"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/me/notification-preferences:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/me/notification-preferences",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetMyNotificationPreferences (CP-02.06, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.06"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/operations/refunds/{refundId}/notices:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/operations/refunds/{refundId}/notices",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordRefundNoticeSent (CP-02.16, PROPOSED)",
+      "source": "CP-02.16"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/alerts:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/alerts",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListOwnerAlerts (CP-02.11, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.11"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/consents:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/consents",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListConsentEvidence (CP-02.05, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.05"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/outreach/authorization-requests:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/outreach/authorization-requests",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListOutreachAuthorizationRequests (CP-02.13, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/ops/outreach/authorization-requests/{requestId}/decline:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/ops/outreach/authorization-requests/{requestId}/decline",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "DeclineOutreachAuthorizationRequest (CP-02.13, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/ops/outreach/drafts/{draftId}/authorization-requests:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/ops/outreach/drafts/{draftId}/authorization-requests",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RequestOutreachAuthorization (CP-02.13, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/outreach/my-authorization-requests:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/outreach/my-authorization-requests",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListMyOutreachAuthorizationRequests (CP-02.13, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/policy/legal-status:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/policy/legal-status",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListPolicyLegalStatus (CP-02.12, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.12"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/refunds:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/refunds",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListRefundsAcrossWorkspaces (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/claims:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/claims",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListClaimsAcrossSellers (CP-02.08, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/claims/{claimId}/history:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/claims/{claimId}/history",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetClaimHistory (CP-02.07, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/customers:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/customers",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListCustomers (CP-02.08, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/money:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/money",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListSellerMoney (CP-02.09, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.09"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/sellers:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/sellers",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListSellers (CP-02.08, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/sellers/{sellerId}:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/sellers/{sellerId}",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetSellerRecord (CP-02.08, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/ops/sales/statements:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/sales/statements",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListStatementsByPeriod (CP-02.08, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/packages/{packageId}:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/packages/{packageId}",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetPackage (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/payment-orders/{orderId}/transfer-proofs:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/payment-orders/{orderId}/transfer-proofs",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RecordTransferProof (CP-02.17, BLOCKED_EXTERNAL)",
+      "source": "CP-02.17"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/plans/{planId}/batches/{batchId}/undo:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/plans/{planId}/batches/{batchId}/undo",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "UndoBatch (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/plans/{planId}/decision-preview:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/plans/{planId}/decision-preview",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetDecisionPreview (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/plans/{planId}/decisions:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/plans/{planId}/decisions",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "DecideMany (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/plans/{planId}/decisions/{groupId}:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/plans/{planId}/decisions/{groupId}",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ChangeDecision (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/plans/{planId}/identity-decisions:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/plans/{planId}/identity-decisions",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListIdentityDecisionRecords (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/plans/{planId}/identity-groups:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/plans/{planId}/identity-groups",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListIdentityGroups (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/plans/{planId}/proven-identities:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/plans/{planId}/proven-identities",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ApplyProvenIdentity (CP-02.15, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.15"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/projects/{projectId}/activity:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/projects/{projectId}/activity",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListProjectActivity (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/projects/{projectId}/dates:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/projects/{projectId}/dates",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetProjectDates (CP-02.02, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.02"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/projects/{projectId}/import-stages/{stageId}/kept-ids:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/projects/{projectId}/import-stages/{stageId}/kept-ids",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ChooseKeptRecordId (CP-02.19, BLOCKED_EXTERNAL)",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/projects/{projectId}/import-stages/{stageId}/reconciliation:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/projects/{projectId}/import-stages/{stageId}/reconciliation",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetImportStageReconciliation (CP-02.19, BLOCKED_EXTERNAL)",
+      "source": "CP-02.19"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/projects/{projectId}/summary:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/projects/{projectId}/summary",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetProjectSummary (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/public/free-check/availability:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/public/free-check/availability",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetFreeCheckAvailability (CP-02.20, CONDITIONAL)",
+      "source": "CP-02.20"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/refunds/{refundId}/notice:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/refunds/{refundId}/notice",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetRefundDecisionNotice (CP-02.16, PROPOSED)",
+      "source": "CP-02.16"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/sales/agencies/{agencyId}/direct-service:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/sales/agencies/{agencyId}/direct-service",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "AssignDirectService (CP-02.18, PROPOSED)",
+      "source": "CP-02.18"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/sales/alerts:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/sales/alerts",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListMyAlerts (CP-02.11, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.11"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/sales/claim-reviews/{reviewId}/decide:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/sales/claim-reviews/{reviewId}/decide",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "DecideClaimReview (CP-02.14, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.14"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/sales/claims:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/sales/claims",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListMyClaims (CP-02.07, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/sales/claims/{claimId}/history:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/sales/claims/{claimId}/history",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetMyClaimHistory (CP-02.07, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/sales/claims/{claimId}/refuse:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/sales/claims/{claimId}/refuse",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RefuseAttribution (CP-02.14, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.14"
+    },
+    {
+      "key": "OPENAPI:POST /api/v1/sales/claims/{claimId}/review-requests:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "POST /api/v1/sales/claims/{claimId}/review-requests",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "RequestClaimReview (CP-02.07, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.07"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/sales/money:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/sales/money",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetMyMoney (CP-02.09, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.09"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/sales/schedule:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/sales/schedule",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "GetSellerSchedule (CP-02.08, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.08"
+    },
+    {
+      "key": "OPENAPI:GET /api/v1/sales/statements/{statementId}/export:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/sales/statements/{statementId}/export",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ExportCommissionStatement (CP-02.13, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.13"
+    },
+    {
+      "key": "OPENAPI:components/StartAuditRequest.targetContractId:REQUIRED_TO_OPTIONAL",
+      "layer": "OPENAPI",
+      "subject": "components/StartAuditRequest.targetContractId",
+      "change": "REQUIRED_TO_OPTIONAL",
+      "class": "ADDITIVE",
+      "detail": "clients may omit it",
+      "source": "CP-02.01"
+    },
+    {
+      "key": "OPENAPI:StartAudit:INVALID_REQUEST/TARGET_CONTRACT_REQUIRED:OUTCOME_ADDED",
+      "layer": "OPENAPI",
+      "subject": "StartAudit:INVALID_REQUEST/TARGET_CONTRACT_REQUIRED",
+      "change": "OUTCOME_ADDED",
+      "class": "COORDINATED",
+      "detail": "a served operation answers a new reason; frontends branch on reason",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/cmd042-request-deletion.test.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/audit/handlers/start-audit.ts",
+        "packages/application/src/audit/outcomes.ts",
+        "packages/domain/src/model/audit/failure-reasons.ts",
+        "packages/persistence/src/audit/store.ts",
+        "packages/persistence/test/audit-adapters.test.ts",
+        "packages/persistence/test/b05-dispatch-settlement.test.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:StartAudit:INVALID_REQUEST/TARGET_CONTRACT_REQUIRED:OUTCOME_ADDED",
+        "class": "COORDINATED",
+        "migration": "Same status as today (400); the reason was SCHEMA_VIOLATION (REQUIRED). Clients that branch on status see no change; the web maps the new reason to the same message. Added to audit/outcomes.ts and FAILURE_REASONS with the handler."
+      }
+    },
+    {
+      "key": "OPENAPI:StartAudit:INVALID_REQUEST/TARGET_NOT_APPLICABLE:OUTCOME_ADDED",
+      "layer": "OPENAPI",
+      "subject": "StartAudit:INVALID_REQUEST/TARGET_NOT_APPLICABLE",
+      "change": "OUTCOME_ADDED",
+      "class": "COORDINATED",
+      "detail": "a served operation answers a new reason; frontends branch on reason",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/cmd042-request-deletion.test.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/audit/handlers/start-audit.ts",
+        "packages/application/src/audit/outcomes.ts",
+        "packages/domain/src/model/audit/failure-reasons.ts",
+        "packages/persistence/src/audit/store.ts",
+        "packages/persistence/test/audit-adapters.test.ts",
+        "packages/persistence/test/b05-dispatch-settlement.test.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:StartAudit:INVALID_REQUEST/TARGET_NOT_APPLICABLE:OUTCOME_ADDED",
+        "class": "COORDINATED",
+        "migration": "New refusal only for a CLEAN project that sends a target, which no current client does for CLEAN (CLEAN cannot reach an audit today). Added with the handler."
+      }
+    },
+    {
+      "key": "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL",
+      "layer": "OPENAPI",
+      "subject": "components/AuditView.targetContractId",
+      "change": "REQUIRED_TO_OPTIONAL",
+      "class": "BREAKING",
+      "detail": "readers that assume it break",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/audit-reads.test.ts",
+        "apps/api/test/audit-role-matrix.test.ts",
+        "apps/api/test/audit-support.ts",
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/control/test/b08-end-to-end.test.ts",
+        "apps/web/src/api/generated.ts",
+        "apps/web/src/screens/health-check/model.ts",
+        "apps/web/src/screens/health-check/view.tsx",
+        "apps/web/test/health-check-screen.test.ts",
+        "apps/web/test/support/fixtures.ts",
+        "packages/application/src/audit/contracts.ts",
+        "packages/application/src/audit/handlers/cancel-audit.ts",
+        "packages/application/src/audit/handlers/projections.ts",
+        "packages/application/src/audit/handlers/reads.ts",
+        "packages/application/src/audit/index.ts",
+        "packages/application/src/audit/response-views.ts",
+        "packages/application/src/audit/views.ts",
+        "tools/review/private/lib/fixtures/money-states.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL",
+        "class": "BREAKING",
+        "acceptedBy": "F-01",
+        "consequenceOf": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
+        "migration": "The served consequence of CP-01.01: the web client is regenerated with the server (isAuditView accepts an audit without a target), the audit screens show no target for CLEAN, packages/application/src/audit/views.ts and response-views.ts serve it as optional; server and web deployed together (C4, C9)."
+      }
+    },
+    {
+      "key": "OPENAPI:components/RetentionExtensionView.retentionClass:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/RetentionExtensionView.retentionClass",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/response-schemas.ts",
+        "packages/application/src/api/views.ts",
+        "packages/application/src/commands/contracts.ts",
+        "packages/application/src/index.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/RetentionExtensionView.retentionClass:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/RetentionExtensionView.ceilingDeadline:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/RetentionExtensionView.ceilingDeadline",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/response-schemas.ts",
+        "packages/application/src/api/views.ts",
+        "packages/application/src/commands/contracts.ts",
+        "packages/application/src/index.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/RetentionExtensionView.ceilingDeadline:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/RetentionExtensionView.ceilingRule:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/RetentionExtensionView.ceilingRule",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/response-schemas.ts",
+        "packages/application/src/api/views.ts",
+        "packages/application/src/commands/contracts.ts",
+        "packages/application/src/index.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/RetentionExtensionView.ceilingRule:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/RetentionExtensionView.previousHardDeadline:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/RetentionExtensionView.previousHardDeadline",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/response-schemas.ts",
+        "packages/application/src/api/views.ts",
+        "packages/application/src/commands/contracts.ts",
+        "packages/application/src/index.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/RetentionExtensionView.previousHardDeadline:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:RequestRetentionExtension:PRECONDITION_FAILED/NO_EXTENDABLE_RECORD:OUTCOME_MEANING_CHANGED",
+      "layer": "OPENAPI",
+      "subject": "RequestRetentionExtension:PRECONDITION_FAILED/NO_EXTENDABLE_RECORD",
+      "change": "OUTCOME_MEANING_CHANGED",
+      "class": "COORDINATED",
+      "detail": "the same token now covers a different situation; copy and branching that relied on the old meaning must follow",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/outcomes.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts",
+        "packages/domain/src/model/errors.ts",
+        "packages/domain/src/model/source/records.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:RequestRetentionExtension:PRECONDITION_FAILED/NO_EXTENDABLE_RECORD:OUTCOME_MEANING_CHANGED",
+        "class": "COORDINATED",
+        "migration": "The token stays; it stops covering an UNPAID-only project once the backend writes the UNPAID soft deadline (C6). The web copy for UNPAID projects moves from \"not available before purchase\" to the extension offer in the same change."
+      }
+    },
+    {
+      "key": "OPENAPI:RequestRetentionExtension:PRECONDITION_FAILED/NO_EXTENSION_ROOM:OUTCOME_MEANING_CHANGED",
+      "layer": "OPENAPI",
+      "subject": "RequestRetentionExtension:PRECONDITION_FAILED/NO_EXTENSION_ROOM",
+      "change": "OUTCOME_MEANING_CHANGED",
+      "class": "COORDINATED",
+      "detail": "the same token now covers a different situation; copy and branching that relied on the old meaning must follow",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/outcomes.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts",
+        "packages/domain/src/model/errors.ts",
+        "packages/domain/src/model/source/records.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:RequestRetentionExtension:PRECONDITION_FAILED/NO_EXTENSION_ROOM:OUTCOME_MEANING_CHANGED",
+        "class": "COORDINATED",
+        "migration": "The ceiling for UNPAID becomes seal + 17 days; the web copy names the ceiling from ceilingDeadline."
+      }
+    },
+    {
+      "key": "OPENAPI:RequestRetentionExtension:PRECONDITION_FAILED/EXTENSION_ALREADY_USED:OUTCOME_MEANING_CHANGED",
+      "layer": "OPENAPI",
+      "subject": "RequestRetentionExtension:PRECONDITION_FAILED/EXTENSION_ALREADY_USED",
+      "change": "OUTCOME_MEANING_CHANGED",
+      "class": "COORDINATED",
+      "detail": "the same token now covers a different situation; copy and branching that relied on the old meaning must follow",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/api/outcomes.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts",
+        "packages/domain/src/model/errors.ts",
+        "packages/domain/src/model/source/records.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:RequestRetentionExtension:PRECONDITION_FAILED/EXTENSION_ALREADY_USED:OUTCOME_MEANING_CHANGED",
+        "class": "COORDINATED",
+        "migration": "Behaviour unchanged (one per project already); the meaning now names the free check explicitly. Copy only."
+      }
+    },
+    {
+      "key": "OPENAPI:components/CommissionStatementView.balance:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/CommissionStatementView.balance",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/api/test/cmd051-close-commission-period.test.ts",
+        "apps/api/test/commission-statement-reads.test.ts",
+        "apps/api/test/integration-support.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/statements/index.ts",
+        "packages/application/src/commercial/views.ts",
+        "packages/application/test/commercial-contracts.test.ts",
+        "tools/review/private/prototypes/sales.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/CommissionStatementView.balance:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "The statement read computes the balance for every statement, also old ones (from their items). Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.kind:ENUM_WIDENED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.kind",
+      "change": "ENUM_WIDENED",
+      "class": "COORDINATED",
+      "detail": "adds RETAINER",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.kind:ENUM_WIDENED",
+        "class": "COORDINATED",
+        "migration": "RETAINER appears only where a signed agreement sets a retainer (default 0). Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.direction:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.direction",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.direction:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.refundId:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.refundId",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.refundId:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.projectId:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.projectId",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.projectId:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.adjustedLineId:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.adjustedLineId",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.adjustedLineId:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.clauseRef:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.clauseRef",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.clauseRef:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceItemView.accrualMonthStart:PROPERTY_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceItemView.accrualMonthStart",
+      "change": "PROPERTY_ADDED",
+      "class": "COORDINATED",
+      "detail": "a closed reply gains a member: the generated web client and its guards must be regenerated with the server",
+      "source": "CP-02.10",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/views.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/StatementBalanceItemView.accrualMonthStart:PROPERTY_ADDED",
+        "class": "COORDINATED",
+        "migration": "Optional member. Regenerate @kauro/contracts, apps/api/openapi.json and apps/web/src/api/generated.ts in the change that serves it (tools/openapi.mjs and tools/web-client.mjs checks fail otherwise), server and web deployed together."
+      }
+    },
+    {
+      "key": "OPENAPI:components/StatementBalanceView:COMPONENT_ADDED",
+      "layer": "OPENAPI",
+      "subject": "components/StatementBalanceView",
+      "change": "COMPONENT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "referenced by GetCommissionStatement",
+      "source": "CP-02.10"
+    },
+    {
+      "key": "OPENAPI:components/RetentionView.class:ENUM_WIDENED",
+      "layer": "OPENAPI",
+      "subject": "components/RetentionView.class",
+      "change": "ENUM_WIDENED",
+      "class": "COORDINATED",
+      "detail": "adds PENDING_PAYMENT_HOLD",
+      "source": "CP-02.17",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/sources/contracts.ts",
+        "packages/application/src/sources/handlers/projections.ts",
+        "packages/application/src/sources/index.ts",
+        "packages/application/src/sources/response-views.ts",
+        "packages/application/src/sources/views.ts",
+        "tools/review/private/prototypes/delivery.ts",
+        "tools/review/private/prototypes/ui29-lifecycle.tsx"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/RetentionView.class:ENUM_WIDENED",
+        "class": "COORDINATED",
+        "migration": "CP-02.17 (blocked with CP-01.11): the revision read and the web client learn PENDING_PAYMENT_HOLD only when the hold is activated."
+      }
+    },
+    {
+      "key": "OPENAPI:components/ActivateAgencyRequest.billingProfileRef:REQUIRED_TO_OPTIONAL",
+      "layer": "OPENAPI",
+      "subject": "components/ActivateAgencyRequest.billingProfileRef",
+      "change": "REQUIRED_TO_OPTIONAL",
+      "class": "ADDITIVE",
+      "detail": "clients may omit it",
+      "source": "CP-02.21"
+    },
+    {
+      "key": "OPENAPI:CreateQuote:PRECONDITION_FAILED/BILLING_PROFILE_MISMATCH:OUTCOME_MEANING_CHANGED",
+      "layer": "OPENAPI",
+      "subject": "CreateQuote:PRECONDITION_FAILED/BILLING_PROFILE_MISMATCH",
+      "change": "OUTCOME_MEANING_CHANGED",
+      "class": "COORDINATED",
+      "detail": "the same token now covers a different situation; copy and branching that relied on the old meaning must follow",
+      "source": "CP-02.21",
+      "consumers": [
+        "apps/api/src/commissions/sweeps.ts",
+        "apps/api/test/b10-failure-cells-replacement.test.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/outcomes.ts",
+        "packages/application/src/commercial/quotes/create-quote.ts",
+        "packages/application/src/commercial/quotes/outcomes.ts",
+        "packages/application/src/commercial/quotes/replacement.ts",
+        "packages/domain/src/commerce/fiscal.ts",
+        "packages/domain/src/commercial/failure-reasons.ts",
+        "packages/domain/src/model/errors.ts",
+        "packages/persistence/src/repositories/commercial-recurrence.ts",
+        "packages/persistence/src/sqlstate.ts",
+        "packages/persistence/test/b10-recurrence-adapters.test.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:CreateQuote:PRECONDITION_FAILED/BILLING_PROFILE_MISMATCH:OUTCOME_MEANING_CHANGED",
+        "class": "COORDINATED",
+        "migration": "CP-02.21 (proposed). Only if the owner moves the billing profile to the first quote; the quote page then asks for the profile."
+      }
+    },
+    {
+      "key": "OPENAPI:components/Problem.reason:ENUM_WIDENED",
+      "layer": "OPENAPI",
+      "subject": "components/Problem.reason",
+      "change": "ENUM_WIDENED",
+      "class": "COORDINATED",
+      "detail": "adds AUDIT_NOT_FINISHED, UNITS_OUTSIDE_PUBLISHED_BANDS, DOCUMENT_VERSION_NOT_PUBLISHED, CONSENT_CHANNEL_INVALID, CONSENT_NOT_WITHDRAWABLE_HERE, ESSENTIAL_NOT_OPTIONAL, DUPLICATE_CHOICE, REVIEW_ALREADY_REQUESTED, DRAFT_SUPERSEDED, REQUEST_ALREADY_OPEN, REQUEST_NOT_OPEN, REFUSAL_REASON_UNKNOWN, REFUSAL_LIST_VERSION_STALE, NOTE_REQUIRED, CLAIM_NOT_REFUSABLE, OWNER_RULE_REFERENCE_REQUIRED, OWNER_RULE_NOT_IN_FORCE, REVIEW_NOT_OPEN, PREVIEW_STALE, NOT_PROVEN_IDENTITY, EXTERNAL_ID_NOT_VERIFIED, PLAN_NOT_EDITABLE, BATCH_TOO_LARGE, GROUP_BLOCKED, BATCH_NOT_LATEST, NOTICE_NOT_PENDING, PROOF_REQUIRED, HOLD_ALREADY_USED, CEILING_REACHED, AMOUNT_OR_REFERENCE_MISMATCH, OWNER_REVIEW_REQUIRED, EFFECTIVE_DATE_IN_PAST, ID_NOT_IN_EVIDENCE, PROCESSING_AUTHORIZATION_MISSING, TARGET_CONTRACT_REQUIRED, TARGET_NOT_APPLICABLE",
+      "source": "CP-02 (every item that adds a reason)",
+      "consumers": [
+        "apps/api/test/outcome-catalogue.test.ts",
+        "apps/web/src/api/generated.ts",
+        "apps/web/test/states.test.ts",
+        "packages/application/src/api/outcome-kit.ts",
+        "packages/application/src/api/outcomes.ts",
+        "packages/application/src/audit/handlers/submit-stage-receipt.ts",
+        "packages/application/src/audit/outcomes.ts",
+        "packages/application/src/branding/outcomes.ts",
+        "packages/application/src/commands/handlers/revise-plan.ts",
+        "packages/application/src/commerce/bank/approve-destination.ts",
+        "packages/application/src/commerce/bank/execute-refund.ts",
+        "packages/application/src/commerce/bank/inbound.ts",
+        "packages/application/src/commerce/bank/instructions.ts",
+        "packages/application/src/commerce/bank/ports.ts",
+        "packages/application/src/commerce/bank/route-config.ts",
+        "packages/application/src/commerce/bank/settlement.ts",
+        "packages/application/src/commerce/outcomes.ts",
+        "packages/application/src/commercial/operations/outcomes.ts",
+        "packages/application/src/commercial/outcomes.ts",
+        "packages/application/src/commercial/outreach/outcomes.ts",
+        "packages/application/src/commercial/quotes/create-quote.ts",
+        "packages/application/src/commercial/quotes/outcomes.ts",
+        "packages/application/src/commercial/sellers/outcomes.ts",
+        "packages/application/src/commercial/sellers/owner-tools/handlers.ts",
+        "packages/application/src/commercial/sellers/owner-tools/outcomes.ts",
+        "packages/application/src/commercial/statements/outcomes.ts",
+        "packages/application/src/execution/handlers/authorize-download.ts",
+        "packages/application/src/execution/outcomes.ts",
+        "packages/application/src/sources/handlers/reserve-upload.ts",
+        "packages/application/src/sources/handlers/selection-rules.ts",
+        "packages/application/src/sources/outcomes.ts",
+        "packages/application/test/commerce-core.test.ts",
+        "packages/application/test/handlers.test.ts",
+        "packages/authorization/test/authorizer.test.ts",
+        "packages/domain/src/commerce/authority.ts",
+        "packages/domain/src/commerce/failure-reasons.ts",
+        "packages/domain/src/commerce/records.ts",
+        "packages/domain/src/commercial/failure-reasons.ts",
+        "packages/domain/src/commercial/outreach.ts",
+        "packages/domain/src/model/errors.ts",
+        "packages/domain/src/model/execution/failure-reasons.ts",
+        "packages/domain/src/model/import-stage.ts",
+        "packages/domain/src/model/membership.ts",
+        "packages/domain/test/commercial-rules.test.ts",
+        "packages/domain/test/end-client-project.test.ts",
+        "packages/domain/test/identity-authorization.test.ts",
+        "packages/domain/test/membership.test.ts",
+        "packages/persistence/src/repositories/bank-refunds.ts",
+        "packages/persistence/src/repositories/commercial-outreach-send.ts",
+        "packages/persistence/src/sqlstate.ts",
+        "packages/persistence/test/adapters-commerce-unit-of-work.test.ts",
+        "packages/persistence/test/source-adapters.test.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/Problem.reason:ENUM_WIDENED",
+        "class": "COORDINATED",
+        "migration": "Every new reason enters packages/domain FAILURE_REASONS and the outcome catalogues with the handler that answers it, and the web client is regenerated; unknown reasons already fall back to the code (frontends branch on code, then reason). Only the reasons of adopted items are added at each re-issue."
+      }
+    },
+    {
+      "key": "EVENTS:audit.queued.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.queued.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/cmd020-start-audit.test.ts",
+        "apps/control/src/audit/orchestration.ts",
+        "apps/control/test/audit-orchestration.test.ts",
+        "apps/control/test/b05-grant-dispatch.test.ts",
+        "apps/control/test/b05-reconciliation-clock.test.ts",
+        "apps/control/test/b16-deletion-executor.test.ts",
+        "apps/control/test/grant-reconciliation.test.ts",
+        "packages/domain/src/model/audit/events.ts",
+        "packages/domain/test/audit-model.test.ts",
+        "packages/persistence/src/audit/store.ts",
+        "packages/persistence/test/audit-adapters.test.ts",
+        "packages/persistence/test/audit-migrations.test.ts",
+        "packages/persistence/test/b05-effect-clock.test.ts",
+        "tools/matrix.mjs",
+        "tools/test/matrix.test.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:audit.queued.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. The audit domain and AUDIT_ORCHESTRATION read the key as optional for CLEAN, in the backend order (C4), tests first."
+      }
+    },
+    {
+      "key": "EVENTS:audit.profiling.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.profiling.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/control/src/audit/orchestration.ts",
+        "apps/control/test/audit-orchestration.test.ts",
+        "packages/domain/src/model/audit/events.ts",
+        "packages/persistence/src/audit/store.ts",
+        "tools/matrix.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:audit.profiling.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.interpreting.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.interpreting.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["apps/control/src/audit/orchestration.ts", "apps/control/test/audit-orchestration.test.ts", "packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.interpreting.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.validating.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.validating.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["apps/control/src/audit/orchestration.ts", "apps/control/test/audit-orchestration.test.ts", "packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.validating.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.draft_ready.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.draft_ready.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["apps/control/test/audit-orchestration.test.ts", "packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.draft_ready.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.needs_decision.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.needs_decision.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.needs_decision.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.unsupported.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.unsupported.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.unsupported.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.failed.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.failed.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.failed.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.cancelled.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.cancelled.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/control/src/audit/orchestration.ts",
+        "packages/domain/src/model/audit/events.ts",
+        "packages/domain/test/audit-model.test.ts",
+        "packages/persistence/src/audit/store.ts",
+        "packages/persistence/test/audit-migrations.test.ts",
+        "tools/matrix.mjs",
+        "tools/test/matrix.test.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:audit.cancelled.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.expired.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.expired.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.expired.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:retention_record.extended.v1:retentionClass:VALUES_WIDENED",
+      "layer": "EVENTS",
+      "subject": "retention_record.extended.v1:retentionClass",
+      "change": "VALUES_WIDENED",
+      "class": "COORDINATED",
+      "detail": "UNPAID: the AUTHORITY_JOURNAL consumer replays an UNPAID extension like a paid one",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/api/test/cmd060-request-retention-extension.test.ts",
+        "apps/control/src/consumers/authority-journal.ts",
+        "apps/control/src/recovery/journal-tail.ts",
+        "apps/control/src/recovery/restore-runner.ts",
+        "apps/control/test/b16-restore.test.ts",
+        "packages/application/src/ports/source-providers.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts",
+        "packages/application/test/source-contracts.test.ts",
+        "packages/domain/src/model/events.ts",
+        "packages/domain/test/source-model.test.ts"
+      ],
+      "declared": {
+        "key": "EVENTS:retention_record.extended.v1:retentionClass:VALUES_WIDENED",
+        "class": "COORDINATED",
+        "migration": "CP-02.04. AUTHORITY_JOURNAL and the restore journal accept UNPAID extensions in the retention order (C6)."
+      }
+    },
+    {
+      "key": "EVENTS:quote.withdrawn.v1:withdrawalCode:KEY_ADDED",
+      "layer": "EVENTS",
+      "subject": "quote.withdrawn.v1:withdrawalCode",
+      "change": "KEY_ADDED",
+      "class": "COORDINATED",
+      "detail": "withdrawalCode PLAN_REVISED when a plan revision withdraws the open quote; the allowlist and its migration seed change together",
+      "source": "CP-02.15",
+      "consumers": [
+        "apps/api/test/b10-failure-cells-replacement.test.ts",
+        "apps/api/test/cmd027-create-quote.test.ts",
+        "apps/api/test/cmd043-close-agency.test.ts",
+        "packages/application/src/commercial/served.ts",
+        "packages/domain/src/commerce/events.ts",
+        "packages/domain/test/commerce-critique.test.ts",
+        "packages/persistence/test/b09-critique.test.ts",
+        "packages/persistence/test/b09-migrations.test.ts",
+        "packages/persistence/test/b10-recurrence-migrations.test.ts",
+        "tools/matrix.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:quote.withdrawn.v1:withdrawalCode:KEY_ADDED",
+        "class": "COORDINATED",
+        "migration": "CP-02.15. COMMERCE_EVENT_PAYLOAD_ALLOWLIST and the event-type seed migration change in the same commit (the persistence tests prove they are equal)."
+      }
+    }
+  ]
+}
