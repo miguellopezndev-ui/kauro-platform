@@ -20,6 +20,8 @@ import type { DestinationAdapter, RelationshipSupport, VendorFieldSpec, VendorOb
  */
 
 const REVIEWED_ON = '2026-09-01';
+/** The source N1-1 added, for the Data Loader step the import instructions describe (D78). */
+const N1_REVIEWED_ON = '2026-10-22';
 
 function field(canonicalField: CanonicalFieldName, header: string, maxLength: number | null = null): VendorFieldSpec {
   return { canonicalField, header, maxLength };
@@ -640,6 +642,12 @@ const SALESFORCE_ADAPTER: DestinationAdapter = {
       url: 'https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_platform_bulkapi.htm',
       reviewedOn: REVIEWED_ON,
       scope: 'Bulk API limits: 131,072 characters per field, 5,000 fields per record, the daily record allowance.',
+    },
+    {
+      url: 'https://github.com/forcedotcom/dataloader/blob/v67.0.0/src/main/java/com/salesforce/dataloader/action/AbstractAction.java',
+      reviewedOn: N1_REVIEWED_ON,
+      scope:
+        'Data Loader result files, read in the vendor source of v67.0.0 (openSuccessWriter, openErrorWriter; AbstractLoadAction.getStatusColumns): the success file is ID, every column of the input row whether mapped or not, then STATUS; the error file is every input column, then ERROR. SOAP and Bulk API 1.0 paths; not run.',
     },
   ],
   customFieldHeader: (label) => label,

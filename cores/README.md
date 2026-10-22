@@ -10,11 +10,19 @@ The platform does not build from these sources. It consumes the pinned tarballs 
 
 | directory | core | version | source commit | status |
 |---|---|---|---|---|
-| `kauro-migration-core/` | Migration Core | 3.0.0 | `3b4b0aea4f1879ffb4189a55a16f22f4520787d4` (tag `v3.0.0`, `main`) | RELEASED |
+| `kauro-migration-core/` | Migration Core | 3.1.0 | this tree (Order 13, N1-1, on 3.0.0 `3b4b0aea4f1879ffb4189a55a16f22f4520787d4`) | PREPARED_UNRELEASED |
 | `kauro-intelligence-core/` | Intelligence Core | 0.6.0 | `4fee8d1bd5045552326f022837525b247f0e1a21` (branch `b04/preflight-fixes`) | PROVISIONAL_UNRELEASED |
 
-Each directory is the exact tree of its commit (`git archive`), byte-exact (`cores/** -text -eol` in `.gitattributes`). Each
-rebuilds to the vendored tarball byte for byte (verified 2026-10-15, Node 24.20.0, npm 11.19.0):
+Each directory started as the exact tree of its commit (`git archive`), byte-exact (`cores/** -text -eol` in `.gitattributes`).
+
+**Migration Core 3.0.0 is the immutable reference, and the platform still consumes it.** Order 13 (N1-1, 2026-10-22) changed
+`kauro-migration-core/` into 3.1.0: prepared and tested, not released, not vendored (`kauro-migration-core/docs/work/
+N1-1_MIGRATION_CORE.md`, decision D78). The 3.0.0 sources are tag `v3.0.0` of `archive/kauro-migration-core.bundle`; its tarball is
+`vendor/kauro-migration-core-3.0.0.tgz`, unchanged. Until 3.1.0 is released at the N1 closing integration, the first command below
+reproduces the 3.0.0 tarball only from a checkout of that tag (`git clone archive/kauro-migration-core.bundle <dir> && git -C <dir>
+checkout v3.0.0`), not from this directory.
+
+Each rebuilt to its vendored tarball byte for byte (verified 2026-10-15, Node 24.20.0, npm 11.19.0):
 
 ```
 cd cores/kauro-migration-core && npm ci && npm run build && node tools/pack.mjs --out <dir>

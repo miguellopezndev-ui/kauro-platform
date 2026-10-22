@@ -135,12 +135,34 @@ export function renderImportInstructions(input: InstructionsInput): string {
     write('This plan declares no relationships, so there is nothing to associate.');
     write();
   } else {
+    // One pass over the edges, tallied by type and disposition: at most three
+    // types and four dispositions, whatever the size of the source.
+    const tally = new Map<string, number>();
+    for (const edge of truth.edges) {
+      const key = `${edge.relationshipType}|${edge.disposition}`;
+      tally.set(key, (tally.get(key) ?? 0) + 1);
+    }
+    const count = (type: string, disposition: string): number => tally.get(`${type}|${disposition}`) ?? 0;
     for (const type of relationships) {
       const shape = relationshipShape(type as RelationshipType);
+      const path = `${IMPORT_AREA}/${adapter.importDirectory}/associations/${type.toLowerCase()}.csv`;
+      const support = adapter.relationships[type as RelationshipType];
+      if (support.kind === 'UNSUPPORTED') {
+        // The file exists so that the file set follows from the plan alone, and
+        // it is empty by construction. Describing it like the others told an
+        // operator to pair records the destination cannot relate.
+        write(
+          `- \`${path}\` — ${shape.from} to ${shape.to}, not supported by ${adapter.mode}: ${support.reason}` +
+            ` The file is empty by design; the ${String(count(type, 'LEFTOVER'))} relationships of this type are in` +
+            ' `02_EXCEPTIONS/leftovers.csv` with the reason for each.',
+        );
+        continue;
+      }
       write(
-        `- \`${IMPORT_AREA}/${adapter.importDirectory}/associations/${type.toLowerCase()}.csv\`` +
+        `- \`${path}\`` +
           ` — ${shape.from} to ${shape.to}. Each row pairs the \`${adapter.associationFromHeader}\` value` +
-          ` from the ${shape.from} file with the \`${adapter.associationToHeader}\` value from the ${shape.to} file.`,
+          ` from the ${shape.from} file with the \`${adapter.associationToHeader}\` value from the ${shape.to} file.` +
+          ` ${String(count(type, 'OUTPUT'))} relationships.`,
       );
     }
     write();
@@ -148,7 +170,8 @@ export function renderImportInstructions(input: InstructionsInput): string {
     write();
     const associations = reconciliation.associations;
     write(
-      `Expect ${String(associations.byDisposition.OUTPUT ?? 0)} relationships to be created. ` +
+      `The association files deliver ${String(associations.byDisposition.OUTPUT ?? 0)} relationships` +
+        `${adapter.mode === 'CLEAN_ONLY' ? '' : ', and they exist in the destination only once the linking step above has been carried out'}. ` +
         `${String(associations.byDisposition.UNRESOLVED ?? 0)} could not be resolved and are listed in ` +
         '`02_EXCEPTIONS/unresolved-associations.csv` with the reason for each.',
     );
@@ -193,18 +216,41 @@ export function renderImportInstructions(input: InstructionsInput): string {
 }
 
 function associationStrategy(adapter: DestinationAdapter): string {
+  // Each sentence is a step the destination's importer is documented, or was
+  // observed in the qualification campaign, to offer (N1-1, D78). 3.0.0 told a
+  // HubSpot operator to choose the association key as the common column, which
+  // HubSpot accepts only for a unique identifier, and a Salesforce operator to
+  // "use the pairing to populate the lookup field" without saying where the
+  // Salesforce Id comes from.
   switch (adapter.mode) {
     case 'HUBSPOT':
       return (
-        'run a multiple-object import. Add the association key column from the association file to both object' +
-        ' files as a common column, then select it under "Common column headers found in your files". The' +
-        ' column is a join key for this import only; do not map it to a property.'
+        'importing the object files alone creates the records and no association. HubSpot associates two files' +
+        ' only through a common column that is a unique identifier of one of the two objects: Record ID, Email for' +
+        ' contacts, Company domain name for companies, or a custom property that requires unique values. The' +
+        ` \`${adapter.associationKeyHeader}\` column is not a unique identifier and is never mapped to a property;` +
+        ' both object files carry a column under that header with different values, so do not select it as a' +
+        ' common column. To associate the two records of a pair, copy the identifier of one of them into the' +
+        " other one's row, under the header its own file uses (for a contact and its company, the company's" +
+        ' `Company domain name` in the contacts file), and choose that column as the common column and as the' +
+        ' unique key of that object. A pair whose records carry no such identifier cannot be associated this way.' +
+        " Afterwards download the import's errors: an association HubSpot did not make is listed there with an" +
+        ' error type such as' +
+        ' ASSOCIATION_RECORD_NOT_FOUND, and the records are created without it.'
       );
     case 'SALESFORCE':
       return (
-        'the association files pair records by their association key. Load the parent object first, then use' +
-        ' the pairing to populate the lookup field on the child, following the operation your Data Loader' +
-        ' profile declares. Kauro does not fabricate a record id it has not been given.'
+        'importing the object files alone creates the records and no relationship. Salesforce links a Contact or' +
+        ' an Opportunity to its Account through the `AccountId` lookup, and no file here carries a Salesforce Id:' +
+        ' none exists until the Accounts are loaded. Load the Account file first with Data Loader, leaving' +
+        ` \`${adapter.associationKeyHeader}\` unmapped. With Data Loader's default and Bulk API (1.0) settings` +
+        ' the success file starts with an `ID` column holding each new Account Id, repeats every column of the' +
+        ` input row, \`${adapter.associationKeyHeader}\` included, and ends with \`STATUS\`; the error file repeats` +
+        ' every column and ends with `ERROR`. The Account Id of a pair is the `ID` of the one success-file row' +
+        ` whose \`${adapter.associationKeyHeader}\` is the Account side of the pair. Put it in an \`AccountId\`` +
+        ' column of the child file, map that column to `AccountId`, and load the child. A child whose Account is' +
+        ' in the error file, is missing from the success file, or appears there more than once has no proven Id' +
+        ' and must not be linked. Kauro does not fabricate a record id it has not been given.'
       );
     default:
       return (

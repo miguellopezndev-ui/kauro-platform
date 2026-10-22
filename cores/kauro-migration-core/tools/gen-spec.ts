@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIG_SCHEMA } from '../src/mapping/config-schema.js';
 import { schemaToJson } from '../src/mapping/schema-validator.js';
 import { REASON_CATEGORIES, REASON_CODES, REASON_CODE_LIST } from '../src/domain/reason-codes.js';
-import { EDGE_DISPOSITIONS, ROW_DISPOSITIONS } from '../src/domain/disposition.js';
+import { CONTRIBUTION_KINDS, EDGE_DISPOSITIONS, ROW_DISPOSITIONS } from '../src/domain/disposition.js';
 import { CANONICAL_FIELDS, CANONICAL_FIELD_LIST, CANONICAL_OBJECTS, SEMANTIC_TYPES } from '../src/domain/canonical.js';
 import { RELATIONSHIP_SHAPES, RELATIONSHIP_TYPES } from '../src/domain/associations.js';
 import { ERROR_CODES } from '../src/domain/errors.js';
@@ -48,6 +48,7 @@ function targets(): { path: string; text: string }[] {
     configSchemaVersion: CONFIG_SCHEMA_VERSION,
     rowDispositions: [...ROW_DISPOSITIONS],
     edgeDispositions: [...EDGE_DISPOSITIONS],
+    contributionKinds: [...CONTRIBUTION_KINDS],
     errorCodes: [...ERROR_CODES],
     canonicalObjects: [...CANONICAL_OBJECTS],
     semanticTypes: [...SEMANTIC_TYPES],

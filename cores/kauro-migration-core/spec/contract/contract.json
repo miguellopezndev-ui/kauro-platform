@@ -410,7 +410,12 @@
     "LEAD"
   ],
   "configSchemaVersion": "3.0.0",
-  "coreVersion": "3.0.0",
+  "contributionKinds": [
+    "RECORD",
+    "ASSOCIATION",
+    "NONE"
+  ],
+  "coreVersion": "3.1.0",
   "edgeDispositions": [
     "OUTPUT",
     "DEDUPLICATED",

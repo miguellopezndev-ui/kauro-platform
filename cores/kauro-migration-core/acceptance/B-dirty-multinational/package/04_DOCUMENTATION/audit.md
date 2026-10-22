@@ -1,7 +1,7 @@
 # Migration audit
 
-- Core version: 3.0.0
-- Run id: run_13174ec28740b76d61f91a28
+- Core version: 3.1.0
+- Run id: run_81cbc43492af10a6bff552b9
 - Bundle id: B-4d0d2a15e1ade00c
 - Configuration hash: 40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404
 - Destination: CLEAN_ONLY, import mode CREATE_ONLY
