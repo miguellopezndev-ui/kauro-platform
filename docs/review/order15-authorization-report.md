@@ -1,0 +1,163 @@
+# Order 15: authorization, roles, sellers, owner and tenant isolation
+
+Branch `order15/security-authorization`, from `main` at `3f6a8d32d32fe7d65888545a9b43960d97f13f53` (PR #118 merged). Final SHA: the PR head.
+Scope: authorization and the authentication bound to it, permissions, isolation between agencies, and the security of the existing routes.
+Out of scope by the order: `cores/kauro-migration-core/` (Order 13), `cores/kauro-intelligence-core/`, `packages/reports/` and the package
+reader (Order 14), and design files owned by other sessions. None of them is touched (see "Non-interference").
+
+This report states what was verified, what failed and was repaired, and what stays pending. It does not describe how to exploit anything:
+each finding names the rule that was broken, the surface, the repair and the test that proves it.
+
+## 1. Method
+
+1. Preflight: the route inventory (`apps/api/openapi.json`, 159 operations, held to the server's registered routes by `tools/openapi.mjs`),
+   the authorizers, the persistence adapters, the RLS policies, the session boundary and the web shell.
+2. Four independent read-only reviews (tenant objects; seller and owner; payments, bank and services; database roles, RLS and sessions),
+   each asked for findings traced route to handler to authorizer to SQL, with the tests that cover them. Every candidate was then checked
+   by a test against the real api, not accepted from the review.
+3. An executable matrix over every served route (section 2), then red-first tests for each confirmed defect, the repair at the point that
+   controls the access, and the regressions of the touched components.
+
+Every test runs the real Fastify server built by the real composition root over a real PostgreSQL 17 cluster the test starts (runtime
+login roles, forced RLS, the real authorizers). Providers are the labelled contract fakes the repository already uses (SIMULATED); no real
+credential, no external system and no production system was used. All data is synthetic.
+
+## 2. The access matrix
+
+`apps/api/test/o15-access-matrix.test.ts` is the matrix. It classifies every operation of the contract into one principal class, checks the
+class against the route's declared role (`x-kauro-role`), and fails when a route is added without a class. For every served route it then
+sends a request whose body passes admission (built from the route's own request schema), with fresh ids and agency A in the path and in
+`X-Kauro-Agency`, as each identity the class must refuse, and asserts that the refusal comes from authentication or authorization (never
+from the absence of the object), with no journal entry, no event, and no table changed but the security facts. A control request as the
+admitted identity proves no refusal is a route refusing everyone.
+
+| Class | Routes | Who is admitted | Enforced at | Refused in the matrix |
+|---|---|---|---|---|
+| AGENCY | 63 | an ACTIVE membership of the agency, then the command's role | `packages/authorization/src/authorizer.ts` (`authorize`, `authorizeRead`, steps 1 to 7) inside the TENANT unit; RLS `agency_id = current_agency_id()` | anonymous, the payment service, disabled, unverified, a verified person with no role, a suspended member, a member of the other agency, the corporate owner, sellers in every state |
+| KAURO_OWNER | 59 | the caller's ACTIVE `KAURO_OWNER` grant | `authorizeCorporateOwner` (`packages/application/src/commercial/authorizer.ts`), `authorizeOperator` (`packages/application/src/commerce/core/authorizer.ts`), `ownerFirst` (bank refund commands) | everyone but the owner: agency owners and members, sellers in every state, the payment service |
+| SELLER_OR_OWNER | 12 | the caller's own (active or assigned) seller row, or the owner | `authorizeSeller`, `authorizeStatementSeller` then `authorizeCorporateOwner`; RLS `current_seller_id()` / `acting_seller_id()` | anonymous, the payment service, disabled, unverified, no role, agency members of either agency |
+| SELLER | 4 | the caller's own seller row (ACTIVE for prospect work; any state for the payout destination; not CANDIDATE for the home) | `authorizeSeller`, `authorizeSellerSelf`, `authorizeStatementSeller` | as above, and the corporate owner |
+| SERVICE / SERVICE_OR_OWNER | 6 | a verified service identity of the command's technical role in this environment (and the owner for CMD056, CMD059) | `authorizeCommercialService`, `authorizeService`, `SERVICE_ROLE_TABLE` | every person, and any other service (`o15-service-identities.test.ts`) |
+| IDENTITY | 3 | any verified identity (CreateAgency, ListAgencies, AcceptInvitation) | `authorize` steps 1 to 3 | anonymous, the payment service, disabled |
+| PUBLIC, PROVIDER, SESSION | 12 | no credential, a provider signature, the browser session boundary | public routes, webhook verifier, `apps/api/src/sessions.ts` | covered by `b11-public-routes`, `cmd030-payment-webhook`, `b11-sessions` |
+
+Identities in the matrix: anonymous; the payment service's credential; a disabled identity; an unverified identity; a verified person with no
+role; agency A's OWNER, VIEWER and a SUSPENDED member; agency B's OWNER; the corporate owner; sellers ACTIVE, SUSPENDED, TERMINATED and
+CANDIDATE. Final run: RESULT_MATRIX.
+
+Object-level (BOLA) isolation is proven per object family by the per-command tests that already existed (each names a foreign and an unknown
+id: cmd009 to cmd060, `b16-tenant-sweep`, `job-reads`, `audit-reads`, `source-reads`, `support-case-reads`, `commission-statement-reads`,
+`ach-route-cells` for transfer instructions) and, for the routes whose foreign half had no test, by `o15-object-isolation.test.ts`.
+
+## 3. Findings
+
+| Id | Finding | Severity | Status |
+|---|---|---|---|
+| F-01 | The owner's bank refund commands (CMD032 with a destination, CMD220 to CMD225) checked the KAURO_OWNER grant only inside their payment-service unit, after reading the cited restricted evidence, locating the refund or attempt in any agency and taking the account's OUTBOUND stream lock. A person without the grant got NOT_FOUND for an unknown id and CORPORATE_ROLE_MISSING for an existing one (an existence signal across agencies), the denial fact named the agency of the located refund, and the request could queue on the owner's stream lock. | Medium (BFLA ordering, cross-tenant existence signal, lock contention) | Fixed |
+| F-02 | The owner's approval naming a destination (CMD032, CMD220) did not fence the browser session in its unit (rule 16): a logout committed while the approval waited did not stop it. | Low | Fixed |
+| F-03 | A verified service identity presented on another service's command was refused, but the refusal's durable fact was written in a unit of the presented service's runtime group, which those routes never bind: the answer was 422 INTEGRITY_FAILURE or 500 INTERNAL_ERROR and the attempt left no fact. | Low (audit loss, wrong answer; no effect) | Fixed |
+| F-04 | The core command pipeline (B06, B07, B08, B16 commands) judged the browser session only at the transport: a logout committed while a command ran inside its unit did not stop the command. Membership and identity changes were already fenced (D-TX-2). | Low | Fixed |
+
+### Repairs
+
+- F-01: `ownerFirst` (`packages/application/src/commerce/bank/approve-destination.ts`) judges the grant in an OPERATOR unit of its own before
+  anything of the command is read or locked, records the refusal in the person's own stream (no agency named), answers a unit that could not
+  decide as the command's own retriable failure (never permission), and is called first by `runOwnerRefund` and by `ownerCommand`
+  (`execute-refund.ts`). The definer's verdict after L1 stays the authority at the effect.
+- F-02: `runOwnerRefund` fences the presented session with `judgedUnderHold` as the unit's last lock, after the source's transition and row
+  locks and the writes, before the ALLOW fact and the journal commit (`kauro.payment_session_fence`, migration 0081). A journaled replay of an
+  owner bank refund command is answered only under a credential that still authenticates the request. The stale "GAP" notes are replaced.
+- F-03: the refusal is recorded in the command's own service group (`ownServiceContextOf` in
+  `packages/application/src/commercial/statements/service.ts`; the payment service's id in `apps/api/src/payments/service-commands.ts`) and
+  names the presented service as its actor.
+- F-04: `runCommandIn` (`packages/application/src/commands/runtime.ts`) fences and judges the request's credential as the unit's last lock,
+  immediately before the journal commit, and before answering a journaled replay. A bearer credential is verified again as it stands; a cookie session's row is held FOR SHARE until
+  COMMIT, so a logout that starts later waits for it.
+- Test harness: `FaultRouting` gains `Routing.unrouted` (`apps/api/test/fault-support.ts`): the refund lane's routed invocations leave the
+  owner's new kauro_app grant unit on the api's own pool, unrouted and uncounted, so the cells keep routing and numbering exactly the
+  command's payment-service units. Every other role still fails loudly when an invocation does not serve it.
+
+### Red first, then green
+
+| Finding | Test | Red on `main` | Green on the branch |
+|---|---|---|---|
+| F-01 | `o15-owner-first.test.ts` (existing vs unknown ids, four outsiders, seven commands; OUTBOUND stream held) | 52 differences; the outsider waited on the owner's stream | 4/4 |
+| F-02 | same file, `F-02 rule 16` | 200, refund APPROVED after logout | 401, nothing approved |
+| F-03 | `o15-service-identities.test.ts`; matrix cells of the payment service on CMD051, CMD053, CMD056, CMD059 | 422 / 500, no fact | 403 SERVICE_NOT_PERMITTED, one fact naming the presented service |
+| F-04 | `o15-session-revocation.test.ts` | 201, client created after logout | 401, nothing written; a later logout waits for the COMMIT |
+
+The red runs and the full logs are kept outside the repository (`Kauro.archive\Evidence\Order15-Security`).
+
+## 4. The owner's scenario: a seller opens Commissions
+
+- Navigation (`apps/web/test/o15-navigation.test.ts`): the owner's menu never lists the seller's Commissions entry; a seller's narrowed menu
+  holds exactly the seller's five screens, Commissions on `/ops/sales/statements` (UI36) and no owner screen; every operations route is
+  served only on the operations host. The production build has no seller screen yet (UI34, UI36, UI53, UI54 are not implemented); the
+  menu a seller saw switch to the owner's was the review simulator's (HD-1), repaired in PR #119 under `tools/review/private` and not
+  repeated here.
+- API (`o15-seller-owner.test.ts`, and the matrix for every owner route): the seller reads its own home and statement; another seller's
+  statement answers exactly like an id nobody holds; an agency selector reaches nothing; its own payout approval, another's, the owner's
+  finance reads, refund reviews, outreach reviews, seller registration and termination are refused CORPORATE_ROLE_MISSING with nothing
+  written. SUSPENDED and TERMINATED sellers keep their home (R2-066) and reach no other seller's statement, no owner action and no prospect
+  work. The owner reads both statements.
+- Data: under the seller's own runtime session (OPERATOR, `kauro_app`) the other seller's statement and its items are not visible at all;
+  the owner's session sees them.
+
+## 5. Verified without change
+
+- Tenant routes: the agency comes only from the path or `X-Kauro-Agency`; every request handler runs in a TENANT unit bound to it; the
+  membership is read after its transition lock and held to the end of the unit (D-TX-2); handlers re-check the row's agency; foreign and
+  unknown ids answer alike. Membership routes keyed by id (ChangeMembership, RevokeMembership) take their agency from the selector and lock
+  only that agency's rows; AcceptInvitation accepts only for the invited identity.
+- Commercial routes: no request field chooses the principal; owner status is a database fact read after its transition lock; dual-principal
+  handlers take the owner branch only with an ACTIVE grant; prospect data policies admit an ACTIVE seller only (0089).
+- Payments: quote, order, refund and transfer-instruction reads check the agency in the application and under RLS; the webhook verifies the
+  signature over the raw bytes before anything is stored; step-up proofs are bound to their user and judged again at commit.
+- Database: no runtime role is superuser, BYPASSRLS or table owner; every `kauro.*` table but the two state-machine catalogues has RLS
+  enabled and forced; context settings are transaction-local; the session row is visible to `kauro_app` only by the hash presented.
+- Sessions: `__Host-` cookie, Secure, HttpOnly, SameSite=Lax; CSRF by exact Origin, Sec-Fetch-Site and an HMAC token compared in constant
+  time; no fixation; idle and absolute expiry judged under lock; ambiguous credentials refused; RS256 pinned, issuer and audience exact.
+
+## 6. Residual risks and recommendations (not changed by this order)
+
+Each is defense in depth or a product decision, not a reachable defect today; each is a proposal for the owner.
+
+1. RLS trusts the transaction's context settings: tenant isolation holds because the application checks the membership first in every
+   unit, not because a policy ties the agency to a membership. Proposal: a restrictive policy requiring an ACTIVE membership of the bound
+   user in the bound agency, measured for cost.
+2. The control-plane role can write `corporate_roles` (it provisions grants by design, 0013) and reads tenant rows when no agency is bound
+   (about 31 tables, including core documents). Proposal: move grant provisioning to a dedicated role and narrow the unbound reads.
+3. Three SECURITY DEFINER functions (0079, 0080, 0081) are owned by the migrator; the owner-authority function answers a verdict for any
+   user id the payment service passes. Proposal: a minimal owner role, as 0077 did for route registration.
+4. Sign-in accepts any unexpired ID token without an `auth_time` bound; a leaked token mints sessions until the identity is disabled.
+   Proposal: a maximum sign-in age, verified against the real Identity Platform.
+5. Reads (`runReadIn`) do not fence the session at their unit; a read already in flight when a logout commits still answers. A bearer
+   credential is verified again inside the command's unit by the fence; a future bearer verifier that does network I/O should cache its keys
+   so that no network call runs while the unit holds its locks.
+6. `getTransferInstructions` declares no role (any ACTIVE member reads the platform's receiving bank details and the order's reference);
+   CreateClient's processing authority reference is a global key (a reference already used elsewhere is refused differently from a new one);
+   InviteMember answers differently for an identity with no account. All three need unguessable inputs; each is a product decision.
+7. The contract-fake service authenticator is not refused by the composition outside LOCAL (no deployment binds one today). Proposal: the
+   same guard the identity verifier has, before B15 binds a real one.
+8. The production operations shell does not narrow its menu by principal (the session view carries none); it matters once seller screens
+   ship. The api already refuses every owner read and action to a seller.
+
+## 7. Pending external verification
+
+Verified locally only with the repository's labelled fakes, to be verified once each provider or environment exists: the Identity Platform
+(token claims, MFA, `auth_time`, revocation), the production service-identity verifier and its key management, provider webhook signatures,
+signed download URLs and their expiry in the real object store, bank evidence storage, AWS deployment hosts and origins (cookie and CSP
+behaviour on the real domains). None of them is declared approved by this order.
+
+## 8. Test results
+
+RESULT_TESTS
+
+## 9. Non-interference with Orders 13 and 14
+
+Files touched: `packages/application/src/commands/runtime.ts`, `packages/application/src/commerce/bank/approve-destination.ts`,
+`packages/application/src/commerce/bank/execute-refund.ts`, `packages/application/src/commercial/statements/service.ts`,
+`apps/api/src/payments/service-commands.ts`, `apps/api/test/fault-support.ts`, `apps/api/test/refund-lane-support.ts`,
+`apps/api/test/refund-generic-cells.test.ts`, new tests under `apps/api/test/o15-*` and `apps/web/test/o15-navigation.test.ts`, and this
+report. Order 13 (PR #121) changes only `cores/` and Order 14 (PR #120) only `packages/reports/`, `packages/data-plane/test/` and one design
+file; no file is shared. No migration, contract, OpenAPI document or generated client changed.
