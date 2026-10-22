@@ -1,6 +1,7 @@
 # Order 15: authorization, roles, sellers, owner and tenant isolation
 
-Branch `order15/security-authorization`, from `main` at `3f6a8d32d32fe7d65888545a9b43960d97f13f53` (PR #118 merged). Final SHA: the PR head.
+Branch `order15/security-authorization`, started from `main` at `3f6a8d32d32fe7d65888545a9b43960d97f13f53` (PR #118 merged) and rebased onto
+`main` at `da68c19862f8ff0e448dac36edc34d55fa3dfef4` (PRs #119 to #123 merged; none of them touches the files below). Final SHA: the PR head.
 Scope: authorization and the authentication bound to it, permissions, isolation between agencies, and the security of the existing routes.
 Out of scope by the order: `cores/kauro-migration-core/` (Order 13), `cores/kauro-intelligence-core/`, `packages/reports/` and the package
 reader (Order 14), and design files owned by other sessions. None of them is touched (see "Non-interference").
@@ -43,7 +44,7 @@ admitted identity proves no refusal is a route refusing everyone.
 
 Identities in the matrix: anonymous; the payment service's credential; a disabled identity; an unverified identity; a verified person with no
 role; agency A's OWNER, VIEWER and a SUSPENDED member; agency B's OWNER; the corporate owner; sellers ACTIVE, SUSPENDED, TERMINATED and
-CANDIDATE. Final run: RESULT_MATRIX.
+CANDIDATE. Final run: 1,760 refusal cells, every one refused by authentication or authorization with nothing written, and every control admitted.
 
 Object-level (BOLA) isolation is proven per object family by the per-command tests that already existed (each names a foreign and an unknown
 id: cmd009 to cmd060, `b16-tenant-sweep`, `job-reads`, `audit-reads`, `source-reads`, `support-case-reads`, `commission-statement-reads`,
@@ -151,13 +152,39 @@ behaviour on the real domains). None of them is declared approved by this order.
 
 ## 8. Test results
 
-RESULT_TESTS
+Local, Windows 11, PostgreSQL 17, on the branch before the rebase (the rebase brought no change to these packages):
 
-## 9. Non-interference with Orders 13 and 14
+- `pnpm run build` and `pnpm run verify` (generate, typecheck, architecture gate, fixture-clock lint, OpenAPI and web-client checks, the
+  case matrix, every package's tests, clean-consume): exit 0. `apps/api`: 1,557 tests, 1,445 pass, 0 fail, 30 skipped and 82 todo (all
+  pre-existing, each naming the seam or slice it waits for). `packages/persistence` 802/802, `packages/application` 237/237,
+  `apps/web` 335/335, `packages/authorization` 12/12, every other package green.
+- After the independent review's repairs: `packages/application` 237/237, `apps/web` 335/335, and the full `apps/api` run with 0 failing
+  tests; four files of that run were cut off when the session that ran it ended (`source-reads`, `source-role-matrix`,
+  `support-case-reads`, `transport`), and pass 16/16 when run again on the rebased branch.
+- On the rebased branch: the 18 `o15-*` api tests and the 3 web navigation tests pass; the refund lane suites (`refund-generic-cells`,
+  `ach-refund-cells`, `refund-generic-v1`: 222 tests) pass with the new grant unit.
+
+CI (`verify`, ubuntu-24.04 and windows-latest) runs on the PR head; its run ids are recorded on the PR.
+
+### Independent review
+
+A separate read-only reviewer read the change set before the PR. It found no critical or high issue and one medium: in `runOwnerRefund` the
+session fence came before the source's transition and row locks, so it was not the unit's last lock. Repaired (the fence now follows the
+writes), together with its low findings: a unit that cannot decide in `ownerFirst` is answered as the command's own retriable failure
+instead of a 500, journaled replays of core commands and owner refund commands are fenced too, and four tests gained the controls the
+reviewer asked for (no 5xx or 401 for an admitted control, own-agency controls for the upload probes, an ACTIVE seller's control for
+prospect work, no restricted-store read for a refused owner command). The dispatcher's independent review of the PR head follows.
+
+## 9. Non-interference with other orders
+
+Files outside the order's primary paths (`packages/authorization`, `packages/persistence`, `apps/api`), kept minimal: the access decisions
+of the defects live in `packages/application` (the command pipeline and the owner bank refund and service commands), so each repair is made
+where the access is decided, not wrapped around it at the route.
 
 Files touched: `packages/application/src/commands/runtime.ts`, `packages/application/src/commerce/bank/approve-destination.ts`,
 `packages/application/src/commerce/bank/execute-refund.ts`, `packages/application/src/commercial/statements/service.ts`,
 `apps/api/src/payments/service-commands.ts`, `apps/api/test/fault-support.ts`, `apps/api/test/refund-lane-support.ts`,
 `apps/api/test/refund-generic-cells.test.ts`, new tests under `apps/api/test/o15-*` and `apps/web/test/o15-navigation.test.ts`, and this
-report. Order 13 (PR #121) changes only `cores/` and Order 14 (PR #120) only `packages/reports/`, `packages/data-plane/test/` and one design
-file; no file is shared. No migration, contract, OpenAPI document or generated client changed.
+report. Order 13 (PR #121) changed only `cores/`, Order 14 (PR #120) only `packages/reports/`, `packages/data-plane/test/` and one design
+file, and the orders merged since (PRs #119, #122, #123) and the open AWS work (PR #124, `deploy/aws/**`) touch none of these files. No
+migration, CP-01 or CP-02 contract, OpenAPI document, generated client, `docs/authority/**` or provider identity changed.
