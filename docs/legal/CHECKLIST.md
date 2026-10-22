@@ -234,3 +234,15 @@ every customer right they stated is kept. None of these edits declares complianc
 | MAN §5.10 Independent sellers training (EN, ES) | only prospect organizations, never the end clients of agency customers, never CRM-file data | wording changed 2026-10-13 for D-33; pending competent review (D-31) |
 | ToS §1.2 Customer (b) | "a company whose in-house CRM or data team works on its own company's data" becomes "a company that works on its own company's data, with or without a dedicated in-house CRM or data team"; the defined term "Internal Customer" is unchanged | wording changed 2026-10-13 for D-33; pending competent review (D-31) |
 | DPA §1 Two-party chain | "an In-house Customer" becomes "an Internal Customer under the Terms, that is, a company processing its own data" | wording changed 2026-10-13 for D-33; pending competent review (D-31) |
+
+## 11. Wording changed for Order 16 (2026-10-22)
+
+Order 16 (functional governance) aligned three places of the draft Terms with decisions already in force, by the procedure of section 10: minimal
+wording, every protection and customer right kept, no compliance declared. The proposals that need a new obligation or competent
+judgement are not applied: they are in `CHANGE-REQUESTS-CP-01.md`, with their entry into force blocked.
+
+| Clause | Change | Source | Status |
+|---|---|---|---|
+| ToS §2 Plan | "tied to a Revision, a Target Contract and specific decisions" becomes "tied to a Revision, to a Target Contract where the mode has one, and to specific decisions" | owner decision 2026-10-20 ("Clean your data" has no destination); the Terms' own Target Contract definition ("when the mode requires it") | wording changed 2026-10-22; pending competent review (D-31) |
+| ToS §3.2 lead | "a single target instance for its paid revision" applies only "where the mode prepares files for a target CRM" | same; ToS §3.2 CLEAN bullet; A3 §3.3 | wording changed 2026-10-22; pending competent review (D-31) |
+| ToS §6.1 | the Quote records the target fingerprint "where the mode has a target" | owner decision 2026-10-20; CP-01.01 | wording changed 2026-10-22; pending competent review (D-31) |

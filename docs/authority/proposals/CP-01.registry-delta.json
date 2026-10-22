@@ -1,0 +1,1025 @@
+{
+  "proposal": "CP-01",
+  "document": "docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md",
+  "preparedBy": "Order 16, 2026-10-22",
+  "revision": 2,
+  "revisions": [
+    {
+      "revision": 1,
+      "date": "2026-10-22",
+      "by": "Order 16",
+      "note": "Prepared; delivered at 16ee3d4b2e3128e75464fee4c7a52f71dc33d965."
+    },
+    {
+      "revision": 2,
+      "date": "2026-10-22",
+      "by": "Order 16, owner resolution",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "note": "Owner decisions recorded; CP-01.07, CP-01.12 and CP-01.11 corrected; nothing adopted."
+    }
+  ],
+  "ownerResolution": {
+    "date": "2026-10-22",
+    "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md"
+  },
+  "base": {
+    "edition": "KAVO-2026.09-R2",
+    "files": {
+      "policy.json": "5ad638f13153723aa81f4cb49c9dd718c599988257f384858f20141fc6f2d23e",
+      "commands.json": "6fa1a124821609a5ac911779304e8876df1a6954c530e895604da107826af0b6",
+      "screens.json": "c9963d7ebe713d88c4f4d2af3ea2b1ad7d44e74c6649fc705f62f49e71a49f80",
+      "contracts.json": "9608c2de39ae0dc5e66c537d241a7257a190c581374aba2c63fd4a1c7d2f29d2",
+      "cases.json": "b0a7960d9c44f4d950ae60cf40f8dd61fd29c41d26713c5d76b96dada66302c1",
+      "requirements.json": "3bd812bb80ce7daac35283060916c1dfdd3de30d7566f62b5dd037be63066ae1"
+    }
+  },
+  "statuses": {
+    "APPROVED_AWAITING_REISSUE": "The owner decided the substance. The vendored registry is not edited: the delta enters only through the authority re-issue coordinated with CP-02 (README, adoption), and never before the conditions in `activation` hold.",
+    "CONDITIONAL": "The owner decided what is recorded in `approval.decision`; a value, a fact, a provider or a professional check named in `pending` is still missing. Not adoptable until `pending` is empty.",
+    "PROPOSED": "Not approved. A deferred item (`deferred`) keeps the current registry text; nothing here makes the proposal a decision."
+  },
+  "items": [
+    {
+      "id": "CP-01.01",
+      "title": "A free check and a plan for \"Clean your data\" need no target contract",
+      "gaps": [
+        "F-01"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-DESIGN-DECISIONS.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "StartAudit, CreatePlan, ApprovePlan and CreateQuote bind CLEAN_ONLY_TARGET_HASH for CLEAN, implemented and tested (O17-01, C4); no artificial CRM target"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "commands.json": [
+          {
+            "op": "test",
+            "path": "/19/id",
+            "value": "CMD020"
+          },
+          {
+            "op": "test",
+            "path": "/19/precondition",
+            "value": "Source is sealed/available, target is eligible, agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "replace",
+            "path": "/19/precondition",
+            "value": "Source is sealed/available; for HUBSPOT and SALESFORCE the target is eligible, while CLEAN takes no target contract and binds the canonical CLEAN target hash; agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "test",
+            "path": "/19/failure",
+            "value": "No budget or stale target returns a typed blocker without a provider call."
+          },
+          {
+            "op": "replace",
+            "path": "/19/failure",
+            "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call."
+          }
+        ],
+        "contracts.json": [
+          {
+            "op": "test",
+            "path": "/54/name",
+            "value": "Audit"
+          },
+          {
+            "op": "test",
+            "path": "/54/fields/2",
+            "value": {
+              "name": "targetContractId",
+              "type": "id",
+              "required": true,
+              "description": "Exact target version."
+            }
+          },
+          {
+            "op": "replace",
+            "path": "/54/fields/2",
+            "value": {
+              "name": "targetContractId",
+              "type": "id",
+              "required": false,
+              "description": "Exact target version; absent for CLEAN, whose audit binds the canonical CLEAN target hash."
+            }
+          }
+        ],
+        "cases.json": [
+          {
+            "op": "test",
+            "path": "/306/id",
+            "value": "CMD020-OK"
+          },
+          {
+            "op": "test",
+            "path": "/306/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Source is sealed/available, target is eligible, agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "replace",
+            "path": "/306/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Source is sealed/available; for HUBSPOT and SALESFORCE the target is eligible, while CLEAN takes no target contract and binds the canonical CLEAN target hash; agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "test",
+            "path": "/307/id",
+            "value": "CMD020-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/307/expected",
+            "value": "No budget or stale target returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/307/expected",
+            "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          }
+        ],
+        "requirements.json": [
+          {
+            "op": "test",
+            "path": "/307/id",
+            "value": "REQ-CMD020-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/307/statement",
+            "value": "No budget or stale target returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/307/statement",
+            "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call. No unauthorized committed state or external effect."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.02",
+      "title": "Retention policy R2-RETENTION-2: the one extension also for the free check, to an exceptional 17 days from sealing",
+      "gaps": [
+        "F-19",
+        "F-20"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "deletion at the extended date, restoration that never revives expired data, SQL checks and row policies (with Order 15), dates read and the UNPAID soft deadline implemented and tested (C6, O17-14)",
+        "compatible legal documentation through its own procedure (LR-01)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/retention/policyVersion",
+            "value": "R2-RETENTION-2"
+          },
+          {
+            "op": "add",
+            "path": "/retention/extendHardCapExceptions",
+            "value": {
+              "UNPAID": {
+                "ceilingDaysFromSeal": 17,
+                "onlyThroughTheProjectExtension": true
+              }
+            }
+          }
+        ],
+        "commands.json": [
+          {
+            "op": "test",
+            "path": "/59/id",
+            "value": "CMD060"
+          },
+          {
+            "op": "test",
+            "path": "/59/precondition",
+            "value": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap."
+          },
+          {
+            "op": "replace",
+            "path": "/59/precondition",
+            "value": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap, except that for an UNPAID record the extension may move the hard cap to at most retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal days from sealing."
+          },
+          {
+            "op": "test",
+            "path": "/59/failure",
+            "value": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority."
+          },
+          {
+            "op": "replace",
+            "path": "/59/failure",
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change other than the UNPAID exception, or stale version. A quote/retry cannot create this authority."
+          }
+        ],
+        "screens.json": [
+          {
+            "op": "test",
+            "path": "/28/id",
+            "value": "UI29"
+          },
+          {
+            "op": "test",
+            "path": "/28/exceptions",
+            "value": "No extension revives expired data or crosses a hard cap."
+          },
+          {
+            "op": "replace",
+            "path": "/28/exceptions",
+            "value": "No extension revives expired data or crosses a hard cap, except the one extension of an unpaid free check, which may move its hard cap to at most 17 days from sealing."
+          }
+        ],
+        "contracts.json": [
+          {
+            "op": "test",
+            "path": "/61/fields/5",
+            "value": {
+              "name": "hardDeadline",
+              "type": "utc",
+              "required": true,
+              "description": "Absolute maximum from the owning immutable event."
+            }
+          },
+          {
+            "op": "replace",
+            "path": "/61/fields/5",
+            "value": {
+              "name": "hardDeadline",
+              "type": "utc",
+              "required": true,
+              "description": "Absolute maximum from the owning immutable event; only the one extension of an UNPAID record may move it, to at most the policy's UNPAID ceiling from sealing."
+            }
+          }
+        ],
+        "cases.json": [
+          {
+            "op": "test",
+            "path": "/426/id",
+            "value": "CMD060-OK"
+          },
+          {
+            "op": "test",
+            "path": "/426/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap."
+          },
+          {
+            "op": "replace",
+            "path": "/426/scenario",
+            "value": "Valid authority, current aggregate and exact preconditions: Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap, except that for an UNPAID record the extension may move the hard cap to at most retention.extendHardCapExceptions.UNPAID.ceilingDaysFromSeal days from sealing."
+          },
+          {
+            "op": "test",
+            "path": "/427/id",
+            "value": "CMD060-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/427/expected",
+            "value": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/427/expected",
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change other than the UNPAID exception, or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          }
+        ],
+        "requirements.json": [
+          {
+            "op": "test",
+            "path": "/427/id",
+            "value": "REQ-CMD060-DENY"
+          },
+          {
+            "op": "test",
+            "path": "/427/statement",
+            "value": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          },
+          {
+            "op": "replace",
+            "path": "/427/statement",
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change other than the UNPAID exception, or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.03",
+      "title": "The free-check pause threshold becomes a policy value",
+      "gaps": [
+        "X-34",
+        "Q-4"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/COMMERCIAL_AMENDMENT_A3.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "the pause reads the budget actually funded (money.actualAvailableFunding); no additional spending is authorised",
+        "the public Terms change only through their amendment procedure (LR-11); adopting the value does not change them"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/intelligence/freeAuditPauseBps",
+            "value": 9000
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.04",
+      "title": "A closed, versioned list of claim refusal reasons",
+      "gaps": [
+        "F-13"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "CONTENT_APPROVED_LEGAL_EFFECT_CONDITIONAL",
+        "basis": [
+          "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "legal effect on sellers only after competent review (LAWYER_LATER L-12, L-19); until then legalStatus commission.claimRules stays PENDING_COUNSEL (CP-01.14)",
+        "RefuseAttribution, RequestClaimReview and their tests (O17-05)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/commission/claimRefusalListVersion",
+            "value": "CLAIM-REFUSAL-1"
+          },
+          {
+            "op": "add",
+            "path": "/commission/claimRefusalReasons",
+            "value": [
+              {
+                "code": "CUSTOMER_OR_DIRECT_CONTACT",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
+              },
+              {
+                "code": "OTHER_SELLER_LIVE_CLAIM",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
+              },
+              {
+                "code": "OWNER_RULE",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": true
+              },
+              {
+                "code": "INSUFFICIENT_OWN_WORK_EVIDENCE",
+                "sellerMessage": "Not enough evidence of your own work",
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
+              },
+              {
+                "code": "OUTSIDE_SELLER_AGREEMENT",
+                "sellerMessage": "Outside your seller agreement",
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
+              },
+              {
+                "code": "DUPLICATE_OWN_CLAIM",
+                "sellerMessage": "Duplicate of a claim you already made",
+                "noteRequired": false,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
+              },
+              {
+                "code": "OTHER",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": true,
+                "evidenceRequired": true,
+                "ruleReferenceRequired": false
+              }
+            ]
+          },
+          {
+            "op": "add",
+            "path": "/commission/claimRefusalRules",
+            "value": {
+              "ownerSees": "CODE_NOTE_AND_EVIDENCE",
+              "sellerSees": "SELLER_MESSAGE_ONLY",
+              "sellerMayRequestReview": true,
+              "ownerRule": {
+                "mustNameARuleInForce": true,
+                "mustBeVersioned": true,
+                "retroactive": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.05",
+      "title": "Seller money: the default retainer",
+      "gaps": [
+        "F-16"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "a signed agreement with another amount prevails under its dates and terms; an accrued obligation is never removed (statement item kind RETAINER, O17-06)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/commission/retainerDefaultCentsPerMonth",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.06",
+      "title": "Alert thresholds and precedence",
+      "gaps": [
+        "F-15"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "the alerts read and its tests (O17-07)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/alerts",
+            "value": {
+              "inactivityDays": 14,
+              "deadlineLeadDays": 2,
+              "claimEndAlertDays": [
+                14,
+                3
+              ],
+              "pilotReviewLeadDays": 14,
+              "precedence": [
+                "BLOCKED",
+                "DEADLINE_PASSED",
+                "DEADLINE_SOON",
+                "INACTIVE"
+              ],
+              "oneItemOnce": true,
+              "otherConditionsShownOnTheSameAlert": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.07",
+      "title": "What counts as relevant progress for the inactivity alert",
+      "gaps": [
+        "F-15"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED_WITH_CHANGES",
+        "basis": []
+      },
+      "pending": [],
+      "activation": [
+        "the alerts read computes inactivity from these acts only, with tests that a read, a sign-in, a reminder, a support message, a command without material effect, a failed retry or a repeated action does not reset it, and that progress moves no retention, legal or quote date (O17-07)"
+      ],
+      "dependsOn": [
+        "CP-01.06"
+      ],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/alerts/relevantProgress",
+            "value": {
+              "rule": "MATERIAL_VERIFIABLE_CHANGE_OF_THE_STATE_OF_THE_PROJECT_OR_ITS_DELIVERABLES",
+              "counts": [
+                "NEW_SEALED_REVISION",
+                "CHECK_CONCLUDED",
+                "PLAN_DECISION_EFFECTIVE",
+                "APPROVAL_GIVEN",
+                "QUOTE_ISSUED",
+                "PAYMENT_RECONCILED",
+                "PREPARATION_COMPLETED",
+                "DELIVERY_MADE",
+                "IMPORT_RECORDED"
+              ],
+              "equivalentActCountsOnlyIf": "IT_LEGITIMATELY_CHANGES_THE_COURSE_OF_THE_PROJECT",
+              "neverCounts": [
+                "READ",
+                "DOWNLOAD",
+                "SIGN_IN",
+                "REMINDER_OR_NOTIFICATION",
+                "ORDINARY_SUPPORT_MESSAGE",
+                "COMMAND_WITHOUT_MATERIAL_EFFECT",
+                "FAILED_ATTEMPT_OR_RETRY",
+                "REPEATED_ACTION_WITHOUT_STATE_CHANGE"
+              ],
+              "affects": [
+                "INACTIVITY_ALERT"
+              ],
+              "neverExtends": [
+                "RETENTION",
+                "LEGAL_DEADLINES",
+                "QUOTE_VALIDITY"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.08",
+      "title": "The approved public headings enter the registry (amendments R2-1 and R2-2)",
+      "gaps": [
+        "G-02"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-PUBLIC.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "the web's AMENDED_PRIMARY_COPY rows for UI03 and UI07 are removed in the same re-issue (apps/web/test/support/registry.ts)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "screens.json": [
+          {
+            "op": "test",
+            "path": "/6/id",
+            "value": "UI07"
+          },
+          {
+            "op": "test",
+            "path": "/6/primaryCopy",
+            "value": "Describe the task; keep CRM files out of this form."
+          },
+          {
+            "op": "replace",
+            "path": "/6/primaryCopy",
+            "value": "Request a free data health check."
+          },
+          {
+            "op": "test",
+            "path": "/2/id",
+            "value": "UI03"
+          },
+          {
+            "op": "test",
+            "path": "/2/primaryCopy",
+            "value": "Check your files and target before you start."
+          },
+          {
+            "op": "replace",
+            "path": "/2/primaryCopy",
+            "value": "Three services for your exported CRM files."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.09",
+      "title": "UI03's action text after amendment R2-3 (the publication version is no longer printed)",
+      "gaps": [
+        "G-02"
+      ],
+      "status": "PROPOSED",
+      "approval": null,
+      "deferred": {
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "until": "the final visual review before the second audit",
+        "currentTextStays": true
+      },
+      "pending": [
+        "owner decision at the final visual review before the second audit; the current UI03 action text stays until then (R2-3 removed the version line, not this sentence)"
+      ],
+      "activation": [],
+      "dependsOn": [],
+      "patch": {
+        "screens.json": [
+          {
+            "op": "test",
+            "path": "/2/actions",
+            "value": "Inspect the exact profile; ask a safe scope question."
+          },
+          {
+            "op": "replace",
+            "path": "/2/actions",
+            "value": "Read each service's state and limits from the capability publication; ask a safe scope question."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.10",
+      "title": "A public page for the Personal Data Processing Policy",
+      "gaps": [
+        "F-08"
+      ],
+      "status": "CONDITIONAL",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "DESIGN_APPROVED_PUBLICATION_CONDITIONAL",
+        "basis": [
+          "docs/legal/CHECKLIST.md"
+        ]
+      },
+      "pending": [
+        "real company data of the controller (CHECKLIST A-08); never invented",
+        "competent review of the Policy (D-31)",
+        "verification that the Policy reflects the processing actually carried out"
+      ],
+      "activation": [
+        "the versioned publication mechanism and the consent record, keeping essential obligations apart from optional commercial authorisations (O17-12, O17-13)",
+        "no incomplete, false or unreviewed policy is published (LR-05)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "screens.json": [
+          {
+            "op": "add",
+            "path": "/-",
+            "value": {
+              "id": "UI56",
+              "origin": "PUBLIC",
+              "route": "/legal/data-processing-policy",
+              "title": "Personal data processing policy",
+              "primaryCopy": "Read how Kauro handles personal data.",
+              "information": "Actual controller, version/date, databases and purposes, rights and their procedure, responsible area, retention and changes.",
+              "actions": "Read the accessible version history; send a query or claim to the responsible area.",
+              "exceptions": "No invented entity details; no version is published before its company data are real, it is reviewed and it reflects the processing actually carried out; the authorization recorded at registration names the exact version shown, and essential obligations stay apart from optional commercial authorizations.",
+              "status": "DESIGN_NOT_RENDERED_PRODUCT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.11",
+      "title": "A pending-payment hold while a sent bank transfer is confirmed",
+      "gaps": [
+        "F-21",
+        "F-22",
+        "F-23"
+      ],
+      "status": "CONDITIONAL",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "PARAMETERS_APPROVED_ACTIVATION_BLOCKED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        ]
+      },
+      "pending": [
+        "Wise Business enabled and the PV1 qualification of the ACH route and of the evidence it really gives (Payments V1 section 2 (a)-(f))",
+        "real, verifiable evidence that a proof can be checked against",
+        "implementation and tests: proof intake with step-up, effective end, one hold per quote and per sealed set, deletion when it ends unpaid, late-credit review and refund (C5, C6)",
+        "abuse controls: hold uniqueness in the database and the owner review from the third hold ended unpaid in 90 days (C10)",
+        "competent review of the terms (LR-02)",
+        "the implementing order fixes the time zone and cut-off of the banking-day count against the sources in `evidence.calendar`, with tests"
+      ],
+      "activation": [
+        "not adopted into the operating registry nor activated before every `pending` point holds",
+        "a declared transfer or a proof is never confirmed payment, starts no preparation and creates no commercial authorisation (F-23 tests)"
+      ],
+      "evidence": {
+        "calendar": {
+          "appliesTo": "US ACH (FedACH) only; no other route, international or domestic, is presumed to follow it",
+          "rule": "Banking days are Monday to Friday except Federal Reserve holidays. A holiday on Saturday: Reserve Banks open the preceding Friday. A holiday on Sunday: closed the following Monday.",
+          "retrieved": "2026-10-22",
+          "sources": [
+            {
+              "name": "Board of Governors of the Federal Reserve System, Federal Reserve holidays (k8)",
+              "url": "https://www.federalreserve.gov/aboutthefed/k8.htm"
+            },
+            {
+              "name": "Federal Reserve Financial Services, Holiday Schedules (FedACH processing ends and resumes)",
+              "url": "https://www.frbservices.org/about/holiday-schedules"
+            },
+            {
+              "name": "Federal Reserve Financial Services, FedACH Processing Schedule",
+              "url": "https://www.frbservices.org/resources/resource-centers/same-day-ach/fedach-processing-schedule.html"
+            },
+            {
+              "name": "Federal Reserve Financial Services, 2026 holiday schedule for FedACH Services",
+              "url": "https://www.frbservices.org/news/fed360/issues/121625/ach-2026-holiday-schedule"
+            },
+            {
+              "name": "5 U.S.C. 6103, legal public holidays (the list; the Reserve Banks' Saturday rule differs from the federal-employee rule)",
+              "url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title5-section6103&num=0&edition=prelim"
+            }
+          ]
+        }
+      },
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/retention/pendingPaymentHold",
+            "value": {
+              "route": "ACH",
+              "businessDaysFromAcceptedProof": 5,
+              "calendar": "US_FEDERAL_RESERVE_BANKING_DAYS",
+              "ceilingDaysFromSeal": 24,
+              "effectiveEnd": "EARLIER_OF_BUSINESS_DAYS_END_AND_CEILING",
+              "customerSeesEffectiveEnd": true,
+              "perQuote": 1,
+              "perSealedSet": 1,
+              "renewable": false,
+              "addsToExtension": false,
+              "withExtension": "LATER_DATE_WITHIN_CEILING",
+              "proof": "TRANSFER_ALREADY_SENT_EXACT_AMOUNT_AND_REFERENCE",
+              "stepUpRequired": true,
+              "isPayment": false,
+              "authorizesExecution": false,
+              "endedUnpaid": "DELETE",
+              "lateCredit": "REVIEW_AND_REFUND_NO_DATA_REVIVAL",
+              "ownerReview": {
+                "fromEndedUnpaidHold": 3,
+                "rollingWindowDays": 90,
+                "scope": "ORGANIZATION"
+              }
+            }
+          }
+        ],
+        "contracts.json": [
+          {
+            "op": "test",
+            "path": "/61/name",
+            "value": "RetentionRecord"
+          },
+          {
+            "op": "test",
+            "path": "/61/fields/2/type",
+            "value": "enum:UNPAID,PAID_ORDINARY,PAID_STAGED,IMPORT_RECEIPT,TARGET_METADATA,ORDINARY_LOG,SECURITY_LOG,LEGAL_FINANCIAL"
+          },
+          {
+            "op": "replace",
+            "path": "/61/fields/2/type",
+            "value": "enum:UNPAID,PENDING_PAYMENT_HOLD,PAID_ORDINARY,PAID_STAGED,IMPORT_RECEIPT,TARGET_METADATA,ORDINARY_LOG,SECURITY_LOG,LEGAL_FINANCIAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.12",
+      "title": "Proven identity, duplicate candidates, blocking conflicts and the size of a bulk decision",
+      "gaps": [
+        "F-25",
+        "F-27"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED_WITH_CHANGES",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "the core intervention (component C7) keeps deterministic merges to the proving keys of Migration Core (cores/kauro-migration-core/src/domain/identity.ts PROVING_KEY_KINDS; identity/resolve-identity.ts); this proposal does not change the core",
+        "the core verifies a declared authoritative external id before it proves identity; Migration Core today requires only the declaration, so until then an external id alone proves nothing without a person's decision (C7)",
+        "the plan contract and bulk decisions with exact preview and explicit human approval, and the decision record (O17-09)",
+        "adversarial identity fixtures (F-27, C11)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/identityResolution",
+            "value": {
+              "deterministicMerge": {
+                "onlyProvenIdentityKeys": [
+                  "SOURCE_RECORD_ID_WITHIN_ONE_IDENTITY_SPACE",
+                  "AUTHORITATIVE_EXTERNAL_ID_VERIFIED"
+                ],
+                "authority": "MIGRATION_CORE_PROVING_KEYS",
+                "humanConfirmation": "NOT_REQUIRED_ONLY_FOR_PROVEN_IDENTITY_WITHOUT_A_BLOCKING_CONFLICT"
+              },
+              "strongCandidateSignals": [
+                [
+                  "SAME_NORMALIZED_EMAIL",
+                  "SAME_NORMALIZED_FULL_NAME"
+                ]
+              ],
+              "candidatesProveIdentity": false,
+              "normalization": {
+                "email": "TRIM_LOWERCASE_NFC_NO_PLUS_STRIPPING",
+                "fullName": "TRIM_COLLAPSE_SPACES_CASEFOLD_NFC_ACCENTS_KEPT",
+                "foldingToManufactureProof": false
+              },
+              "candidateDecision": {
+                "maximumGroupsPerDecision": 100,
+                "exactPreview": true,
+                "explicitHumanApproval": true
+              },
+              "blockingConflicts": [
+                "DISTINCT_CRM_RECORD_IDS_NOT_SAFELY_UNIFIABLE",
+                "GENERIC_OR_SHARED_ADDRESS",
+                "CONSENT_CONFLICT",
+                "CHAIN_OF_MATCHES_NOT_PROVING_IDENTITY",
+                "MATERIAL_CONTRADICTION_ON_IDENTITY_OR_SURVIVING_RECORD"
+              ],
+              "decisionRecord": [
+                "DECISION",
+                "EVIDENCE",
+                "RESPONSIBLE_PERSON",
+                "VERSION",
+                "EFFECT"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.13",
+      "title": "Seller money: the period of a collection and of a refund",
+      "gaps": [
+        "F-12"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "statements and their tests: a capture counted once, refunds and adjustments in the period they happen linked to their originals, earlier periods never rewritten, signed agreements respected (O17-04, O17-06, C4)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/commission/collectionPeriod",
+            "value": "MONTH_OF_CONFIRMED_CAPTURE"
+          },
+          {
+            "op": "add",
+            "path": "/commission/refundPeriod",
+            "value": "MONTH_IN_WHICH_THE_REFUND_HAPPENED"
+          },
+          {
+            "op": "add",
+            "path": "/commission/refundRewritesEarlierPeriods",
+            "value": false
+          },
+          {
+            "op": "add",
+            "path": "/commission/captureCountedOnce",
+            "value": true
+          },
+          {
+            "op": "add",
+            "path": "/commission/amountStates",
+            "value": [
+              "EARNED",
+              "HELD",
+              "PAYABLE",
+              "PAID"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.14",
+      "title": "The legal status of the claim rules",
+      "gaps": [
+        "F-18"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-22",
+        "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+        "decision": "APPROVED",
+        "basis": [
+          "docs/design/ORDER11-ROUND2-OPS.md"
+        ]
+      },
+      "pending": [],
+      "activation": [
+        "the state changes from PENDING_COUNSEL only with the evidence of the competent review recorded in `validation`"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/legalStatus",
+            "value": {
+              "commission.claimRules": {
+                "state": "PENDING_COUNSEL",
+                "since": "2026-10-21",
+                "covers": [
+                  "commission.acceptedClaimDays",
+                  "commission.terminationOpportunityTailDays",
+                  "commission.claimRefusalReasons",
+                  "commission.claimRefusalRules"
+                ],
+                "validation": null
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
