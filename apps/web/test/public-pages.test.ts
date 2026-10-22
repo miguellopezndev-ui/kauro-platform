@@ -272,7 +272,7 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   ])
     assert.ok(text.includes(claim), claim);
   assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "no stage names a duration");
-  assert.doesNotMatch(text.slice(0, text.indexOf("One project, start to finish")), /HubSpot|Salesforce/, "the stages name a destination only through the capability publication, on Supported services; the invented example names its service");
+  assert.doesNotMatch(text, /HubSpot|Salesforce/, "the page names a destination only through the capability publication, on Supported services");
   assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
   assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
   const primary = linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary"));
@@ -284,38 +284,15 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   }
 });
 
-test("How it works: one invented project, start to finish, on one sheet: each stage in order with figures read from the sample, the price counting the units sealed, and the sheet marked invented", () => {
+test("How it works tells no invented project of its own (Home and Sample delivery do): the quote's stage says the price counts the units sealed and leads to Pricing, the delivery's stage leads to the sample", () => {
   const html = page("how").html(ALL);
-  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
-  const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
-  assert.ok(contacts !== undefined && companies !== undefined);
-  const units = contacts.source + companies.source;
-  assert.equal(units, 15_684, "both sealed files are counted, before anything is unified");
-  const band = bandIndexOf(units);
-  assert.ok(band !== null);
-  const sheet = /<figure class="kauro-record kauro-paper"[\s\S]*?<\/figure>/.exec(html)?.[0] ?? "";
-  const rows = [...sheet.matchAll(/<li class="kauro-record-row[\s\S]*?<\/ul><\/div><\/li>/g)].map((row) => textOf(row[0]));
-  const stageNames = ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"];
-  assert.equal(rows.length, 6, "one row per stage");
-  stageNames.forEach((name, index) => assert.ok((rows[index] ?? "").includes(name), `row ${index + 1} is ${name}`));
-  const output = contacts.rows + companies.rows;
-  const groups = SAMPLE_GROUPS.pairs + SAMPLE_GROUPS.triples;
-  for (const [index, fact] of [
-    [0, `${formatCount(units)} billable source units sealed`],
-    [1, `${formatCount(428)} contacts in duplicate candidate groups`],
-    [2, `${formatCount(groups - SAMPLE_GROUPS.pairsKeptApart)} of ${formatCount(groups)} candidate groups approved to unify`],
-    [2, `${formatCount(contacts.unified)} contact rows unified`],
-    [3, `${formatUsd(priceOf(band, SAMPLE_MODE))} before tax`],
-    [3, "Prepare for HubSpot"],
-    [3, `The price counts the ${formatCount(units)} units sealed, not the ${formatCount(output)} rows delivered`],
-    [4, `${formatCount(units)} source rows less ${formatCount(contacts.unified + companies.unified)} unified with approval: ${formatCount(output)}`],
-    [5, `${SAMPLE.contactsFile}: ${formatCount(contacts.rows)} rows`],
-  ] as const)
-    assert.ok((rows[index] ?? "").includes(fact), `${index + 1}: ${fact}`);
-  // the sheet says it is invented in its own head, and the line under it says so in words (owner, 2026-10-21: the note sits with what it qualifies)
-  assert.match(sheet, /<figcaption[^>]*>[\s\S]*Invented[\s\S]*<\/figcaption>/);
-  const after = html.slice(html.indexOf("</figure>"), html.indexOf("</figure>") + 400);
-  assert.ok(textOf(after).startsWith("Invented figures."));
+  assert.doesNotMatch(html, /kauro-record|One project, start to finish|A worked example/);
+  const sheet = (key: string): string => /<article class="kauro-stage-sheet"[\s\S]*?<\/article>/.exec(html.slice(html.indexOf(`id="stage-${key}-panel"`)))?.[0] ?? "";
+  assert.ok(hrefsOf(sheet("quote")).includes(ROUTE.pricing), "the quote's card leads to Pricing");
+  assert.ok(hrefsOf(sheet("import")).includes(ROUTE.sample), "the delivery's card leads to the sample");
+  for (const key of ["files", "check", "decide", "prepare"]) assert.equal(hrefsOf(sheet(key)).length, 0, `stage ${key} leads nowhere else`);
+  const details = /<details class="kauro-path-details"[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
+  assert.ok(textOf(details).includes("The price counts the units in the files your team sealed, before duplicates are unified, not the rows delivered."));
 });
 
 // ---- Supported services ---------------------------------------------------------------------------------------------------------------

@@ -8,16 +8,14 @@
 // steps). Owner's section review (2026-10-21): the six stages are one section, not an overview followed by six sheets. They are a timeline
 // that runs down (StagePath); choosing a stage opens what happens, what you get and what stops it, beside the timeline on a wide screen and
 // under the stage on a narrow one. Who acts, what it needs and what happens at each stage sit once, folded, above the call to action
-// that closes the section. Then one invented project, start to finish: the sample delivery's project followed through the six stages on
-// one sheet, its price among them (ProjectRecord).
+// that closes the section. The invented project is not retold here (Home and Sample delivery show it): the stage of the quote says the
+// price counts the units sealed and leads to Pricing, and the stage of the delivery leads to the sample.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../../copy/public.ts";
 import { INPUT_LIMITS } from "../limits.ts";
-import { modeName } from "../estimate-text.ts";
-import { bandIndexOf, bandLabel, formatCount, formatUsd, priceOf } from "../pricing-bands.ts";
+import { formatCount } from "../pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
 import { Block, CHECK_CTA, Closing, Head } from "../r2.tsx";
-import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_GROUPS, SAMPLE_MODE, SAMPLE_SOURCES } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
 import { StagePath, type PathStage } from "../stage-path.tsx";
 
@@ -38,6 +36,8 @@ interface Stage {
   readonly happens: readonly Line[];
   readonly gets: readonly Line[];
   readonly stops: readonly Line[];
+  /** Where the card leads for more, at its foot. */
+  readonly link?: { readonly href: string; readonly label: PublicCopyId };
 }
 
 const ACTOR_LABEL: Readonly<Record<Actor, PublicCopyId>> = { team: "how.actor.team.label", kauro: "how.actor.kauro.label" };
@@ -94,6 +94,7 @@ const STAGES: readonly Stage[] = [
     needs: ["how.stage.quote.needs.plan", "how.stage.quote.needs.units"],
     happens: [
       "how.stage.quote.happens.band",
+      "how.stage.quote.happens.counted",
       "how.stage.quote.happens.lines",
       { id: "how.stage.quote.happens.valid", values: { days: POLICY_SNAPSHOT.quoteDays } },
       "how.stage.quote.happens.binding",
@@ -106,6 +107,7 @@ const STAGES: readonly Stage[] = [
       "how.stage.quote.stops.tax",
       { id: "pricing.estimate.not-offered", values: { units: formatCount(POLICY_SNAPSHOT.launchSourceUnits) } },
     ],
+    link: { href: ROUTE.pricing, label: "how.stage.quote.link" },
   },
   {
     key: "prepare",
@@ -128,6 +130,7 @@ const STAGES: readonly Stage[] = [
     happens: ["how.stage.import.happens.order", "how.stage.import.happens.stages", "how.stage.import.happens.kept"],
     gets: ["how.stage.import.gets.package", "how.stage.import.gets.report", "how.stage.import.gets.instructions"],
     stops: ["how.stage.import.stops.receipt", "how.stage.import.stops.removed"],
+    link: { href: ROUTE.sample, label: "services.sample.cta" },
   },
 ];
 
@@ -178,6 +181,11 @@ function StageSheet({ stage }: { readonly stage: Stage }): ReactElement {
           </dd>
         </div>
       </dl>
+      {stage.link === undefined ? null : (
+        <a className="kauro-site-arrow kauro-r2-stage-link" href={stage.link.href}>
+          {PUBLIC_COPY[stage.link.label]}
+        </a>
+      )}
     </article>
   );
 }
@@ -236,110 +244,6 @@ const PATH: readonly PathStage[] = STAGES.map((stage, index) => ({
   sheet: <StageSheet stage={stage} />,
 }));
 
-/** A line of the project record: its words with the figures they state. */
-type RecordLine = { readonly id: PublicCopyId; readonly values: CopyValues };
-
-/**
- * One project, start to finish: the invented project of the sample delivery followed through the six stages, on one sheet that runs down
- * like the timeline above it. Each stage gives one figure and a few facts, all read from the sample's own data, so they add up with
- * Sample delivery: the units sealed, what the check found, what the team approved, the price (which counts the units sealed, not the rows
- * delivered), the rows verified and the files handed over. It replaces a table that only went from units to price, which Pricing already
- * explains.
- */
-function ProjectRecord(): ReactElement | null {
-  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
-  const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
-  const report = (label: PublicCopyId): number => REPORT_ROWS.find((row) => row.label === label)?.count ?? 0;
-  if (contacts === undefined || companies === undefined) return null;
-  const units = contacts.source + companies.source;
-  const band = bandIndexOf(units);
-  if (band === null) return null;
-  const n = formatCount;
-  const groups = SAMPLE_GROUPS.pairs + SAMPLE_GROUPS.triples;
-  const output = contacts.rows + companies.rows;
-  const unified = contacts.unified + companies.unified;
-  const rows: ReadonlyArray<{ readonly stage: Stage; readonly main: RecordLine; readonly facts: readonly RecordLine[] }> = [
-    {
-      stage: STAGES[0] as Stage,
-      main: { id: "how.record.files.main", values: { units: n(units) } },
-      facts: [{ id: "how.record.files.fact", values: { files: n(SAMPLE_SOURCES.length), contacts: n(contacts.source), count: n(companies.source) } }],
-    },
-    {
-      stage: STAGES[1] as Stage,
-      main: { id: "how.record.check.main", values: { count: n(report("sample.report.duplicates")) } },
-      facts: [
-        { id: "how.record.check.emails", values: { count: n(report("sample.report.emails")) } },
-        { id: "how.record.check.blockers", values: { count: n(report("sample.report.blockers")) } },
-      ],
-    },
-    {
-      stage: STAGES[2] as Stage,
-      main: { id: "how.record.decide.main", values: { count: n(groups - SAMPLE_GROUPS.pairsKeptApart), max: n(groups) } },
-      facts: [
-        { id: "how.record.decide.kept", values: { kept: n(SAMPLE_GROUPS.pairsKeptApart) } },
-        { id: "how.record.decide.unified", values: { unified: n(contacts.unified) } },
-      ],
-    },
-    {
-      stage: STAGES[3] as Stage,
-      main: { id: "how.record.quote.main", values: { price: formatUsd(priceOf(band, SAMPLE_MODE)) } },
-      facts: [
-        { id: "how.record.quote.band", values: { band: bandLabel(band), mode: modeName(SAMPLE_MODE) } },
-        { id: "how.record.quote.rule", values: { units: n(units), output: n(output) } },
-      ],
-    },
-    {
-      stage: STAGES[4] as Stage,
-      main: { id: "how.record.prepare.main", values: { output: n(output) } },
-      facts: [{ id: "how.record.prepare.fact", values: { source: n(units), unified: n(unified), output: n(output) } }],
-    },
-    {
-      stage: STAGES[5] as Stage,
-      main: { id: "how.record.import.main", values: { files: n(MANIFEST_FILES.length) } },
-      facts: MANIFEST_FILES.map((file) => ({ id: "how.record.import.file", values: { name: file.name, count: n(file.rows) } })),
-    },
-  ];
-  return (
-    <div className="kauro-record-wrap">
-      <figure className="kauro-record kauro-paper" aria-labelledby="how-record-caption">
-        <figcaption id="how-record-caption" className="kauro-record-head">
-          <span>{PUBLIC_COPY["how.record.caption"]}</span>
-          <span className="kauro-record-tag">{PUBLIC_COPY["how.record.tag"]}</span>
-        </figcaption>
-        <ol className="kauro-record-rows">
-          {rows.map((row, index) => (
-            <li key={row.stage.key} className={`kauro-record-row kauro-record-row--${row.stage.key}`}>
-              <span className="kauro-record-number" aria-hidden="true">
-                {numberOf(index)}
-              </span>
-              <span className="kauro-record-stage">{PUBLIC_COPY[row.stage.heading]}</span>
-              <div className="kauro-record-facts">
-                <p className="kauro-record-main">{copy(row.main.id, row.main.values)}</p>
-                <ul>
-                  {row.facts.map((fact) => (
-                    <li key={`${fact.id}-${String(fact.values["name"] ?? "")}`}>{copy(fact.id, fact.values)}</li>
-                  ))}
-                </ul>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </figure>
-      <div className="kauro-r2-example-notes">
-        <p className="kauro-r2-example-synthetic">{PUBLIC_COPY["how.example.synthetic"]}</p>
-        <p className="kauro-record-links">
-          <a className="kauro-site-arrow" href={ROUTE.sample}>
-            {PUBLIC_COPY["services.sample.cta"]}
-          </a>
-          <a className="kauro-site-arrow" href={ROUTE.pricing}>
-            {PUBLIC_COPY["how.record.pricing.cta"]}
-          </a>
-        </p>
-      </div>
-    </div>
-  );
-}
-
 const NEVER = [
   { key: "live", name: "home.limits.live.name", body: "home.limits.live" },
   { key: "import", name: "home.limits.import.name", body: "home.limits.import" },
@@ -359,9 +263,6 @@ export function HowItWorksPage(): ReactElement {
           </a>
           <p className="kauro-r2-hint">{PUBLIC_COPY["pricing.answer.free"]}</p>
         </div>
-      </Block>
-      <Block id="how-record" heading={PUBLIC_COPY["how.record.heading"]} lead={PUBLIC_COPY["how.record.lead"]} layout="split">
-        <ProjectRecord />
       </Block>
       <Block id="how-never" heading={PUBLIC_COPY["home.limits.heading"]} lead={PUBLIC_COPY["home.limits.lead"]} tone="sunken">
         <ul className="kauro-r2-never">
