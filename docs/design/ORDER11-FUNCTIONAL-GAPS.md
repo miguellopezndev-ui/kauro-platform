@@ -7,6 +7,9 @@ in Order 11; later orders group the fixes with the other changes to the same com
 Each entry: what the design or the decision says; what the code does, with file and line; how to reproduce it; what a fix would touch;
 how sure the finding is (read in the code, or reproduced).
 
+**Order 16 (2026-10-22)** classified every entry (`docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md` §3) and annotated six of them in
+place (F-13, F-19, F-20, F-21, F-24, F-29), each note marked "Order 16".
+
 ## F-01. CLEAN asks for a destination contract it should not need
 
 **Decision in force.** The owner, 2026-10-20: "Clean your data" is an independent service without a destination CRM; no artificial
@@ -152,6 +155,8 @@ no seller-facing message. **Needs.** A closed, versioned reason code, an evidenc
 refusal, the seller-facing message derived from the code. **Status.** Drawn (P-24; UI34 "Not available" state); list to be validated
 by counsel (F-18).
 
+**Order 16 (2026-10-22).** Correction: `decisionReason` is a token from four acceptance reasons (`accept-attribution.ts:36`), not free text; the free text is the allocation's `rulingReason`; a rejection carries no reason, evidence or seller message (`commercial/machines.ts:94-95`). The list is CP-01.04 (`docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md`); its legal validation is LAWYER_LATER L-19.
+
 ## F-14. A seller's request for a review, and the decision history
 
 **Decision.** The seller can ask for a review of a refusal or of "Not available"; the owner sees every decision in order. **Code (read).**
@@ -210,6 +215,8 @@ more on request"); deletion/retention jobs (the sweeper reads the extended soft 
 project across the unpaid and paid classes; a request after the soft deadline is refused). **Depends on** F-20. **Status.** Drawn: P-30
 "extended", UI13 "extended", UI29 "check" and "check-extended".
 
+**Order 16 (2026-10-22).** Correction: the formula is in SQL (`persistence/src/source/retention.ts:261-262`; CHECK `0069:31-35`), not in `records.ts`. The registry and ToS §13.2 already allow the extension for any soft period; the paid-only restriction is the implementation's (`retention.ts:227`; `0069:56,69`; trigger `0069:78`), and UNPAID records carry no soft deadline yet (`0012:251`). No policy or legal change is needed for this entry, only for F-20 (CP-01.02).
+
 ## F-20. An exceptional ceiling of 17 days from sealing, reached only through the extension (owner decision, 2026-10-21)
 
 **Decision.** The ordinary absolute limit of a free check's files stays 14 days from sealing; only when the extension is requested may they
@@ -222,6 +229,8 @@ with the hard cap movable for the unpaid class only, as a new retention policy v
 min(extended soft deadline, sealing + 17 days)); restoration (a backup restored after that deadline never brings the files back); tests (14
 days without the extension, at most 17 with it, never more). **Status.** Drawn with the "Proposed" marker on every date table (P-30, P-31,
 UI29).
+
+**Order 16 (2026-10-22).** CP-01.02 proposes `retention.unpaidExtendedCeilingDaysFromSeal = 17` and the label `R2-RETENTION-2`; the legal wording is LR-01. Found meanwhile: two retention labels are written today (`R2-RETENTION-1` for UNPAID, `R2-INITIAL` for PAID_ORDINARY in `persistence/src/execution/store.ts:117`).
 
 ## F-21. A separate, limited hold while a sent bank transfer is confirmed (owner decision, 2026-10-21; value proposed)
 
@@ -238,6 +247,8 @@ pending-payment retention record whose end deletes the files unless an exact cre
 revives files whose hold ended); DPA/legal text (ToS §8 and §13: the hold, that it is not payment, that a late transfer is reviewed and
 returned; the DPA retention annex: a new period and its purpose); tests. **Depends on** the PV1 qualification of the route and its evidence
 store, F-22, F-23. **Status.** Drawn: P-31 (all states), P-30 "held", UI13 "held", UI29 "held".
+
+**Order 16 (2026-10-22).** Correction: the bank-transfer states are live in a separate `PaymentOrderBank` machine (`0045_bank_transfer_kit.sql:35,88-92`; `0046_bank_routes.sql:191`), not in the PaymentOrder machine. The hold is CP-01.11 (conditional on PV1 and the owner's values) and LR-02.
 
 ## F-22. Abuse limits of the hold: a fictitious or repeated order never keeps files indefinitely (owner decision, 2026-10-21)
 
@@ -271,6 +282,8 @@ label per date on Quote, Payment, Overview, Projects, Data and deletion, Billing
 DPA/legal text (the same five names in ToS §6.2, §8 and §13); tests (the five labels never merge; no screen shows a hold and an extension as
 added). **Depends on** F-19 to F-22. **Status.** Drawn as one shared table (`tools/review/private/prototypes/retention-dates.tsx`) on P-30,
 P-31 and UI29.
+
+**Order 16 (2026-10-22).** Correction: a customer can already read a revision's retention records (`GET /api/v1/revisions/{revisionId}`, `SourceRevisionView.retention[]`); missing are the extension, the hold and a project dates read (Order 17, O17-03).
 
 ## F-25. Batch unification: demonstrated identities applied together, probable duplicates decided in bulk by a person (owner decision, 2026-10-21)
 
@@ -331,6 +344,8 @@ policy key); DPA/legal text (Salesforce IDs and error messages processed); abuse
 resubmissions); tests (reconciliation edge cases: duplicate-rule and validation rejections, missing rows, a key imported twice, ambiguous
 matches; fingerprints of the evidence files). **To verify:** that Data Loader's success and error files repeat the unmapped source-key
 column. **Depends on** F-28. **Status.** Drawn: UI27 and UI28 "sf-reconciled".
+
+**Order 16 (2026-10-22).** Qualification: CMD040 validates a closed-shape receipt (`import-stage.ts:107-112`) but reads no Data Loader file and generates nothing. No new retention key is needed: `retention.importReceiptDaysFromTerminal` and ToS §13.1 already keep result files 7 days after verification and while a staged project needs them.
 
 ## F-30. HubSpot associations: no generated IDs, the returned error file still checked
 

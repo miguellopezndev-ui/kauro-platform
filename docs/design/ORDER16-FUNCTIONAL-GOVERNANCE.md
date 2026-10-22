@@ -216,8 +216,8 @@ superseded). Dependencies are therefore given by the FCI component each later or
 
 ## 10. No interference with Orders 14 and 15
 
-- Order 14 (PR #120) owns `packages/reports`, its tests and `docs/design/ORDER11-FUNCTIONAL-GAPS.md` while it integrates. This order
-  touches none of them; FG's corrections wait (section 11).
+- Order 14 (PR #120) owned `packages/reports`, its tests and `docs/design/ORDER11-FUNCTIONAL-GAPS.md` while it integrated. This
+  order touched none of them before PR #120 merged; FG was annotated afterwards, on the merged text (section 11).
 - Order 15 owns authorizers, roles, permissions, RLS policies and their tests (its worktree changes files under `apps/api`,
   `apps/web/test` and `packages/application`). This order changes no code under `apps/` or `packages/`; where a rule needs them it
   names the dependency (F-11, F-14, F-19, F-25, G-08, G-13).
@@ -225,14 +225,17 @@ superseded). Dependencies are therefore given by the FCI component each later or
 
 Changed files: `docs/authority/proposals/*` (new), `docs/legal/CHANGE-REQUESTS-CP-01.md` (new), `docs/legal/TERMS_OF_SERVICE.md`,
 `docs/legal/CHECKLIST.md`, `docs/legal/LAWYER_LATER.md`, `docs/design/LEGAL-CORRECTION-REQUESTS.md`,
-`docs/design/FUNCTIONAL-CHANGE-INVENTORY.md`, this file, and `tools/test/change-proposals.test.mjs` (new).
+`docs/design/FUNCTIONAL-CHANGE-INVENTORY.md`, `docs/design/ORDER11-FUNCTIONAL-GAPS.md` (notes only, after PR #120), this file,
+`tools/test/change-proposals.test.mjs` (new) and `tools/test/owned-cleanup.test.mjs` (the recursive-delete census counts the new
+test's one owned delete).
 
-## 11. Corrections for ORDER11-FUNCTIONAL-GAPS.md (after PR #120 merges)
+## 11. Corrections applied to ORDER11-FUNCTIONAL-GAPS.md (after PR #120 merged)
 
 | Entry | Correction |
 |---|---|
 | F-13 | `decisionReason` is a token from four acceptance reasons (`accept-attribution.ts:36`), not free text; the free text is the allocation's `rulingReason`; rejections carry no reason. |
 | F-19 | The extension formula is in SQL (`persistence/src/source/retention.ts:261-262`; CHECK `0069:31-35`), not in `records.ts`; unpaid refusal at three layers (`retention.ts:227`, `0069:56,69`, trigger `0069:78`). |
+| F-20 | Note added: CP-01.02 and LR-01; the two retention labels written today (section 5.4). |
 | F-21 | The bank-transfer states are live in a separate `PaymentOrderBank` machine (`0045_bank_transfer_kit.sql:35,88-92`; `0046_bank_routes.sql:191`), not in the PaymentOrder machine. |
 | F-24 | A customer can read a revision's retention records (`GET /revisions/{id}`, `SourceRevisionView.retention[]`); missing are the extension, the hold and a project dates read. |
 | F-29 | CMD040 validates a closed-shape receipt (`import-stage.ts:107-112`); it does not read Data Loader files or generate dependent files. |
