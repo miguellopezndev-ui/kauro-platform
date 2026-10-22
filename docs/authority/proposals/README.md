@@ -22,7 +22,7 @@ recorded provenance until an item is adopted.
 |---|---|
 | `APPROVED_AWAITING_REISSUE` | The substance was decided by the owner, or is already stated by the authority or the law. It waits for adoption, and takes effect only with its `activation`. |
 | `CONDITIONAL` | The principle is decided; a value, a fact or a professional check listed in `pending` is missing. Not adoptable yet. |
-| `PROPOSED` | A recommendation. It needs the owner's decision; writing it here decides nothing. |
+| `PROPOSED` | Not approved: a recommendation awaiting the owner, or an item the owner deferred (`deferred`), whose current registry text stays. Writing it here decides nothing. |
 
 `ADOPTED` is not used until the first adoption (below); the test refuses it.
 
@@ -39,7 +39,7 @@ Each item also carries:
 
 1. The owner decides the items in the proposal's decision block (date and words, with the decision record in
    `docs/authority/decisions/`), or rejects them. A formal external signature is added only where a procedure requires one.
-2. The authority re-issue applies the signed items' operations to the registry, sets the new edition label, and records the new hashes
+2. The authority re-issue applies the decided items' operations to the registry, sets the new edition label, and records the new hashes
    and the proposal in `PROVENANCE.json` (`source`). This is the step the generator's message calls "re-vendor from the authority and
    record the new hash"; it is never a silent edit.
 3. In the same change: the generated contracts are regenerated; every copy of a changed value is updated with its drift test (domain

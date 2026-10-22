@@ -866,6 +866,7 @@
       "pending": [],
       "activation": [
         "the core intervention (component C7) keeps deterministic merges to the proving keys of Migration Core (cores/kauro-migration-core/src/domain/identity.ts PROVING_KEY_KINDS; identity/resolve-identity.ts); this proposal does not change the core",
+        "the core verifies a declared authoritative external id before it proves identity; Migration Core today requires only the declaration, so until then an external id alone proves nothing without a person's decision (C7)",
         "the plan contract and bulk decisions with exact preview and explicit human approval, and the decision record (O17-09)",
         "adversarial identity fixtures (F-27, C11)"
       ],
@@ -1010,7 +1011,8 @@
                 "covers": [
                   "commission.acceptedClaimDays",
                   "commission.terminationOpportunityTailDays",
-                  "commission.claimRefusalReasons"
+                  "commission.claimRefusalReasons",
+                  "commission.claimRefusalRules"
                 ],
                 "validation": null
               }

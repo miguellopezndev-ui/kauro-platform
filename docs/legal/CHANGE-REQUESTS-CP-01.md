@@ -51,11 +51,12 @@ No company data (NIT, address, phone, effective date) is filled in here: they st
 ## LR-03. Proven identity is a technical class, not a guarantee (F-25; CP-01.12)
 
 - **Today.** ToS §3.7: "A duplicate candidate is not a confirmed merge; Kauro merges duplicates only with the Customer's approval".
-- **Proposed (revision 2, after the owner's security modification of 2026-10-22).** Add: "Records are combined without a separate
-  decision only when they share an identifier that proves they are one record: the same source record identifier within one identity
-  space, or an external identifier the Customer declared authoritative and that was verified. The same email address and the same name
-  are a strong sign of a possible duplicate, not proof: those candidates are decided by a person, with a preview, in groups of at most
-  one hundred (100). Kauro writes to no CRM." Revision 1's example (same email and same name as "demonstrated") is withdrawn.
+- **Proposed (revision 2, after the owner's security modification of 2026-10-22).** Add: "Records that share an identifier proving
+  they are one record (the same source record identifier within one identity space, or an external identifier declared authoritative
+  in the configuration and verified) are one record, not a duplicate candidate. The same email address and the same name are a strong
+  sign of a possible duplicate, not proof: such candidates are merged only with the Customer's approval, given by a person after an
+  exact preview, for at most one hundred (100) groups per decision. Kauro writes to no CRM." This keeps §3.7: a duplicate candidate is
+  still never merged without approval. Revision 1's example (same email and same name as "demonstrated") is withdrawn.
 - **Blocked until.** CP-01.12 adopted with the core intervention that implements it; competent review.
 
 ## LR-04. Salesforce record IDs and import error messages (F-28, F-29)

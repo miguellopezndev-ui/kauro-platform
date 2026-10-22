@@ -187,9 +187,9 @@ superseded). Dependencies are therefore given by the FCI component each later or
 |---|---|---|
 | C4 backend domain and application | CP-01 and CP-02 adopted | F-01 handlers; F-12 to F-17 seller money; F-25, F-26 plan; F-29 reconciliation engine; F-33, F-34 if decided; the retention label (section 5.4) |
 | C6 deletion, retention, restoration | CP-01.02 adopted; Order 15 for row policies | UNPAID soft deadline written by the audit producer; extension for UNPAID; ceiling 17; SQL pins updated with drift tests; one retention label; restored backups never revive data |
-| C5 payments and the hold | PV1 qualification; CP-01.11 values | Proof intake; matching against the route's evidence; hold never authorises execution (F-23 tests) |
+| C5 payments and the hold | Wise Business and the PV1 qualification (CP-01.11 values decided 2026-10-22) | Proof intake; matching against the route's evidence; hold never authorises execution (F-23 tests) |
 | C10 abuse controls | C5; Order 15 | Hold uniqueness in the database; unpaid-hold counter and owner review; bulk-decision caps, rate limits, audit |
-| C7 cores | CP-01.12; tool checks | Evidence classification; CRM IDs and shared addresses; Salesforce route; generated files from proved IDs; adversarial fixtures |
+| C7 cores | CP-01.12; tool checks | Evidence classification; verification of a declared authoritative external id before it proves identity; CRM IDs and shared addresses; Salesforce route; generated files from proved IDs; adversarial fixtures |
 | C8 identity | Provider decision (A9 vs code); Order 15 | F-07, G-01, G-08; consent record of O17-12 |
 | C9 web | C3 and the above | Every proposed screen onto real reads; public words of LR-01, LR-02 with the legal re-issue; X-37 lists; F-08 contact checkbox |
 | C11 tests | with each step | The named suites of FCI §2 C11, plus section 3 of CP-01 per item |
@@ -284,7 +284,7 @@ CP-01.08, CP-01.12 (modified), CP-01.13, CP-01.14.
 | Item | Revision 1 | Revision 2 (owner) |
 |---|---|---|
 | CP-01.07 | Any committed command counts as progress | Only a material, verifiable change of the state of the project or its deliverables (nine named acts, or an equivalent that legitimately changes the course); eight kinds of act never count; progress affects the inactivity alert only and never extends retention, legal deadlines or a quote's validity |
-| CP-01.12 | Same normalised email and full name = demonstrated | Deterministic merge only on the core's proving keys (source record id within one identity space; authoritative, verified external id); email and name are candidates decided by a person, at most 100 groups, exact preview, explicit approval; five blocking conflicts; no folding; decision record |
+| CP-01.12 | Same normalised email and full name = demonstrated | Deterministic merge only on the core's proving keys (source record id within one identity space; authoritative external id, which the core must also verify: today it is only declared); email and name are candidates decided by a person, at most 100 groups, exact preview, explicit approval; five blocking conflicts; no folding; decision record |
 | CP-01.11 | Support calendar (America/Bogota); review after 2 in 90 days per workspace; step-up recommended | Five US banking days (FedACH calendar, official sources fixed), the earlier of that and 24 days from sealing, the customer sees the real date; review from the third in a rolling 90 days per organisation; step-up required; activation blocked |
 | CP-01.04 | Code names and three messages to confirm | Confirmed; evidence on every refusal; note and evidence for `OTHER`; a versioned rule in force for `OWNER_RULE`, never retroactive; the seller sees the message only and may ask for a review |
 | CP-01.13 | Periods to confirm | Month of confirmed capture; month the refund happened; earlier periods never rewritten; a capture counted once; earned, held, payable, paid kept apart |
@@ -318,9 +318,11 @@ section 7 are unchanged.
 2. **Identity (O17-09).** A merge without human confirmation is accepted only for a proving key without a blocking conflict; email and
    name matches are refused as proof and offered as candidates; accents, plus-addressing or other characters never make a proof; each
    blocking conflict refuses; a bulk decision over 100 groups is refused; a decision without the exact preview hash or explicit approval
-   is refused; the decision record carries decision, evidence, person, version and effect.
+   is refused; an external identifier that is declared authoritative but not verified proves nothing on its own; the decision record
+   carries decision, evidence, person, version and effect.
 3. **Claims (O17-05).** `OTHER` without a note or evidence refused; `OWNER_RULE` without a versioned rule in force at the decision
-   refused, and a rule dated after the claim refused as retroactive; the seller view never shows the code, note or evidence.
+   refused, and (Order 16's reading of "never retroactive") a rule that entered into force after the claimed facts refused; the seller
+   view never shows the code, note or evidence.
 4. **CLEAN (O17-01).** A CLEAN project reaches audit, plan, approval and quote without a target contract and binds the canonical hash;
    a target given for CLEAN is refused with nothing written; HUBSPOT and SALESFORCE unchanged.
 5. **Extension (O17-14).** UNPAID: 14 days without extension, at most 17 with it, one per project across classes; refusals as CP-01

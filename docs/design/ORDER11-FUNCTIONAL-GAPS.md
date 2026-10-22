@@ -248,7 +248,7 @@ revives files whose hold ended); DPA/legal text (ToS §8 and §13: the hold, tha
 returned; the DPA retention annex: a new period and its purpose); tests. **Depends on** the PV1 qualification of the route and its evidence
 store, F-22, F-23. **Status.** Drawn: P-31 (all states), P-30 "held", UI13 "held", UI29 "held".
 
-**Order 16 (2026-10-22).** Correction: the bank-transfer states are live in a separate `PaymentOrderBank` machine (`0045_bank_transfer_kit.sql:35,88-92`; `0046_bank_routes.sql:191`), not in the PaymentOrder machine. The hold is CP-01.11 (conditional on PV1 and the owner's values) and LR-02.
+**Order 16 (2026-10-22).** Correction: the bank-transfer states are live in a separate `PaymentOrderBank` machine (`0045_bank_transfer_kit.sql:35,88-92`; `0046_bank_routes.sql:191`), not in the PaymentOrder machine. The hold is CP-01.11 (owner's values decided 2026-10-22; conditional on Wise Business, PV1, implementation, abuse controls and legal review) and LR-02.
 
 ## F-22. Abuse limits of the hold: a fictitious or repeated order never keeps files indefinitely (owner decision, 2026-10-21)
 

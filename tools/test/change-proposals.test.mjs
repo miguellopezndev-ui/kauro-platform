@@ -239,6 +239,9 @@ test("CP-01: every item carries the owner resolution, CP-01.09 stays deferred, a
 
 test("CP-01.07: only a material change of state is progress, and progress extends nothing but the inactivity alert", () => {
   const progress = added("CP-01.07", "policy.json", "/alerts/relevantProgress");
+  assert.equal(progress.rule, "MATERIAL_VERIFIABLE_CHANGE_OF_THE_STATE_OF_THE_PROJECT_OR_ITS_DELIVERABLES");
+  assert.deepEqual(progress.counts, ["NEW_SEALED_REVISION", "CHECK_CONCLUDED", "PLAN_DECISION_EFFECTIVE", "APPROVAL_GIVEN", "QUOTE_ISSUED", "PAYMENT_RECONCILED", "PREPARATION_COMPLETED", "DELIVERY_MADE", "IMPORT_RECORDED"], "only the owner's material acts count");
+  assert.equal(progress.equivalentActCountsOnlyIf, "IT_LEGITIMATELY_CHANGES_THE_COURSE_OF_THE_PROJECT");
   for (const act of progress.counts) {
     assert.doesNotMatch(act, /COMMAND|READ|DOWNLOAD|SIGN_IN|REMINDER|NOTIFICATION|SUPPORT|RETRY|ATTEMPT|ANY/, `${act} is not a generic or non-material act`);
   }
@@ -270,7 +273,9 @@ test("CP-01.12: only the core's proving keys merge without a person; name and em
   assert.equal(identity.candidateDecision.maximumGroupsPerDecision, batchItems, "no new limit: api.batchItems");
   assert.equal(identity.candidateDecision.exactPreview, true);
   assert.equal(identity.candidateDecision.explicitHumanApproval, true);
-  assert.equal(identity.blockingConflicts.length, 5);
+  assert.deepEqual(identity.blockingConflicts, ["DISTINCT_CRM_RECORD_IDS_NOT_SAFELY_UNIFIABLE", "GENERIC_OR_SHARED_ADDRESS", "CONSENT_CONFLICT", "CHAIN_OF_MATCHES_NOT_PROVING_IDENTITY", "MATERIAL_CONTRADICTION_ON_IDENTITY_OR_SURVIVING_RECORD"]);
+  assert.deepEqual(identity.deterministicMerge.onlyProvenIdentityKeys, ["SOURCE_RECORD_ID_WITHIN_ONE_IDENTITY_SPACE", "AUTHORITATIVE_EXTERNAL_ID_VERIFIED"]);
+  assert.ok(cp01Item("CP-01.12").activation.some((a) => /verifies a declared authoritative external id/.test(a)), "the core's missing verification is an activation condition");
   for (const field of ["DECISION", "EVIDENCE", "RESPONSIBLE_PERSON", "VERSION", "EFFECT"]) assert.ok(identity.decisionRecord.includes(field), `records ${field}`);
 });
 
@@ -304,7 +309,7 @@ test("CP-01.11: the hold's approved parameters, its official calendar sources, a
   }
 });
 
-test("CP-01.02 to .05 and .14: the decided values and the legal status", () => {
+test("CP-01.02 to .06, .13 and .14: the decided values and the legal status", () => {
   const retention = readJson(join(registryDir, "policy.json")).retention;
   assert.deepEqual(added("CP-01.02", "policy.json", "/retention/extendHardCapExceptions"), { UNPAID: { ceilingDaysFromSeal: 17, onlyThroughTheProjectExtension: true } });
   assert.equal(retention.softExtensionMaximumSeconds, 72 * 3600, "the extension is up to 72 hours");
@@ -322,6 +327,22 @@ test("CP-01.02 to .05 and .14: the decided values and the legal status", () => {
   const legal = added("CP-01.14", "policy.json", "/legalStatus")["commission.claimRules"];
   assert.equal(legal.state, "PENDING_COUNSEL", "not legally approved without the competent review");
   assert.equal(legal.validation, null);
-  assert.ok(legal.covers.includes("commission.claimRefusalReasons"));
+  for (const key of ["commission.acceptedClaimDays", "commission.terminationOpportunityTailDays", "commission.claimRefusalReasons", "commission.claimRefusalRules"]) {
+    assert.ok(legal.covers.includes(key), `${key} is under PENDING_COUNSEL`);
+  }
+  const alerts = added("CP-01.06", "policy.json", "/alerts");
+  assert.deepEqual(alerts.precedence, ["BLOCKED", "DEADLINE_PASSED", "DEADLINE_SOON", "INACTIVE"]);
+  assert.equal(alerts.inactivityDays, 14);
+  assert.equal(alerts.deadlineLeadDays, 2);
+  assert.deepEqual(alerts.claimEndAlertDays, [14, 3]);
+  assert.equal(alerts.pilotReviewLeadDays, 14);
+  assert.equal(alerts.oneItemOnce, true);
+  assert.equal(alerts.otherConditionsShownOnTheSameAlert, true);
+  assert.equal(added("CP-01.13", "policy.json", "/commission/collectionPeriod"), "MONTH_OF_CONFIRMED_CAPTURE");
+  assert.equal(added("CP-01.13", "policy.json", "/commission/refundPeriod"), "MONTH_IN_WHICH_THE_REFUND_HAPPENED");
+  assert.equal(added("CP-01.13", "policy.json", "/commission/refundRewritesEarlierPeriods"), false);
+  assert.equal(added("CP-01.13", "policy.json", "/commission/captureCountedOnce"), true);
+  assert.deepEqual(added("CP-01.13", "policy.json", "/commission/amountStates"), ["EARNED", "HELD", "PAYABLE", "PAID"]);
+  assert.match(readJson(join(registryDir, "policy.json")).commission.base, /EXCLUDING_TAX/, "tax stays out of the base");
   assert.equal(added("CP-01.05", "policy.json", "/commission/retainerDefaultCentsPerMonth"), 0);
 });

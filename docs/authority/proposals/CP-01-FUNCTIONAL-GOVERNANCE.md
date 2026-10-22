@@ -140,11 +140,12 @@ the delta) does not enter into force early. A business authorization here is not
   allocation (`commercial/machines.ts:94-95`), which carries a label `ruling_reason` and a `ruling_evidence_hash`
   (`0029_sales_attribution.sql:403-404`). Missing: a closed refusal code and a seller-facing message.
 - **Change (revision 2).** CP-01.04: `commission.claimRefusalListVersion = CLAIM-REFUSAL-1`; seven codes, each with its seller
-  message, `noteRequired` (only `OTHER`), `evidenceRequired` (every refusal: the owner sees its evidence, as the existing
+  message, `noteRequired` (only `OTHER`), `evidenceRequired` (every refusal; Order 16's reading of "the owner sees the cause and its
+  evidence", which the owner states expressly for `OTHER`; the existing
   `ruling_evidence_hash` already records) and `ruleReferenceRequired` (only `OWNER_RULE`); `commission.claimRefusalRules`: the owner
   sees code, note and evidence, the seller sees the message only and may ask for a review, an owner rule must be in force and
   versioned and is never retroactive. CP-01.14: `legalStatus["commission.claimRules"] = PENDING_COUNSEL` since 2026-10-21, covering
-  the 90-day claim, the tail and the refusal reasons; `validation` stays null until the review's evidence exists.
+  the 90-day claim, the tail, the refusal reasons and the refusal rules; `validation` stays null until the review's evidence exists.
 - **Counsel.** The validation of the 90-day claim, the tail and the reasons is a seller-agreement question (LAWYER_LATER L-12, L-19).
   Until then the rules have no legal effect beyond what the signed seller agreements already say.
 
@@ -204,6 +205,8 @@ the same alert without duplicating it. Change: the `alerts` object, with `otherC
   be prepared.
 - **Pending.** Real company data (CHECKLIST A-08); competent review (D-31); verification that the content reflects the processing
   actually carried out. No incomplete, false or unreviewed policy is published (LR-05).
+- **Order 16's reading.** The item stays `CONDITIONAL` as a whole, UI56's registry row included, because the screen exists only to
+  publish the Policy; the owner may have the screen row adopted earlier with a "not yet published" state if the re-issue needs it.
 - **Basis.** The law requires the policy to be accessible and the authorization to be provable (Decreto 1074 arts. 2.2.2.25.2.4,
   2.2.2.25.3.1; CHECKLIST C-03, C-05; POL §8.1); the registry publishes three legal pages and not this one.
 - **Change (revision 2).** Screen UI56; its exceptions now say that no version is published before its company data are real, it is
@@ -254,7 +257,10 @@ the same alert without duplicating it. Change: the `alerts` object, with `otherC
   `PROVING_KEY_KINDS = SOURCE_RECORD_ID | EXTERNAL_ID`; `identity/resolve-identity.ts`: "Records are combined only when they share a
   key the configuration declares authoritative … a shared email address, a shared phone number, the same name — produces a duplicate
   candidate for review and changes nothing"): a source record identifier within one identity space, or an external identifier declared
-  authoritative and verified. Policy: `identityResolution.deterministicMerge.onlyProvenIdentityKeys` names exactly those two.
+  authoritative. Policy: `identityResolution.deterministicMerge.onlyProvenIdentityKeys` names exactly those two, and the external one
+  as `AUTHORITATIVE_EXTERNAL_ID_VERIFIED`: the owner requires it to be declared **and verified**, while the core today requires only the
+  declaration in the configuration. Until the core intervention (C7) adds that verification, an external identifier proves nothing
+  without a person's decision (CP-01.12 `activation`).
 - **Candidates.** Name-and-email matches without that proof stay candidates (`candidatesProveIdentity = false`). They may be selected
   and decided in batches of at most 100 groups (`api.batchItems`), with an exact preview and explicit human approval.
 - **Blocking conflicts kept.** Distinct CRM identifiers that cannot be unified safely; generic or shared addresses; consent conflicts;
