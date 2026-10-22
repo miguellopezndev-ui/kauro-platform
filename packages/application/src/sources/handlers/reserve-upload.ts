@@ -70,6 +70,7 @@ import {
   quarantineObjectName,
   textDigest,
 } from "@kauro/domain";
+import { judgedUnderHold } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { applied, checkExpectedVersion } from "../../commands/handlers/shared.js";
 import { AuthorizationDenied, contextOf, identityOf, resultOf, settleCommandFailure } from "../../commands/runtime.js";
@@ -231,6 +232,10 @@ async function reserveUpload(runtime: SourceRuntime, collaborators: B07Collabora
         correlationId,
         payload: { uploadId: moved.uploadId, agencyId: moved.agencyId, revisionId: moved.revisionId, sessionAttempt: first.attempt, providerSessionDigest },
       });
+      // rule 16 (Order 15 F-04, review R-01): the session is issued and its bearer credential delivered only under a credential that still
+      // authenticates the request, fenced as this unit's last lock (a logout committed meanwhile rolls the issuance back; the session the
+      // provider created is then cancelled, as for any attempt that did not complete)
+      await judgedUnderHold(envelope.authority, uow, runtime.clock);
       const journaled = await commitJournal(uow, first.entryId, await journaledView(uow, moved, revision, membership, issued.chunkMultipleBytes), moved.uploadId);
       // the delivery of the bearer credential is a fact of the agency's stream, committed with the answer that carries it
       await recordDelivery(uow, membership.agencyId, spec.id);
@@ -386,6 +391,8 @@ async function reserveUpload(runtime: SourceRuntime, collaborators: B07Collabora
     const found = await run(async (uow) => {
       const upload = await uow.sources.uploads.get(uploadId);
       if (!upload) throw new DomainFailure("INTEGRITY_FAILURE", "a journaled upload is not visible");
+      // a journaled answer hands out the upload's bearer credential: only under a credential that still authenticates the request (rule 16)
+      await judgedUnderHold(envelope.authority, uow, runtime.clock);
       return { upload, secret: await uow.sources.sessionSecrets.readOwn(uploadId) };
     });
     if (found.secret === null) {

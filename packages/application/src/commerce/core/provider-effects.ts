@@ -42,6 +42,7 @@ import type {
   ServiceContext,
 } from "@kauro/domain";
 import { DomainFailure, IdempotencyConflictFailure, NotFoundFailure, providerRequestHash, providerRequestIdOf } from "@kauro/domain";
+import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
 import type { CommandResult } from "../../api/envelope.js";
 import { problemOf } from "../../api/problems.js";
 import type { CommerceReconciler, PaymentProviderAdapter, ProviderDispatchResult, ProviderOrderObservation } from "../ports.js";
@@ -349,6 +350,11 @@ export interface ProviderCommandRun<Body, View> {
   readonly digest: Sha256Hex;
   readonly correlationId: CorrelationId;
   readonly body: Body;
+  /**
+   * The request's credential (a person's command): fenced and judged in T1 as its last lock, before its intent or its answer commits and
+   * before a replay is answered (rule 16). Absent for a SERVICE principal, whose identity was verified as it stands.
+   */
+  readonly authority?: RequestAuthority;
   readonly maxAttempts?: number;
   /** The access decision, before the reservation (B06 D-PIPE-1); throws a DomainFailure to deny. A SERVICE principal adopts its scope here. */
   access(uow: CommerceUnitOfWork): Promise<void>;
@@ -420,6 +426,7 @@ export async function runProviderCommand<Body, View>(run: ProviderCommandRun<Bod
         case "REPLAY": {
           const status = reservation.entry.responseStatus;
           if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+          await judgedUnderHold(run.authority, uow, run.clock);
           return { kind: "REPLAY", status, view: reservation.entry.responseBody as View };
         }
         case "CONFLICT":
@@ -433,6 +440,9 @@ export async function runProviderCommand<Body, View>(run: ProviderCommandRun<Bod
           await run.assure?.(uow);
           const now = run.clock.now();
           const outcome = await run.phases.intent(uow, run.body, reservation.entryId as string as CausationId, now);
+          // rule 16 (Order 15 F-04, review R-01): T1 is where the person authorizes the effect; its credential is fenced here as the unit's
+          // last lock, so a logout committed while T1 ran leaves no intent (no provider call follows) and one that starts later waits for it
+          await judgedUnderHold(run.authority, uow, run.clock);
           if (outcome.kind === "FINAL") {
             const committed = await uow.journal.commit(reservation.entryId, { responseStatus: outcome.status, responseBody: outcome.view, resourceKind: outcome.resourceKind, resourceId: outcome.resourceId });
             return { kind: "FINAL", result: { kind: "COMPLETED", status: outcome.status, view: committed.responseBody as View, version: outcome.version, replayed: false } };

@@ -165,6 +165,7 @@ export function createPaymentOrderHandler(runtime: CommerceRequestRuntime, co: C
         adapter,
         clock: runtime.clock,
         principal: { unitOfWork: runtime.unitOfWork, context },
+        ...(envelope.authority === undefined ? {} : { authority: envelope.authority }),
         service: { unitOfWork: co.payment ?? unboundPaymentService(), context: service },
         identity: commerceIdentityOf(spec, envelope),
         digest: commerceDigestOf(spec, envelope),
