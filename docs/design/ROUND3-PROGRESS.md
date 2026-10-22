@@ -35,11 +35,11 @@ both from the first line to the last. Then this ledger.
 | Foundations 8: L1 concepts and the vertical slice | **Done.** System chosen: c4 "one ledger with four mastheads" (300 blind judgements; 60 of 60 in its final round; gates pass) | research/round3-slice/AUDITIONS.md; PD-05 |
 | Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
 | Foundations 9: the kit, frozen | Inventory done (42 families). Auditions decided for groups A (144 judgements), C (150) and D (180): 13 families. Group B (panels, facts, interactive table, filters) being judged. Kit record drafted (version 0.9); frozen as version 1 after group B | research/round3-kit/DECISIONS.md; ROUND3-KIT.md |
-| Owner console | **L2 decided** (54 blind judgements): nav V1 and inventory I-A (18 pages). **L3 Today decided** (36 judgements): t3 "three answers first, reference folded" clearly beats the corrected incumbent t0f (6–0, lead 5.0); gates clean at 8 widths. L4 Today: section variants being built (the three answers and the phone fold, Health, Money) | research/round3-owner (NAV-DECISION.md, today/AUDITIONS.md) |
+| Owner console | **L2 decided** (nav V1, inventory I-A). **Today: L3 decided** (t3, 36 judgements), **L4 decided** (180 judgements: answers strip s1, Health s2, Money incumbent), outside critic done, **L5 pass done** (gates clean at 8 widths, type and spacing on scale in the page CSS; shared off-scale values filed as kit CR-3). **Finance: L3 decided** (f1, 36 judgements; OWN-10 flagged), L4 being built. **Payouts:** L3 being built | research/round3-owner (today/AUDITIONS.md, today/final/, finance/AUDITIONS.md) |
 | Agency/company workspace | Pending | — |
 | Seller portal | Pending | — |
 | Public site | Pending | — |
-| Deliverables track | Research done (195 references); 24 briefs and the index written; Migration Core run on the canonical world (3 projects verified; public sample exact); report-reader defects recorded (F-31, F-32); canon aligned with the engine; Tier A alternatives being built (the PDF report r0–r3; the package entry e0–e3 and the importer guides g0–g3) | research/round3-docs-*, round3-docs-INDEX.md, round3-docs-canon/CANON-PACKAGES.md |
+| Deliverables track | Research, 24 briefs, canon packages done. **Package entry (Tier A): e2 decided** (36 judgements), finished, critic, fix pass done. **Importer guide (Tier A): g1 decided** (36 judgements), finished, critic, fix pass done; the HubSpot association steps need a qualification import before the engine patch ships (open). **PDF report (Tier A): r2 decided** (36 judgements); final being built; PD-08 (tabular font) proposed | research/round3-docs-package-entry, round3-docs-import-instructions, round3-docs-report (AUDITIONS.md, final/) |
 | All four together | Pending | — |
 | Push and merge | Pending (end only) | — |
 
@@ -58,6 +58,7 @@ both from the first line to the last. Then this ledger.
   state of a Clean your data project ("Delivered" proposed), the report's title per service, Home's six step names, and whether the
   registry primaries that conflict with the glossary are amended together. Until answered, screens use the proposals and mark them.
 
+- **Qualification import (HubSpot association step)** and the **issuer details** shown in documents: both open; the specimens say so.
 - **Codex** is not installed and needs a sign-in. A fresh-context agent plays the outside critic unless the owner sets Codex up.
 - **The engine's documents** (audit summary, importer guides, exception and trace files, manifest, README) are delivered as finished
   specimens and an archived patch, not merged. The reason: the Intelligence Core accepts only Migration Core 3.0.0 and may not be
