@@ -10,6 +10,14 @@ ChangeProposal. The legal-text part is `docs/legal/CHANGE-REQUESTS-CP-01.md`; th
 corrects CP-01.07 and CP-01.12 as the owner required, and fixes the parameters and the calendar sources of CP-01.11. Revision 1 is
 the text delivered at `16ee3d4b`.
 
+**Revision 3 (2026-10-22): Order 17 rectification of CP-01.01's error contract.** Section 3.1 named the refusal of a target given for
+CLEAN "422 TARGET_NOT_APPLICABLE" and a CRM project without a target "still TARGET_STALE". Order 17 checked the api in force: CMD011
+refuses a missing mode-dependent member as `400 INVALID_REQUEST` with a reason (`TARGET_INSTANCE_REQUIRED`, `create-project.ts:54`), a
+StartAudit without a target is `400 SCHEMA_VIOLATION` today (the closed schema requires it), and only a target that is given but not
+confirmed or current is `422 TARGET_STALE` (`apps/api/test/cmd020-start-audit.test.ts`). Section 3.1 now states the compatible contract that
+CP-02.01 specifies. The owner's decision, the delta's operations, statuses, approvals and base hashes are unchanged; only the delta's
+`revision` and `revisions` record this text change (`docs/design/ORDER17-API-CONTRACTS.md` §5).
+
 **State: not adopted.** The registry is unchanged and the authority is not re-issued. Adoption is one coordinated re-issue with CP-02
 (Order 17) and its tests (`README.md`, adoption); an item whose behaviour or legal documentation is not ready (its `activation` list in
 the delta) does not enter into force early. A business authorization here is not a deployment.
@@ -78,11 +86,14 @@ the delta) does not enter into force early. A business authorization here is not
   passes a target, and the helper inserts CLEAN-mode target artifacts (`cmd018-cmd019-target-contract.test.ts:59`).
 - **Change.** CMD020 precondition and failure, their copies in cases and requirements, and the Audit contract's `targetContractId`
   (now `required: false`, absent for CLEAN) (delta). The openapi makes the field required unless the project's mode is CLEAN.
-- **Rule for Order 17.** CLEAN: no `targetContractId`; one given is refused `422 TARGET_NOT_APPLICABLE` (one canonical hash, no
-  ambiguity). The audit records `CLEAN_ONLY_TARGET_HASH`; CreatePlan, ApprovePlan and CreateQuote bind that hash and lock no target
-  row for CLEAN. HUBSPOT and SALESFORCE unchanged.
+- **Rule for Order 17 (revision 3).** CLEAN: no `targetContractId`; one given is refused `400 INVALID_REQUEST`, reason
+  `TARGET_NOT_APPLICABLE` (one canonical hash, no ambiguity). HUBSPOT and SALESFORCE without a target: `400 INVALID_REQUEST`, reason
+  `TARGET_CONTRACT_REQUIRED` (today's status for a missing target); a target given but not confirmed or current: `422 TARGET_STALE`, as
+  now. The audit records `CLEAN_ONLY_TARGET_HASH`; CreatePlan, ApprovePlan and CreateQuote bind that hash and lock no target row for
+  CLEAN. The contract is CP-02.01. (Revision 2 said `422 TARGET_NOT_APPLICABLE`; corrected for the api's convention.)
 - **Tests (first).** A CLEAN project reaches audit, plan, approval and quote with no target contract; a target supplied for CLEAN is
-  refused with nothing written; HUBSPOT without a target still `TARGET_STALE`; a CLEAN quote binds the canonical CLEAN hash internally
+  refused `400 TARGET_NOT_APPLICABLE` with nothing written; HUBSPOT or SALESFORCE without a target is `400 TARGET_CONTRACT_REQUIRED`
+  and with a superseded one `422 TARGET_STALE`, nothing written in either case; a CLEAN quote binds the canonical CLEAN hash internally
   and shows no target fingerprint (ToS §6.1).
 
 ### 3.2 CP-01.02: retention R2-RETENTION-2 (F-19, F-20) — `APPROVED_AWAITING_REISSUE`

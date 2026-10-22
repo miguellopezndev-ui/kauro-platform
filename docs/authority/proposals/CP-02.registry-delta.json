@@ -5,12 +5,21 @@
   "generatedBy": "tools/cp02.mjs from docs/authority/proposals/CP-02.api.json; do not edit",
   "complementOf": {
     "proposal": "CP-01",
-    "revision": 2,
+    "revision": 3,
     "pr": 122,
-    "commit": "f5422605936254e6317defb2da1fbb15cd15ad97",
+    "mergedIn": "d38c00b25f124e442b17a26cae0bac017f19c0c8",
     "delta": "docs/authority/proposals/CP-01.registry-delta.json",
-    "sha256": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a",
-    "previous": { "revision": 1, "commit": "16ee3d4b2e3128e75464fee4c7a52f71dc33d965", "sha256": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a" }
+    "sha256": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d",
+    "history": [
+      { "revision": 1, "commit": "16ee3d4b2e3128e75464fee4c7a52f71dc33d965", "sha256": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a" },
+      {
+        "revision": 2,
+        "commit": "f5422605936254e6317defb2da1fbb15cd15ad97",
+        "sha256": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a",
+        "note": "merged into main by PR #122 (d38c00b2)"
+      },
+      { "revision": 3, "note": "Order 17 rectification of CP-01.01 section 3.1 (error contract); operations, statuses, approvals and base hashes unchanged" }
+    ]
   },
   "base": {
     "edition": "KAVO-2026.09-R2",

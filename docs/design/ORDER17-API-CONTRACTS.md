@@ -13,7 +13,7 @@ package was touched.
 | Fact | At the start (2026-10-22) | At the end |
 |---|---|---|
 | `main` | `58dda63f40c2f4f3f315ebdbdc5b393d66cb8492` (merge of PR #120, Orders 13 and 14); CI `verify` run 39823650915 in progress, then green | see section 8 |
-| PR #122 (Order 16) | open at `16ee3d4b` (CP-01 revision 1) | open at `f5422605`: the owner resolved CP-01 (revision 2, `docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md`) and authorized its documentary merge; see section 8 |
+| PR #122 (Order 16) | open at `16ee3d4b` (CP-01 revision 1) | merged into `main` as `d38c00b2` (CP-01 revision 2 and the owner's resolution); this branch merged that `main` without rewriting its history |
 | Orders 15 and 25 | their own worktrees (`order15-security-authorization`, `order25-aws-offline-infrastructure`) | not used, not touched |
 
 The branch was created from `origin/main` in a worktree of its own. PR #122 was read by explicit commit (`git show <sha>:<path>`), never
@@ -82,7 +82,7 @@ field and code, validated by the api's strict compiler.
 
 | Point | Order 16 said | Order 17 | Why |
 |---|---|---|---|
-| CLEAN with a target | `422 TARGET_NOT_APPLICABLE` | `400 INVALID_REQUEST`, reason `TARGET_NOT_APPLICABLE` | CMD011's convention for a mode-dependent member (`TARGET_INSTANCE_REQUIRED`); no new problem code |
+| CLEAN with a target | `422 TARGET_NOT_APPLICABLE` | `400 INVALID_REQUEST`, reason `TARGET_NOT_APPLICABLE`; CP-01 rectified to match (revision 3) | CMD011's convention for a mode-dependent member (`TARGET_INSTANCE_REQUIRED`, `create-project.ts:54`); no new problem code |
 | CRM project without a target | "still TARGET_STALE" | `400 INVALID_REQUEST TARGET_CONTRACT_REQUIRED` | today it is `400 SCHEMA_VIOLATION` (the schema requires it); same status; TARGET_STALE stays for a stale target |
 | Claim events | "events for each" | commercial transitions, no domain event | D10-EVT-1 |
 | Seller home additions | members of the seller home | a separate `GetSellerSchedule` read | `SellerHomeView` is a closed reply the web client validates |
@@ -105,7 +105,7 @@ Failures the rules caught on the real proposal while it was built, each repaired
 
 | Rule | Failure | Repair |
 |---|---|---|
-| CP-01 pin | PR #122 moved to revision 2 (owner resolution) and the pinned hash refused it | CP-02 re-verified and updated to revision 2 (CP-02.09, .11, .14, .15, .17) |
+| CP-01 pin | PR #122 moved to revision 2 (owner resolution) and the pinned hash refused it | CP-02 re-verified and updated to revision 2 (CP-02.09, .11, .14, .15, .17); after the merge of PR #122 and CP-01 revision 3, CP-02 reads CP-01 from the repository only (no branch, no git) and pins revision 3 by hash and number |
 | Authorization | RecordConsent and WithdrawConsent answered `ConsentRecord`, exposing the server's `evidenceHash` to the person | they answer `ConsentView` |
 | Authorization | RequestOutreachAuthorization answered the seller with the owner's `declineCode` | `SellerOutreachRequestView`, and a seller list |
 | Authorization | A rule required owner commands under `/api/v1/ops`, but served owner commands sit beside their siblings (`/api/v1/sales`, `/api/v1/operations`) | the prefix rule separates owner reads (all new, `/api/v1/ops`) from owner commands |
@@ -193,11 +193,13 @@ owner has decided it and the re-issue has adopted it with CP-01.
 | 8 | Competent review of the claim rules (L-12, L-19) | Counsel | the legal effect of CP-02.14 |
 | 9 | Publication of the Policy: company data, review, actual processing (CP-01.10, LR-05) | Owner, counsel | recording the processing authorization (CP-02.05) |
 | 10 | Identity provider (B-13) | Owner | CP-02.05, .06 activation |
-| 11 | CP-01.01's text (§3.1) still says "422 TARGET_NOT_APPLICABLE" and "HUBSPOT without a target still TARGET_STALE"; CP-02.01 answers 400 for both (section 5). Align CP-01's prose before the re-issue, or decide otherwise | Order 16, owner | consistency of the two signed records |
+| 11 | Resolved: CP-01 revision 3 aligns CP-01.01's §3.1 with CP-02.01 (400 TARGET_NOT_APPLICABLE, 400 TARGET_CONTRACT_REQUIRED, 422 TARGET_STALE for a stale target); the owner's decision is unchanged | — | — |
 
 ## 12. No interference
 
 Order 15 (authorization, RLS) and Order 25 (AWS) own their files; this order changed none of them, nor Migration Core, Intelligence Core,
 reports or vendored packages. All CP-02 artifacts are new files (`docs/authority/proposals/CP-02*`, `tools/cp02.mjs`,
 `tools/test/cp02-api-contracts.test.mjs`, this report); no file PR #122 changes was edited, so its merge and this branch integrate without
-conflict (checked with a working-tree merge of `f5422605`).
+conflict. After PR #122 merged, `main` (`d38c00b2`) was merged into this branch; the only Order 16 files this order then changed are
+CP-01's document and delta (revision 3, the error-contract rectification, recorded in `revisions`) and one dated note in Order 16's report
+(the O17-01 row), both explicit, none silent.

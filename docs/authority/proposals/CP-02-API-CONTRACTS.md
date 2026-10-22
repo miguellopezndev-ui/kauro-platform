@@ -1,8 +1,9 @@
 # CP-02: api contracts of the functional change (commands, read models, events, OpenAPI, cases and gates)
 
 Prepared by Order 17 on 2026-10-22 against registry edition `KAVO-2026.09-R2` (the hashes of `packages/contracts/registry/PROVENANCE.json`)
-and the served api `apps/api/openapi.json` at `main` `58dda63f`. It is the complement of CP-01 revision 2 (PR #122 at `f5422605`, after the
-owner's resolution of CP-01 on 2026-10-22, `docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md`): component C3 of
+and the served api `apps/api/openapi.json` at `main` `58dda63f`, integrated with `main` `d38c00b2` (PR #122 merged). It is the complement
+of CP-01 revision 3 (revision 2 carries the owner's resolution of 2026-10-22, `docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md`;
+revision 3 is Order 17's rectification of CP-01.01's error contract, section 4 below): component C3 of
 `docs/design/FUNCTIONAL-CHANGE-INVENTORY.md`, the handoff of `docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md` §7 and §13. The order's report
 is `docs/design/ORDER17-API-CONTRACTS.md`.
 
@@ -23,12 +24,13 @@ an adopted item takes effect only with its `activation`.
 
 `node tools/cp02.mjs generate` rebuilds the three generated files; `check` fails when a committed one differs. Both need the workspace built.
 
-**Dependency on CP-01.** CP-02 is reviewable on its own; its adoption needs CP-01's registry changes (`requires` per item). CP-02 reads
-CP-01's delta from disk once PR #122 has merged and from commit `f5422605` until then, and refuses any version whose SHA-256 is not
-`a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a` (revision 2): if CP-01 changes, CP-02 is re-verified against it, never
-silently. The rule has already worked once: CP-02 was first written against revision 1 (`16ee3d4b`, `a2133dd9…`); the owner's resolution
-produced revision 2, the pin refused it, and CP-02 was re-verified and updated (CP-02.09, .11, .14, .15 and .17). CP-02 never states CP-01's
-operations again and never touches a path CP-01 changes; PR #122's test checks that across proposals as well.
+**Dependency on CP-01.** CP-02's adoption needs CP-01's registry changes (`requires` per item). CP-02 reads CP-01's delta from this
+repository only and refuses any bytes whose SHA-256 is not `54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d` or whose
+revision is not 3: if CP-01 changes, CP-02 is re-verified against it, never silently. The rule worked twice: CP-02 was first written against
+revision 1 (`a2133dd9…`); the owner's resolution produced revision 2 (`a0148e42…`), the pin refused it and CP-02 was updated (CP-02.09, .11,
+.14, .15 and .17); revision 3 changed only CP-01's prose and `revisions`, and the pin was moved in the same commit with every test passing.
+CP-02 never states CP-01's operations again and never touches a path CP-01 changes; `tools/test/change-proposals.test.mjs` checks that
+across proposals and runs the generator on both together.
 
 ## 1. Change record
 
@@ -109,8 +111,9 @@ every command carries the registry's own OK, DENY and RACE cases.
 
 ## 4. Approved items: what Order 17 decided inside the delegation, and why
 
-- **CLEAN (CP-02.01).** The project's mode decides; no request member chooses the branch. Order 16's text named the refusal "422
-  TARGET_NOT_APPLICABLE" and said a CRM project without a target is "still TARGET_STALE". Order 17 keeps `TARGET_NOT_APPLICABLE` as the reason
+- **CLEAN (CP-02.01).** The project's mode decides; no request member chooses the branch. CP-01 revision 2 named the refusal "422
+  TARGET_NOT_APPLICABLE" and said a CRM project without a target is "still TARGET_STALE"; CP-01 revision 3 now states the contract below,
+  so the two records agree. Order 17 keeps `TARGET_NOT_APPLICABLE` as the reason
   but answers `400 INVALID_REQUEST`, as CMD011 does for `TARGET_INSTANCE_REQUIRED` (the repository's convention for a mode-dependent member),
   and answers a missing CRM target `400 INVALID_REQUEST TARGET_CONTRACT_REQUIRED`: today it is `400 SCHEMA_VIOLATION`, so no client that
   branches on status sees a change. `TARGET_STALE` stays for a target that is given but not current. The closed request schema cannot say

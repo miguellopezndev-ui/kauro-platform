@@ -6,12 +6,21 @@
   "note": "Source of CP-02. tools/cp02.mjs generates CP-02.registry-delta.json, CP-02.openapi.json and CP-02.compatibility.json from this file and the vendored registry; tools/test/cp02-api-contracts.test.mjs proves them. Nothing here is authority until the owner signs an item and the authority re-issue adopts it together with CP-01.",
   "complementOf": {
     "proposal": "CP-01",
-    "revision": 2,
+    "revision": 3,
     "pr": 122,
-    "commit": "f5422605936254e6317defb2da1fbb15cd15ad97",
+    "mergedIn": "d38c00b25f124e442b17a26cae0bac017f19c0c8",
     "delta": "docs/authority/proposals/CP-01.registry-delta.json",
-    "sha256": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a",
-    "previous": { "revision": 1, "commit": "16ee3d4b2e3128e75464fee4c7a52f71dc33d965", "sha256": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a" }
+    "sha256": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d",
+    "history": [
+      { "revision": 1, "commit": "16ee3d4b2e3128e75464fee4c7a52f71dc33d965", "sha256": "a2133dd98c83d4943c0110ffc4109ee59f14adfd6c3e4d9f8020903000e8ad0a" },
+      {
+        "revision": 2,
+        "commit": "f5422605936254e6317defb2da1fbb15cd15ad97",
+        "sha256": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a",
+        "note": "merged into main by PR #122 (d38c00b2)"
+      },
+      { "revision": 3, "note": "Order 17 rectification of CP-01.01 section 3.1 (error contract); operations, statuses, approvals and base hashes unchanged" }
+    ]
   },
   "classes": {
     "APPROVED_AWAITING_REISSUE": "Substance decided by the owner, the authority or the law (or a read under the owner's standing delegation of design decisions); every CP-01 item it requires is itself approved. Waits only for the re-issue that adopts CP-01 and CP-02 together.",
@@ -23,28 +32,28 @@
   "authorities": {
     "F-01": { "record": "docs/design/ORDER11-DESIGN-DECISIONS.md", "anchor": "7. **\"Clean your data\" [O].** No destination step", "standing": "APPROVED", "by": "owner", "date": "2026-10-20" },
     "CP01-RES": {
-      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "anchor": "# Owner resolution on ChangeProposal CP-01 (2026-10-22)",
       "standing": "APPROVED",
       "by": "owner",
       "date": "2026-10-22"
     },
     "CP01-RES-04": {
-      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "anchor": "| CP-01.04 | **Content approved; legal effect conditional.**",
       "standing": "APPROVED",
       "by": "owner",
       "date": "2026-10-22"
     },
     "CP01-RES-07": {
-      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "anchor": "| CP-01.07 | **Approved with modification.** Not every persisted command resets inactivity.",
       "standing": "APPROVED",
       "by": "owner",
       "date": "2026-10-22"
     },
     "CP01-RES-11": {
-      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "anchor": "| CP-01.11 | **Parameters approved; activation blocked by PV1.**",
       "standing": "EXTERNAL",
       "by": "owner",
@@ -52,21 +61,21 @@
       "waitsFor": "Wise Business, the PV1 evidence, implementation, abuse controls and legal review (LR-02) before any adoption or activation"
     },
     "CP01-RES-12": {
-      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "anchor": "| CP-01.12 | **Approved with a security modification.**",
       "standing": "APPROVED",
       "by": "owner",
       "date": "2026-10-22"
     },
     "CP01-RES-13": {
-      "record": "pr122:docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "record": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "anchor": "| CP-01.13 | **Approved.** A collection belongs to the period in which the money was captured and confirmed",
       "standing": "APPROVED",
       "by": "owner",
       "date": "2026-10-22"
     },
     "O16-R2": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
       "anchor": "### 13.4 Contract changes unblocked for CP-02",
       "standing": "APPROVED",
       "by": "authority",
@@ -341,7 +350,7 @@
       "waitsFor": "the PV1 qualification of the Wise route: Payments V1 §2 (a)-(f)"
     },
     "O16-HANDOFF": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
       "anchor": "## 7. Handoff to Order 17 (api contract: openapi, commands, events, read models)",
       "standing": "APPROVED",
       "by": "authority",
@@ -349,63 +358,58 @@
       "note": "Order 16's classification; it decides nothing the owner did not decide"
     },
     "B-03": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
       "anchor": "| B-03 | A3 §3.2 amendment for the self-serve free check (F-03) | Owner |",
       "standing": "PROPOSED",
       "waitsFor": "the owner"
     },
-    "B-06": { "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md", "anchor": "| B-06 | Serving a customer directly (F-34) | Owner |", "standing": "PROPOSED", "waitsFor": "the owner" },
+    "B-06": { "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md", "anchor": "| B-06 | Serving a customer directly (F-34) | Owner |", "standing": "PROPOSED", "waitsFor": "the owner" },
     "B-07": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
       "anchor": "| B-07 | Refund decision message (F-33) | Owner, counsel |",
       "standing": "PROPOSED",
       "waitsFor": "the owner and counsel"
     },
-    "B-09": { "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md", "anchor": "| B-09 | PM-12 billing details at the first quote | Owner |", "standing": "PROPOSED", "waitsFor": "the owner" },
+    "B-09": { "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md", "anchor": "| B-09 | PM-12 billing details at the first quote | Owner |", "standing": "PROPOSED", "waitsFor": "the owner" },
     "B-14": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
       "anchor": "| B-14 | Data Loader result files echo the source key",
       "standing": "EXTERNAL",
       "waitsFor": "verification on the tools (Salesforce Data Loader, HubSpot export)"
     },
     "B-15": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
+      "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
       "anchor": "| B-15 | Wise route qualification (PV1 §2) and company facts",
       "standing": "EXTERNAL",
       "waitsFor": "the owner and the providers"
     },
-    "PM-12": {
-      "record": "pr122:docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md",
-      "anchor": "| PM-12: billing details at the first quote | PROP |",
-      "standing": "PROPOSED",
-      "waitsFor": "the owner (B-09)"
-    },
+    "PM-12": { "record": "docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md", "anchor": "| PM-12: billing details at the first quote | PROP |", "standing": "PROPOSED", "waitsFor": "the owner (B-09)" },
     "LR-01": {
-      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "record": "docs/legal/CHANGE-REQUESTS-CP-01.md",
       "anchor": "## LR-01. The free check's extension, to 17 days from sealing",
       "standing": "EXTERNAL",
       "waitsFor": "competent legal review (L-20)"
     },
     "LR-02": {
-      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "record": "docs/legal/CHANGE-REQUESTS-CP-01.md",
       "anchor": "## LR-02. The pending-payment hold, and five dates named alike",
       "standing": "EXTERNAL",
       "waitsFor": "competent legal review (L-20)"
     },
     "LR-05": {
-      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "record": "docs/legal/CHANGE-REQUESTS-CP-01.md",
       "anchor": "## LR-05. Publishing the Personal Data Processing Policy and recording the authorization",
       "standing": "EXTERNAL",
       "waitsFor": "operator facts and competent legal review (L-20)"
     },
     "LR-06": {
-      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "record": "docs/legal/CHANGE-REQUESTS-CP-01.md",
       "anchor": "## LR-06. Who tells the customer a refund decision, and when (F-33)",
       "standing": "EXTERNAL",
       "waitsFor": "competent legal review (L-20)"
     },
     "LR-11": {
-      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "record": "docs/legal/CHANGE-REQUESTS-CP-01.md",
       "anchor": "## LR-11. The free-check pause: 90% of the funded envelope or \"exhausted\"",
       "standing": "EXTERNAL",
       "waitsFor": "the owner and counsel (L-20)"
@@ -417,7 +421,7 @@
       "waitsFor": "competent legal review of the seller relationship"
     },
     "L-19": {
-      "record": "pr122:docs/legal/LAWYER_LATER.md",
+      "record": "docs/legal/LAWYER_LATER.md",
       "anchor": "| L-19 | **OPEN — pending competent review (Order 16, 2026-10-22).**",
       "standing": "EXTERNAL",
       "waitsFor": "competent legal review of the claim rules"

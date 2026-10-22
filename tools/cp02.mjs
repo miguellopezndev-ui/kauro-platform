@@ -9,7 +9,7 @@
 //
 // A proposal is not authority (docs/authority/proposals/README.md at PR #122; D-34 §1.3): nothing here touches the vendored registry,
 // apps/api/openapi.json or any handler. The registry the proposals would produce is built only in a temporary directory.
-// CP-01 is read from disk when PR #122 has merged, otherwise from the pinned commit of PR #122 (git), and must match its pinned hash.
+// CP-01 is read from this repository (PR #122 merged into main) and must match its pinned hash and revision.
 //
 // Requires the workspace to be built (pnpm run build, or tools/prepare-fast.mjs): the request vocabulary, the problem statuses and the
 // event registry are read from the built @kauro/application and @kauro/domain, the very modules the api runs.
@@ -77,34 +77,24 @@ export function loadRegistry() {
   return Object.fromEntries(Object.keys(provenance.files).map((file) => [file, readJson(join(PATHS.registry, file))]));
 }
 
-function git(args) {
-  const run = spawnSync("git", args, { cwd: ROOT, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 });
-  if (run.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${run.stderr.toString("utf8").trim()}`);
-  return run.stdout;
-}
-
-/**
- * A record named "pr122:<path>" is PR #122's version of a file: read from disk once PR #122 has merged (CP-01's delta is on disk),
- * from the pinned commit before (the file may exist on main in an older version).
- */
+/** A record CP-02 cites: a file of this repository (since PR #122 merged, CP-01's records are on main too). */
 export function readRecord(spec, ref) {
-  const pr = ref.startsWith("pr122:");
-  const path = pr ? ref.slice("pr122:".length) : ref;
-  if (pr && !existsSync(join(ROOT, spec.complementOf.delta))) return git(["show", `${spec.complementOf.commit}:${path}`]).toString("utf8");
-  if (!existsSync(join(ROOT, path))) throw new Error(`record ${ref} does not exist`);
-  return readFileSync(join(ROOT, path), "utf8");
+  if (!existsSync(join(ROOT, ref))) throw new Error(`record ${ref} does not exist`);
+  return readFileSync(join(ROOT, ref), "utf8");
 }
 
-/** CP-01's delta, from disk (PR #122 merged) or from its pinned commit; its bytes must be the ones CP-02 was written against. */
+/** CP-01's delta in this repository; its bytes must be the ones CP-02 was verified against (the pinned SHA-256). */
 export function loadCp01(spec) {
-  const { delta: path, commit, sha256: pin } = spec.complementOf;
-  const onDisk = existsSync(join(ROOT, path));
-  const bytes = onDisk ? readFileSync(join(ROOT, path)) : git(["show", `${commit}:${path}`]);
+  const { delta: path, sha256: pin, revision } = spec.complementOf;
+  if (!existsSync(join(ROOT, path))) throw new Error(`CP-01's delta ${path} is not in the repository`);
+  const bytes = readFileSync(join(ROOT, path));
   const actual = sha256(bytes);
   if (actual !== pin) {
-    throw new Error(`CP-01 delta (${onDisk ? "on disk" : `commit ${commit}`}) has sha256 ${actual}, not the ${pin} CP-02 was verified against: re-verify CP-02 against the new CP-01 and update complementOf`);
+    throw new Error(`CP-01 delta has sha256 ${actual}, not the ${pin} of revision ${revision} CP-02 was verified against: re-verify CP-02 against the new CP-01 and update complementOf`);
   }
-  return { delta: JSON.parse(bytes.toString("utf8")), origin: onDisk ? "disk" : `git ${commit.slice(0, 12)}` };
+  const delta = JSON.parse(bytes.toString("utf8"));
+  if (delta.revision !== revision) throw new Error(`CP-01 is revision ${delta.revision}, CP-02 pins revision ${revision}`);
+  return { delta, origin: "disk" };
 }
 
 // --- JSON Patch subset (the rules of CP-01's test: add never overwrites, replace never creates, arrays grow at their end) ---------

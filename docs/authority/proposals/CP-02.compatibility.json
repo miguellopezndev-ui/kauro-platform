@@ -15,7 +15,7 @@
       "program.json": "24d14cd0dcd20762f7a725fb54e334389dbaf22a9117f71f5c06a9543ad02144"
     },
     "openapi": "deb1ada0e685c6cbc14ca00528485664a454117ac638e5622b4917e4c27dfdd8",
-    "cp01": "a0148e428cf3443b74a79857fd3b28ac498e68278c2a0580abb6f12ed7ac692a"
+    "cp01": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d"
   },
   "classes": {
     "ADDITIVE": "No current consumer changes: a new contract, command, operation, case, policy key, or a relaxed request member.",

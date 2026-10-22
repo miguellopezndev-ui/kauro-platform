@@ -194,12 +194,14 @@ function checkDisjoint(first, second) {
   }
 }
 
-test("CP-01: the pinned delta is the one on PR #122, and CP-02 never touches a value CP-01 changes", () => {
+test("CP-01: the delta in the repository is the pinned revision, and CP-02 never touches a value CP-01 changes", () => {
   const { origin } = loadCp01(spec);
-  assert.ok(origin === "disk" || origin.startsWith("git"), origin);
+  assert.equal(origin, "disk", "CP-01 is read from this repository, not from a branch");
+  assert.equal(cp01.revision, spec.complementOf.revision, "the pinned revision");
   assert.equal(cp01.proposal, "CP-01");
   checkDisjoint(cp01, cp02);
   mustFail(() => loadCp01({ ...spec, complementOf: { ...spec.complementOf, sha256: "0".repeat(64) } }), /re-verify/, "a CP-01 other than the pinned one");
+  mustFail(() => loadCp01({ ...spec, complementOf: { ...spec.complementOf, revision: 2 } }), /pins revision 2/, "a CP-01 of another revision");
   const clash = clone(cp02);
   clash.items[0].patch["commands.json"] = [{ op: "test", path: "/19/precondition", value: valueAt(registry["commands.json"], "/19/precondition") }, { op: "replace", path: "/19/precondition", value: "x" }];
   mustFail(() => checkDisjoint(cp01, clash), /CP-01 changes/, "a CP-02 change on a CP-01 path");
