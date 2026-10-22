@@ -29,7 +29,8 @@ credential, no external system and no production system was used. All data is sy
 class against the route's declared role (`x-kauro-role`), and fails when a route is added without a class. For every served route it then
 sends a request whose body passes admission (built from the route's own request schema), with fresh ids and agency A in the path and in
 `X-Kauro-Agency`, as each identity the class must refuse, and asserts that the refusal comes from authentication or authorization (never
-from the absence of the object), with no journal entry, no event, and no table changed but the security facts. A control request as the
+from the absence of the object), with no journal entry, no event, and no table's content changed but the security facts (a digest of
+every row of every table, so an update is seen as well as an insert). A control request as the
 admitted identity proves no refusal is a route refusing everyone.
 
 | Class | Routes | Who is admitted | Enforced at | Refused in the matrix |
@@ -57,7 +58,7 @@ id: cmd009 to cmd060, `b16-tenant-sweep`, `job-reads`, `audit-reads`, `source-re
 | F-01 | The owner's bank refund commands (CMD032 with a destination, CMD220 to CMD225) checked the KAURO_OWNER grant only inside their payment-service unit, after reading the cited restricted evidence, locating the refund or attempt in any agency and taking the account's OUTBOUND stream lock. A person without the grant got NOT_FOUND for an unknown id and CORPORATE_ROLE_MISSING for an existing one (an existence signal across agencies), the denial fact named the agency of the located refund, and the request could queue on the owner's stream lock. | Medium (BFLA ordering, cross-tenant existence signal, lock contention) | Fixed |
 | F-02 | The owner's approval naming a destination (CMD032, CMD220) did not fence the browser session in its unit (rule 16): a logout committed while the approval waited did not stop it. | Low | Fixed |
 | F-03 | A verified service identity presented on another service's command was refused, but the refusal's durable fact was written in a unit of the presented service's runtime group, which those routes never bind: the answer was 422 INTEGRITY_FAILURE or 500 INTERNAL_ERROR and the attempt left no fact. | Low (audit loss, wrong answer; no effect) | Fixed |
-| F-04 | The core command pipeline (B06, B07, B08, B16 commands) judged the browser session only at the transport: a logout committed while a command ran inside its unit did not stop the command. Membership and identity changes were already fenced (D-TX-2). | Low | Fixed |
+| F-04 | Every command pipeline but the bank owner commands judged the browser session only at the transport: a logout committed while a command ran inside its unit did not stop the command. Pipelines: B06's `runCommandIn` (B06, B07, B08 and the team commands), the commerce and commercial pipeline `runCommerceCommand` (every B10, B12 and B16 owner, seller and operations command, and the agency's refund commands), the provider-effect intent of `runProviderCommand` (CMD028, CMD029), the quote pipeline (CMD027) and the two-phase source reservation (CMD013). Membership and identity changes were already fenced (D-TX-2). The first candidate repaired only `runCommandIn`; the dispatcher's review found the rest (R-01). | Low (a narrow race), inside the order's mandatory revocation criterion | Fixed |
 
 ### Repairs
 
@@ -71,9 +72,16 @@ id: cmd009 to cmd060, `b16-tenant-sweep`, `job-reads`, `audit-reads`, `source-re
 - F-03: the refusal is recorded in the command's own service group (`ownServiceContextOf` in
   `packages/application/src/commercial/statements/service.ts`; the payment service's id in `apps/api/src/payments/service-commands.ts`) and
   names the presented service as its actor.
-- F-04: `runCommandIn` (`packages/application/src/commands/runtime.ts`) fences and judges the request's credential as the unit's last lock,
-  immediately before the journal commit, and before answering a journaled replay. A bearer credential is verified again as it stands; a cookie session's row is held FOR SHARE until
-  COMMIT, so a logout that starts later waits for it.
+- F-04: each person-command pipeline fences and judges the request's credential (`judgedUnderHold`) as the unit's last lock, immediately
+  before its journal commit, and before answering a journaled replay: `runCommandIn` (`packages/application/src/commands/runtime.ts`),
+  `runCommerceCommand` (`commerce/request/runtime.ts`, as a check registered for the committed instant, which runs after every wait of the
+  work immediately before COMMIT, where the bank bodies already judged it; their hold and this one re-lock without waiting),
+  T1 of `runProviderCommand` (`commerce/core/provider-effects.ts`, the authority now passed by CMD028 and CMD029; a SERVICE principal has
+  none), CreateQuote (`commercial/quotes/create-quote.ts`: the answer, the replacement's intent and the replay) and ReserveUpload
+  (`sources/handlers/reserve-upload.ts`: the session's issuance unit and every hand-out of the upload's bearer credential). A bearer
+  credential is verified again as it stands; a cookie session's row is held FOR SHARE until COMMIT, so a logout that starts later waits for
+  it. Units that only complete an effect the person already authorized (the provider protocol's T4, a replacement quote's completion) are
+  not fenced: the authorization point is the fenced intent.
 - Test harness: `FaultRouting` gains `Routing.unrouted` (`apps/api/test/fault-support.ts`): the refund lane's routed invocations leave the
   owner's new kauro_app grant unit on the api's own pool, unrouted and uncounted, so the cells keep routing and numbering exactly the
   command's payment-service units. Every other role still fails loudly when an invocation does not serve it.
@@ -85,7 +93,8 @@ id: cmd009 to cmd060, `b16-tenant-sweep`, `job-reads`, `audit-reads`, `source-re
 | F-01 | `o15-owner-first.test.ts` (existing vs unknown ids, four outsiders, seven commands; OUTBOUND stream held) | 52 differences; the outsider waited on the owner's stream | 4/4 |
 | F-02 | same file, `F-02 rule 16` | 200, refund APPROVED after logout | 401, nothing approved |
 | F-03 | `o15-service-identities.test.ts`; matrix cells of the payment service on CMD051, CMD053, CMD056, CMD059 | 422 / 500, no fact | 403 SERVICE_NOT_PERMITTED, one fact naming the presented service |
-| F-04 | `o15-session-revocation.test.ts` | 201, client created after logout | 401, nothing written; a later logout waits for the COMMIT |
+| F-04 | `o15-session-revocation.test.ts` (CMD009, B06 pipeline) | 201, client created after logout | 401, nothing written; a later logout waits for the COMMIT |
+| F-04 (R-01) | `o15-session-revocation-commerce.test.ts` (CMD056 owner, CMD031 agency, CMD027, CMD028, CMD013) | 201 for all five, each writing its row after the logout | 401, nothing written, for all five; each commits under a live session; a logout waits for a commerce command's COMMIT |
 
 The red runs and the full logs are kept outside the repository (`Kauro.archive\Evidence\Order15-Security`).
 
@@ -132,7 +141,9 @@ Each is defense in depth or a product decision, not a reachable defect today; ea
    user id the payment service passes. Proposal: a minimal owner role, as 0077 did for route registration.
 4. Sign-in accepts any unexpired ID token without an `auth_time` bound; a leaked token mints sessions until the identity is disabled.
    Proposal: a maximum sign-in age, verified against the real Identity Platform.
-5. Reads (`runReadIn`) do not fence the session at their unit; a read already in flight when a logout commits still answers. A bearer
+5. Reads (`runReadIn` and the read routes) and the content-addressed document intakes (selection manifest, decision artifact, logo) do
+   not fence the session at their unit: a read already in flight when a logout commits still answers, and an intake stores a document that
+   grants nothing until a fenced command cites it. Service commands are not fenced (a service identity is verified as it stands). A bearer
    credential is verified again inside the command's unit by the fence; a future bearer verifier that does network I/O should cache its keys
    so that no network call runs while the unit holds its locks.
 6. `getTransferInstructions` declares no role (any ACTIVE member reads the platform's receiving bank details and the order's reference);
@@ -163,6 +174,10 @@ Local, Windows 11, PostgreSQL 17, on the branch before the rebase (the rebase br
   `support-case-reads`, `transport`), and pass 16/16 when run again on the rebased branch.
 - On the rebased branch: the 18 `o15-*` api tests and the 3 web navigation tests pass; the refund lane suites (`refund-generic-cells`,
   `ach-refund-cells`, `refund-generic-v1`: 222 tests) pass with the new grant unit.
+- After R-01: the five pipelines' red test (`o15-session-revocation-commerce`: all five commands answered 201 and wrote after the logout)
+  is green with its two controls, and the matrix's no-effect check now compares content digests; the typecheck, architecture gate,
+  fixture-clock lint, `packages/application` (237/237) and the full `apps/api` suite (1,561 tests: 1,449 pass, 0 fail, 30 skipped and
+  82 pre-existing todo) pass on Windows.
 
 CI (`verify`, ubuntu-24.04 and windows-latest) runs on the PR head; its run ids are recorded on the PR.
 
@@ -173,7 +188,13 @@ session fence came before the source's transition and row locks, so it was not t
 writes), together with its low findings: a unit that cannot decide in `ownerFirst` is answered as the command's own retriable failure
 instead of a 500, journaled replays of core commands and owner refund commands are fenced too, and four tests gained the controls the
 reviewer asked for (no 5xx or 401 for an admitted control, own-agency controls for the upload probes, an ACTIVE seller's control for
-prospect work, no restricted-store read for a refused owner command). The dispatcher's independent review of the PR head follows.
+prospect work, no restricted-store read for a refused owner command).
+
+The dispatcher's independent review of the first candidate (`90db3715`) accepted F-01 to F-03 and returned REJECT_MATERIAL for one
+finding, R-01: the session fence of F-04 existed only in B06's pipeline, while the commerce and commercial pipeline (about 36 commands,
+B16's CMD056 among them) and the provider-effect intent had none; it reproduced CMD056 committing after a logout. Repaired at each
+pipeline's controlling point (F-04 above), proven by a red-first test over five commands of the five pipelines; its observation O-1 (row
+counts would not see an update) is closed by the content digests.
 
 ## 9. Non-interference with other orders
 
@@ -182,7 +203,10 @@ of the defects live in `packages/application` (the command pipeline and the owne
 where the access is decided, not wrapped around it at the route.
 
 Files touched: `packages/application/src/commands/runtime.ts`, `packages/application/src/commerce/bank/approve-destination.ts`,
-`packages/application/src/commerce/bank/execute-refund.ts`, `packages/application/src/commercial/statements/service.ts`,
+`packages/application/src/commerce/bank/execute-refund.ts`, `packages/application/src/commercial/statements/service.ts`, and for the
+session fence of every pipeline `packages/application/src/commerce/request/runtime.ts`, `commerce/core/provider-effects.ts`,
+`commerce/request/create-payment-order.ts`, `commerce/request/capture-payment.ts`, `commercial/quotes/create-quote.ts` and
+`sources/handlers/reserve-upload.ts` (all under `packages/application/src/`);
 `apps/api/src/payments/service-commands.ts`, `apps/api/test/fault-support.ts`, `apps/api/test/refund-lane-support.ts`,
 `apps/api/test/refund-generic-cells.test.ts`, new tests under `apps/api/test/o15-*` and `apps/web/test/o15-navigation.test.ts`, and this
 report. Order 13 (PR #121) changed only `cores/`, Order 14 (PR #120) only `packages/reports/`, `packages/data-plane/test/` and one design
