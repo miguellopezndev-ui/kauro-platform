@@ -9,7 +9,9 @@
 // that runs down (StagePath); choosing a stage opens what happens, what you get and what stops it, beside the timeline on a wide screen and
 // under the stage on a narrow one. Who acts, what it needs and what happens at each stage sit once, folded, above the call to action
 // that closes the section. The invented project is not retold here (Home and Sample delivery show it): the stage of the quote says the
-// price counts the units sealed and leads to Pricing, and the stage of the delivery leads to the sample.
+// price counts the units sealed and leads to Pricing, and the stage of the delivery leads to the sample. What Kauro does not do is not a
+// section of its own here (Home has it, and no process page in the round-3 sample has one): the stages say who acts at each step, and the
+// closing band says what stays with your team.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../../copy/public.ts";
 import { INPUT_LIMITS } from "../limits.ts";
@@ -244,12 +246,6 @@ const PATH: readonly PathStage[] = STAGES.map((stage, index) => ({
   sheet: <StageSheet stage={stage} />,
 }));
 
-const NEVER = [
-  { key: "live", name: "home.limits.live.name", body: "home.limits.live" },
-  { key: "import", name: "home.limits.import.name", body: "home.limits.import" },
-  { key: "decide", name: "home.limits.decide.name", body: "home.limits.decide" },
-] as const satisfies ReadonlyArray<{ readonly key: string; readonly name: PublicCopyId; readonly body: PublicCopyId }>;
-
 export function HowItWorksPage(): ReactElement {
   return (
     <>
@@ -263,16 +259,6 @@ export function HowItWorksPage(): ReactElement {
           </a>
           <p className="kauro-r2-hint">{PUBLIC_COPY["pricing.answer.free"]}</p>
         </div>
-      </Block>
-      <Block id="how-never" heading={PUBLIC_COPY["home.limits.heading"]} lead={PUBLIC_COPY["home.limits.lead"]} tone="sunken">
-        <ul className="kauro-r2-never">
-          {NEVER.map((item) => (
-            <li key={item.key}>
-              <h3>{PUBLIC_COPY[item.name]}</h3>
-              <p>{PUBLIC_COPY[item.body]}</p>
-            </li>
-          ))}
-        </ul>
       </Block>
       <Closing
         id="how-responsibility"

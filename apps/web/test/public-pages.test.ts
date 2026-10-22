@@ -287,6 +287,10 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
 test("How it works tells no invented project of its own (Home and Sample delivery do): the quote's stage says the price counts the units sealed and leads to Pricing, the delivery's stage leads to the sample", () => {
   const html = page("how").html(ALL);
   assert.doesNotMatch(html, /kauro-record|One project, start to finish|A worked example/);
+  // what Kauro does not do is no section of its own here (Home has it): the stages and the closing band still say all three
+  assert.doesNotMatch(html, /What Kauro does not do|kauro-r2-never/);
+  const said = textOf(html);
+  for (const limit of ["Kauro does not write to your CRM at any step", "runs the import", "approves every change"]) assert.ok(said.includes(limit), limit);
   const sheet = (key: string): string => /<article class="kauro-stage-sheet"[\s\S]*?<\/article>/.exec(html.slice(html.indexOf(`id="stage-${key}-panel"`)))?.[0] ?? "";
   assert.ok(hrefsOf(sheet("quote")).includes(ROUTE.pricing), "the quote's card leads to Pricing");
   assert.ok(hrefsOf(sheet("import")).includes(ROUTE.sample), "the delivery's card leads to the sample");

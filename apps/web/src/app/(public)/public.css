@@ -9711,32 +9711,6 @@ body:has(> .kauro-site-header) {
 .kauro-site-main .kauro-r2-stage-link {
   justify-self: start;
 }
-.kauro-site-main .kauro-r2-never {
-  display: grid;
-  gap: var(--kauro-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-@media (min-width: 48rem) {
-  .kauro-site-main .kauro-r2-never {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-.kauro-site-main .kauro-r2-never li {
-  padding: var(--kauro-space-5);
-  border: 1px solid var(--kauro-color-border);
-  border-radius: var(--kauro-radius-large);
-  background: var(--kauro-color-raised);
-}
-.kauro-site-main .kauro-r2-never h3 {
-  margin-block-end: var(--kauro-space-2);
-  font-size: 1.125rem;
-}
-.kauro-site-main .kauro-r2-never p {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
-}
 
 /* ---- numbered steps (the importer guide, the contact page, the path of a file) ---- */
 .kauro-site-main .kauro-r2-steps,
