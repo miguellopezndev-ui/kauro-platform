@@ -11,6 +11,19 @@ State: 2026-10-21, end of Order 11 round 2. Sources:
 
 Nothing in this file is decided by it: an item marked **owner** still needs the owner's decision, and **counsel** the legal check.
 
+**State after Order 16 (2026-10-22).** Every F and G item is classified in `docs/design/ORDER16-FUNCTIONAL-GOVERNANCE.md` §3. Step 2 of
+section 3 is prepared, not adopted: the policy and registry part of C1 and C2 is ChangeProposal CP-01
+(`docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md`, items CP-01.01 to CP-01.14), and the legal part is
+`docs/legal/CHANGE-REQUESTS-CP-01.md` (LR-01 to LR-11). Corrections to this inventory, proved in Order 16 §5:
+- F-19 needs no policy or legal change: the registry and ToS §13.2 already allow the one extension for any soft period. It needs the
+  UNPAID soft deadline to be written and the paid-only restriction lifted (C4, C6, with Order 15 for the row policies). Only F-20's
+  17-day ceiling changes policy and legal text.
+- F-29 needs no new retention key: `retention.importReceiptDaysFromTerminal` and ToS §13.1 already keep result files 7 days after
+  their verification and while a staged project needs them.
+- F-28's processing of CRM record IDs is already described (DPA Annex I.4); LR-04 only clarifies error messages.
+- F-02 and F-09 are recommended for rejection; F-23 is already enforced (tests come with the hold).
+- F-31 and F-32 were fixed by Order 14 (PR #120); F-33 and F-34 wait for the owner (Order 16 §9, B-06, B-07).
+
 ## 1. Gaps recorded only in the round's files
 
 | Id | Gap | Source |
@@ -144,7 +157,7 @@ The order follows the dependencies; within one intervention every item opening t
 | Step | Intervention | Items | Needs first |
 |---|---|---|---|
 | 1 | Owner decisions still open, counsel's checks, and the three tool checks | F-02, F-09, F-22 threshold, F-25 batch cap, F-07 provider; F-13, F-18 (**counsel**); F-28 to F-30 (**to verify**) | — |
-| 2 | Policy, registry and legal texts, as one ChangeProposal and one legal procedure | C1, C2 | step 1 |
+| 2 | Policy, registry and legal texts, as one ChangeProposal and one legal procedure (prepared in Order 16: CP-01, LR-01 to LR-11; owner resolution 2026-10-22, CP-01 revision 2; adoption in one re-issue with CP-02, each item with its activation conditions) | C1, C2 | step 1 |
 | 3 | The api contract version: every read and command of C3 in one contract change | C3 | step 2 |
 | 4 | Cores, each repository opened once | C7 | steps 2, 3 |
 | 5 | Backend domain and application, with deletion, retention and restoration in the same change | C4, C6 | steps 3, 4 |

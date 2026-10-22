@@ -52,13 +52,14 @@ test("S088: every recursive delete in tools/** removes a directory its own code 
   const whole = census(join(repo, "tools"));
   assert.deepEqual(whole.unresolved, [], "an alias form the census cannot follow fails closed");
   // The 82 sites are the census of 99266f52, plus withLateWorker in test-runner.test.mjs and removeAfter's own test; red-proof's
-  // eleven fixture removals moved from literal rmSync to removeAfter. The files of this lane add owned deletes of their own, judged by the same rule below.
+  // eleven fixture removals moved from literal rmSync to removeAfter; change-proposals.test.mjs (Order 16) adds one owned delete of its
+  // generator sandbox. The files of this lane add owned deletes of their own, judged by the same rule below.
   const result = { ...whole, sites: whole.sites.filter((s) => !LANE_FILES.includes(s.file)) };
   const literal = result.sites.filter((s) => s.via === "literal");
   const aliased = result.sites.filter((s) => s.via === "alias-param");
-  assert.equal(literal.length, 64, "literal recursive deletes");
+  assert.equal(literal.length, 65, "literal recursive deletes");
   assert.equal(aliased.length, 18, "real-delete callers of withCleanup and removeAfter (default remover = rmSync)");
-  assert.equal(result.sites.length, 82);
+  assert.equal(result.sites.length, 83);
   assert.deepEqual(result.aliasBindings.map((b) => `${b.file}:${b.fn}`), ["test/gate-process.mjs:withCleanup", "test/gate-process.mjs:removeAfter"]);
   assert.equal(result.stubs.length, 10, "stub removers are not sinks");
   assert.ok(result.stubs.every((s) => s.file === "test/gate-process.test.mjs"));
