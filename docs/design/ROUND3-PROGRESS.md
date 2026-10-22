@@ -34,12 +34,12 @@ both from the first line to the last. Then this ledger.
 | Foundations 7: Home DNA | Drafted (colour, type, space, vocabulary, audit) | HOME-DNA.md |
 | Foundations 8: L1 concepts and the vertical slice | **Done.** System chosen: c4 "one ledger with four mastheads" (300 blind judgements; 60 of 60 in its final round; gates pass) | research/round3-slice/AUDITIONS.md; PD-05 |
 | Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
-| Foundations 9: the kit, frozen | Inventory done (42 families); auditions of 17 families: group A (states, inline status, dialogs and step-up, buttons) being judged (144 judgements); groups B, C, D being built | research/round3-kit |
-| Owner console | **L2 decided** (54 blind judgements): nav V1 (domain groups, counts on pages that wait) and inventory I-A (18 pages, Refunds added). L3 Today: brief and 4 compositions being built | research/round3-owner (L2-BRIEF.md, NAV-DECISION.md, today/) |
+| Foundations 9: the kit, frozen | Inventory done (42 families). Auditions decided for groups A (144 judgements), C (150) and D (180): 13 families. Group B (panels, facts, interactive table, filters) being judged. Kit record drafted (version 0.9); frozen as version 1 after group B | research/round3-kit/DECISIONS.md; ROUND3-KIT.md |
+| Owner console | **L2 decided** (54 blind judgements): nav V1 and inventory I-A (18 pages). **L3 Today decided** (36 judgements): t3 "three answers first, reference folded" clearly beats the corrected incumbent t0f (6–0, lead 5.0); gates clean at 8 widths. L4 Today: section variants being built (the three answers and the phone fold, Health, Money) | research/round3-owner (NAV-DECISION.md, today/AUDITIONS.md) |
 | Agency/company workspace | Pending | — |
 | Seller portal | Pending | — |
 | Public site | Pending | — |
-| Deliverables track | Research done (195 references); 24 briefs and the index written; Migration Core run on the canonical world (3 projects verified; public sample exact); report-reader defects recorded (F-31, F-32); canon being aligned with the engine | research/round3-docs-*, round3-docs-INDEX.md, round3-docs-canon/CANON-PACKAGES.md |
+| Deliverables track | Research done (195 references); 24 briefs and the index written; Migration Core run on the canonical world (3 projects verified; public sample exact); report-reader defects recorded (F-31, F-32); canon aligned with the engine; Tier A alternatives being built (the PDF report r0–r3; the package entry e0–e3 and the importer guides g0–g3) | research/round3-docs-*, round3-docs-INDEX.md, round3-docs-canon/CANON-PACKAGES.md |
 | All four together | Pending | — |
 | Push and merge | Pending (end only) | — |
 
