@@ -32,7 +32,18 @@
       "class": "COORDINATED",
       "detail": "a new member of a closed shape: generated types and validators change with it",
       "source": "CP-02.10",
-      "consumers": [],
+      "consumers": [
+        "apps/api/test/cmd051-close-commission-period.test.ts",
+        "apps/api/test/commission-statement-reads.test.ts",
+        "apps/api/test/integration-support.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/statements/index.ts",
+        "packages/application/src/commercial/views.ts",
+        "packages/application/test/commercial-contracts.test.ts",
+        "tools/review/private/prototypes/sales.ts"
+      ],
       "declared": {
         "key": "REGISTRY:contracts.json:CommissionStatement.balance:FIELD_ADDED",
         "class": "COORDINATED",
@@ -47,7 +58,18 @@
       "class": "COORDINATED",
       "detail": "a new member of a closed shape: generated types and validators change with it",
       "source": "CP-02.10",
-      "consumers": [],
+      "consumers": [
+        "apps/api/test/cmd051-close-commission-period.test.ts",
+        "apps/api/test/commission-statement-reads.test.ts",
+        "apps/api/test/integration-support.ts",
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/commercial/response-schemas.ts",
+        "packages/application/src/commercial/statements/get-statement.ts",
+        "packages/application/src/commercial/statements/index.ts",
+        "packages/application/src/commercial/views.ts",
+        "packages/application/test/commercial-contracts.test.ts",
+        "tools/review/private/prototypes/sales.ts"
+      ],
       "declared": {
         "key": "REGISTRY:contracts.json:CommissionStatement.balanceItems:FIELD_ADDED",
         "class": "COORDINATED",
@@ -62,12 +84,31 @@
       "class": "BREAKING",
       "detail": "readers that assume the member break",
       "source": "CP-01",
-      "consumers": [],
+      "consumers": [
+        "apps/api/test/audit-reads.test.ts",
+        "apps/api/test/audit-role-matrix.test.ts",
+        "apps/api/test/audit-support.ts",
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/control/test/b08-end-to-end.test.ts",
+        "apps/web/src/api/generated.ts",
+        "apps/web/src/screens/health-check/model.ts",
+        "apps/web/src/screens/health-check/view.tsx",
+        "apps/web/test/health-check-screen.test.ts",
+        "apps/web/test/support/fixtures.ts",
+        "packages/application/src/audit/contracts.ts",
+        "packages/application/src/audit/handlers/cancel-audit.ts",
+        "packages/application/src/audit/handlers/projections.ts",
+        "packages/application/src/audit/handlers/reads.ts",
+        "packages/application/src/audit/index.ts",
+        "packages/application/src/audit/response-views.ts",
+        "packages/application/src/audit/views.ts",
+        "tools/review/private/lib/fixtures/money-states.ts"
+      ],
       "declared": {
         "key": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
         "class": "BREAKING",
         "acceptedBy": "F-01",
-        "migration": "CP-01.01. Existing audits all carry a target and keep it; only CLEAN audits started after adoption omit it. Readers branch on the project mode: the audit records (domain model/audit, persistence audit store, audit.queued.v1 payload) take targetContractId as optional and targetContractHash = CLEAN_ONLY_TARGET_HASH for CLEAN. No TypeScript consumer imports the registry Audit type (none found); the change is in the backend order C4 with its tests first."
+        "migration": "CP-01.01. Existing audits all carry a target and keep it; only CLEAN audits started after adoption omit it. No module imports the registry Audit type, but its served projection does follow it: AuditView (GetAudit, CancelAudit) and the web client's AuditView type and guard, changed by CP-02.01 (declared on the served component). The audit records, persistence and every audit.*.v1 payload take it as optional for CLEAN in the backend order (C4), tests first."
       }
     },
     {
@@ -78,7 +119,17 @@
       "class": "COORDINATED",
       "detail": "adds PENDING_PAYMENT_HOLD",
       "source": "CP-01",
-      "consumers": ["packages/domain/src/model/source/records.ts"],
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/sources/contracts.ts",
+        "packages/application/src/sources/handlers/projections.ts",
+        "packages/application/src/sources/index.ts",
+        "packages/application/src/sources/response-views.ts",
+        "packages/application/src/sources/views.ts",
+        "packages/domain/src/model/source/records.ts",
+        "tools/review/private/prototypes/delivery.ts",
+        "tools/review/private/prototypes/ui29-lifecycle.tsx"
+      ],
       "declared": {
         "key": "REGISTRY:contracts.json:RetentionRecord.class:ENUM_WIDENED",
         "class": "COORDINATED",
@@ -819,7 +870,7 @@
       "subject": "cases.json",
       "change": "RECORDS_ADDED",
       "class": "ADDITIVE",
-      "detail": "+132",
+      "detail": "+133",
       "source": "CP-02.01 + CP-02.02 + CP-02.03 + CP-02.04 + CP-02.05 + CP-02.06 + CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.15 + CP-02.16 + CP-02.17 + CP-02.18 + CP-02.19 + CP-02.20 + CP-02.21"
     },
     {
@@ -846,7 +897,7 @@
       "subject": "requirements.json",
       "change": "RECORDS_ADDED",
       "class": "ADDITIVE",
-      "detail": "+132",
+      "detail": "+133",
       "source": "CP-02.01 + CP-02.02 + CP-02.03 + CP-02.04 + CP-02.05 + CP-02.06 + CP-02.07 + CP-02.08 + CP-02.09 + CP-02.10 + CP-02.11 + CP-02.12 + CP-02.13 + CP-02.14 + CP-02.15 + CP-02.16 + CP-02.17 + CP-02.18 + CP-02.19 + CP-02.20 + CP-02.21"
     },
     {
@@ -855,7 +906,7 @@
       "subject": "gates.json:G-IC-KERNEL",
       "change": "CASES_ADDED_TO_GATE",
       "class": "ADDITIVE",
-      "detail": "+24",
+      "detail": "+25",
       "source": "CP-02.01 + CP-02.15"
     },
     {
@@ -2249,6 +2300,42 @@
       }
     },
     {
+      "key": "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL",
+      "layer": "OPENAPI",
+      "subject": "components/AuditView.targetContractId",
+      "change": "REQUIRED_TO_OPTIONAL",
+      "class": "BREAKING",
+      "detail": "readers that assume it break",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/audit-reads.test.ts",
+        "apps/api/test/audit-role-matrix.test.ts",
+        "apps/api/test/audit-support.ts",
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/control/test/b08-end-to-end.test.ts",
+        "apps/web/src/api/generated.ts",
+        "apps/web/src/screens/health-check/model.ts",
+        "apps/web/src/screens/health-check/view.tsx",
+        "apps/web/test/health-check-screen.test.ts",
+        "apps/web/test/support/fixtures.ts",
+        "packages/application/src/audit/contracts.ts",
+        "packages/application/src/audit/handlers/cancel-audit.ts",
+        "packages/application/src/audit/handlers/projections.ts",
+        "packages/application/src/audit/handlers/reads.ts",
+        "packages/application/src/audit/index.ts",
+        "packages/application/src/audit/response-views.ts",
+        "packages/application/src/audit/views.ts",
+        "tools/review/private/lib/fixtures/money-states.ts"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL",
+        "class": "BREAKING",
+        "acceptedBy": "F-01",
+        "consequenceOf": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
+        "migration": "The served consequence of CP-01.01: the web client is regenerated with the server (isAuditView accepts an audit without a target), the audit screens show no target for CLEAN, packages/application/src/audit/views.ts and response-views.ts serve it as optional; server and web deployed together (C4, C9)."
+      }
+    },
+    {
       "key": "OPENAPI:components/RetentionExtensionView.retentionClass:PROPERTY_ADDED",
       "layer": "OPENAPI",
       "subject": "components/RetentionExtensionView.retentionClass",
@@ -2575,6 +2662,30 @@
       "source": "CP-02.10"
     },
     {
+      "key": "OPENAPI:components/RetentionView.class:ENUM_WIDENED",
+      "layer": "OPENAPI",
+      "subject": "components/RetentionView.class",
+      "change": "ENUM_WIDENED",
+      "class": "COORDINATED",
+      "detail": "adds PENDING_PAYMENT_HOLD",
+      "source": "CP-02.17",
+      "consumers": [
+        "apps/web/src/api/generated.ts",
+        "packages/application/src/sources/contracts.ts",
+        "packages/application/src/sources/handlers/projections.ts",
+        "packages/application/src/sources/index.ts",
+        "packages/application/src/sources/response-views.ts",
+        "packages/application/src/sources/views.ts",
+        "tools/review/private/prototypes/delivery.ts",
+        "tools/review/private/prototypes/ui29-lifecycle.tsx"
+      ],
+      "declared": {
+        "key": "OPENAPI:components/RetentionView.class:ENUM_WIDENED",
+        "class": "COORDINATED",
+        "migration": "CP-02.17 (blocked with CP-01.11): the revision read and the web client learn PENDING_PAYMENT_HOLD only when the hold is activated."
+      }
+    },
+    {
       "key": "OPENAPI:components/ActivateAgencyRequest.billingProfileRef:REQUIRED_TO_OPTIONAL",
       "layer": "OPENAPI",
       "subject": "components/ActivateAgencyRequest.billingProfileRef",
@@ -2686,7 +2797,7 @@
       "subject": "audit.queued.v1:targetContractId",
       "change": "KEY_SOMETIMES_ABSENT",
       "class": "COORDINATED",
-      "detail": "a CLEAN audit omits targetContractId and carries targetContractHash = CLEAN_ONLY_TARGET_HASH; AUDIT_ORCHESTRATION reads it as optional",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
       "source": "CP-02.01",
       "consumers": [
         "apps/api/test/cmd020-start-audit.test.ts",
@@ -2709,6 +2820,156 @@
         "key": "EVENTS:audit.queued.v1:targetContractId:KEY_SOMETIMES_ABSENT",
         "class": "COORDINATED",
         "migration": "CP-02.01. The audit domain and AUDIT_ORCHESTRATION read the key as optional for CLEAN, in the backend order (C4), tests first."
+      }
+    },
+    {
+      "key": "EVENTS:audit.profiling.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.profiling.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/control/src/audit/orchestration.ts",
+        "apps/control/test/audit-orchestration.test.ts",
+        "packages/domain/src/model/audit/events.ts",
+        "packages/persistence/src/audit/store.ts",
+        "tools/matrix.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:audit.profiling.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.interpreting.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.interpreting.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["apps/control/src/audit/orchestration.ts", "apps/control/test/audit-orchestration.test.ts", "packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.interpreting.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.validating.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.validating.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["apps/control/src/audit/orchestration.ts", "apps/control/test/audit-orchestration.test.ts", "packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.validating.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.draft_ready.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.draft_ready.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["apps/control/test/audit-orchestration.test.ts", "packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.draft_ready.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.needs_decision.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.needs_decision.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.needs_decision.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.unsupported.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.unsupported.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.unsupported.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.failed.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.failed.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.failed.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.cancelled.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.cancelled.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/control/src/audit/orchestration.ts",
+        "packages/domain/src/model/audit/events.ts",
+        "packages/domain/test/audit-model.test.ts",
+        "packages/persistence/src/audit/store.ts",
+        "packages/persistence/test/audit-migrations.test.ts",
+        "tools/matrix.mjs",
+        "tools/test/matrix.test.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:audit.cancelled.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+      }
+    },
+    {
+      "key": "EVENTS:audit.expired.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.expired.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH",
+      "source": "CP-02.01",
+      "consumers": ["packages/domain/src/model/audit/events.ts", "tools/matrix.mjs"],
+      "declared": {
+        "key": "EVENTS:audit.expired.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
       }
     },
     {

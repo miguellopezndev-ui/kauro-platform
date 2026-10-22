@@ -7,7 +7,6 @@
     "proposal": "CP-01",
     "revision": 3,
     "pr": 122,
-    "mergedIn": "d38c00b25f124e442b17a26cae0bac017f19c0c8",
     "delta": "docs/authority/proposals/CP-01.registry-delta.json",
     "sha256": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d",
     "history": [
@@ -19,7 +18,9 @@
         "note": "merged into main by PR #122 (d38c00b2)"
       },
       { "revision": 3, "note": "Order 17 rectification of CP-01.01 section 3.1 (error contract); operations, statuses, approvals and base hashes unchanged" }
-    ]
+    ],
+    "revision2MergedIn": "d38c00b25f124e442b17a26cae0bac017f19c0c8",
+    "revision3": "Order 17, this branch (CP-01.01 section 3.1 rectification)"
   },
   "base": {
     "edition": "KAVO-2026.09-R2",
@@ -5256,10 +5257,15 @@
               "path": "/api/v1/plans/{planId}/decisions/{groupId}",
               "role": "AGENCY_OPERATOR",
               "owner": "06",
-              "fields": [{ "name": "expectedVersion", "type": "version" }, { "name": "decision", "type": "enum:UNDECIDED,UNIFY,KEEP_SEPARATE" }],
-              "precondition": "The plan is not approved; a CANDIDATE group is unified only by this person's decision.",
+              "fields": [
+                { "name": "expectedVersion", "type": "version" },
+                { "name": "decision", "type": "enum:UNDECIDED,UNIFY,KEEP_SEPARATE" },
+                { "name": "previewHash", "type": "hash" },
+                { "name": "approval", "type": "enum:EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW" }
+              ],
+              "precondition": "The plan is not approved; the person decides one CANDIDATE group on its exact, current preview with explicit approval (identityResolution.candidateDecision).",
               "effect": "Change one group's decision, recorded.",
-              "failure": "An approved plan needs a new revision; a BLOCKED group cannot be unified.",
+              "failure": "An approved plan needs a new revision; a BLOCKED group cannot be unified; a stale preview or a missing approval rejects.",
               "gate": "G-IC-KERNEL",
               "idempotency": "REQUIRED",
               "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION",
@@ -5476,7 +5482,7 @@
             "value": {
               "id": "CMD075-OK",
               "title": "ChangeDecision OK",
-              "scenario": "Valid authority, current aggregate and exact preconditions: The plan is not approved; a CANDIDATE group is unified only by this person's decision.",
+              "scenario": "Valid authority, current aggregate and exact preconditions: The plan is not approved; the person decides one CANDIDATE group on its exact, current preview with explicit approval (identityResolution.candidateDecision).",
               "expected": "Change one group's decision, recorded.",
               "gate": "G-IC-KERNEL",
               "owner": "06",
@@ -5507,7 +5513,7 @@
               "id": "CMD075-DENY",
               "title": "ChangeDecision DENY",
               "scenario": "Foreign tenant/wrong role and then one missing material prerequisite at ChangeDecision",
-              "expected": "An approved plan needs a new revision; a BLOCKED group cannot be unified. No unauthorized committed state or external effect.",
+              "expected": "An approved plan needs a new revision; a BLOCKED group cannot be unified; a stale preview or a missing approval rejects. No unauthorized committed state or external effect.",
               "gate": "G-IC-KERNEL",
               "owner": "06",
               "package": "C7",
@@ -5852,6 +5858,35 @@
                 "independent_review"
               ]
             }
+          },
+          {
+            "op": "add",
+            "path": "/-",
+            "value": {
+              "id": "CP02-15-SINGLE-DECISION-SAFEGUARDS",
+              "title": "One candidate is never unified without its preview and approval (adversarial)",
+              "scenario": "ChangeDecision UNIFY on a name-and-email CANDIDATE group without previewHash, without approval, and with the preview of another group.",
+              "expected": "The closed schema refuses the missing members; PREVIEW_STALE for the other group's hash; the group stays undecided.",
+              "gate": "G-IC-KERNEL",
+              "owner": "06",
+              "package": "C7",
+              "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT",
+              "origin": "CP02_C3_CONTRACT",
+              "requirementId": "REQ-CP02-15-SINGLE-DECISION-SAFEGUARDS",
+              "publicBoundary": "Full public Intelligence API through durable journal and real MC adapter",
+              "oracle": "Sealed candidate set, allowlisted facts, controlled provider trace, complete request sentinels and independent truth",
+              "verification": "Observe all physical requests and final consumer effects; an internal helper test cannot prove full cancellation/privacy.",
+              "requiredEvidence": [
+                "exact_subject_and_environment",
+                "input_manifest",
+                "presealed_expected_truth",
+                "actual_public_result",
+                "external_effect_identity",
+                "exit_status",
+                "artifact_digests",
+                "independent_review"
+              ]
+            }
           }
         ],
         "requirements.json": [
@@ -5955,7 +5990,7 @@
               "caseIds": ["CMD075-DENY"],
               "gate": "G-IC-KERNEL",
               "packages": ["C7"],
-              "statement": "An approved plan needs a new revision; a BLOCKED group cannot be unified. No unauthorized committed state or external effect.",
+              "statement": "An approved plan needs a new revision; a BLOCKED group cannot be unified; a stale preview or a missing approval rejects. No unauthorized committed state or external effect.",
               "origin": "CP02_C3_CONTRACT"
             }
           },
@@ -6101,6 +6136,19 @@
               "statement": "A new plan revision needs validation and approval; the open quote is WITHDRAWN with PLAN_REVISED; no approval carries over.",
               "origin": "CP02_C3_CONTRACT"
             }
+          },
+          {
+            "op": "add",
+            "path": "/-",
+            "value": {
+              "id": "REQ-CP02-15-SINGLE-DECISION-SAFEGUARDS",
+              "owner": "06",
+              "caseIds": ["CP02-15-SINGLE-DECISION-SAFEGUARDS"],
+              "gate": "G-IC-KERNEL",
+              "packages": ["C7"],
+              "statement": "The closed schema refuses the missing members; PREVIEW_STALE for the other group's hash; the group stays undecided.",
+              "origin": "CP02_C3_CONTRACT"
+            }
           }
         ],
         "gates.json": [
@@ -6123,7 +6171,8 @@
           { "op": "add", "path": "/3/caseIds/-", "value": "CP02-15-BLOCKING-CONFLICTS" },
           { "op": "add", "path": "/3/caseIds/-", "value": "CP02-15-CAP-PREVIEW-APPROVAL" },
           { "op": "add", "path": "/3/caseIds/-", "value": "CP02-15-STALE-AND-RACE" },
-          { "op": "add", "path": "/3/caseIds/-", "value": "CP02-15-REVISION-WITHDRAWS-QUOTE" }
+          { "op": "add", "path": "/3/caseIds/-", "value": "CP02-15-REVISION-WITHDRAWS-QUOTE" },
+          { "op": "add", "path": "/3/caseIds/-", "value": "CP02-15-SINGLE-DECISION-SAFEGUARDS" }
         ]
       }
     },

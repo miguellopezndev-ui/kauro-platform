@@ -787,8 +787,11 @@ export function eventChanges(spec, domain) {
         add(k, "KEY_ADDED", ch.note);
       }
       for (const k of ch.optionalKeys ?? []) {
-        if (!allow.includes(k)) throw new Error(`${item.id}: ${ch.eventType} has no key ${k}`);
-        add(k, "KEY_SOMETIMES_ABSENT", ch.note);
+        for (const type of [ch.eventType, ...(ch.alsoEventTypes ?? [])]) {
+          const allowed = domain.EVENT_PAYLOAD_ALLOWLIST[type];
+          if (!allowed?.includes(k)) throw new Error(`${item.id}: ${type} has no key ${k}`);
+          changes.push({ layer: "EVENTS", subject: `${type}:${k}`, change: "KEY_SOMETIMES_ABSENT", class: "COORDINATED", detail: ch.note, source: item.id });
+        }
       }
       for (const [k, values] of Object.entries(ch.widenValues ?? {})) {
         if (!allow.includes(k)) throw new Error(`${item.id}: ${ch.eventType} has no key ${k}`);
@@ -797,6 +800,49 @@ export function eventChanges(spec, domain) {
     }
   }
   return changes.map((c) => ({ key: keyOf(c), ...c }));
+}
+
+/** The served components that project a registry contract, by contract (their `$comment`, written by the application's view kit). */
+export function projectionsOf(live) {
+  const out = {};
+  for (const [name, schema] of Object.entries(live.components.schemas)) {
+    const m = /^Projection of registry contract ([A-Za-z]+)\./.exec(schema.$comment ?? "");
+    if (m) (out[m[1]] ??= []).push({ name, schema, everyMember: /Every registry member is selected/.test(schema.$comment) });
+  }
+  return out;
+}
+
+const enumOf = (type) => (type?.startsWith("enum:") ? type.slice(5).split(",") : []);
+
+/**
+ * A registry change to a contract reaches every served component that projects it. Each such component must be modified by the
+ * proposal in the same way (a member made optional is unrequired, new values are added, a new member of an every-member projection is
+ * added); a projection left behind would answer a shape the registry no longer guarantees, or refuse records the registry now allows.
+ * Returns one BREAKING change per projection not followed.
+ */
+export function projectionGaps(base, after, live, proposedOpenapi) {
+  const gaps = [];
+  const edits = {};
+  for (const mod of Object.values(proposedOpenapi["x-kauro-modified"])) for (const [name, c] of Object.entries(mod.components)) (edits[name] ??= []).push(...(c.edits ?? []));
+  const projections = projectionsOf(live);
+  for (const c of registryChanges(base, after)) {
+    const m = /^contracts\.json:([A-Za-z]+)\.([A-Za-z]+)$/.exec(c.subject);
+    if (!m) continue;
+    const [, contract, field] = m;
+    const before = base["contracts.json"].find((x) => x.name === contract)?.fields.find((f) => f.name === field);
+    const now = after["contracts.json"].find((x) => x.name === contract).fields.find((f) => f.name === field);
+    for (const p of projections[contract] ?? []) {
+      const has = Object.hasOwn(p.schema.properties ?? {}, field);
+      const mine = edits[p.name] ?? [];
+      let followed = true;
+      if (c.change === "REQUIRED_TO_OPTIONAL" && has && p.schema.required?.includes(field)) followed = mine.some((e) => e.op === "unrequire" && e.property === field);
+      else if (c.change === "ENUM_WIDENED" && has) followed = enumOf(now.type).filter((v) => !enumOf(before.type).includes(v)).every((v) => mine.some((e) => e.op === "addEnumValue" && e.property === field && e.value === v));
+      else if (c.change === "FIELD_ADDED" && p.everyMember && !has) followed = mine.some((e) => e.op === "addProperty" && e.property === field);
+      else if (["TYPE_CHANGED", "FIELD_REMOVED", "OPTIONAL_TO_REQUIRED"].includes(c.change) && has) followed = false;
+      if (!followed) gaps.push({ layer: "OPENAPI", subject: `components/${p.name}.${field}`, change: "PROJECTION_NOT_FOLLOWED", class: "BREAKING", detail: `${c.subject} ${c.change} is not followed by its served projection ${p.name}` });
+    }
+  }
+  return gaps;
 }
 
 export function compatibility(spec, registry, cp01, cp02, live, proposedOpenapi, domain) {
@@ -818,7 +864,8 @@ export function compatibility(spec, registry, cp01, cp02, live, proposedOpenapi,
     const op = c.change === "OPERATION_ADDED" ? /\((CP-02\.\d{2}),/.exec(c.detail)?.[1] : null;
     return { key: keyOf(c), ...c, source: op ?? mod?.[1].item ?? "CP-02" };
   });
-  return [...attributed, ...api, ...eventChanges(spec, domain)];
+  const gaps = projectionGaps(registry, combined, live, proposedOpenapi).map((c) => ({ key: keyOf(c), ...c, source: "CP-01 + CP-02 together" }));
+  return [...attributed, ...api, ...gaps, ...eventChanges(spec, domain)];
 }
 
 // --- consumers ------------------------------------------------------------------------------------------------------------
@@ -863,7 +910,8 @@ export function consumersOf(change, live) {
     const m = /^contracts\.json:([A-Za-z]+)/.exec(change.subject);
     if (!m) return [];
     const pattern = new RegExp(`import\\s+(?:type\\s+)?\\{[^}]*\\b${m[1]}\\b[^}]*\\}\\s+from\\s+"@kauro/contracts"`);
-    match = (body) => pattern.test(body);
+    const views = (projectionsOf(live)[m[1]] ?? []).map((p) => new RegExp(`\\b${p.name}\\b`));
+    match = (body) => pattern.test(body) || views.some((v) => v.test(body));
   } else if (change.subject.startsWith("components/Problem")) {
     const reasons = live.components.schemas.Problem.properties.reason.enum;
     match = (body) => reasons.filter((r) => body.includes(`"${r}"`)).length >= 10;

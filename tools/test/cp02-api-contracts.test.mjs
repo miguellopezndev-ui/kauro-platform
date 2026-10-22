@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   PATHS, ROOT, applyDeltas, applyOp, buildAll, canonicalHash, generateBundle, generatedOutputs, isCurrent, itemOperations, loadCp01,
-  loadProvenance, openapiChanges, readRecord, registryChanges, sha256, valueAt,
+  loadProvenance, openapiChanges, projectionGaps, readRecord, registryChanges, sha256, valueAt,
 } from "../cp02.mjs";
 import { generate as generateWebClient } from "../web-client.mjs";
 
@@ -404,6 +404,15 @@ function checkAuthorization(s, reg) {
       }
     }
   }
+  // CP-01.12 as the owner modified it: a person unifies a candidate only on its exact preview with explicit approval, in bulk or alone
+  for (const item of s.items) {
+    for (const o of itemOperations(item).filter((x) => x.kind === "command")) {
+      const decision = o.registry.fields.find(([n]) => n === "decision");
+      if (!decision || !decision[1].includes("UNIFY")) continue;
+      for (const member of ["previewHash", "approval"]) assert.ok(o.request.required.includes(member), `${item.id} ${o.operationId}: a command that can unify identities requires ${member}`);
+      assert.ok(o.registry.fields.find(([n]) => n === "approval")[1] === "enum:EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW", `${item.id} ${o.operationId}: approval is the explicit statement`);
+    }
+  }
   // four things never confused (Order 17 §4.D)
   const consent = s.items.flatMap(contractsOf).find((c) => c.name === "ConsentRecord");
   const kinds = consent.fields.find(([n]) => n === "kind")[1].slice(5).split(",");
@@ -436,6 +445,11 @@ test("authorization: audiences, roles, routes, field visibility per identity and
   const s5 = clone(spec);
   s5.items[9].modified[0].components[1].edits.push({ op: "addProperty", property: "rulingReason", required: false, schema: { type: "string" } });
   mustFail(() => checkAuthorization(s5, combined), /SELLER must not read StatementBalanceItemView.rulingReason/, "an internal reason added to a served seller reply");
+  const s6 = clone(spec);
+  const change = s6.items.find((i) => i.id === "CP-02.15");
+  change.commands.find((c) => c.id === "CMD075").fields = [["expectedVersion", "version"], ["decision", "enum:UNDECIDED,UNIFY,KEEP_SEPARATE"]];
+  change.operations.find((o) => o.command === "CMD075").request.required = ["expectedVersion", "decision"];
+  mustFail(() => checkAuthorization(s6, combined), /ChangeDecision: a command that can unify identities requires previewHash/, "a single unification without preview and approval");
   const s4 = clone(spec);
   s4.items.find((i) => i.id === "CP-02.06").contracts[0].fields[0][1] += ",MARKETING_NEWS";
   mustFail(() => checkAuthorization(s4, combined), /marketing is a consent/, "marketing as a notification preference");
@@ -562,9 +576,14 @@ function checkCompatibility(s, m) {
     assert.ok(d, `${c.key} (${c.class}) can break a current consumer and is not declared`);
     assert.equal(d.class, c.class, `${c.key}: declared ${d.class}, computed ${c.class}`);
     assert.ok(d.migration, `${c.key}: declares its migration`);
+    assert.notEqual(c.change, "PROJECTION_NOT_FOLLOWED", `${c.key}: ${c.detail}`);
     if (c.class === "BREAKING") {
       assert.ok(d.acceptedBy && s.authorities[d.acceptedBy]?.standing === "APPROVED", `${c.key}: a breaking change names the approved decision that accepted it`);
-      assert.ok(!/^CP-02/.test(c.source) || s.items.find((i) => i.id === c.source)?.class !== "APPROVED_AWAITING_REISSUE", `${c.key}: an approved CP-02 item breaks no consumer`);
+      const owner = s.items.find((i) => i.id === c.source);
+      if (owner?.class === "APPROVED_AWAITING_REISSUE") {
+        const cause = m.changes.find((x) => x.key === d.consequenceOf);
+        assert.ok(cause && cause.class === "BREAKING" && cause.source === "CP-01", `${c.key}: an approved CP-02 item breaks a consumer only as the served consequence of an approved CP-01 break (consequenceOf)`);
+      }
     }
   }
   for (const key of declared.keys()) assert.ok(computed.some((c) => c.key === key), `${key} is declared but no longer computed`);
@@ -581,9 +600,26 @@ test("compatibility: every change that can break a current consumer is computed,
   const s2 = clone(spec);
   s2.compatibility.pop();
   mustFail(() => checkCompatibility(s2, matrix), /not declared/, "an undeclared change");
+  const s4 = clone(spec);
+  delete s4.compatibility.find((d) => d.key === "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL").consequenceOf;
+  mustFail(() => checkCompatibility(s4, matrix), /served consequence/, "a break in an approved CP-02 item with no approved cause");
+  const m5 = clone(matrix);
+  m5.changes.push({ key: "OPENAPI:components/AuditView.targetContractId:PROJECTION_NOT_FOLLOWED", layer: "OPENAPI", subject: "components/AuditView.targetContractId", change: "PROJECTION_NOT_FOLLOWED", class: "BREAKING", source: "CP-01 + CP-02 together", detail: "not followed" });
+  mustFail(() => checkCompatibility(spec, m5), /not followed|not declared/, "a served projection left behind");
   const s3 = clone(spec);
   s3.compatibility.find((d) => d.class === "BREAKING").acceptedBy = "F-33";
   mustFail(() => checkCompatibility(s3, matrix), /approved decision/, "a breaking change accepted by a proposal");
+});
+
+test("compatibility: a registry change reaches every served projection of its contract (the AuditView defect of the final review)", () => {
+  assert.deepEqual(projectionGaps(registry, combined, live, openapi), [], "every projection follows CP-01 + CP-02");
+  const withoutAuditView = clone(openapi);
+  delete withoutAuditView["x-kauro-modified"].GetAudit;
+  const gaps = projectionGaps(registry, combined, live, withoutAuditView).map((g) => g.subject);
+  assert.deepEqual(gaps, ["components/AuditView.targetContractId"], "Audit.targetContractId made optional while AuditView still requires it is found");
+  const withoutRetention = clone(openapi);
+  delete withoutRetention["x-kauro-modified"].GetRevision;
+  assert.ok(projectionGaps(registry, combined, live, withoutRetention).some((g) => g.subject === "components/RetentionView.class"), "a widened class not followed by RetentionView is found");
 });
 
 test("compatibility: the classifier finds real breaks (removal, type, required, closed replies, enums)", () => {
@@ -626,7 +662,7 @@ test("compatibility: every non-additive change is attributed to the proposal ite
       const names = it.modified.flatMap((m) => [m.operationId, ...m.components.map((x) => x.name)]);
       assert.ok(names.some((n) => c.subject.startsWith(`${n}:`) || c.subject.startsWith(`components/${n}.`)), `${c.key}: ${c.source} modifies it`);
     } else if (c.layer === "EVENTS") {
-      assert.ok(spec.items.find((i) => i.id === c.source).eventPayloadChanges.some((e) => c.subject.startsWith(`${e.eventType}:`)), `${c.key}: ${c.source} declares it`);
+      assert.ok(spec.items.find((i) => i.id === c.source).eventPayloadChanges.some((e) => [e.eventType, ...(e.alsoEventTypes ?? [])].some((t) => c.subject.startsWith(`${t}:`))), `${c.key}: ${c.source} declares it`);
     }
   }
   for (const layer of ["REGISTRY", "OPENAPI", "EVENTS"]) assert.ok(matrix.changes.some((c) => c.layer === layer), `the matrix has a ${layer} layer`);

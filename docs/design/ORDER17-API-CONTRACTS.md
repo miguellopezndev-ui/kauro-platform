@@ -56,9 +56,9 @@ catalogues).
 | O17-18 | Self-serve free check | CP-02.20 | Conditional | A3 §3.2 amendment (B-03) |
 | O17-19 | Billing details at the first quote | CP-02.21 | Proposed | B-09 |
 
-Totals: 15 approved, 1 conditional, 3 proposed, 2 blocked; 57 proposed operations (17 commands CMD065–CMD081, 40 reads), 5 served operations
-modified, 54 new registry contracts and 1 extended, 2 state machines, 9 new event types, 2 subscriptions and 3 payload changes of registered
-events, 132 cases with their requirements and gate entries. Detail per item: CP-02 §3 to §5.
+Totals: 15 approved, 1 conditional, 3 proposed, 2 blocked; 57 proposed operations (17 commands CMD065–CMD081, 40 reads), 7 served operations
+modified, 54 new registry contracts and 1 extended, 2 state machines, 9 new event types, 2 subscriptions and payload changes of 12 registered
+events, 133 cases with their requirements and gate entries. Detail per item: CP-02 §3 to §5.
 
 ## 4. What was delivered
 
@@ -98,8 +98,8 @@ field and code, validated by the api's strict compiler.
 and disjointness, authority (exact words in the records), correspondence (commands, operations, cases, requirements, gates, contracts,
 events), authorization as represented (audiences, roles, prefixes, field visibility, assurance, the four consent notions), OpenAPI (drift,
 registry fields and contracts, served shapes, collisions, base hashes, the web client generator), compatibility (declared = computed,
-consumers found; the classifier tested on real breaks), examples. Each rule also runs on deliberately broken copies (50 of them) and must
-fail for its own reason.
+consumers found; served projections follow registry changes; the classifier tested on real breaks), examples. Each rule also runs on
+deliberately broken copies (54 of them) and must fail for its own reason.
 
 Failures the rules caught on the real proposal while it was built, each repaired only after it was seen failing:
 
@@ -123,12 +123,14 @@ the cross-proposal path ownership, the joint generator run, CP-02's test and the
 
 ## 7. Compatibility
 
-`CP-02.compatibility.json` lists 271 changes of CP-01 + CP-02 in three layers (registry, served api, payloads of registered events): 229
-additive (new contracts, commands, operations, cases, policy keys, relaxed request members), 16 text (registry prose), 25 coordinated,
-1 breaking.
+`CP-02.compatibility.json` lists 282 changes of CP-01 + CP-02 in three layers (registry 189, served api 81, payloads of registered events
+12): 229 additive (new contracts, commands, operations, cases, policy keys, relaxed request members), 16 text (registry prose), 35
+coordinated, 2 breaking.
 
-- **Breaking (CP-01.01):** `Audit.targetContractId` becomes optional. Accepted by the owner (F-01, CP-01 resolution); no TypeScript consumer
-  imports the registry type; the audit records, persistence and `audit.queued.v1` take it as optional for CLEAN in the backend order (C4).
+- **Breaking (CP-01.01 and its served consequence in CP-02.01):** `Audit.targetContractId` becomes optional in the registry, and its served
+  projection `AuditView` (GetAudit, CancelAudit) follows. Accepted by the owner (F-01, CP-01 resolution). Consumers: the web client's
+  `AuditView` type and `isAuditView` guard, the application's audit views, every `audit.*.v1` payload and its readers; all changed for
+  CLEAN in the backend and web orders (C4, C9), server and web deployed together.
 - **Coordinated:** the extension reply (4 members, 3 outcome meanings), the statement reply (`balance`, `RETAINER`, 6 optional item
   members), `CommissionStatement` (2 optional members), StartAudit's 2 new reasons, CreateQuote's outcome meaning (proposed item), the
   RetentionRecord class (CP-01.11, blocked), the Problem reason vocabulary, and three event payloads (`audit.queued.v1` without a target for
@@ -157,6 +159,21 @@ and what was done:
 | CP-02.20 silent on LR-11 | stated |
 | A money amount typed as a count in an event; the contact form under an authenticated command; no check of O17 coverage | `minorUnits` (as commerce's events carry amounts); the command's source is REGISTRATION or PREFERENCES only; the test requires all nineteen groups |
 | The matrix's consumer lists would make CP-02 stale on unrelated work | they are regenerated with the matrix and left out of the drift comparison |
+
+### Final review (after the integration with `main` and CP-01 revision 3)
+
+A second independent review, of CP-01 revision 2 as merged plus revision 3 and of CP-02's last commit against `main`'s contracts and
+consumers, first answered **REJECT** with two material defects, both repaired at their root and each reproduced by a test that fails on the
+defect:
+
+| Defect | Root cause | Repair | Test that reproduces it |
+|---|---|---|---|
+| `Audit.targetContractId` optional in the registry while the served `AuditView` (GetAudit, CancelAudit) and the web client still required it; declared "no consumer" | consumers of a registry change were looked for only among importers of the registry type; served projections were never compared with registry changes | CP-02.01 modifies `AuditView` (BREAKING, the served consequence of CP-01.01, accepted by F-01, with migration); every `audit.*.v1` payload declared; the RetentionView projection follows CP-01.11 inside CP-02.17; consumers now include the projections' readers | `projectionGaps`: every served projection (`$comment` "Projection of registry contract X") must follow each change of X; removing the AuditView or RetentionView modification is found |
+| ChangeDecision (CMD075) could unify one name-and-email candidate without the exact preview or explicit approval the owner required (CP-01.12) | the safeguard was put on the bulk command only | CMD075 requires `previewHash` and `approval`, refuses `PREVIEW_STALE`; GetDecisionPreview previews one group; an adversarial case | every command that can set `UNIFY` must require `previewHash` and the explicit approval statement; the previous CMD075 fails |
+
+Minor points also closed: the pin's provenance label (revision 2 merged in `d38c00b2`, revision 3 on this branch); CP-01 §3.1's leftover line
+on the request schema (revision 3 text). The noisy outcome-consumer lists are left as they are (they over-report, never under-report).
+The re-review of the repaired commit is recorded below.
 
 ## 9. Verification and CI
 

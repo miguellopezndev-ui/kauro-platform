@@ -42,7 +42,7 @@ across proposals and runs the generator on both together.
 | Chosen behavior | Section 3 and the delta. |
 | Rejected | Writing CP-02 in the vendored registry or `apps/api/openapi.json` (D-34 §1.3); domain events for B10 corporate aggregates (D10-EVT-1: claims and outreach requests are commercial transitions); a public read that reveals the budget; identity proved by name and e-mail (CP-01.12 as the owner modified it). |
 | Deferred | The items classed CONDITIONAL, PROPOSED and BLOCKED_EXTERNAL (section 5), registered for a later version without holding back the approved ones. |
-| Impacted ids | 54 new registry contracts and one extended (CommissionStatement); commands CMD065–CMD081 (17); text of CMD041, CMD002, CMD027 (proposed and blocked items only); state machines ClaimReview, OutreachAuthorizationRequest; screen UI57 (conditional); 132 cases with their requirements; gates' case lists. No existing contract field is removed, retyped or made required by CP-02. |
+| Impacted ids | 54 new registry contracts and one extended (CommissionStatement); commands CMD065–CMD081 (17); text of CMD041, CMD002, CMD027 (proposed and blocked items only); state machines ClaimReview, OutreachAuthorizationRequest; screen UI57 (conditional); 133 cases with their requirements; gates' case lists. No existing contract field is removed, retyped or made required by CP-02. |
 | Producers and consumers | Producer: the authority re-issue. Consumers: `@kauro/contracts` (regenerated), the application's request and response schemas and outcome catalogues, `apps/api/openapi.json`, `apps/web/src/api/generated.ts`, the domain event registry, its payload allowlists and migrations; the consumers of each coordinated change are listed in `CP-02.compatibility.json` (found in the code at each generation, left out of the drift comparison so unrelated work never makes CP-02 stale). |
 | Security and privacy | Audiences and field visibility per identity are part of the contract (section 2) and tested; the effective authorization, roles, RLS and the cross-workspace owner scope are Order 15's. No read exposes a cell value, a provider identifier, a tombstone or the free-check budget. Consent, processing authorization, session and step-up are four distinct things (CP-02.05). |
 | Price and commission | None to prices. Commission: reads of figures CP-01.05 and CP-01.13 define, the retainer and offset items on the statement, the closed refusal; no rate or rule changes. |
@@ -80,7 +80,7 @@ reads the server's evidence hash; the public never reads an id, a count or money
 
 | Item | O17 | Class | Requires | Registry | Api |
 |---|---|---|---|---|---|
-| CP-02.01 | O17-01 | APPROVED_AWAITING_REISSUE | CP-01.01 | 5 acceptance cases | StartAudit: `targetContractId` optional; reasons TARGET_CONTRACT_REQUIRED, TARGET_NOT_APPLICABLE |
+| CP-02.01 | O17-01 | APPROVED_AWAITING_REISSUE | CP-01.01 | 5 acceptance cases | StartAudit: `targetContractId` optional; reasons TARGET_CONTRACT_REQUIRED, TARGET_NOT_APPLICABLE; AuditView (GetAudit, CancelAudit) serves it as optional |
 | CP-02.02 | O17-03 | APPROVED_AWAITING_REISSUE | CP-01.02 | ProjectDate, ProjectDates (the hold's tokens reserved for CP-02.17) | GetProjectDates |
 | CP-02.03 | O17-02 | APPROVED_AWAITING_REISSUE | — | 14 read contracts | 13 reads: project summary, board, clients, findings, estimate, activity, billing profile, billing documents, package, support cases, deletion records, refunds, the owner's refunds across workspaces |
 | CP-02.04 | O17-14 | APPROVED_AWAITING_REISSUE | CP-01.02 | RetentionExtension | RequestRetentionExtension reply states class and ceiling; three outcome meanings |
@@ -102,9 +102,9 @@ reads the server's evidence hash; the public never reads an id, a count or money
 | CP-02.20 | O17-18 | CONDITIONAL | CP-01.03 | 2 contracts; CMD081; screen UI57 | GetFreeCheckAvailability (public), RecordFreeCheckEligibility |
 | CP-02.21 | O17-19 | PROPOSED | — | CMD002 and CMD027 precondition text | ActivateAgency: `billingProfileRef` optional; CreateQuote outcome meaning |
 
-Totals: 15 approved, 1 conditional, 3 proposed, 2 blocked by an external party; 57 proposed operations (17 commands, 40 reads); 5 served
-operations modified (StartAudit, RequestRetentionExtension, GetCommissionStatement, ActivateAgency, CreateQuote); 54 new registry contracts,
-1 extended; 9 new event types, 2 new subscriptions and 3 payload changes of registered events; 2 state machines.
+Totals: 15 approved, 1 conditional, 3 proposed, 2 blocked by an external party; 57 proposed operations (17 commands, 40 reads); 7 served
+operations modified (StartAudit, GetAudit, RequestRetentionExtension, GetCommissionStatement, ActivateAgency, CreateQuote, GetRevision);
+54 new registry contracts, 1 extended; 9 new event types, 2 new subscriptions and payload changes of 12 registered events; 2 state machines.
 
 Every item carries positive, negative and adversarial acceptance cases (written as registry cases with their requirements and gates);
 every command carries the registry's own OK, DENY and RACE cases.
@@ -118,6 +118,9 @@ every command carries the registry's own OK, DENY and RACE cases.
   and answers a missing CRM target `400 INVALID_REQUEST TARGET_CONTRACT_REQUIRED`: today it is `400 SCHEMA_VIOLATION`, so no client that
   branches on status sees a change. `TARGET_STALE` stays for a target that is given but not current. The closed request schema cannot say
   "required unless CLEAN" (the strict validator has no conditional keywords and the mode is not a request member), so the handler enforces it.
+  The served projection of Audit follows the registry: `AuditView` (GetAudit, CancelAudit) serves `targetContractId` as optional, a break
+  for its current readers (the web client's type and guard, the application's audit views) declared as the served consequence of
+  CP-01.01's own break, accepted by the owner (F-01), with its migration; every `audit.*.v1` payload of a CLEAN audit omits the key.
 - **Dates (CP-02.02).** One entry per date kind, each with its rule, anchor, state and the action and role available; `governingRetentionKind`
   points at the date that deletes the data and nothing adds two dates. The hold's kind is in the vocabulary (the five dates are the owner's
   F-24) and is `NOT_APPLICABLE` until CP-02.17: the item declares that reservation (`reserves`: the tokens, CP-01.11, CP-02.17 and why), so
@@ -157,7 +160,8 @@ every command carries the registry's own OK, DENY and RACE cases.
 - **Identity (CP-02.15).** Follows CP-01.12 as the owner modified it: `PROVEN_IDENTITY` only from Migration Core's proving keys (a source
   record id within one identity space; an authoritative external id once the core verifies it, which it does not do yet: until then
   `EXTERNAL_ID_NOT_VERIFIED`); equal normalized e-mail and full name is a `CANDIDATE`, never proof, decided by a person with DecideMany
-  (at most 100 groups, the exact preview hash and an explicit approval member); nothing is folded to manufacture a proof; the five blocking
+  (at most 100 groups, the exact preview hash and an explicit approval member), and ChangeDecision on one group carries the same preview
+  hash and approval; nothing is folded to manufacture a proof; the five blocking
   conflicts refuse; every decision is recorded with decision, evidence, person, version and effect. `ApplyDemonstratedBatch` of the first
   draft became `ApplyProvenIdentity`. The evidence classes, the verification and RevisePlan are the core's (C7): activation, not adoption.
 
@@ -180,7 +184,7 @@ A screen in the review never authorizes anything: the prototypes are evidence of
 
 ## 6. Proof
 
-`tools/test/cp02-api-contracts.test.mjs` (15 tests, 50 broken copies). Every rule runs on the proposal and on deliberately broken copies,
+`tools/test/cp02-api-contracts.test.mjs` (16 tests, 54 broken copies). Every rule runs on the proposal and on deliberately broken copies,
 and each broken copy must fail for the rule's own reason:
 
 1. procedure: every O17 group has an item; ids, the four classes and their statuses, approvals, activation, open points, unlock and reason
@@ -202,8 +206,9 @@ and each broken copy must fail for the rule's own reason:
    written against the served bytes and add only members of their registry contract; the web client generator translates the result, and
    the committed web client is still the one generated from the served api alone;
 8. compatibility: every change that can affect a consumer (registry, served api, payloads of registered events) is declared with the computed
-   class, a migration, and for a break the approved decision that accepted it; each is attributed to the item that really makes it; the
-   classifier is itself tested on real breaks;
+   class, a migration, and for a break the approved decision that accepted it (in an approved CP-02 item only as the served consequence of an
+   approved CP-01 break); every served projection of a changed registry contract follows the change; each change is attributed to the item
+   that really makes it; the classifier is itself tested on real breaks;
 9. examples: valid examples pass and invalid ones fail with the expected field and code under the api's strict validator.
 
 ## 7. Adoption with CP-01

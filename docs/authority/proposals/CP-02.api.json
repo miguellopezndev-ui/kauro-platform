@@ -8,7 +8,6 @@
     "proposal": "CP-01",
     "revision": 3,
     "pr": 122,
-    "mergedIn": "d38c00b25f124e442b17a26cae0bac017f19c0c8",
     "delta": "docs/authority/proposals/CP-01.registry-delta.json",
     "sha256": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d",
     "history": [
@@ -20,7 +19,9 @@
         "note": "merged into main by PR #122 (d38c00b2)"
       },
       { "revision": 3, "note": "Order 17 rectification of CP-01.01 section 3.1 (error contract); operations, statuses, approvals and base hashes unchanged" }
-    ]
+    ],
+    "revision2MergedIn": "d38c00b25f124e442b17a26cae0bac017f19c0c8",
+    "revision3": "Order 17, this branch (CP-01.01 section 3.1 rectification)"
   },
   "classes": {
     "APPROVED_AWAITING_REISSUE": "Substance decided by the owner, the authority or the law (or a read under the owner's standing delegation of design decisions); every CP-01 item it requires is itself approved. Waits only for the re-issue that adopts CP-01 and CP-02 together.",
@@ -587,6 +588,16 @@
             }
           ],
           "audience": "AGENCY"
+        },
+        {
+          "operationId": "GetAudit",
+          "method": "GET",
+          "path": "/api/v1/audits/{auditId}",
+          "audience": "AGENCY",
+          "components": [
+            { "name": "AuditView", "direction": "response", "registryContract": "Audit", "edits": [{ "op": "unrequire", "property": "targetContractId" }] }
+          ],
+          "outcomes": []
         }
       ],
       "rules": [
@@ -594,7 +605,8 @@
         "CLEAN: no targetContractId; the audit records CLEAN_ONLY_TARGET_HASH (plan-compiler.ts) as targetContractHash and locks no target row; CreatePlan, ApprovePlan and CreateQuote bind that hash for CLEAN and never read a target contract.",
         "HUBSPOT and SALESFORCE: unchanged, a confirmed and current target contract of the project is required (TARGET_STALE when it is not current).",
         "The quote of a CLEAN project shows no target fingerprint (Quote has no target member; QuoteView unchanged).",
-        "Order 16's text named the CLEAN refusal \"422 TARGET_NOT_APPLICABLE\" and said a HUBSPOT project without a target is \"still TARGET_STALE\". Order 17 keeps the token as the reason but answers 400 INVALID_REQUEST, as CMD011 already does for TARGET_INSTANCE_REQUIRED (the repository's convention for a mode-dependent member), and keeps today's 400 for a missing CRM target: a client that branches on the status sees no change. TARGET_STALE stays for a target that is given but not current."
+        "Order 16's text named the CLEAN refusal \"422 TARGET_NOT_APPLICABLE\" and said a HUBSPOT project without a target is \"still TARGET_STALE\". Order 17 keeps the token as the reason but answers 400 INVALID_REQUEST, as CMD011 already does for TARGET_INSTANCE_REQUIRED (the repository's convention for a mode-dependent member), and keeps today's 400 for a missing CRM target: a client that branches on the status sees no change. TARGET_STALE stays for a target that is given but not current.",
+        "The served projection of Audit (AuditView: GetAudit and CancelAudit) follows the registry: targetContractId becomes optional and is absent for CLEAN; the web client's AuditView type and guard and the application's audit views are regenerated with the server (C4, C9)."
       ],
       "acceptance": [
         {
@@ -648,7 +660,18 @@
         {
           "eventType": "audit.queued.v1",
           "optionalKeys": ["targetContractId"],
-          "note": "a CLEAN audit omits targetContractId and carries targetContractHash = CLEAN_ONLY_TARGET_HASH; AUDIT_ORCHESTRATION reads it as optional"
+          "alsoEventTypes": [
+            "audit.profiling.v1",
+            "audit.interpreting.v1",
+            "audit.validating.v1",
+            "audit.draft_ready.v1",
+            "audit.needs_decision.v1",
+            "audit.unsupported.v1",
+            "audit.failed.v1",
+            "audit.cancelled.v1",
+            "audit.expired.v1"
+          ],
+          "note": "a CLEAN audit omits targetContractId in every audit.*.v1 transition (persistence/src/audit/store.ts writes it on each); consumers (AUDIT_ORCHESTRATION, execute-project) read it as optional; targetContractHash = CLEAN_ONLY_TARGET_HASH"
         }
       ],
       "activation": ["the StartAudit, CreatePlan, ApprovePlan and CreateQuote handlers take the CLEAN branch with the canonical CLEAN binding and their tests (C4), CP-01.01's activation"]
@@ -3376,10 +3399,10 @@
           "path": "/api/v1/plans/{planId}/decisions/{groupId}",
           "role": "AGENCY_OPERATOR",
           "owner": "06",
-          "fields": [["expectedVersion", "version"], ["decision", "enum:UNDECIDED,UNIFY,KEEP_SEPARATE"]],
-          "precondition": "The plan is not approved; a CANDIDATE group is unified only by this person's decision.",
+          "fields": [["expectedVersion", "version"], ["decision", "enum:UNDECIDED,UNIFY,KEEP_SEPARATE"], ["previewHash", "hash"], ["approval", "enum:EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW"]],
+          "precondition": "The plan is not approved; the person decides one CANDIDATE group on its exact, current preview with explicit approval (identityResolution.candidateDecision).",
           "effect": "Change one group's decision, recorded.",
-          "failure": "An approved plan needs a new revision; a BLOCKED group cannot be unified.",
+          "failure": "An approved plan needs a new revision; a BLOCKED group cannot be unified; a stale preview or a missing approval rejects.",
           "gate": "G-IC-KERNEL",
           "idempotency": "REQUIRED",
           "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION",
@@ -3428,7 +3451,8 @@
           "scope": "AGENCY_HEADER",
           "response": { "contract": "PlanDecisionPreview" },
           "query": [
-            { "name": "evidenceClass", "enum": ["PROVEN_IDENTITY", "CANDIDATE"], "required": true, "description": "Which groups." }
+            { "name": "evidenceClass", "enum": ["PROVEN_IDENTITY", "CANDIDATE"], "required": true, "description": "Which groups." },
+            { "name": "groupId", "id": true, "description": "One group, for ChangeDecision." }
           ],
           "summary": "The exact effects an apply or a bulk decision would have.",
           "outcomes": []
@@ -3495,12 +3519,13 @@
           "audience": "AGENCY",
           "scope": "AGENCY_HEADER",
           "assurance": "SESSION",
-          "request": { "required": ["expectedVersion", "decision"] },
+          "request": { "required": ["expectedVersion", "decision", "previewHash", "approval"] },
           "response": { "status": 200, "contract": "IdentityGroupView" },
           "events": ["plan_decision_batch.applied.v1"],
           "outcomes": [
             { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PLAN_NOT_EDITABLE", "layer": "COMMAND", "meaning": "the plan is approved: a change is a new revision (F-26)" },
-            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "GROUP_BLOCKED", "layer": "COMMAND", "meaning": "a BLOCKED group cannot be unified" }
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "GROUP_BLOCKED", "layer": "COMMAND", "meaning": "a BLOCKED group cannot be unified" },
+            { "status": 409, "code": "PRECONDITION_FAILED", "reason": "PREVIEW_STALE", "layer": "COMMAND", "meaning": "the group's preview hash is not current" }
           ]
         },
         {
@@ -3587,6 +3612,15 @@
           "title": "A revision after approval withdraws the quote",
           "scenario": "A decision changed after approval through RevisePlan.",
           "expected": "A new plan revision needs validation and approval; the open quote is WITHDRAWN with PLAN_REVISED; no approval carries over."
+        },
+        {
+          "tag": "SINGLE-DECISION-SAFEGUARDS",
+          "kind": "ADVERSARIAL",
+          "gate": "G-IC-KERNEL",
+          "template": "kernel",
+          "title": "One candidate is never unified without its preview and approval",
+          "scenario": "ChangeDecision UNIFY on a name-and-email CANDIDATE group without previewHash, without approval, and with the preview of another group.",
+          "expected": "The closed schema refuses the missing members; PREVIEW_STALE for the other group's hash; the group stays undecided."
         }
       ],
       "events": [
@@ -3823,7 +3857,18 @@
           ]
         }
       ],
-      "modified": [],
+      "modified": [
+        {
+          "operationId": "GetRevision",
+          "method": "GET",
+          "path": "/api/v1/revisions/{revisionId}",
+          "audience": "AGENCY",
+          "components": [
+            { "name": "RetentionView", "direction": "response", "registryContract": "RetentionRecord", "edits": [{ "op": "addEnumValue", "property": "class", "value": "PENDING_PAYMENT_HOLD" }] }
+          ],
+          "outcomes": []
+        }
+      ],
       "rules": ["The ProjectDate PENDING_PAYMENT_HOLD entry (CP-02.02) becomes applicable with this item.", "The hold never yields a commercial authorization; ExecuteProject still needs a capture."],
       "acceptance": [
         {
@@ -4369,7 +4414,7 @@
       "key": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
       "class": "BREAKING",
       "acceptedBy": "F-01",
-      "migration": "CP-01.01. Existing audits all carry a target and keep it; only CLEAN audits started after adoption omit it. Readers branch on the project mode: the audit records (domain model/audit, persistence audit store, audit.queued.v1 payload) take targetContractId as optional and targetContractHash = CLEAN_ONLY_TARGET_HASH for CLEAN. No TypeScript consumer imports the registry Audit type (none found); the change is in the backend order C4 with its tests first."
+      "migration": "CP-01.01. Existing audits all carry a target and keep it; only CLEAN audits started after adoption omit it. No module imports the registry Audit type, but its served projection does follow it: AuditView (GetAudit, CancelAudit) and the web client's AuditView type and guard, changed by CP-02.01 (declared on the served component). The audit records, persistence and every audit.*.v1 payload take it as optional for CLEAN in the backend order (C4), tests first."
     },
     {
       "key": "REGISTRY:contracts.json:RetentionRecord.class:ENUM_WIDENED",
@@ -4495,6 +4540,63 @@
       "key": "EVENTS:quote.withdrawn.v1:withdrawalCode:KEY_ADDED",
       "class": "COORDINATED",
       "migration": "CP-02.15. COMMERCE_EVENT_PAYLOAD_ALLOWLIST and the event-type seed migration change in the same commit (the persistence tests prove they are equal)."
+    },
+    {
+      "key": "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL",
+      "class": "BREAKING",
+      "acceptedBy": "F-01",
+      "consequenceOf": "REGISTRY:contracts.json:Audit.targetContractId:REQUIRED_TO_OPTIONAL",
+      "migration": "The served consequence of CP-01.01: the web client is regenerated with the server (isAuditView accepts an audit without a target), the audit screens show no target for CLEAN, packages/application/src/audit/views.ts and response-views.ts serve it as optional; server and web deployed together (C4, C9)."
+    },
+    {
+      "key": "OPENAPI:components/RetentionView.class:ENUM_WIDENED",
+      "class": "COORDINATED",
+      "migration": "CP-02.17 (blocked with CP-01.11): the revision read and the web client learn PENDING_PAYMENT_HOLD only when the hold is activated."
+    },
+    {
+      "key": "EVENTS:audit.profiling.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.interpreting.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.validating.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.draft_ready.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.needs_decision.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.unsupported.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.failed.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.cancelled.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
+    },
+    {
+      "key": "EVENTS:audit.expired.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. Every audit transition of a CLEAN audit omits targetContractId; its consumers read it as optional (C4)."
     }
   ],
   "examples": {
@@ -5121,6 +5223,23 @@
     "modified:ActivateAgencyRequest": {
       "valid": [{ "expectedVersion": 1, "termsVersion": "ToS-1.0", "privacyAgreementVersion": "DPA-1.0" }],
       "invalid": [{ "why": "the agreements stay required", "value": { "expectedVersion": 1, "termsVersion": "ToS-1.0" }, "error": { "field": "privacyAgreementVersion", "code": "REQUIRED" } }]
+    },
+    "request:ChangeDecisionRequest": {
+      "valid": [
+        { "expectedVersion": 5, "decision": "UNIFY", "previewHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "approval": "EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW" }
+      ],
+      "invalid": [
+        {
+          "why": "a single unification without the exact preview",
+          "value": { "expectedVersion": 5, "decision": "UNIFY", "approval": "EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW" },
+          "error": { "field": "previewHash", "code": "REQUIRED" }
+        },
+        {
+          "why": "a single unification without explicit approval",
+          "value": { "expectedVersion": 5, "decision": "UNIFY", "previewHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+          "error": { "field": "approval", "code": "REQUIRED" }
+        }
+      ]
     }
   },
   "pathRulesNote": "The outreach routes of the served api (PrepareOutreachDraft, SendAuthorizedOutreach) live under /api/v1/ops/outreach for the assigned seller too; CP-02 follows that convention. Owner reads across workspaces are new and all live under /api/v1/ops; owner commands sit beside the served command they extend (AcceptAttribution under /api/v1/sales, the refund operations under /api/v1/operations)."

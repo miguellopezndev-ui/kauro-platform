@@ -15,7 +15,7 @@ CLEAN "422 TARGET_NOT_APPLICABLE" and a CRM project without a target "still TARG
 refuses a missing mode-dependent member as `400 INVALID_REQUEST` with a reason (`TARGET_INSTANCE_REQUIRED`, `create-project.ts:54`), a
 StartAudit without a target is `400 SCHEMA_VIOLATION` today (the closed schema requires it), and only a target that is given but not
 confirmed or current is `422 TARGET_STALE` (`apps/api/test/cmd020-start-audit.test.ts`). Section 3.1 now states the compatible contract that
-CP-02.01 specifies. The owner's decision, the delta's operations, statuses, approvals and base hashes are unchanged; only the delta's
+CP-02.01 specifies, and how the request schema and the served AuditView follow the optional member. The owner's decision, the delta's operations, statuses, approvals and base hashes are unchanged; only the delta's
 `revision` and `revisions` record this text change (`docs/design/ORDER17-API-CONTRACTS.md` §5).
 
 **State: not adopted.** The registry is unchanged and the authority is not re-issued. Adoption is one coordinated re-issue with CP-02
@@ -85,7 +85,8 @@ the delta) does not enter into force early. A business authorization here is not
   compiler already has a canonical CLEAN hash (`plan-compiler.ts:27-28,78`) that no audit can carry. Tests mask it: every CMD020 test
   passes a target, and the helper inserts CLEAN-mode target artifacts (`cmd018-cmd019-target-contract.test.ts:59`).
 - **Change.** CMD020 precondition and failure, their copies in cases and requirements, and the Audit contract's `targetContractId`
-  (now `required: false`, absent for CLEAN) (delta). The openapi makes the field required unless the project's mode is CLEAN.
+  (now `required: false`, absent for CLEAN) (delta). The api (CP-02.01, revision 3 wording): the request member becomes optional and
+  the handler requires it for HUBSPOT and SALESFORCE; the served AuditView follows the registry and carries it only when there is one.
 - **Rule for Order 17 (revision 3).** CLEAN: no `targetContractId`; one given is refused `400 INVALID_REQUEST`, reason
   `TARGET_NOT_APPLICABLE` (one canonical hash, no ambiguity). HUBSPOT and SALESFORCE without a target: `400 INVALID_REQUEST`, reason
   `TARGET_CONTRACT_REQUIRED` (today's status for a missing target); a target given but not confirmed or current: `422 TARGET_STALE`, as

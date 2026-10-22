@@ -2564,6 +2564,16 @@
             }
           },
           {
+            "name": "groupId",
+            "in": "query",
+            "required": false,
+            "description": "One group, for ChangeDecision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
           }
         ],
@@ -2708,7 +2718,7 @@
       "post": {
         "operationId": "ChangeDecision",
         "summary": "CMD075 ChangeDecision",
-        "description": "Precondition: The plan is not approved; a CANDIDATE group is unified only by this person's decision.\n\nEffect: Change one group's decision, recorded.\n\nFailure: An approved plan needs a new revision; a BLOCKED group cannot be unified.",
+        "description": "Precondition: The plan is not approved; the person decides one CANDIDATE group on its exact, current preview with explicit approval (identityResolution.candidateDecision).\n\nEffect: Change one group's decision, recorded.\n\nFailure: An approved plan needs a new revision; a BLOCKED group cannot be unified; a stale preview or a missing approval rejects.",
         "x-kauro-command": "CMD075",
         "x-kauro-idempotency": "REQUIRED",
         "x-kauro-gate": "G-IC-KERNEL",
@@ -2790,7 +2800,7 @@
             }
           },
           "409": {
-            "description": "Problem: the 2 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
+            "description": "Problem: the 3 outcomes this operation adds at 409; the envelope, admission and authentication outcomes of every command route are added by tools/openapi.mjs when the route is served.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2810,6 +2820,12 @@
                 "reason": "GROUP_BLOCKED",
                 "layer": "COMMAND",
                 "meaning": "a BLOCKED group cannot be unified"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PREVIEW_STALE",
+                "layer": "COMMAND",
+                "meaning": "the group's preview hash is not current"
               }
             ]
           }
@@ -4362,6 +4378,184 @@
         }
       }
     },
+    "GetAudit": {
+      "method": "GET",
+      "path": "/api/v1/audits/{auditId}",
+      "item": "CP-02.01",
+      "class": "APPROVED_AWAITING_REISSUE",
+      "components": {
+        "AuditView": {
+          "direction": "response",
+          "baseSha256": "c4460fd99cf873c8a266578e116ba0a1acdf09218a8ed3bbb0f16a8bf7655b04",
+          "edits": [
+            {
+              "op": "unrequire",
+              "property": "targetContractId"
+            }
+          ],
+          "proposed": {
+            "title": "AuditView",
+            "description": "An audit's safe progress (10 \"Long work returns 202 with operationId, current state, status URL and allowed polling guidance\"; design B08 §12): its durable phase, deadlines, grant classification and state, pending decisions or unsupported capabilities and its draft plan — never a provider identity, a prompt, the sealed source's or the target's hash or a customer value.",
+            "$comment": "Projection of registry contract Audit. Withheld: interpretationDeadline (Served as the optional interpretationDeadlineAt: the registry requires the deadline, but an audit that has not reached INTERPRETING has none yet (it is stamped once, by the database, at the first INTERPRETING).)",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "auditId",
+              "revisionId",
+              "state",
+              "version",
+              "startedAt",
+              "absoluteDeadline",
+              "grantId",
+              "grantClass",
+              "grantState",
+              "cancelVersion",
+              "permittedActions"
+            ],
+            "properties": {
+              "auditId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Logical audit identity.",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "revisionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Sealed source.",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "targetContractId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact target version.",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "QUEUED",
+                  "PROFILING",
+                  "INTERPRETING",
+                  "VALIDATING",
+                  "DRAFT_READY",
+                  "NEEDS_DECISION",
+                  "UNSUPPORTED",
+                  "FAILED",
+                  "CANCELLED",
+                  "EXPIRED"
+                ],
+                "description": "Durable visible phase."
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Aggregate concurrency version."
+              },
+              "startedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$",
+                "description": "Original logical start."
+              },
+              "interpretationDeadlineAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$",
+                "description": "No new semantic dispatch after this instant (the first INTERPRETING plus the interpretation window); absent until the audit reaches INTERPRETING and kept afterwards."
+              },
+              "absoluteDeadline": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$",
+                "description": "No successful finalization afterward."
+              },
+              "grantId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Funded budget reservation.",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "grantClass": {
+                "type": "string",
+                "enum": [
+                  "FREE_AUDIT"
+                ],
+                "description": "How the audit's grant is classified: FREE_AUDIT, carved from the platform's funded pool (D8-GRANT-1); never the pool's identity or the funding authorization."
+              },
+              "grantState": {
+                "type": "string",
+                "enum": [
+                  "PREPARED",
+                  "AUTHORIZED",
+                  "EXHAUSTED",
+                  "EXPIRED",
+                  "CLOSED"
+                ],
+                "description": "The audit grant's state (PREPARED, AUTHORIZED, EXHAUSTED, EXPIRED or CLOSED)."
+              },
+              "candidateManifestHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "Complete expected candidate set after planning."
+              },
+              "cancelVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Cancellation generation."
+              },
+              "pendingDecisions": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+                },
+                "description": "The decisions the customer owes, as stable finding codes (NEEDS_DECISION only); never a column name or a cell value."
+              },
+              "unsupportedCapabilities": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+                },
+                "description": "The capabilities the audit could not plan, as stable finding codes (UNSUPPORTED only)."
+              },
+              "terminalReason": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+                "description": "The classified cause of a FAILED, EXPIRED or CANCELLED audit."
+              },
+              "draftPlanId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "description": "The system draft plan a DRAFT_READY audit published."
+              },
+              "permittedActions": {
+                "type": "array",
+                "maxItems": 2,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CancelAudit",
+                    "CreatePlan"
+                  ]
+                },
+                "description": "The audit commands the caller may issue on this audit, derived server-side from the caller's role and the audit's state (CancelAudit while it is live, CreatePlan once it needs a decision); informative, never authority (B06 D-PERM-1)."
+              }
+            }
+          }
+        }
+      },
+      "outcomes": {}
+    },
     "RequestRetentionExtension": {
       "method": "POST",
       "path": "/api/v1/projects/{projectId}/retention-extensions",
@@ -4924,6 +5118,115 @@
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]*)$",
                 "maxLength": 16
+              }
+            }
+          }
+        }
+      },
+      "outcomes": {}
+    },
+    "GetRevision": {
+      "method": "GET",
+      "path": "/api/v1/revisions/{revisionId}",
+      "item": "CP-02.17",
+      "class": "BLOCKED_EXTERNAL",
+      "components": {
+        "RetentionView": {
+          "direction": "response",
+          "baseSha256": "a7a5d4ed9c5c1d90c880983a13c576fad3562f1a73420072097c2fc2c56f1f52",
+          "edits": [
+            {
+              "op": "addEnumValue",
+              "property": "class",
+              "value": "PENDING_PAYMENT_HOLD"
+            }
+          ],
+          "proposed": {
+            "title": "RetentionView",
+            "description": "A retention record governing a revision's data (09 \"Retention schedule\"; HASHING \"Retention formulas\"; registry RetentionRecord: the effective deadline is a minimum of named anchors and retries do not extend it).",
+            "$comment": "Projection of registry contract RetentionRecord. Withheld: scope (The enclosing revision names the agency, project and revision the record governs.)",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "retentionId",
+              "class",
+              "anchorEvidenceHash",
+              "hardDeadline",
+              "effectiveDeadline",
+              "policyVersion",
+              "providerResiduals",
+              "state"
+            ],
+            "properties": {
+              "retentionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Lifecycle policy identity.",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "class": {
+                "type": "string",
+                "enum": [
+                  "UNPAID",
+                  "PAID_ORDINARY",
+                  "PAID_STAGED",
+                  "IMPORT_RECEIPT",
+                  "TARGET_METADATA",
+                  "ORDINARY_LOG",
+                  "SECURITY_LOG",
+                  "LEGAL_FINANCIAL",
+                  "PENDING_PAYMENT_HOLD"
+                ],
+                "description": "Owning retention class."
+              },
+              "anchorEvidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "Actual seal/capture/ready/stage/terminal facts."
+              },
+              "softDeadline": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$",
+                "description": "Policy interval from the applicable ready event."
+              },
+              "hardDeadline": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$",
+                "description": "Absolute maximum from the owning immutable event."
+              },
+              "effectiveDeadline": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$",
+                "description": "Minimum active deadline after all relevant caps."
+              },
+              "policyVersion": {
+                "type": "string",
+                "maxLength": 40000,
+                "description": "Retention rule at collection/contract."
+              },
+              "providerResiduals": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 40000
+                },
+                "maxItems": 10000,
+                "description": "Observed classes that outlive active access with reasons."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "EXPIRED",
+                  "DELETING",
+                  "DELETED_WITH_RESIDUALS",
+                  "DELETED"
+                ],
+                "description": "Actual managed lifecycle."
               }
             }
           }
@@ -6273,6 +6576,165 @@
           }
         }
       },
+      "AuditView": {
+        "title": "AuditView",
+        "description": "An audit's safe progress (10 \"Long work returns 202 with operationId, current state, status URL and allowed polling guidance\"; design B08 §12): its durable phase, deadlines, grant classification and state, pending decisions or unsupported capabilities and its draft plan — never a provider identity, a prompt, the sealed source's or the target's hash or a customer value.",
+        "$comment": "Projection of registry contract Audit. Withheld: interpretationDeadline (Served as the optional interpretationDeadlineAt: the registry requires the deadline, but an audit that has not reached INTERPRETING has none yet (it is stamped once, by the database, at the first INTERPRETING).)",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auditId",
+          "revisionId",
+          "state",
+          "version",
+          "startedAt",
+          "absoluteDeadline",
+          "grantId",
+          "grantClass",
+          "grantState",
+          "cancelVersion",
+          "permittedActions"
+        ],
+        "properties": {
+          "auditId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Logical audit identity.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "revisionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Sealed source.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "targetContractId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Exact target version.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "PROFILING",
+              "INTERPRETING",
+              "VALIDATING",
+              "DRAFT_READY",
+              "NEEDS_DECISION",
+              "UNSUPPORTED",
+              "FAILED",
+              "CANCELLED",
+              "EXPIRED"
+            ],
+            "description": "Durable visible phase."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Aggregate concurrency version."
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "Original logical start."
+          },
+          "interpretationDeadlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "No new semantic dispatch after this instant (the first INTERPRETING plus the interpretation window); absent until the audit reaches INTERPRETING and kept afterwards."
+          },
+          "absoluteDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "No successful finalization afterward."
+          },
+          "grantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Funded budget reservation.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "grantClass": {
+            "type": "string",
+            "enum": [
+              "FREE_AUDIT"
+            ],
+            "description": "How the audit's grant is classified: FREE_AUDIT, carved from the platform's funded pool (D8-GRANT-1); never the pool's identity or the funding authorization."
+          },
+          "grantState": {
+            "type": "string",
+            "enum": [
+              "PREPARED",
+              "AUTHORIZED",
+              "EXHAUSTED",
+              "EXPIRED",
+              "CLOSED"
+            ],
+            "description": "The audit grant's state (PREPARED, AUTHORIZED, EXHAUSTED, EXPIRED or CLOSED)."
+          },
+          "candidateManifestHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Complete expected candidate set after planning."
+          },
+          "cancelVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Cancellation generation."
+          },
+          "pendingDecisions": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+            },
+            "description": "The decisions the customer owes, as stable finding codes (NEEDS_DECISION only); never a column name or a cell value."
+          },
+          "unsupportedCapabilities": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+            },
+            "description": "The capabilities the audit could not plan, as stable finding codes (UNSUPPORTED only)."
+          },
+          "terminalReason": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+            "description": "The classified cause of a FAILED, EXPIRED or CANCELLED audit."
+          },
+          "draftPlanId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "The system draft plan a DRAFT_READY audit published."
+          },
+          "permittedActions": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "enum": [
+                "CancelAudit",
+                "CreatePlan"
+              ]
+            },
+            "description": "The audit commands the caller may issue on this audit, derived server-side from the caller's role and the audit's state (CancelAudit while it is live, CreatePlan once it needs a decision); informative, never authority (B06 D-PERM-1)."
+          }
+        }
+      },
       "BillingDocumentItem": {
         "title": "BillingDocumentItem",
         "type": "object",
@@ -6563,7 +7025,9 @@
         "additionalProperties": false,
         "required": [
           "expectedVersion",
-          "decision"
+          "decision",
+          "previewHash",
+          "approval"
         ],
         "properties": {
           "expectedVersion": {
@@ -6577,6 +7041,16 @@
               "UNDECIDED",
               "UNIFY",
               "KEEP_SEPARATE"
+            ]
+          },
+          "previewHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "approval": {
+            "type": "string",
+            "enum": [
+              "EXPLICIT_HUMAN_APPROVAL_OF_EXACT_PREVIEW"
             ]
           }
         },
@@ -11281,6 +11755,95 @@
             "format": "date-time",
             "pattern": "Z$",
             "description": "Hard deadline before the extension."
+          }
+        }
+      },
+      "RetentionView": {
+        "title": "RetentionView",
+        "description": "A retention record governing a revision's data (09 \"Retention schedule\"; HASHING \"Retention formulas\"; registry RetentionRecord: the effective deadline is a minimum of named anchors and retries do not extend it).",
+        "$comment": "Projection of registry contract RetentionRecord. Withheld: scope (The enclosing revision names the agency, project and revision the record governs.)",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "retentionId",
+          "class",
+          "anchorEvidenceHash",
+          "hardDeadline",
+          "effectiveDeadline",
+          "policyVersion",
+          "providerResiduals",
+          "state"
+        ],
+        "properties": {
+          "retentionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Lifecycle policy identity.",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "class": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID_ORDINARY",
+              "PAID_STAGED",
+              "IMPORT_RECEIPT",
+              "TARGET_METADATA",
+              "ORDINARY_LOG",
+              "SECURITY_LOG",
+              "LEGAL_FINANCIAL",
+              "PENDING_PAYMENT_HOLD"
+            ],
+            "description": "Owning retention class."
+          },
+          "anchorEvidenceHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Actual seal/capture/ready/stage/terminal facts."
+          },
+          "softDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "Policy interval from the applicable ready event."
+          },
+          "hardDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "Absolute maximum from the owning immutable event."
+          },
+          "effectiveDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "Minimum active deadline after all relevant caps."
+          },
+          "policyVersion": {
+            "type": "string",
+            "maxLength": 40000,
+            "description": "Retention rule at collection/contract."
+          },
+          "providerResiduals": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40000
+            },
+            "maxItems": 10000,
+            "description": "Observed classes that outlive active access with reasons."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "EXPIRED",
+              "DELETING",
+              "DELETED_WITH_RESIDUALS",
+              "DELETED"
+            ],
+            "description": "Actual managed lifecycle."
           }
         }
       },
