@@ -272,7 +272,7 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   ])
     assert.ok(text.includes(claim), claim);
   assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "no stage names a duration");
-  assert.doesNotMatch(text.slice(0, text.indexOf("A worked example")), /HubSpot|Salesforce/, "the stages name a destination only through the capability publication, on Supported services; the invented example names its service");
+  assert.doesNotMatch(text.slice(0, text.indexOf("One project, start to finish")), /HubSpot|Salesforce/, "the stages name a destination only through the capability publication, on Supported services; the invented example names its service");
   assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
   assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
   const primary = linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary"));
@@ -284,9 +284,8 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   }
 });
 
-test("How it works: the worked example prices the billable units, with the counting rule and the invented-figures line directly under it", () => {
+test("How it works: one invented project, start to finish, on one sheet: each stage in order with figures read from the sample, the price counting the units sealed, and the sheet marked invented", () => {
   const html = page("how").html(ALL);
-  const text = textOf(html);
   const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
   const companies = MANIFEST_FILES.find((file) => file.name !== SAMPLE.contactsFile);
   assert.ok(contacts !== undefined && companies !== undefined);
@@ -294,10 +293,29 @@ test("How it works: the worked example prices the billable units, with the count
   assert.equal(units, 15_684, "both sealed files are counted, before anything is unified");
   const band = bandIndexOf(units);
   assert.ok(band !== null);
-  for (const fact of [`the price counts ${formatCount(units)} units, while the delivery holds ${formatCount(contacts.rows + companies.rows)} rows`, formatUsd(priceOf(band, SAMPLE_MODE)), "Invented figures.", "the service Prepare for HubSpot"]) assert.ok(text.includes(fact), fact);
-  // the note that the figures are invented sits in the same block as the rule it qualifies, right after it (owner, 2026-10-21)
-  const notes = /<div class="kauro-r2-example-notes">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? "";
-  assert.ok(textOf(notes).indexOf("Units are counted before duplicates are unified") < textOf(notes).indexOf("Invented figures."));
+  const sheet = /<figure class="kauro-record kauro-paper"[\s\S]*?<\/figure>/.exec(html)?.[0] ?? "";
+  const rows = [...sheet.matchAll(/<li class="kauro-record-row[\s\S]*?<\/ul><\/div><\/li>/g)].map((row) => textOf(row[0]));
+  const stageNames = ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"];
+  assert.equal(rows.length, 6, "one row per stage");
+  stageNames.forEach((name, index) => assert.ok((rows[index] ?? "").includes(name), `row ${index + 1} is ${name}`));
+  const output = contacts.rows + companies.rows;
+  const groups = SAMPLE_GROUPS.pairs + SAMPLE_GROUPS.triples;
+  for (const [index, fact] of [
+    [0, `${formatCount(units)} billable source units sealed`],
+    [1, `${formatCount(428)} contacts in duplicate candidate groups`],
+    [2, `${formatCount(groups - SAMPLE_GROUPS.pairsKeptApart)} of ${formatCount(groups)} candidate groups approved to unify`],
+    [2, `${formatCount(contacts.unified)} contact rows unified`],
+    [3, `${formatUsd(priceOf(band, SAMPLE_MODE))} before tax`],
+    [3, "Prepare for HubSpot"],
+    [3, `The price counts the ${formatCount(units)} units sealed, not the ${formatCount(output)} rows delivered`],
+    [4, `${formatCount(units)} source rows less ${formatCount(contacts.unified + companies.unified)} unified with approval: ${formatCount(output)}`],
+    [5, `${SAMPLE.contactsFile}: ${formatCount(contacts.rows)} rows`],
+  ] as const)
+    assert.ok((rows[index] ?? "").includes(fact), `${index + 1}: ${fact}`);
+  // the sheet says it is invented in its own head, and the line under it says so in words (owner, 2026-10-21: the note sits with what it qualifies)
+  assert.match(sheet, /<figcaption[^>]*>[\s\S]*Invented[\s\S]*<\/figcaption>/);
+  const after = html.slice(html.indexOf("</figure>"), html.indexOf("</figure>") + 400);
+  assert.ok(textOf(after).startsWith("Invented figures."));
 });
 
 // ---- Supported services ---------------------------------------------------------------------------------------------------------------
