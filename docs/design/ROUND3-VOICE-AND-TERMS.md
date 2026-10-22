@@ -526,9 +526,12 @@ Rules for every heading:
   - "Open {object}" for a project, case or delivery;
   - "Go to {area}" for a workspace area;
   - "Go to {section or item}" for a jump within the same page ("Go to decision 1", "Go to Alerts"). Added 2026-10-22 from the owner
-    console's Today page.
+    console's Today page;
+  - "Back to {place}" for the return link of a footnote ("Back to the summary"). Added 2026-10-22 from Finance.
 
   The object is the page's exact name.
+- **"Unknown" and "None" in place of a figure** keep their capital, because they stand where a value would ("Costs: Unknown: the
+  bank route is not connected"). Inside a sentence they are lower case ("its due date is unknown").
 - Inconsistent today: "View the synthetic sample" (`public.ts:54`), "See the sample delivery" (`:389`), "Read pricing" (`:509`), "See
   pricing" (`:391`), "See the prices and estimate yours" (`:251`) and "Review supported services" (`:309`). Choose "See the sample
   delivery", "See pricing" and "See supported services".
