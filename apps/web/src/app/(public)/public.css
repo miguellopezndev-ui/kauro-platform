@@ -8834,6 +8834,109 @@ body:has(> .kauro-site-header) {
   }
 }
 
+/* ---- a closing band with an object (How it works, owner's section review 2026-10-21): the words with their actions under them, and the
+   object beside them, on the left of a wide screen and under the words on a narrow one ---- */
+.kauro-site-main .kauro-r2-closing--art .kauro-r2-closing-actions {
+  display: grid;
+  justify-items: start;
+  gap: var(--kauro-space-3);
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-site-main .kauro-r2-closing-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-5);
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-r2-closing--art .kauro-r2-closing-inner {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  }
+  .kauro-site-main .kauro-r2-closing--art .kauro-r2-closing-text {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .kauro-site-main .kauro-r2-closing--art .kauro-handover-rock {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .kauro-site-main .kauro-r2-closing--art .kauro-r2-closing-actions {
+    justify-content: flex-start;
+  }
+}
+/* the handover slip: a sheet of the product on the brand's rock (the identity's rule: texture only under an object), off square like
+   the site's other objects, with the state it hands over stamped on its corner */
+.kauro-site-main .kauro-handover-rock {
+  display: grid;
+  place-items: center;
+  min-block-size: 18rem;
+  padding: clamp(2rem, 4vw, 3rem) clamp(1.5rem, 4vw, 2.5rem);
+  border-radius: var(--kauro-radius-large);
+  background: url("./textures/ember-rock.svg") center / cover, var(--kauro-color-accent);
+}
+.kauro-site-main .kauro-handover {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  inline-size: min(100%, 21rem);
+  padding: 1.5rem 1.5rem 1.75rem;
+  border-radius: 0.5rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  filter: drop-shadow(0 1.5rem 2rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent));
+  transform: rotate(-3deg);
+}
+.kauro-site-main .kauro-handover-brand {
+  font-family: var(--kauro-display-family);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+.kauro-site-main .kauro-handover-title {
+  padding-block-end: 0.875rem;
+  border-block-end: 1px dashed var(--kauro-color-control-border);
+  font-family: var(--kauro-display-family);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.kauro-site-main .kauro-handover ul {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-main .kauro-handover li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+}
+.kauro-site-main .kauro-handover li .kauro-r2-actor {
+  flex: none;
+}
+.kauro-site-main .kauro-handover-stamp {
+  position: absolute;
+  inset-inline-end: -0.75rem;
+  inset-block-end: -1.25rem;
+  padding: 0.375rem 0.625rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.25rem;
+  background: var(--kauro-color-raised);
+  box-shadow: inset 0 0 0 2px var(--kauro-color-raised), inset 0 0 0 3px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transform: rotate(8deg);
+}
+
 /* ---- state tags: the words always, a dot of colour beside them ---- */
 .kauro-site-main .kauro-r2-state {
   display: inline-flex;

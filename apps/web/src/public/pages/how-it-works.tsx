@@ -246,6 +246,36 @@ const PATH: readonly PathStage[] = STAGES.map((stage, index) => ({
   sheet: <StageSheet stage={stage} />,
 }));
 
+/**
+ * The closing band's object: a handover slip on the brand's rock, stamped "Prepared for import". It shows where Kauro's part ends and your
+ * team's begins, in the stages' own actor labels. Decorative: the band's sentence says the same in words, so the slip is hidden from
+ * assistive technology.
+ */
+function Handover(): ReactElement {
+  const lines = [
+    { key: "prepared", label: "how.handover.prepared", actor: "kauro" },
+    { key: "decisions", label: "how.handover.decisions", actor: "team" },
+    { key: "import", label: "how.handover.import", actor: "team" },
+  ] as const satisfies ReadonlyArray<{ readonly key: string; readonly label: PublicCopyId; readonly actor: Actor }>;
+  return (
+    <div className="kauro-handover-rock" aria-hidden="true">
+      <div className="kauro-handover">
+        <span className="kauro-handover-brand">{PUBLIC_COPY["site.name"]}</span>
+        <span className="kauro-handover-title">{PUBLIC_COPY["how.handover.title"]}</span>
+        <ul>
+          {lines.map((line) => (
+            <li key={line.key}>
+              <span>{PUBLIC_COPY[line.label]}</span>
+              <span className={`kauro-r2-actor kauro-r2-actor--${line.actor}`}>{PUBLIC_COPY[ACTOR_LABEL[line.actor]]}</span>
+            </li>
+          ))}
+        </ul>
+        <span className="kauro-handover-stamp">{PUBLIC_COPY["how.handover.stamp"]}</span>
+      </div>
+    </div>
+  );
+}
+
 export function HowItWorksPage(): ReactElement {
   return (
     <>
@@ -269,6 +299,7 @@ export function HowItWorksPage(): ReactElement {
           { href: ROUTE.services, label: PUBLIC_COPY["how.next.services.cta"] },
           { href: ROUTE.sample, label: PUBLIC_COPY["services.sample.cta"] },
         ]}
+        art={<Handover />}
       />
     </>
   );

@@ -85,24 +85,35 @@ export interface TextLink {
  * The end of a decision page: one heading at the section size, one sentence, the site's one call to action as the only filled button, and
  * at most two quiet links. The same band on every page, so the reader learns where the next step is.
  */
-export function Closing({ id, heading, body, primary, links = [] }: { readonly id: string; readonly heading: string; readonly body: string; readonly primary: TextLink; readonly links?: readonly TextLink[] }): ReactElement {
+/**
+ * The closing band: a heading, a sentence and the site's one call to action with up to two text links. Given an object (`art`), the band
+ * sets the object on one side and the words with their actions under them on the other (How it works, owner's section review 2026-10-21);
+ * without one it keeps the words on one side and the actions on the other.
+ */
+export function Closing({ id, heading, body, primary, links = [], art }: { readonly id: string; readonly heading: string; readonly body: string; readonly primary: TextLink; readonly links?: readonly TextLink[]; readonly art?: ReactNode }): ReactElement {
+  const linkList = links.slice(0, 2).map((link) => (
+    <a key={link.href + link.label} className="kauro-site-arrow" href={link.href}>
+      {link.label}
+    </a>
+  ));
+  // beside an object the button keeps its own line and the links share the next one
+  const actions = (
+    <div className="kauro-r2-closing-actions">
+      <a className="kauro-site-button kauro-site-button--primary" href={primary.href}>
+        {primary.label}
+      </a>
+      {art === undefined ? linkList : linkList.length === 0 ? null : <div className="kauro-r2-closing-links">{linkList}</div>}
+    </div>
+  );
   return (
-    <section id={id} className="kauro-r2-closing" aria-labelledby={`${id}-heading`}>
+    <section id={id} className={join("kauro-r2-closing", art !== undefined && "kauro-r2-closing--art")} aria-labelledby={`${id}-heading`}>
       <div className="kauro-site-wrap kauro-r2-closing-inner">
-        <div>
+        <div className="kauro-r2-closing-text">
           <h2 id={`${id}-heading`}>{heading}</h2>
           <p>{body}</p>
+          {art === undefined ? null : actions}
         </div>
-        <div className="kauro-r2-closing-actions">
-          <a className="kauro-site-button kauro-site-button--primary" href={primary.href}>
-            {primary.label}
-          </a>
-          {links.slice(0, 2).map((link) => (
-            <a key={link.href + link.label} className="kauro-site-arrow" href={link.href}>
-              {link.label}
-            </a>
-          ))}
-        </div>
+        {art === undefined ? actions : art}
       </div>
     </section>
   );

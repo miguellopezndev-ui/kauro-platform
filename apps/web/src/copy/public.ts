@@ -300,6 +300,11 @@ export const PUBLIC_COPY = {
   "how.example.unified.meaning": "Each approved group keeps one row, and the others are unified into it with a trace in the manifest: {source} source rows become {output} delivered rows.",
 
   "how.responsibility.heading": "Where your responsibility starts",
+  "how.handover.title": "Handover",
+  "how.handover.prepared": "Files prepared and verified",
+  "how.handover.decisions": "Business decisions",
+  "how.handover.import": "Import into your CRM",
+  "how.handover.stamp": "Prepared for import",
   "how.responsibility.body": "Your team is responsible for confirming that it may process the data, for the decisions that only the business can make, and for the import into the target. Kauro does not write to your CRM at any step.",
   "how.next.services.cta": "Review supported services",
   "how.actor.team.label": "Your team",
