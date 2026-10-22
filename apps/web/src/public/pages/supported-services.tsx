@@ -23,6 +23,18 @@ import type { ServiceMode } from "../pricing-bands.ts";
 import { Block, CHECK_CTA, Closing, GroupedTable, Head, SERVICE_ORDER, StateTag } from "../r2.tsx";
 import { ROUTE } from "../site.ts";
 
+/** What every service covers at launch, and what none of them does, as two lists of short items. */
+const SCOPE_IN: readonly PublicCopyId[] = ["services.scope.in.contacts", "services.scope.in.organisations", "services.scope.in.deals", "services.scope.in.associations"];
+const SCOPE_OUT: readonly PublicCopyId[] = [
+  "services.scope.out.leads",
+  "services.scope.out.custom",
+  "services.scope.out.activities",
+  "services.scope.out.attachments",
+  "services.scope.out.campaigns",
+  "services.scope.out.owners",
+  "services.scope.out.automations",
+];
+
 const CARD_ID: Readonly<Record<ServiceMode, string>> = { CLEAN: "services-clean", HUBSPOT: "services-hubspot", SALESFORCE: "services-salesforce" };
 const NAME: Readonly<Record<ServiceMode, PublicCopyId>> = { CLEAN: "services.clean.name", HUBSPOT: "services.hubspot.name", SALESFORCE: "services.salesforce.name" };
 const DESTINATION: Readonly<Record<ServiceMode, PublicCopyId>> = {
@@ -125,15 +137,23 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
         {someClosed ? <p className="kauro-r2-after">{PUBLIC_COPY["services.unavailable.body"]}</p> : null}
         {publication.kind === "READ" && modes.length === 0 ? <p className="kauro-r2-after">{PUBLIC_COPY["services.none.body"]}</p> : null}
       </Block>
-      <Block id="services-scope" heading={PUBLIC_COPY["services.scope.heading"]}>
+      <Block id="services-scope" heading={PUBLIC_COPY["services.scope.heading"]} lead={PUBLIC_COPY["services.scope.lead"]}>
         <div className="kauro-r2-pair">
           <div className="kauro-r2-pair-item kauro-r2-pair-item--in">
             <h3>{PUBLIC_COPY["services.scope.in.label"]}</h3>
-            <p>{PUBLIC_COPY["services.scope.objects"]}</p>
+            <ul>
+              {SCOPE_IN.map((id) => (
+                <li key={id}>{PUBLIC_COPY[id]}</li>
+              ))}
+            </ul>
           </div>
           <div className="kauro-r2-pair-item kauro-r2-pair-item--out">
             <h3>{PUBLIC_COPY["services.scope.out.label"]}</h3>
-            <p>{PUBLIC_COPY["services.scope.excluded"]}</p>
+            <ul>
+              {SCOPE_OUT.map((id) => (
+                <li key={id}>{PUBLIC_COPY[id]}</li>
+              ))}
+            </ul>
           </div>
         </div>
         <p className="kauro-r2-after">{PUBLIC_COPY["services.scope.unsupported"]}</p>

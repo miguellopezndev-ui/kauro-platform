@@ -368,7 +368,12 @@ test("Supported services: a publication that cannot be read shows no service as 
 test("Supported services: the scope, the exclusions and the limits of a project as one table, with the limits taken from the policy", () => {
   const html = page("services").html(ALL);
   const text = textOf(html);
-  for (const claim of ["contacts, organisations or accounts, and deals or opportunities", "Lead conversion, custom objects, activities, attachments, engagement history, campaign memberships, owner setup and automations are not included", "ask in writing"]) assert.ok(text.includes(claim), claim);
+  assert.ok(text.includes("ask in writing"));
+  // what is in scope: two lists of short items, the same for all three services (owner's section review, 2026-10-21)
+  const scope = /<section id="services-scope"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+  const items = (side: string): string[] => [...(new RegExp(`kauro-r2-pair-item--${side}"[\\s\\S]*?<\\/ul>`).exec(scope)?.[0] ?? "").matchAll(/<li>([^<]*)<\/li>/g)].map((match) => match[1] ?? "");
+  assert.deepEqual(items("in"), ["Contacts", "Organisations or accounts", "Deals or opportunities", "The associations each destination supports"]);
+  assert.deepEqual(items("out"), ["Lead conversion", "Custom objects", "Activities and engagement history", "Attachments", "Campaign memberships", "Owner setup", "Automations"]);
   const table = /<table[\s\S]*?<\/table>/.exec(html)?.[0] ?? "";
   const rows = [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((match) => [...(match[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? "")));
   assert.deepEqual(rows, [

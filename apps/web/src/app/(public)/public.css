@@ -9166,11 +9166,35 @@ body:has(> .kauro-site-header) {
 .kauro-site-main .kauro-r2-pair-item--out h3::before {
   background: var(--kauro-color-text-muted);
 }
+/* included items carry the tick the service cards use; excluded items a quiet dash, never a cross that reads as an error */
 .kauro-site-main .kauro-r2-pair-item ul {
   display: grid;
   gap: var(--kauro-space-2);
   margin: 0;
-  padding-inline-start: 1.1rem;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-main .kauro-r2-pair-item li {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  gap: var(--kauro-space-2);
+  line-height: 1.45;
+}
+.kauro-site-main .kauro-r2-pair-item--in li::before {
+  content: "";
+  inline-size: 0.3125rem;
+  block-size: 0.5625rem;
+  margin: 0.3125rem 0 0 0.25rem;
+  border: solid var(--kauro-color-success-text);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.kauro-site-main .kauro-r2-pair-item--out li::before {
+  content: "\2013" / "";
+  color: var(--kauro-color-text-muted);
+}
+.kauro-site-main .kauro-r2-pair-item--out li {
+  color: var(--kauro-color-text-muted);
 }
 
 /* ---- the limits: one table, values at reading size, aligned on the right ---- */
