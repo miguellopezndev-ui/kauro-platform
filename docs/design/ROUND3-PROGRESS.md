@@ -35,7 +35,7 @@ both from the first line to the last. Then this ledger.
 | Foundations 8: L1 concepts and the vertical slice | **Done.** System chosen: c4 "one ledger with four mastheads" (300 blind judgements; 60 of 60 in its final round; gates pass) | research/round3-slice/AUDITIONS.md; PD-05 |
 | Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
 | Foundations 9: the kit, frozen | In progress: component inventory running; base = c4 system.css; early report sent to the owner | research/round3-kit |
-| Owner console | Pending | — |
+| Owner console | L2 brief written (18 pages, 3 inventory options, 4 nav versions); nav versions being built | research/round3-owner |
 | Agency/company workspace | Pending | — |
 | Seller portal | Pending | — |
 | Public site | Pending | — |
@@ -44,6 +44,12 @@ both from the first line to the last. Then this ledger.
 | Push and merge | Pending (end only) | — |
 
 ## Open items for the owner (non-blocking)
+
+- **Owner console, OQ-2 to OQ-6** (round3-owner/L2-BRIEF.md §6): whether anyone else uses the console; whether you may open unpaid
+  workspaces' projects (stage and dates only); whether you are ever also a seller; whether you decide on a phone; who publishes seller
+  resources. Until answered: owner only; projects not opened (alerts link to the customer); no seller switch; decisions possible on a
+  phone with the authenticator; resources managed outside the console (a recorded gap). OQ-1 ("numbers in the menu") is resolved
+  from A10 lines 69–71 and 128: ordinal numbering, not counts.
 
 - **Downloads for checks** (ROUND3-FEASIBILITY.md §4): WebKit, Playwright Firefox, Java and veraPDF, Lighthouse, two Markdown renderers.
   Until answered, each check uses its written fallback, which counts as the bar.
