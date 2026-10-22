@@ -351,14 +351,18 @@ read:
 
 No acceptance package holds such a row, so no test catches it. **Effect:** a customer whose file has one malformed line gets a
 verified package but no PDF report. **Opens.** platform (`packages/reports` package reading; logic, outside the design run); tests (an
-acceptance case with rejected rows). **Status.** Recorded, not changed: round 3 changes presentation only.
+acceptance case with rejected rows). **Status.** Recorded, not changed: round 3 changes presentation only. **Fixed by Order 14**
+(branch `order14/reports-reader`): the reader counts rejected rows among the rows read and accepts `NONE` for exactly the rows the
+core writes it for; a package the core wrote with such rows is a test fixture.
 
 ## F-32. The report reader needs about 3.4 GB of memory for a 71,380-row package (found in round 3, 2026-10-22)
 
 **Found.** The same run: the reader ran out of memory at Node's default heap (about 2 GB) on the canonical Salesforce project. It
 rendered with `--max-old-space-size=8192`, peaking at about 3.4 GB. **Effect:** large real projects may fail in the worker. **Opens.**
 platform (the reader reads whole files into memory; stream or bound it); data-plane worker limits; tests at scale. **Status.**
-Recorded, not changed.
+Recorded, not changed. **Fixed by Order 14** (branch `order14/reports-reader`): the reader scans each table once; the same
+147.5 MB package reads in 1.3 s within a 35 MB V8 heap (it needed 2.8 GB). The worker's 256 MiB in-memory package cap
+(`DEFAULT_MAX_PACKAGE_BYTES`) is now the limit, not the reader.
 
 ## F-33. Refund decision notifications have no recorded sender or send state (round 3, Oct 22, 2026)
 

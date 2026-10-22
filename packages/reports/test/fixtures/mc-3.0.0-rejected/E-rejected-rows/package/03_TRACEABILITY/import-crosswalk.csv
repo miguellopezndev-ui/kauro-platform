@@ -1,0 +1,16 @@
+import_path,import_row_number,association_key,migration_key,object,survivor_row_locator_id
+01_IMPORT/clean-only/companies.csv,1,6fd886b1b0c6c55ee8c9c1e1,mk_company_0297f1b42cf061ace680,COMPANY,F-8979c7b1f833:S0:R3
+01_IMPORT/clean-only/companies.csv,2,ead9f11af2f123ca985162f7,mk_company_6bd2f1f82b773f47da97,COMPANY,F-8979c7b1f833:S0:R4
+01_IMPORT/clean-only/companies.csv,3,101aaeac9313ab6d78fc2d8b,mk_company_9e4661cabeab7534a22e,COMPANY,F-8979c7b1f833:S0:R2
+01_IMPORT/clean-only/companies.csv,4,9b72a37225731a9129d59430,mk_company_ec6be3d10a3ab4e3823c,COMPANY,F-8979c7b1f833:S0:R5
+01_IMPORT/clean-only/contacts.csv,1,d66e14ad8af341aca1f3895e,mk_contact_0f895d0d3d9339ebe2bd,CONTACT,F-a75de921c085:S0:R3
+01_IMPORT/clean-only/contacts.csv,2,7d18c3c68f9e3034e80b091f,mk_contact_122bf25a215436b056b1,CONTACT,F-a75de921c085:S0:R5
+01_IMPORT/clean-only/contacts.csv,3,58a80c33a1f8c7cf219dedd7,mk_contact_c483ee2664a9ec5fffc7,CONTACT,F-a75de921c085:S0:R2
+01_IMPORT/clean-only/contacts.csv,4,7e9d48dbed39e99965d35634,mk_contact_e56ccdaa67bb4c737736,CONTACT,F-a75de921c085:S0:R6
+01_IMPORT/clean-only/contacts.csv,5,c6571074eeaa0087088b0580,mk_contact_e950dc0d1f66f60e155b,CONTACT,F-a75de921c085:S0:R4
+01_IMPORT/clean-only/deals.csv,1,7e1af6a6955285aea9833584,mk_deal_0478b352c4c92cda10e2,DEAL,F-8e8781cb243c:S0:R4
+01_IMPORT/clean-only/deals.csv,2,ee7b96d43b78e257da5fb492,mk_deal_9fffffdf8892f5f38865,DEAL,F-8e8781cb243c:S0:R3
+01_IMPORT/clean-only/deals.csv,3,f03200b31d00d4abcec79538,mk_deal_f4bca1e4be84b8fc29bb,DEAL,F-8e8781cb243c:S0:R2
+01_IMPORT/clean-only/leads.csv,1,,mk_lead_5b90de3ef1ab0ff7d5f7,LEAD,F-de04b0a4fefc:S0:R4
+01_IMPORT/clean-only/leads.csv,2,,mk_lead_8741e1cd55d74e745093,LEAD,F-de04b0a4fefc:S0:R2
+01_IMPORT/clean-only/leads.csv,3,,mk_lead_b5026d1989197a843289,LEAD,F-de04b0a4fefc:S0:R3

@@ -45,12 +45,27 @@ export class ReportModelError extends Error {
   }
 }
 
+/**
+ * Problems listed in one refusal. A package that has lost its shape can produce one problem per row; a refusal that cannot be
+ * reported without exhausting memory is not a refusal (as the core's `MAX_REPORTED_PROBLEMS`). The rest are counted in a last entry.
+ */
+export const MAX_LISTED_PROBLEMS = 100;
+
 export class Problems {
   readonly list: Problem[] = [];
+  #unlisted: { code: ProblemCode; count: number } | null = null;
   add(code: ProblemCode, subject: string, detail: string): void {
-    this.list.push({ code, subject, detail });
+    if (this.list.length < MAX_LISTED_PROBLEMS) this.list.push({ code, subject, detail });
+    else (this.#unlisted ??= { code, count: 0 }).count++;
+  }
+  /** Takes over every problem `other` found, listed or counted. */
+  absorb(other: Problems): void {
+    for (const p of other.list) this.add(p.code, p.subject, p.detail);
+    if (other.#unlisted !== null) (this.#unlisted ??= { code: other.#unlisted.code, count: 0 }).count += other.#unlisted.count;
   }
   throwIfAny(): void {
-    if (this.list.length > 0) throw new ReportModelError(this.list);
+    if (this.list.length === 0) return;
+    const unlisted = this.#unlisted;
+    throw new ReportModelError(unlisted === null ? this.list : [...this.list, { code: unlisted.code, subject: "(more)", detail: `${unlisted.count} more problems are not listed` }]);
   }
 }
