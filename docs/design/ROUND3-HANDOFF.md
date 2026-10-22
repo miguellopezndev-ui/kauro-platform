@@ -97,11 +97,12 @@ in `ORDER11-ROUND3-MASTER-PLAN.md`, and every record is the page's `AUDITIONS.md
 6. **The nine paused owner pages,** one at a time, from `L3-TASK.md`.
 7. **Then:** the agency workspace, the seller portal, the public site, all four together, the remaining deliverables, and the
    implementation.
-8. **Quota (owner, 2026-10-22):** run the cheaper method.
-   - 2 judges per pair for Tier B;
-   - one outside critic per site;
-   - at most 6 agents at a time;
-   - every agent prompt forbids installing anything.
+8. **Method: master plan version 8**, which replaces version 7. The depth is the same; the organisation is cheaper:
+   - adaptive judging (2 judges, plus a third only when the result is close), which gave the same decisions on 294 past pairs;
+   - the truth audit before judging;
+   - one shared page generator;
+   - the pre-critic checklist;
+   - at most 6 agents unless the owner says the quota is ample.
 
 ## 5. Tools (all in `Kauro.archive\Deliveries\Visual\order11\tools\round3\`)
 

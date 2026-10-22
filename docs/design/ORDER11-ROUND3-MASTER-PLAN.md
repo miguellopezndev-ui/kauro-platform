@@ -39,6 +39,28 @@ Nothing is assumed finished, Home included. Home is the reference until somethin
 - simulated usability, deeper accessibility, internationalisation readiness, performance budgets, cross-browser checks, regression
   snapshots and a handoff (§10.5).
 
+**Version 8** (22 October 2026, after the first night; owner: "the same depth, faster, and this is the plan from now on"). It
+replaces version 7 wherever the two differ. Its changes were tested on the 294 judged pairs of the first night.
+- **The research and design depth stays the same:**
+  - the question bank;
+  - at least 3 real alternatives per decision;
+  - the corrected incumbent always competing;
+  - the gates;
+  - the truth audit;
+  - L4 on Tier A pages;
+  - my review;
+  - an outside critic.
+- **What changes:** how the work is organised.
+  - Judging becomes adaptive (§9.4), which reproduces every 3-judge decision of the first night with 12% fewer calls.
+  - Truth and rule defects are found before judging, never after (§8.4).
+  - Builders share one page generator and the kit's CSS (§8.4).
+  - A fixed pre-critic checklist (§11) removes the critic's routine findings before the critic runs.
+  - Concurrency follows the owner's quota (§8.4).
+- **What was measured, and rejected:**
+  - **A flat 2-judge panel.** It agrees with 3 judges on 270 of 294 pairs and never reverses a winner. But 24 pairs move between
+    "clear" and "not clear", and at least one page decision would have changed (Claims, section B).
+  - **One critic per site for Tier B.** The Customers critic (Tier B) found two High defects that every gate had passed.
+
 This file is the plan I follow without needing the owner between gates. It is written so that a fresh session can resume it from the
 progress ledger (§13).
 
@@ -611,6 +633,29 @@ This is how about 70 screens stay one system.
 - **Depth where it pays.** More questions and alternatives go into the nav, landing pages, key sections and the first viewport. Fewer
   go into rare states and repeated patterns, which reuse a winner already chosen. The bar (§0) is the same for all.
 
+**Version 8 working rules.** These were learnt on the first night. Each one removes repeated work, not depth.
+1. **The truth audit comes before any judging.**
+   - The brief's §0 audits the incumbent against the canon, the contracts and the recorded rules.
+   - Every defect becomes a given for all candidates.
+   - Judges must never be the ones to find a false figure, an invented rule or a missing canon fact. On the first night that cost
+     re-checks on Sellers, Claims and Payouts.
+   - **Never invent:** a deadline, a reason list, a command or a figure. If the canon or the contract does not have it, write
+     "Unknown" or record a gap.
+2. **One shared page generator.**
+   - Every page builder imports one module: the shell, nav V1, the kit CSS, the canon reader, the forbidden-word and sum guards, and
+     the shoot, gate and measure scripts.
+   - It does not copy and re-read a sibling's build.
+   - The module lives in `Kauro.archive\...\order11\tools\round3\page-kit\` and is built once, before the next page.
+3. **Every builder reads the same short pack.** That is the shared task file (`round3-owner\L3-TASK.md` and its equivalents per
+   site), the page's L2 row, and the finals it must agree with. It does not read whole sibling folders.
+4. **Batches are made the moment a page's L3 is built**, from the shared task file, so judging never waits.
+5. **Fix passes are single.** The builder runs the pre-critic checklist (§11) before the critic, so the critic's fix pass is the
+   last pass.
+6. **Concurrency follows the owner's quota.** The default is at most 6 agents at a time; up to 20 when the owner says the quota is
+   ample. Every agent prompt forbids installing anything.
+7. **The kit is frozen before the next site.** Group B is judged and the kit becomes v1, so pages compose decided parts instead of
+   auditioning parts again.
+
 ## 9. How a winner is chosen (as objectively as possible)
 
 ### 9.0 Fidelity rises with the level
@@ -672,6 +717,15 @@ If every finalist fails the gates, the incumbent is kept and fixed up to the bar
 **The bracket.**
 - A Swiss bracket only: about 3 rounds, each alternative meeting another with a similar record.
 - Three fresh-context judges get each pair: anonymous screenshots at 1280 and 375, the brief and the rubric.
+- **Version 8, the adaptive panel.** It gives the same decisions as three judges, with fewer calls.
+  - Judges 1 and 2 judge each pair in both side orders first.
+  - If both pick the same side in both orders, and its mean rubric total leads by 8 points or more, the pair is decided.
+  - Otherwise judge 3 judges the pair in both orders, and the three-judge rule below decides.
+  - Tested on all 294 pairs of the first night: the same decision every time, with 12% fewer judge calls. With a threshold of 7,
+    one pair differed; with 6, five did. So 8 is the rule.
+  - `bracket.mjs make` builds judges 1–2 first; the third judge's batches are made for the pairs left open.
+- **In practice the bracket is a full round robin of the incumbent and 3 alternatives** (6 pairs, 36 calls at most). Every
+  candidate meets every other, which is cheaper than a Swiss bracket at this size and leaves no unmet pair.
 - Each pair is judged twice with the sides swapped. A judge that contradicts itself on a swap is discarded for that pair.
 - **Each judge also scores the rubric on its own** (§9.2) for both alternatives.
 - **Every bracket ends with a final match:** the bracket's winner meets the incumbent under the winning rule below.
@@ -817,6 +871,37 @@ is never counted twice; retainer and offsets are shown with basis, amount and ba
 
 One outside critic per Tier A and Tier B page, and one per site walk for Tier C, is played by a fresh-context agent. Codex is not
 installed and needs a sign-in I may not do. If the owner sets it up, it takes this role.
+
+**Version 8, the pre-critic checklist.** The builder runs it on the final before the critic is called, so the critic finds only
+what a checklist cannot. It is drawn from every critique of the first night:
+1. **Truth.**
+   - Every figure, date, state and quote matches the canon and the sibling finals: the same money words, the same counts as the
+     nav and Today.
+   - Nothing is invented: no rule, deadline, reason list or command the contract lacks.
+   - A command that does not exist is drawn "Needs a command", locked.
+2. **Money states.**
+   - Every state that tells the owner whether money moved is drawn, each with its next step: sent, paid, came back, reversed,
+     refused, could not confirm.
+   - An error never claims "nothing happened" when Kauro cannot know it.
+3. **Editable figures.** An editable amount drives every figure that depends on it, has field errors, and keeps its action locked
+   until it is valid.
+4. **No repetition.** One statement per fact; a second place points to it. Section numbers have no gaps.
+5. **Stamps and wine.** At most one stamp per region. One wine object per screen, with the rock only behind money; the measured
+   shares are recorded with their reason.
+6. **The phone, read at full size.**
+   - No values run into each other.
+   - The first-screen rule of the brief is measured.
+   - Folded panels are drawn open as well.
+   - Filters and no-result states are drawn.
+7. **States.** Every action's form and result line; empty; loading (with no "as of" before load); error; many rows; long and
+   non-Latin names.
+8. **Access beyond the gates.**
+   - Stacked tables keep their column heads for screen readers.
+   - Headings do not swallow their meta line.
+   - Link names are distinct ("Go to …", "Back to …").
+9. **Craft.** Every value on the kit's scales (anatomy auditor); no empty half-columns; text at 75 characters a line at most.
+10. **Links and roles.** Every link in the page's shell stays in its role's site. A seller never reaches an owner page (owner's
+    finding HD-1).
 
 ## 12. Records
 
