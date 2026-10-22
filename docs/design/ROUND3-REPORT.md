@@ -3,6 +3,8 @@
 **Date:** 2026-10-22. **Branch:** `order11/private-review` (PR #118). **Status:** stopped by the owner on 2026-10-22 to keep a quota
 margin for other orders. The owner then asked for the best combination so far to be merged and reported. That is this report.
 
+**Resuming the work: read `ROUND3-HANDOFF.md` first.**
+
 ## 1. What this merge contains, and what it does not
 
 **It contains:**
