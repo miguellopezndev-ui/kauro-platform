@@ -191,7 +191,7 @@ export const PUBLIC_COPY = {
   "how.field.happens": "What happens",
   "how.field.gets": "What you get",
   "how.field.stops": "What stops it",
-  "how.stage.more": "Who acts, what it needs and what happens",
+  "how.details.summary": "Who acts, what it needs and what happens at each stage",
 
   "how.stage.files.heading": "Upload and seal your files",
   "how.stage.files.summary": "Your team uploads its exported files, chooses what is in scope and seals the set. Everything after this is measured, priced and prepared on the sealed set.",

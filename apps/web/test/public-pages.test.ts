@@ -233,7 +233,7 @@ test("Home lists the services the publication lists, and says so plainly when it
 test("How it works is the buyer's guide: the six stages in one timeline, each opening what you get and what stops it in view; rendered without a script every stage is open; nothing plays", () => {
   const html = page("how").html(ALL);
   const text = textOf(html);
-  assert.equal(count(html, "<ol"), 1, "the stages are one ordered list");
+  assert.equal(count(html, '<ol class="kauro-path-list"'), 1, "the stages are one ordered list");
   assert.equal(count(html, 'class="kauro-stage kauro-stage--'), 6);
   const stageNames = ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"];
   assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text).slice(0, 6), stageNames);
@@ -244,13 +244,17 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   assert.equal(count(path, "kauro-path-turn"), 0, "previous and next appear only with the script");
   const sheets = [...html.matchAll(/<article class="kauro-stage-sheet"[\s\S]*?<\/article>/g)];
   assert.equal(sheets.length, 6);
+  // each card holds what you get and what stops it, always in view, and nothing folded
   for (const sheet of sheets) {
-    // what you get and what stops it are always in view; who acts, what it needs and what happens are one control away, on the stage itself
-    const shown = sheet[0].slice(0, sheet[0].indexOf("<details"));
-    assert.deepEqual([...shown.matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["What you get", "What stops it"]);
-    const folded = /<details[\s\S]*?<\/details>/.exec(sheet[0])?.[0] ?? "";
-    assert.deepEqual([...folded.matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["Who acts", "What it needs", "What happens"]);
+    assert.deepEqual([...sheet[0].matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["What you get", "What stops it"]);
+    assert.doesNotMatch(sheet[0], /<details/);
   }
+  // who acts, what it needs and what happens: one folded block for all six stages, in order, above the call to action
+  const details = /<details class="kauro-path-details"[\s\S]*?<\/details>/.exec(html)?.[0] ?? "";
+  const answers = [...details.matchAll(/<li>[\s\S]*?<\/dl><\/li>/g)].map((item) => item[0]);
+  assert.equal(answers.length, 6);
+  for (const answer of answers) assert.deepEqual([...answer.matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["Who acts", "What it needs", "What happens"]);
+  assert.ok(html.indexOf("kauro-path-details") < html.indexOf("kauro-path-cta"), "the detail sits above the call to action");
   assert.doesNotMatch(html, /kauro-flow|kauro-scene/, "the long animation of the process is retired: Home tells it");
   for (const claim of [
     "free and creates no obligation to buy",

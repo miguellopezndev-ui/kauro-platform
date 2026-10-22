@@ -158,8 +158,8 @@ function Lines({ lines }: { readonly lines: readonly Line[] }): ReactElement {
 
 /**
  * The body of one stage, shown when the stage is chosen: the summary, then what you get and what stops it, always in view (a stop is a
- * disclosure a buyer must not have to open). Who acts, what it needs and what happens, the detail a buyer reads once, are folded under one
- * control.
+ * disclosure a buyer must not have to open). Who acts, what it needs and what happens are the same three questions for every stage, so
+ * they are answered once for all six under the stages (StageDetails), not inside each card.
  */
 function StageSheet({ stage }: { readonly stage: Stage }): ReactElement {
   return (
@@ -179,30 +179,51 @@ function StageSheet({ stage }: { readonly stage: Stage }): ReactElement {
           </dd>
         </div>
       </dl>
-      <details className="kauro-r2-stage-more">
-        <summary>{PUBLIC_COPY["how.stage.more"]}</summary>
-        <dl className="kauro-r2-stage-detail">
-          <div>
-            <dt>{PUBLIC_COPY[FIELD_LABEL.who]}</dt>
-            <dd>
-              <p>{PUBLIC_COPY[stage.who]}</p>
-            </dd>
-          </div>
-          <div>
-            <dt>{PUBLIC_COPY[FIELD_LABEL.needs]}</dt>
-            <dd>
-              <Lines lines={stage.needs} />
-            </dd>
-          </div>
-          <div>
-            <dt>{PUBLIC_COPY[FIELD_LABEL.happens]}</dt>
-            <dd>
-              <Lines lines={stage.happens} />
-            </dd>
-          </div>
-        </dl>
-      </details>
     </article>
+  );
+}
+
+/**
+ * Who acts, what it needs and what happens at each stage: the detail a buyer reads once, for all six stages in order, folded under one
+ * control above the call to action. On a wide screen each stage's name sits in the timeline's column and its answers beside it.
+ */
+function StageDetails(): ReactElement {
+  return (
+    <details className="kauro-path-details">
+      <summary>{PUBLIC_COPY["how.details.summary"]}</summary>
+      <ol className="kauro-path-details-list">
+        {STAGES.map((stage, index) => (
+          <li key={stage.key}>
+            <h3 className="kauro-path-details-name">
+              <span className="kauro-path-details-number" aria-hidden="true">
+                {numberOf(index)}
+              </span>
+              {PUBLIC_COPY[stage.heading]}
+            </h3>
+            <dl className="kauro-r2-stage-detail">
+              <div>
+                <dt>{PUBLIC_COPY[FIELD_LABEL.who]}</dt>
+                <dd>
+                  <p>{PUBLIC_COPY[stage.who]}</p>
+                </dd>
+              </div>
+              <div>
+                <dt>{PUBLIC_COPY[FIELD_LABEL.needs]}</dt>
+                <dd>
+                  <Lines lines={stage.needs} />
+                </dd>
+              </div>
+              <div>
+                <dt>{PUBLIC_COPY[FIELD_LABEL.happens]}</dt>
+                <dd>
+                  <Lines lines={stage.happens} />
+                </dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 
@@ -264,6 +285,7 @@ export function HowItWorksPage(): ReactElement {
       <Head kind="path" accent={3} eyebrow={PUBLIC_COPY["nav.how.label"]} title={PUBLIC_COPY["how.title"]} lead={PUBLIC_COPY["how.lead"]} />
       <Block id="how-stages" heading={PUBLIC_COPY["how.stages.heading"]} lead={PUBLIC_COPY["how.stages.lead"]} tone="sunken">
         <StagePath stages={PATH} />
+        <StageDetails />
         <div className="kauro-r2-inline-cta kauro-path-cta">
           <a className="kauro-site-button kauro-site-button--primary" href={ROUTE.contact}>
             {PUBLIC_COPY["public.cta.request-health-check.cta"]}

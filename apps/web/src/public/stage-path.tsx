@@ -3,7 +3,8 @@
 // How it works, the six stages (owner's section review, 2026-10-21): one section instead of an overview followed by six sheets. The stages
 // are a timeline that runs down, the numbers joined by a rule; choosing one opens what happens, what you get and what stops it. On a wide
 // screen the timeline is the index on the left and the chosen stage reads in a panel beside it; on a narrow one the chosen stage opens
-// under its own name (as GOV.UK's step-by-step and Airtable's sections do). One stage is open at a time: the first on a wide screen, none
+// under its own name (as GOV.UK's step-by-step and Airtable's sections do). On a wide screen every card has the height of the tallest, so
+// the panel and its previous and next never move as the stages change. One stage is open at a time: the first on a wide screen, none
 // on a narrow one until it is chosen. The open stage ends with the previous and next stage.
 //
 // It never hides anything it cannot give back: rendered without a script (and in print) every stage is open, in order, as a plain list. The
@@ -102,9 +103,12 @@ export function StagePath({ stages }: { readonly stages: readonly PathStage[] })
                 <span className="kauro-path-sign" aria-hidden="true" />
               </div>
               <div id={`stage-${stage.key}-panel`} className="kauro-path-panel" role="region" aria-labelledby={`stage-${stage.key}-button`} hidden={!isOpen}>
-                <p className="kauro-path-panel-title" aria-hidden="true">
-                  <span className="kauro-path-panel-number">{stage.number}</span> {stage.name}
-                </p>
+                <div className="kauro-path-panel-head" aria-hidden="true">
+                  <p className="kauro-path-panel-title">
+                    <span className="kauro-path-panel-number">{stage.number}</span> {stage.name}
+                  </p>
+                  <span className={`kauro-r2-actor kauro-r2-actor--${stage.actor}`}>{stage.actorLabel}</span>
+                </div>
                 {stage.sheet}
                 {ready ? (
                   <div className="kauro-path-turn">
