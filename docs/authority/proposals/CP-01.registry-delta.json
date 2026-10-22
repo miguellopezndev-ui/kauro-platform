@@ -1,0 +1,574 @@
+{
+  "proposal": "CP-01",
+  "document": "docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md",
+  "preparedBy": "Order 16, 2026-10-22",
+  "base": {
+    "edition": "KAVO-2026.09-R2",
+    "files": {
+      "policy.json": "5ad638f13153723aa81f4cb49c9dd718c599988257f384858f20141fc6f2d23e",
+      "commands.json": "6fa1a124821609a5ac911779304e8876df1a6954c530e895604da107826af0b6",
+      "screens.json": "c9963d7ebe713d88c4f4d2af3ea2b1ad7d44e74c6649fc705f62f49e71a49f80",
+      "contracts.json": "9608c2de39ae0dc5e66c537d241a7257a190c581374aba2c63fd4a1c7d2f29d2"
+    }
+  },
+  "statuses": {
+    "APPROVED_AWAITING_REISSUE": "The substance was decided by the owner or is already stated by the authority. The vendored registry is not edited: the delta enters only through the authority re-issue (README, adoption).",
+    "CONDITIONAL": "The principle is decided; a value, a fact or a professional check named in `pending` is still missing. Not adoptable until `pending` is empty.",
+    "PROPOSED": "A recommendation of Order 16. It needs the owner's decision; nothing here makes it a decision."
+  },
+  "items": [
+    {
+      "id": "CP-01.01",
+      "title": "A free check and a plan for \"Clean your data\" need no target contract",
+      "gaps": [
+        "F-01"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-20",
+        "record": "docs/design/ORDER11-DESIGN-DECISIONS.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "commands.json": [
+          {
+            "op": "test",
+            "path": "/19/id",
+            "value": "CMD020"
+          },
+          {
+            "op": "test",
+            "path": "/19/precondition",
+            "value": "Source is sealed/available, target is eligible, agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "replace",
+            "path": "/19/precondition",
+            "value": "Source is sealed/available; for HUBSPOT and SALESFORCE the target is eligible, while CLEAN takes no target contract and binds the canonical CLEAN target hash; agency audit concurrency fits and a conservative funded grant can be reserved."
+          },
+          {
+            "op": "test",
+            "path": "/19/failure",
+            "value": "No budget or stale target returns a typed blocker without a provider call."
+          },
+          {
+            "op": "replace",
+            "path": "/19/failure",
+            "value": "No budget, a stale target (HUBSPOT, SALESFORCE) or a target supplied for CLEAN returns a typed blocker without a provider call."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.02",
+      "title": "Retention policy R2-RETENTION-2: the one extension also for the free check, to an exceptional 17 days from sealing",
+      "gaps": [
+        "F-19",
+        "F-20"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/retention/policyVersion",
+            "value": "R2-RETENTION-2"
+          },
+          {
+            "op": "add",
+            "path": "/retention/unpaidExtendedCeilingDaysFromSeal",
+            "value": 17
+          }
+        ],
+        "commands.json": [
+          {
+            "op": "test",
+            "path": "/59/id",
+            "value": "CMD060"
+          },
+          {
+            "op": "test",
+            "path": "/59/precondition",
+            "value": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap."
+          },
+          {
+            "op": "replace",
+            "path": "/59/precondition",
+            "value": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap, except that an UNPAID record may be extended up to unpaidExtendedCeilingDaysFromSeal days from its sealing."
+          },
+          {
+            "op": "test",
+            "path": "/59/failure",
+            "value": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority."
+          },
+          {
+            "op": "replace",
+            "path": "/59/failure",
+            "value": "Reject expired/deleted scope, a second extension, any hard-cap change beyond the UNPAID ceiling, or stale version. A quote/retry cannot create this authority."
+          }
+        ],
+        "screens.json": [
+          {
+            "op": "test",
+            "path": "/28/id",
+            "value": "UI29"
+          },
+          {
+            "op": "test",
+            "path": "/28/exceptions",
+            "value": "No extension revives expired data or crosses a hard cap."
+          },
+          {
+            "op": "replace",
+            "path": "/28/exceptions",
+            "value": "No extension revives expired data or crosses a hard cap; the one extension of an unpaid free check may keep its data at most 17 days from sealing."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.03",
+      "title": "The free-check pause threshold becomes a policy value",
+      "gaps": [
+        "X-34",
+        "Q-4"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "authority",
+        "date": "2026-09-25",
+        "record": "docs/COMMERCIAL_AMENDMENT_A3.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/intelligence/freeAuditPauseBps",
+            "value": 9000
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.04",
+      "title": "A closed, versioned list of claim refusal reasons, and the legal status of the claim rules",
+      "gaps": [
+        "F-13",
+        "F-18"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/commission/claimRefusalListVersion",
+            "value": "CLAIM-REFUSAL-1"
+          },
+          {
+            "op": "add",
+            "path": "/commission/claimRefusalReasons",
+            "value": [
+              {
+                "code": "CUSTOMER_OR_DIRECT_CONTACT",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": false
+              },
+              {
+                "code": "OTHER_SELLER_LIVE_CLAIM",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": false
+              },
+              {
+                "code": "OWNER_RULE",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": false
+              },
+              {
+                "code": "INSUFFICIENT_OWN_WORK_EVIDENCE",
+                "sellerMessage": "Not enough evidence of your own work",
+                "noteRequired": false
+              },
+              {
+                "code": "OUTSIDE_SELLER_AGREEMENT",
+                "sellerMessage": "Outside your seller agreement",
+                "noteRequired": false
+              },
+              {
+                "code": "DUPLICATE_OWN_CLAIM",
+                "sellerMessage": "Duplicate of a claim you already made",
+                "noteRequired": false
+              },
+              {
+                "code": "OTHER",
+                "sellerMessage": "Not available to claim",
+                "noteRequired": true
+              }
+            ]
+          },
+          {
+            "op": "add",
+            "path": "/legalStatus",
+            "value": {
+              "commission.claimRules": {
+                "state": "PENDING_COUNSEL",
+                "since": "2026-10-21",
+                "covers": [
+                  "commission.acceptedClaimDays",
+                  "commission.terminationOpportunityTailDays",
+                  "commission.claimRefusalReasons"
+                ],
+                "validation": null
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.05",
+      "title": "Seller money: the period of a collection and of a refund, and the default retainer",
+      "gaps": [
+        "F-12",
+        "F-16"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/commission/collectionPeriod",
+            "value": "MONTH_OF_CAPTURE"
+          },
+          {
+            "op": "add",
+            "path": "/commission/refundPeriod",
+            "value": "MONTH_OF_REFUND"
+          },
+          {
+            "op": "add",
+            "path": "/commission/retainerDefaultCentsPerMonth",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.06",
+      "title": "Alert thresholds and precedence",
+      "gaps": [
+        "F-15"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-OPS.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/alerts",
+            "value": {
+              "inactivityDays": 14,
+              "deadlineLeadDays": 2,
+              "claimEndAlertDays": [
+                14,
+                3
+              ],
+              "pilotReviewLeadDays": 14,
+              "precedence": [
+                "BLOCKED",
+                "DEADLINE_PASSED",
+                "DEADLINE_SOON",
+                "INACTIVE"
+              ],
+              "oneItemOnce": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.07",
+      "title": "What counts as relevant progress for the inactivity alert",
+      "gaps": [
+        "F-15"
+      ],
+      "status": "PROPOSED",
+      "approval": null,
+      "pending": [
+        "owner decision on the definition (CP-01 section 3.7)"
+      ],
+      "dependsOn": [
+        "CP-01.06"
+      ],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/alerts/relevantProgress",
+            "value": {
+              "counts": [
+                "STATE_TRANSITION_OF_THE_PROJECT_OR_ITS_CHILDREN",
+                "COMMAND_COMMITTED_BY_A_PERSON_OR_KAURO_ON_THE_PROJECT"
+              ],
+              "neverCounts": [
+                "READ_OR_DOWNLOAD",
+                "SIGN_IN",
+                "REMINDER_OR_NOTIFICATION_SENT",
+                "SUPPORT_MESSAGE",
+                "RETRY_OF_A_FAILED_ATTEMPT"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.08",
+      "title": "The approved public headings enter the registry (amendments R2-1 and R2-2)",
+      "gaps": [
+        "G-02"
+      ],
+      "status": "APPROVED_AWAITING_REISSUE",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-PUBLIC.md"
+      },
+      "pending": [],
+      "dependsOn": [],
+      "patch": {
+        "screens.json": [
+          {
+            "op": "test",
+            "path": "/6/id",
+            "value": "UI07"
+          },
+          {
+            "op": "test",
+            "path": "/6/primaryCopy",
+            "value": "Describe the task; keep CRM files out of this form."
+          },
+          {
+            "op": "replace",
+            "path": "/6/primaryCopy",
+            "value": "Request a free data health check."
+          },
+          {
+            "op": "test",
+            "path": "/2/id",
+            "value": "UI03"
+          },
+          {
+            "op": "test",
+            "path": "/2/primaryCopy",
+            "value": "Check your files and target before you start."
+          },
+          {
+            "op": "replace",
+            "path": "/2/primaryCopy",
+            "value": "Three services for your exported CRM files."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.09",
+      "title": "UI03's action text after amendment R2-3 (the publication version is no longer printed)",
+      "gaps": [
+        "G-02"
+      ],
+      "status": "PROPOSED",
+      "approval": null,
+      "pending": [
+        "owner confirmation of the wording: R2-3 approved removing the version line, not this sentence"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "screens.json": [
+          {
+            "op": "test",
+            "path": "/2/actions",
+            "value": "Inspect the exact profile; ask a safe scope question."
+          },
+          {
+            "op": "replace",
+            "path": "/2/actions",
+            "value": "Read each service's state and limits from the capability publication; ask a safe scope question."
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.10",
+      "title": "A public page for the Personal Data Processing Policy",
+      "gaps": [
+        "F-08"
+      ],
+      "status": "CONDITIONAL",
+      "approval": {
+        "source": "law",
+        "date": "2026-10-06",
+        "record": "docs/legal/CHECKLIST.md"
+      },
+      "pending": [
+        "owner approval of the screen's primary copy (Order 16 wording)",
+        "publication of the Policy itself: operator facts (CHECKLIST A-08) and competent review (D-31)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "screens.json": [
+          {
+            "op": "add",
+            "path": "/-",
+            "value": {
+              "id": "UI56",
+              "origin": "PUBLIC",
+              "route": "/legal/data-processing-policy",
+              "title": "Personal data processing policy",
+              "primaryCopy": "Read how Kauro handles personal data.",
+              "information": "Actual controller, version/date, databases and purposes, rights and their procedure, responsible area, retention and changes.",
+              "actions": "Read the accessible version history; send a query or claim to the responsible area.",
+              "exceptions": "No invented entity details; the authorization recorded at registration names the exact version shown.",
+              "status": "DESIGN_NOT_RENDERED_PRODUCT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.11",
+      "title": "A pending-payment hold while a sent bank transfer is confirmed",
+      "gaps": [
+        "F-21",
+        "F-22",
+        "F-23"
+      ],
+      "status": "CONDITIONAL",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+      },
+      "pending": [
+        "PV1 qualification of the route and of the evidence it really gives (Payments V1 section 2 (a)-(f))",
+        "owner decision on the values: 5 business days, 24 days from sealing, the review threshold (Order 16 recommends 2 holds ended unpaid in 90 days)",
+        "owner decision on step-up for the proof (Order 16 recommends yes)",
+        "competent review of the terms (LR-02)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/retention/pendingPaymentHold",
+            "value": {
+              "businessDaysFromAcceptedProof": 5,
+              "calendar": "support",
+              "ceilingDaysFromSeal": 24,
+              "perQuote": 1,
+              "perSealedSet": 1,
+              "renewable": false,
+              "addsToExtension": false,
+              "authorizesExecution": false,
+              "endedUnpaidReviewThreshold": {
+                "count": 2,
+                "windowDays": 90
+              }
+            }
+          }
+        ],
+        "contracts.json": [
+          {
+            "op": "test",
+            "path": "/61/name",
+            "value": "RetentionRecord"
+          },
+          {
+            "op": "test",
+            "path": "/61/fields/2/type",
+            "value": "enum:UNPAID,PAID_ORDINARY,PAID_STAGED,IMPORT_RECEIPT,TARGET_METADATA,ORDINARY_LOG,SECURITY_LOG,LEGAL_FINANCIAL"
+          },
+          {
+            "op": "replace",
+            "path": "/61/fields/2/type",
+            "value": "enum:UNPAID,PENDING_PAYMENT_HOLD,PAID_ORDINARY,PAID_STAGED,IMPORT_RECEIPT,TARGET_METADATA,ORDINARY_LOG,SECURITY_LOG,LEGAL_FINANCIAL"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CP-01.12",
+      "title": "Demonstrated identity, blocking conflicts and the size of a bulk decision",
+      "gaps": [
+        "F-25",
+        "F-27"
+      ],
+      "status": "CONDITIONAL",
+      "approval": {
+        "source": "owner",
+        "date": "2026-10-21",
+        "record": "docs/design/ORDER11-ROUND2-WORKSPACE.md"
+      },
+      "pending": [
+        "owner decision on the definition and on accents (Order 16 recommends: accents are not folded)",
+        "owner decision on the cap (Order 16 recommends the existing api.batchItems, 100 groups)"
+      ],
+      "dependsOn": [],
+      "patch": {
+        "policy.json": [
+          {
+            "op": "add",
+            "path": "/identityResolution",
+            "value": {
+              "demonstrated": {
+                "allOf": [
+                  "SAME_NORMALIZED_EMAIL",
+                  "SAME_NORMALIZED_FULL_NAME"
+                ],
+                "emailNormalization": "TRIM_LOWERCASE_NFC_NO_PLUS_STRIPPING",
+                "nameNormalization": "TRIM_COLLAPSE_SPACES_CASEFOLD_NFC_ACCENTS_KEPT"
+              },
+              "blockingConflicts": [
+                "DISTINCT_EXISTING_CRM_RECORD_IDS",
+                "SHARED_OR_ROLE_ADDRESS",
+                "CONSENT_CONFLICT",
+                "CHAIN_OF_THREE_OR_MORE_WITH_A_NON_DEMONSTRATED_LINK"
+              ],
+              "decideManyMaximumGroups": 100
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

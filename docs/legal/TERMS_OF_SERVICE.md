@@ -42,8 +42,8 @@ binds only if it appears in a written amendment to the Order accepted by both pa
 - **Files:** the CRM exports and spreadsheets the Customer uploads.
 - **Source Revision:** the sealed set of admitted Files and sheets, with their hashes and read configuration. Any later change
   creates a new Revision.
-- **Plan:** the bounded transformation plan the Customer reviews and approves, tied to a Revision, a Target Contract and specific
-  decisions.
+- **Plan:** the bounded transformation plan the Customer reviews and approves, tied to a Revision, to a Target Contract where the
+  mode has one, and to specific decisions.
 - **Target Contract:** the current approved description of the target CRM instance (when the mode requires it).
 - **Supported Profile:** the import profile accepted for a target (HubSpot importer or Salesforce Data Loader).
 - **Package:** the published deliverable (files, report, machine-readable manifest and import instructions).
@@ -53,7 +53,7 @@ binds only if it appears in a written amendment to the Order accepted by both pa
 - **Billable Units:** the occurrences of admitted objects under the sealed projection, before approved deduplication, as
   provided in section 7.
 - **Free data health check:** the free, pre-purchase review of the state of the uploaded data (section 3.3).
-<!-- auth: 19 §Service terms: required operative content ("define files, source revision, plan, package, target contract, supported profile, service completion and authorized users"); 02 §4 Upload, inspect and seal; 02 §6 Resolve and approve the plan; 16 §Billable unit and fairness; A3 §3.2 -->
+<!-- auth: 19 §Service terms: required operative content ("define files, source revision, plan, package, target contract, supported profile, service completion and authorized users"); 02 §4 Upload, inspect and seal; 02 §6 Resolve and approve the plan; 16 §Billable unit and fairness; A3 §3.2; Plan definition wording changed 2026-10-22 by Order 16 for "Clean your data" (no destination), pending competent review, D-31; CHECKLIST §11 -->
 
 ## 3. Purpose and scope of the service
 
@@ -63,7 +63,8 @@ and, where the mode includes it, an import procedure for the target. The service
 files, not the live CRM.
 <!-- auth: 01 §Purpose and customer promise (second paragraph); A3 §3.3 ("we clean exported files, not your live CRM") -->
 
-3.2. **Modes.** Each project has a single purchased mode and a single target instance for its paid revision:
+3.2. **Modes.** Each project has a single purchased mode and, where the mode prepares files for a target CRM, a single target instance
+for its paid revision:
 - **CLEAN:** clean tables, disposition of each source unit, an inventory of issues, an explanation of the approved
   transformations and machine verification. It does not claim that a generic file meets the schema of an unknown CRM.
 - **HUBSPOT:** files for the supported objects, associations, importer configuration, ordered steps and target-bound evidence,
@@ -74,15 +75,15 @@ files, not the live CRM.
 Only the modes and capabilities the Platform shows as available at the time of the Quote may be quoted. Kauro qualifies imports
 only for HubSpot and Salesforce. Changing from CLEAN to HUBSPOT, or changing Salesforce organization, requires a new Quote and
 a new approval.
-<!-- auth: 02 §Service modes; 02 §Capability publication contract; A3 §3.3 -->
+<!-- auth: 02 §Service modes; 02 §Capability publication contract; A3 §3.3; owner decision 2026-10-20 ("Clean your data" has no destination; docs/design/ORDER11-DESIGN-DECISIONS.md §4.7; wording changed 2026-10-22 by Order 16, pending competent review, D-31; CHECKLIST §11) -->
 
 3.3. **Free data health check.** Before buying, the Customer may request a Free data health check on the Files it uploads within
 the published limits. It is free and creates no obligation to buy. It is bounded and abuse-protected: one active review per
-Customer at a time, a processing-spend cap per review and a pause on new free reviews when the available budget is exhausted. It
-is not always available immediately and its duration depends on observed capacity; Kauro promises no fixed time. If the
-processing budget is exhausted, the Platform delivers the deterministic profile and a specific pending status, without
-inventing a complete interpretation.
-<!-- auth: A3 §3.2 (public name, cap USD 1.50 freeAuditCeilingCents 150, agencyAudits 1, pause at 90%); A3 §3.5 ("the check is free and creates no obligation to buy"); A3 §3.6 (no fixed time); 02 §5 Receive the audit -->
+Customer at a time, a processing-spend cap per review and a pause on new free reviews once ninety percent (90%) of the funded
+processing budget is used. It is not always available immediately and its duration depends on observed capacity; Kauro promises
+no fixed time. If the processing budget is exhausted, the Platform delivers the deterministic profile and a specific pending
+status, without inventing a complete interpretation.
+<!-- auth: A3 §3.2 (public name, cap USD 1.50 freeAuditCeilingCents 150, agencyAudits 1, pause at 90%; pause wording aligned with A3 on 2026-10-22 by Order 16, pending competent review, D-31; CHECKLIST §11); A3 §3.5 ("the check is free and creates no obligation to buy"); A3 §3.6 (no fixed time); 02 §5 Receive the audit -->
 
 3.4. **Covered objects.** The initial object scope is contacts, organizations/accounts and deals/opportunities, with the
 associations supported per target. Unless a qualified capability is published, the following are not included: lead conversion,
@@ -174,10 +175,10 @@ and may suspend abuse under section 19.
 ## 6. Quote, Order and electronic acceptance
 
 6.1. **Quote.** The server calculates the Quote from the admitted Billable Units, the mode, the recurrence tier and the valid
-discount. The Quote records the price version, quantity evidence, discount applied, tax treatment, issuer, source, plan and
-target fingerprints, price expiry and the date until which the data will be available. An issued Quote does not change; a
-material correction creates a substitute Quote with a visible comparison.
-<!-- auth: 16 §Quote calculation; 02 §7 Quote and purchase -->
+discount. The Quote records the price version, quantity evidence, discount applied, tax treatment, issuer, source and plan
+fingerprints and, where the mode has a target, the target fingerprint, price expiry and the date until which the data will be
+available. An issued Quote does not change; a material correction creates a substitute Quote with a visible comparison.
+<!-- auth: 16 §Quote calculation; 02 §7 Quote and purchase; target fingerprint wording changed 2026-10-22 by Order 16 for "Clean your data" (no destination), pending competent review, D-31; CHECKLIST §11 -->
 
 6.2. **Validity.** The price of a Quote expires after fourteen (14) days. Data availability is shown separately and may end
 earlier. A Quote cannot be paid or executed on data that has already been deleted; in that case the Customer re-uploads the
