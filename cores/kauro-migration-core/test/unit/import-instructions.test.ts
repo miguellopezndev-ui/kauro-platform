@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { readTable, readTextArtifact, repoRoot, runFixture } from '../support/harness.js';
@@ -51,8 +52,10 @@ describe('[N1-1] Salesforce instructions describe the steps Data Loader offers',
     assert.ok(!line.includes('Each row pairs'), line);
     assert.ok(line.includes('not supported by SALESFORCE'), line);
     assert.ok(line.includes('OpportunityContactRole'), line);
-    const leftovers = readTable(packageDir, 'leftovers.csv').rows.length;
-    assert.ok(line.includes(`${String(leftovers)} relationships of this type`), `${line} (leftovers.csv holds ${String(leftovers)})`);
+    // Stated from the input: the fixture's contact-deals.csv lists every contact-to-deal pair, one per data row.
+    const pairs = readFileSync(join(ACCEPTANCE, 'D-salesforce', 'input', 'contact-deals.csv'), 'utf8').trim().split('\n').length - 1;
+    assert.equal(pairs, 4);
+    assert.ok(line.includes(`${String(pairs)} relationships of this type`), `${line} (the input holds ${String(pairs)} pairs)`);
     assert.ok(line.includes('02_EXCEPTIONS/leftovers.csv'), line);
   });
 
@@ -61,6 +64,11 @@ describe('[N1-1] Salesforce instructions describe the steps Data Loader offers',
     assert.ok(toCompany.includes('Each row pairs'), toCompany);
     const pairs = readTable(packageDir, '01_IMPORT/salesforce/associations/contact_to_company.csv').rows.length;
     assert.ok(toCompany.includes(`${String(pairs)} relationships`), `${toCompany} (the file holds ${String(pairs)})`);
+  });
+
+  it('refuses to link a child paired with more than one Account, and offers no generated linked file', () => {
+    assert.ok(text.includes('a child paired with more than one Account has no single `AccountId`'));
+    assert.ok(text.includes('this package does not generate the linked child file'));
   });
 
   it('says the object files alone create no relationship, and how the Account Id is proved', () => {
@@ -85,6 +93,24 @@ describe('[N1-1] HubSpot instructions describe the steps the importer offers', (
     assert.ok(!text.includes('select it under "Common column headers found in your files"'));
     assert.ok(text.includes('is not a unique identifier'));
     assert.ok(text.includes('do not select it as a common column'));
+  });
+
+  it('associates in the creating import and never by importing an object file again', () => {
+    assert.ok(text.includes('Associations are made in the same multiple-object import that creates the records'));
+    assert.ok(text.includes('do not import an object file a second time to add them'));
+    assert.ok(text.includes('such as every deal, is created again'));
+  });
+
+  it('offers the common column only where one row can carry it, and says which pairs it cannot express', () => {
+    // The fixture pairs one deal with two contacts (input/contact-deals.csv): one deal row holds one Email, so
+    // copying a contact identifier into the deal row would either duplicate the deal or drop an association.
+    const dealPairs = readFileSync(join(ACCEPTANCE, 'D-hubspot', 'input', 'contact-deals.csv'), 'utf8').trim().split('\n').slice(1);
+    const deals = dealPairs.map((row) => row.split(',')[1]);
+    assert.ok(new Set(deals).size < deals.length, 'the fixture holds a deal with more than one contact');
+    assert.ok(text.includes('It needs the contact to be paired with exactly one company'));
+    assert.ok(text.includes('a deal with more than one contact or company'));
+    assert.ok(text.includes('cannot be associated through these files'));
+    assert.ok(!text.includes("copy the identifier of one of them into the other one's row"), 'the 3.1.0 draft offered a step that duplicates deals');
   });
 
   it('names the identifiers HubSpot accepts as a common column and the error file to check', () => {

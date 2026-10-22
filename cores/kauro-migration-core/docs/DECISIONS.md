@@ -1614,3 +1614,16 @@ declared relationship, so they are a new core version, 3.1.0. It is prepared and
 tested, not released: no tag, no release, no vendored tarball. 3.0.0 stays the
 immutable reference — `vendor/kauro-migration-core-3.0.0.tgz` in the platform,
 tag `v3.0.0` in `cores/archive/kauro-migration-core.bundle`.
+
+Amended after the independent review (N1-1): the HubSpot step first drafted for
+3.1.0 told the operator to copy one record's identifier into the other's row for
+any pair. A deal has no unique identifier before it exists and one row holds one
+value per column, so for a deal with two contacts that would either create the
+deal twice or drop an association no error file reports. The instructions now
+offer only the step run against a portal (a contact and its one company, through
+the company's domain), say the association is made in the creating import and
+never by importing an object file again, and name the pairs these files cannot
+express. The Salesforce step refuses a child paired with more than one Account,
+and says it is manual: no linked file and no Id is generated. The adapters'
+`operatorInstructions` and the source registry's HubSpot common-column decision,
+which still carried the 3.0.0 wording, say the same.

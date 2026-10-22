@@ -230,12 +230,18 @@ function associationStrategy(adapter: DestinationAdapter): string {
         ' contacts, Company domain name for companies, or a custom property that requires unique values. The' +
         ` \`${adapter.associationKeyHeader}\` column is not a unique identifier and is never mapped to a property;` +
         ' both object files carry a column under that header with different values, so do not select it as a' +
-        ' common column. To associate the two records of a pair, copy the identifier of one of them into the' +
-        " other one's row, under the header its own file uses (for a contact and its company, the company's" +
-        ' `Company domain name` in the contacts file), and choose that column as the common column and as the' +
-        ' unique key of that object. A pair whose records carry no such identifier cannot be associated this way.' +
-        " Afterwards download the import's errors: an association HubSpot did not make is listed there with an" +
-        ' error type such as' +
+        ' common column. Associations are made in the same multiple-object import that creates the records:' +
+        ' do not import an object file a second time to add them, because a record that carries no unique' +
+        ' identifier HubSpot matches on, such as every deal, is created again. The step run against a real' +
+        ' portal is a contact and its company:' +
+        " add the company's `Company domain name` to the contact's row in the contacts file, under that header," +
+        ' and import the two files together, choosing that column as the common column and as the unique key of' +
+        ' companies. It needs the contact to be paired with exactly one company, and that company to carry a' +
+        ' domain. A deal has no unique identifier before it exists, and one row holds one value per column, so a' +
+        ' contact with more than one company, a deal with more than one contact or company, and a pair whose' +
+        ' records carry no unique identifier cannot be associated through these files: they stay listed in their' +
+        ' association file, for a person to add in HubSpot after the import. Afterwards download the import' +
+        "'s errors: an association HubSpot did not make is listed there with an error type such as" +
         ' ASSOCIATION_RECORD_NOT_FOUND, and the records are created without it.'
       );
     case 'SALESFORCE':
@@ -250,7 +256,9 @@ function associationStrategy(adapter: DestinationAdapter): string {
         ` whose \`${adapter.associationKeyHeader}\` is the Account side of the pair. Put it in an \`AccountId\`` +
         ' column of the child file, map that column to `AccountId`, and load the child. A child whose Account is' +
         ' in the error file, is missing from the success file, or appears there more than once has no proven Id' +
-        ' and must not be linked. Kauro does not fabricate a record id it has not been given.'
+        ' and must not be linked, and a child paired with more than one Account has no single `AccountId` and' +
+        ' must not be linked by this step either. This is a manual step: this package does not generate the' +
+        ' linked child file, and Kauro does not fabricate a record id it has not been given.'
       );
     default:
       return (

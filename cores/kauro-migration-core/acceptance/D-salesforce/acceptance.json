@@ -169,10 +169,10 @@
       "sha256": "f14c238ee3affa7fee386cf418b23eb96517e52c638a8d9a32e7fc3d5d17b66e"
     },
     {
-      "byteLength": 5005,
+      "byteLength": 5202,
       "path": "04_DOCUMENTATION/import-instructions.md",
       "rowCount": null,
-      "sha256": "f1312c53f82bf853d723a60cecb3658be210a998a391f2d5becd62f525a94509"
+      "sha256": "ed7bfd7d1106a4ae82cc3b907babfbc283933a806b024895ffa35094a5bd9509"
     }
   ],
   "associations": {
@@ -210,7 +210,7 @@
     "provenMerges": 0
   },
   "intent": "The same source bundle rendered for Salesforce, which carries a Lead object HubSpot does not, and supports fewer relationships: a contact on an opportunity is an OpportunityContactRole, which is outside this envelope.",
-  "manifestSha256": "a0b70cc45db919b18e67e7c9df3a7e77e8ab70935b2379d08384f36ad69f9326",
+  "manifestSha256": "c88a1306f8cbb5a5f344f3608e1a7f3769a53caa40d4cfa4c414f739e77f7a75",
   "records": {
     "byObject": {
       "COMPANY": 4,

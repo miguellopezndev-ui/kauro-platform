@@ -16,7 +16,7 @@ the adapter definitions. Registry version: **2026-10-22**.
 
 What was revised on **2026-10-22** (N1-1, D78): one source was added and two
 facts were read again, for the steps `import-instructions.md` now describes for
-relationships; no existing fact changed. The source is the Data Loader v67.0.0
+relationships. One `KAURO_DECISION` was corrected, the HubSpot common column below. The source is the Data Loader v67.0.0
 code that writes the success and error files, because the Salesforce
 documentation pages still answer 403. That is a reading of the vendor's source,
 not a run: the qualification campaign never loaded a file carrying an unmapped
@@ -200,11 +200,16 @@ Reviewed 2026-09-04. All pages below resolved.
   itself does not. Association identifier values must contain no line breaks and
   be at most 100 characters.
 - `KAURO_DECISION`. The adapter uses the two-file form, and labels are outside the
-  support envelope, so that subscription gate is not relied on. The common column
-  is `Association Key` on the object files, and `Association Key` and
-  `Associated Association Key` on the association file. HubSpot does not name
-  those columns; Kauro does, and the operator selects the object-file one in the
-  "Common column headers found in your files" menu.
+  support envelope, so that subscription gate is not relied on. The object files
+  carry `Association Key`, and the association file `Association Key` and
+  `Associated Association Key`, so that the pairs can be read; HubSpot does not
+  name those columns, and they are not a common column it accepts, because a
+  common column must be a unique identifier (below). The operator never selects
+  or maps them. The common column is the parent's own identifier — for a contact
+  and its one company, the company's `Company domain name` added to the contact's
+  row (qualification case I7). Corrected 2026-10-22 (N1-1, D78): until then this
+  bullet said the operator selects `Association Key` in the "Common column headers
+  found in your files" menu.
 - `DOCUMENTED`. The documentation names contact-to-company, contact-to-deal,
   deal-to-company and call-to-contact as association pairs, and does not
   enumerate the rest.

@@ -807,10 +807,10 @@
           "sha256": "41cf9c5f675de4600938bce01695dc4f446e594aafbdb61b1433d4132442b4f4"
         },
         {
-          "byteLength": 4457,
+          "byteLength": 5059,
           "path": "04_DOCUMENTATION/import-instructions.md",
           "rowCount": null,
-          "sha256": "e442d11feb463a49febc21b388f63e2125ef202293b454ddefa43669a98fd917"
+          "sha256": "d9e552167c94630e01b1f46ee12e6afc7249475ea90bae5788e3b04b17ad7ba6"
         }
       ],
       "associations": {
@@ -848,7 +848,7 @@
         "provenMerges": 0
       },
       "intent": "One shared source bundle rendered for HubSpot.",
-      "manifestSha256": "fd3797489731cea851a62e9c8467fd2a7447c7fcf11fe2b5e0d742e71ad594ef",
+      "manifestSha256": "b3db3ade09ebcfe20ecf228ac94901a458d4e7af5c3f8c08d0d52d1c14bf8457",
       "records": {
         "byObject": {
           "COMPANY": 4,
@@ -1053,10 +1053,10 @@
           "sha256": "f14c238ee3affa7fee386cf418b23eb96517e52c638a8d9a32e7fc3d5d17b66e"
         },
         {
-          "byteLength": 5005,
+          "byteLength": 5202,
           "path": "04_DOCUMENTATION/import-instructions.md",
           "rowCount": null,
-          "sha256": "f1312c53f82bf853d723a60cecb3658be210a998a391f2d5becd62f525a94509"
+          "sha256": "ed7bfd7d1106a4ae82cc3b907babfbc283933a806b024895ffa35094a5bd9509"
         }
       ],
       "associations": {
@@ -1094,7 +1094,7 @@
         "provenMerges": 0
       },
       "intent": "The same source bundle rendered for Salesforce, which carries a Lead object HubSpot does not, and supports fewer relationships: a contact on an opportunity is an OpportunityContactRole, which is outside this envelope.",
-      "manifestSha256": "a0b70cc45db919b18e67e7c9df3a7e77e8ab70935b2379d08384f36ad69f9326",
+      "manifestSha256": "c88a1306f8cbb5a5f344f3608e1a7f3769a53caa40d4cfa4c414f739e77f7a75",
       "records": {
         "byObject": {
           "COMPANY": 4,

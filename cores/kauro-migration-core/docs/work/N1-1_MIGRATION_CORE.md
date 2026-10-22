@@ -52,6 +52,10 @@ either row order, a consent disagreement under `PREFER_SURVIVOR`, cluster ids th
 | F-29 staged reconciliation | A pure function over a verified package and a Data Loader success and error file: one success row per association key proves an Id, everything else is blocked with a reason; the dependent file carries `AccountId` from proved Ids only; fingerprints of every input | The import-stage read and commands (C3), the result-file retention key (C1), size and resubmission caps (C10) |
 | F-30 HubSpot error file | A reader of the import's error file that lists each association not made by type (`ASSOCIATION_RECORD_NOT_FOUND`, …) against the package's pairs | The same import-stage contract |
 
+**Automatic generation of Salesforce AccountIds is pending and must not be offered.** 3.1.0 tells the operator how an Account Id is
+proved from Data Loader's success file and leaves the linking to a person; it generates no linked file and no Id. Offering that as a
+product capability waits for F-29 (above) and its qualification.
+
 **Outside the sold envelope, not introduced**: OpportunityContactRole (contact-to-opportunity on Salesforce stays `LEFTOVER`, its own
 qualification gate `SF-OCR-01`, scope decision first); activities (D54); Salesforce person accounts and lead conversion; fuzzy or
 normalised matching as proof (plus-addressing, look-alikes, accents stay supporting evidence at most); any field Kauro asks a CRM to
@@ -106,5 +110,7 @@ Each stays outside 3.1.0 and is written here so the contract work can start from
 | F-25, F-28, F-29, F-30 contracts | registry and api contract (C3), policy (C1) | owner decisions listed in section 2 |
 | The core halves of section 4 | Migration Core, one more coordinated opening | the contracts above |
 | Accept 3.1.0 | Intelligence Core (`SUPPORTED_MIGRATION_CORE`, peer dependency, vendored tarball), then the platform pins | the N1 closing integration |
-| Release 3.1.0 | Migration Core: tarball, `vendor/MANIFEST.json`, `SHA256SUMS`, lock | Intelligence Core accepting it |
+| Qualify 3.1.0: the capacity campaign (`npm run architecture`, whose founding profiles carry leads, now grouped by the person signals as well) and mutation testing (`npm run sabotage`). Neither ran in Order 13; the independent review judged neither needed to merge an unreleased 3.1.0 and both needed before its release | Migration Core | nothing |
+| Release 3.1.0 | Migration Core: tarball, `vendor/MANIFEST.json`, `SHA256SUMS`, lock | Intelligence Core accepting it; the qualification above |
+| Minor points of the independent review, left open: the Salesforce strategy id `RELATIONSHIP_HEADER_BY_DECLARED_MATCH_FIELD` names the route the package does not generate; `ASSOCIATION_RECORD_NOT_FOUND` is HubSpot's API error type and the registry cites only the UI label; CONTRACT §1 counts the rows of an excluded duplicate file (`EXCLUDE_ONE`) as rejected though they are well formed; D78 understates that every package's association keys move with the core version (§5 states it) | Migration Core | the next coordinated opening |
 | Integration tests | platform: a CLEAN run through the worker on 3.1.0; the report on a package with rejected rows; Salesforce and HubSpot packages through the reader | all of the above |

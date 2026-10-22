@@ -197,11 +197,11 @@
       "sha256": "f14c238ee3affa7fee386cf418b23eb96517e52c638a8d9a32e7fc3d5d17b66e"
     },
     {
-      "byteLength": 5005,
+      "byteLength": 5202,
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/import-instructions.md",
       "rowCount": null,
-      "sha256": "f1312c53f82bf853d723a60cecb3658be210a998a391f2d5becd62f525a94509"
+      "sha256": "ed7bfd7d1106a4ae82cc3b907babfbc283933a806b024895ffa35094a5bd9509"
     }
   ],
   "bundleId": "B-5aa7638ee54fbb15",
