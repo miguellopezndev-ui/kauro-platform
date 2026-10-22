@@ -28,12 +28,12 @@ both from the first line to the last. Then this ledger.
 | Foundations 1: decisions register | Done: ~255 entries, 45 conflicts in its §7 (to resolve where they arise) | ROUND3-DECISIONS-REGISTER.md |
 | Foundations 2: Day-0 feasibility and dry runs | In progress (agent) | ROUND3-FEASIBILITY.md |
 | Foundations 3: canonical fixtures | Pending | — |
-| Foundations 4: voice and terms | In progress (agent) | ROUND3-VOICE-AND-TERMS.md |
-| Foundations 5: tooling | colour-share, anatomy, capture-all built | Kauro.archive/…/tools/round3 |
+| Foundations 4: voice and terms | Done: 8 principles, glossary, formats, message patterns, 38 inconsistencies (I-01 to I-38), 5 owner questions | ROUND3-VOICE-AND-TERMS.md |
+| Foundations 5: tooling | colour-share, anatomy, capture-all, capture-urls, degrade (blind), score-calibration built | Kauro.archive/…/tools/round3 |
 | Foundations 6: "before" captures | Done: 71 screens × 1280 and 375, 0 failures | Kauro.archive/…/research/round3-before |
 | Foundations 7: Home DNA | Drafted (colour, type, space, vocabulary, audit) | HOME-DNA.md |
 | Foundations 8: L1 concepts and the vertical slice | Research running (owner consoles; multi-role systems and density) | research/round3-owner-research, round3-system-research |
-| Judges' calibration | Pilot (not blind) discarded; blind set of 40 pairs being judged | Kauro.archive/…/round3-foundations/calibration |
+| Judges' calibration | **Passed, prompt version 1 frozen:** 95% of 80 judgements (bar 85%); 2 guards added (wine preference, line length) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
 | Foundations 9: the kit, frozen | Pending | ROUND3-KIT.md |
 | Owner console | Pending | — |
 | Agency/company workspace | Pending | — |
@@ -44,6 +44,10 @@ both from the first line to the last. Then this ledger.
 | Push and merge | Pending (end only) | — |
 
 ## Open items for the owner (non-blocking)
+
+- **Voice and terms, Q-1 to Q-5** (ROUND3-VOICE-AND-TERMS.md §7): the time zone of the owner console and seller portal, the final
+  state of a Clean your data project ("Delivered" proposed), the report's title per service, Home's six step names, and whether the
+  registry primaries that conflict with the glossary are amended together. Until answered, screens use the proposals and mark them.
 
 - **Codex** is not installed and needs a sign-in. A fresh-context agent plays the outside critic unless the owner sets Codex up.
 - **The engine's documents** (audit summary, importer guides, exception and trace files, manifest, README) are delivered as finished
