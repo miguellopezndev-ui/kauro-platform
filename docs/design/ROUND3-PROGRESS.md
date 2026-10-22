@@ -34,12 +34,12 @@ both from the first line to the last. Then this ledger.
 | Foundations 7: Home DNA | Drafted (colour, type, space, vocabulary, audit) | HOME-DNA.md |
 | Foundations 8: L1 concepts and the vertical slice | **Done.** System chosen: c4 "one ledger with four mastheads" (300 blind judgements; 60 of 60 in its final round; gates pass) | research/round3-slice/AUDITIONS.md; PD-05 |
 | Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
-| Foundations 9: the kit, frozen | Pending | ROUND3-KIT.md |
+| Foundations 9: the kit, frozen | In progress: component inventory running; base = c4 system.css; early report sent to the owner | research/round3-kit |
 | Owner console | Pending | — |
 | Agency/company workspace | Pending | — |
 | Seller portal | Pending | — |
 | Public site | Pending | — |
-| Deliverables track | Started: documents research running | research/round3-docs-research, round3-docs-baseline |
+| Deliverables track | Research done (195 references); 24 briefs and the index written; Migration Core run on the canonical world (3 projects verified; public sample exact); report-reader defects recorded (F-31, F-32); canon being aligned with the engine | research/round3-docs-*, round3-docs-INDEX.md, round3-docs-canon/CANON-PACKAGES.md |
 | All four together | Pending | — |
 | Push and merge | Pending (end only) | — |
 
