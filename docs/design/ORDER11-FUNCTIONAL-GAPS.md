@@ -339,3 +339,23 @@ importer links records across files by a shared unique value (email for contacts
 file; it still checks the error file of the linking stage and lists each link not made with its action. **Opens.** cores and api/backend
 (read HubSpot's error file for association errors); tests. **To verify:** whether a HubSpot export includes the associated company's record
 ID (it would let Kauro prove links, not only failures). **Status.** Drawn: UI27 "hs-links" and a permanent note on HubSpot import pages.
+
+## F-31. The report reader refuses a package that holds an unreadable row (defect found in round 3, 2026-10-22)
+
+**Found.** Migration Core 3.0.0 was run on the canonical world in a scratch copy (`Kauro.archive/…/research/round3-docs-canon/
+CANON-PACKAGES.md`). Every package verified. The platform's report reader still refused the two that held a row the core could not
+read:
+- `packages/reports/src/package.ts:376` compares the manifest's `dataRowCount`, which leaves rejected rows out, with a total that
+  counts them;
+- `:411` does not accept the `contribution_kind` `NONE` that the core writes for such rows.
+
+No acceptance package holds such a row, so no test catches it. **Effect:** a customer whose file has one malformed line gets a
+verified package but no PDF report. **Opens.** platform (`packages/reports` package reading; logic, outside the design run); tests (an
+acceptance case with rejected rows). **Status.** Recorded, not changed: round 3 changes presentation only.
+
+## F-32. The report reader needs about 3.4 GB of memory for a 71,380-row package (found in round 3, 2026-10-22)
+
+**Found.** The same run: the reader ran out of memory at Node's default heap (about 2 GB) on the canonical Salesforce project. It
+rendered with `--max-old-space-size=8192`, peaking at about 3.4 GB. **Effect:** large real projects may fail in the worker. **Opens.**
+platform (the reader reads whole files into memory; stream or bound it); data-plane worker limits; tests at scale. **Status.**
+Recorded, not changed.
