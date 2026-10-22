@@ -81,7 +81,7 @@ ORDER11-ROUND2-OPS.md and the customer workspace in ORDER11-ROUND2-WORKSPACE.md.
 |---|---|
 | Change | UI03's rendered heading becomes "Three services for your exported CRM files." (was "Check your files and target before you start.") |
 | Reason | Measured in the owner's section review (2026-10-21): 7 of 8 comparable "supported platforms / connectors" pages head the page with what moves and where to; an instruction says neither. The heading names no destination, so it never presents a service as open: each card still reads its state from the capability publication (UI03's exception on planned or internal capability and stale caches is kept by the cards, not by the heading). Record: Kauro.archive/Deliveries/Visual/order11/research/round3-services-head. |
-| Approval | Owner's section review, 2026-10-21 (pending until the owner approves the section). |
+| Approval | Owner, 2026-10-21: "Aprobada la cabecera de Supported services." |
 | How | As R2-1: the registry is not edited; the web's tests read the amended text through `AMENDED_PRIMARY_COPY` in `apps/web/test/support/registry.ts`, which names this record. |
 
 ## Not done here, and why
