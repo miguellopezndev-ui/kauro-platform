@@ -19,11 +19,10 @@
 //   - examples: the valid ones pass and the invalid ones fail, with the expected error, under the api's own strict validator.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  PATHS, ROOT, applyDeltas, applyOp, buildAll, canonicalHash, compatibility, generateBundle, generatedOutputs, itemOperations, loadCp01,
+  PATHS, ROOT, applyDeltas, applyOp, buildAll, canonicalHash, generateBundle, generatedOutputs, isCurrent, itemOperations, loadCp01,
   loadProvenance, openapiChanges, readRecord, registryChanges, sha256, valueAt,
 } from "../cp02.mjs";
 import { generate as generateWebClient } from "../web-client.mjs";
@@ -52,6 +51,8 @@ function checkProcedure(s, delta) {
   assert.equal(delta.proposal, "CP-02");
   assert.ok(existsSync(join(ROOT, delta.document)), `${delta.document} exists`);
   const record = readFileSync(join(ROOT, delta.document), "utf8");
+  const covered = new Set(s.items.flatMap((i) => i.o17));
+  for (let n = 1; n <= 19; n += 1) assert.ok(covered.has(`O17-${String(n).padStart(2, "0")}`), `O17-${String(n).padStart(2, "0")} has an item`);
   assert.equal(delta.items.length, s.items.length, "one delta item per source item");
   const ids = [];
   for (const [i, item] of s.items.entries()) {
@@ -123,6 +124,7 @@ test("procedure: CP-02 follows the ChangeProposal procedure and the four classes
   mustFail(broken((s, d) => { d.items[20].patch["commands.json"].splice(1, 1); }), /tested right before/, "a replace without its test");
   mustFail(broken((s, d) => { d.items[0].patch["cases.json"].push({ op: "remove", path: "/0" }); }), /nothing is removed/, "a remove op");
   mustFail(broken((s, d) => { delete d.items[3].activation; }), /activation/, "an item without its activation");
+  mustFail(broken((s) => { s.items[20].o17 = ["O17-18"]; }), /O17-19 has an item/, "an O17 group without an item");
 });
 
 // --- 2. application ---------------------------------------------------------------------------------------------------------
@@ -221,7 +223,15 @@ function checkAuthority(s, first) {
       assert.ok(s.authorities[ref] || cp01Items.has(ref) || itemIds.has(ref) || /^O17-\d{2}$/.test(ref), `${item.id}: cites ${ref}, which no record or proposal defines`);
     }
     if (item.approval) assert.ok(item.basis.some((b) => s.authorities[b].record === item.approval.record), `${item.id}: its approval record is one of its bases`);
+    for (const r of item.reserves ?? []) {
+      assert.ok(cp01Items.has(r.requires) && itemIds.has(r.for) && r.why, `${item.id}: a reservation names the CP-01 item, the CP-02 item it is for, and why`);
+      for (const t of r.tokens) assert.ok(JSON.stringify(item.contracts).includes(t), `${item.id}: reserved token ${t} is in its contracts`);
+    }
     if (item.class === "APPROVED_AWAITING_REISSUE") {
+      const { activation, reserves, ...body } = item;
+      for (const ref of JSON.stringify(body).match(/\bCP-01\.\d{2}\b/g) ?? []) {
+        assert.equal(cp01Items.get(ref).status, "APPROVED_AWAITING_REISSUE", `${item.id}: relies on ${ref} (${cp01Items.get(ref).status}) outside its activation and its declared reservations`);
+      }
       for (const b of item.basis) assert.equal(s.authorities[b].standing, "APPROVED", `${item.id}: an approved item cites only approved decisions (${b} is ${s.authorities[b].standing})`);
       for (const r of item.requires) assert.equal(cp01Items.get(r).status, "APPROVED_AWAITING_REISSUE", `${item.id}: requires ${r}, which CP-01 has not approved (${cp01Items.get(r).status})`);
       for (const d of item.dependsOn) assert.equal(s.items.find((i) => i.id === d).class, "APPROVED_AWAITING_REISSUE", `${item.id}: depends on ${d}, which is not approved`);
@@ -237,15 +247,19 @@ test("authority: every cited decision exists with its words; approved items cite
     return () => checkAuthority(s, cp01);
   };
   mustFail(broken((s) => { s.items[1].basis.push("F-33"); }), /only approved decisions/, "an approved item citing a proposal");
-  mustFail(broken((s) => { s.items[1].requires.push("CP-01.11"); }), /not approved/, "an approved item requiring a conditional CP-01 item");
+  mustFail(broken((s) => { s.items[1].requires.push("CP-01.11"); }), /relies on CP-01.11|not approved/, "an approved item requiring a conditional CP-01 item");
   mustFail(broken((s) => { s.items[2].rules.push("As decided in F-99."); }), /no record or proposal defines/, "a decision nobody recorded");
+  mustFail(broken((s) => { s.items[2].rules.push("The hold of CP-01.11 applies."); }), /relies on CP-01.11/, "an approved item relying on a conditional CP-01 item in its text");
+  mustFail(broken((s) => { s.items[1].reserves[0].requires = "CP-01.99"; }), /reservation names|no record or proposal defines/, "a reservation of an unknown CP-01 item");
   mustFail(broken((s) => { s.authorities["F-24"].anchor = "## F-24. The five dates may be added"; }), /cited words/, "words the record does not say");
   mustFail(broken((s) => { s.items[7].dependsOn = ["CP-02.09"]; s.items[7].dependsOn = ["CP-02.07"]; s.items[6].class = "CONDITIONAL"; }), /not approved/, "an approved item depending on a conditional one");
 });
 
 // --- 5. correspondence --------------------------------------------------------------------------------------------------------
 
-const safeKinds = new Set(["id", "hash", "token", "count", "bool", "utc"]);
+// what an event payload may carry (model/events.ts isSafeScalar): ids, hashes, tokens, non-negative integers (counts and, as commerce's
+// events do, amounts in minor units), booleans and instants
+const safeKinds = new Set(["id", "hash", "token", "count", "minorUnits", "bool", "utc"]);
 
 function contractsOf(item) {
   return [...item.contracts, ...(item.extraContracts ?? [])];
@@ -283,7 +297,7 @@ function checkCorrespondence(s, reg, dom) {
         if (m) for (const n of refsOf(m[1])) referenced.add(n);
       }
     }
-    for (const m of item.modified) if (m.registryContract) for (const n of refsOf(m.registryContract)) referenced.add(n);
+    for (const m of item.modified) for (const c of m.components) if (c.registryContract) for (const n of refsOf(c.registryContract)) referenced.add(n);
     for (const ext of item.extendContracts) for (const [, type] of ext.fields) {
       const m = /^(?:ref|list):(.+)$/.exec(type);
       if (m) for (const n of refsOf(m[1])) referenced.add(n);
@@ -378,6 +392,16 @@ function checkAuthorization(s, reg) {
       }
     }
   }
+  for (const item of s.items) {
+    for (const m of item.modified) {
+      assert.ok(s.identities[m.audience], `${item.id} ${m.operationId}: the audience of a modified served operation is declared`);
+      const visible = s.visibility[m.audience];
+      for (const c of m.components) {
+        const added = c.new ? Object.keys(c.schema.properties) : (c.edits ?? []).filter((e) => e.op === "addProperty").map((e) => e.property);
+        for (const name of added) assert.ok(!visible.forbiddenFields.includes(name), `${item.id} ${m.operationId}: ${m.audience} must not read ${c.name}.${name}`);
+      }
+    }
+  }
   // four things never confused (Order 17 §4.D)
   const consent = s.items.flatMap(contractsOf).find((c) => c.name === "ConsentRecord");
   const kinds = consent.fields.find(([n]) => n === "kind")[1].slice(5).split(",");
@@ -407,6 +431,9 @@ test("authorization: audiences, roles, routes, field visibility per identity and
   const s3 = clone(spec);
   s3.items[2].operations[0].role = "ANYONE";
   mustFail(() => checkAuthorization(s3, combined), /in force or declared new/, "an undeclared role");
+  const s5 = clone(spec);
+  s5.items[9].modified[0].components[1].edits.push({ op: "addProperty", property: "rulingReason", required: false, schema: { type: "string" } });
+  mustFail(() => checkAuthorization(s5, combined), /SELLER must not read StatementBalanceItemView.rulingReason/, "an internal reason added to a served seller reply");
   const s4 = clone(spec);
   s4.items.find((i) => i.id === "CP-02.06").contracts[0].fields[0][1] += ",MARKETING_NEWS";
   mustFail(() => checkAuthorization(s4, combined), /marketing is a consent/, "marketing as a notification preference");
@@ -456,6 +483,20 @@ function checkOpenapi(s, doc, served, bndl) {
       else assert.equal(c.baseSha256, canonicalHash(served.components.schemas[name]), `${key}: ${name} was written against the served component (re-verify after the served api changed)`);
     }
   }
+  // a modified served component adds only what its registry contract holds (the view is a projection of the stored contract)
+  for (const item of s.items) {
+    for (const m of item.modified) {
+      for (const c of m.components) {
+        if (!c.registryContract) continue;
+        const fields = new Map(combined["contracts.json"].find((x) => x.name === c.registryContract).fields.map((f) => [f.name, f]));
+        const added = c.new ? Object.keys(c.schema.properties) : (c.edits ?? []).filter((e) => e.op === "addProperty").map((e) => e.property);
+        for (const name of added) assert.ok(fields.has(name), `${item.id}: ${c.name}.${name} is a member of its registry contract ${c.registryContract}`);
+        for (const e of (c.edits ?? []).filter((x) => x.op === "addEnumValue")) {
+          assert.ok(fields.get(e.property)?.type.includes(e.value), `${item.id}: ${c.name}.${e.property} value ${e.value} is in ${c.registryContract}`);
+        }
+      }
+    }
+  }
   // shared shapes: the request vocabulary is the served api's own
   const sa = doc.components.schemas.RecordConsentRequest.properties;
   assert.deepEqual(sa.documentVersion, served.components.schemas.StartAuditRequest.properties.auditPolicyVersion, "label is the served label");
@@ -465,7 +506,11 @@ function checkOpenapi(s, doc, served, bndl) {
 }
 
 test("OpenAPI: the committed files are the generated ones", () => {
-  for (const [path, body] of generatedOutputs(built)) assert.equal(readFileSync(path, "utf8"), body, `${path} is current (node tools/cp02.mjs generate)`);
+  for (const output of generatedOutputs(built)) assert.ok(isCurrent(output), `${output[0]} is current (node tools/cp02.mjs generate)`);
+  const [, , normalize] = generatedOutputs(built)[2];
+  const moved = JSON.parse(readFileSync(PATHS.compatibility, "utf8"));
+  moved.changes.find((c) => c.class === "COORDINATED").class = "ADDITIVE";
+  assert.notEqual(normalize(JSON.stringify(moved)), normalize(readFileSync(PATHS.compatibility, "utf8")), "a hand edit of a class in the matrix is drift");
   const tampered = clone(openapi);
   tampered.paths["/api/v1/projects/{projectId}/dates"].get.summary = "edited by hand";
   assert.notEqual(JSON.stringify(tampered, null, 2) + "\n", readFileSync(PATHS.openapi, "utf8"), "a hand edit is visible as drift");
@@ -482,6 +527,9 @@ test("OpenAPI: requests are the registry fields, replies the registry contracts,
   const l3 = clone(live);
   l3.components.schemas.RetentionExtensionView.properties.extensionId.description = "changed on main";
   mustFail(() => checkOpenapi(spec, openapi, l3, bundle), /written against the served component/, "a served component that moved under the proposal");
+  const s5 = clone(spec);
+  s5.items[3].modified[0].components[0].edits.push({ op: "addProperty", property: "retentionVersion2", required: true, schema: { type: "integer" } });
+  mustFail(() => checkOpenapi(s5, openapi, live, bundle), /member of its registry contract RetentionExtension/, "a served reply member the registry contract does not hold");
   const d4 = clone(openapi);
   d4.components.schemas.ProjectDates.required = ["projectId"];
   mustFail(() => checkOpenapi(spec, d4, live, bundle), /same required members/, "a reply that differs from the registry contract");
@@ -563,11 +611,23 @@ test("compatibility: the classifier finds real breaks (removal, type, required, 
   assert.ok(api.includes("components/QuoteView.state:ENUM_NARROWED:ADDITIVE"), "a narrower reply vocabulary is safe for readers");
 });
 
-test("compatibility: the matrix covers CP-01 + CP-02 and attributes each change", () => {
-  const recomputed = compatibility(spec, registry, cp01, cp02, live, openapi);
-  assert.deepEqual(recomputed.map((c) => c.key), matrix.changes.map((c) => c.key), "the committed matrix is the computed one");
-  for (const c of matrix.changes) assert.ok(c.source, `${c.key}: attributed`);
-  for (const id of ["CP-02.01", "CP-02.04", "CP-02.10"]) assert.ok(matrix.changes.some((c) => c.source.includes(id)), `${id} has its changes`);
+test("compatibility: every non-additive change is attributed to the proposal item that really makes it", () => {
+  for (const c of matrix.changes.filter((x) => RANK[x.class] >= 1)) {
+    if (c.layer === "REGISTRY") {
+      const contract = /^contracts\.json:([A-Za-z]+)/.exec(c.subject)[1];
+      const index = registry["contracts.json"].findIndex((x) => x.name === contract);
+      const touches = (delta, ids) => delta.items.filter((i) => ids.includes(i.id)).some((i) => (i.patch["contracts.json"] ?? []).some((op) => op.op !== "test" && op.path.startsWith(`/${index}/`)));
+      const ids = c.source.split(" + ");
+      assert.ok(ids.includes("CP-01") ? touches(cp01, cp01.items.map((i) => i.id)) : touches(cp02, ids), `${c.key}: ${c.source} changes contract ${contract}`);
+    } else if (c.layer === "OPENAPI" && c.source.startsWith("CP-02.")) {
+      const it = spec.items.find((i) => i.id === c.source);
+      const names = it.modified.flatMap((m) => [m.operationId, ...m.components.map((x) => x.name)]);
+      assert.ok(names.some((n) => c.subject.startsWith(`${n}:`) || c.subject.startsWith(`components/${n}.`)), `${c.key}: ${c.source} modifies it`);
+    } else if (c.layer === "EVENTS") {
+      assert.ok(spec.items.find((i) => i.id === c.source).eventPayloadChanges.some((e) => c.subject.startsWith(`${e.eventType}:`)), `${c.key}: ${c.source} declares it`);
+    }
+  }
+  for (const layer of ["REGISTRY", "OPENAPI", "EVENTS"]) assert.ok(matrix.changes.some((c) => c.layer === layer), `the matrix has a ${layer} layer`);
 });
 
 // --- 9. examples -----------------------------------------------------------------------------------------------------------
@@ -615,7 +675,11 @@ test("nothing is adopted: the registry, the served api and the generated client 
   assert.equal(openapi.info["x-kauro-base"].openapi, sha256(readFileSync(PATHS.liveOpenapi)), "the proposal was generated against the served api on disk");
   assert.equal(openapi["x-kauro-status"], "PROPOSED_NOT_ADOPTED");
   for (const p of Object.values(openapi.paths)) for (const o of Object.values(p)) assert.notEqual(o["x-kauro-class"], "ADOPTED");
+  assert.equal(openapi.info["x-kauro-base"].webClient, sha256(readFileSync(PATHS.webClient)), "the generated web client is the one the proposal was written against");
+  const { text: client, failures } = generateWebClient(readFileSync(PATHS.liveOpenapi, "utf8"));
+  assert.deepEqual(failures, []);
+  assert.equal(client, readFileSync(PATHS.webClient, "utf8"), "the committed web client is still generated from the served api alone: no proposed operation reached it");
+  assert.doesNotMatch(client, /\bProjectDates\b|\bRecordConsent\b/, "no CP-02 type in the served client");
   const added = JSON.stringify(cp02.items.map((i) => Object.values(i.patch).flat().filter((op) => op.op !== "test").map((op) => op.value)));
   assert.doesNotMatch(added, /\bKAVO|\bkavo/, "amendment A2: new registry text is Kauro's");
-  assert.ok(createHash, "node:crypto");
 });

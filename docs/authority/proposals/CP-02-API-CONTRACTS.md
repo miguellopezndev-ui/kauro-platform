@@ -40,15 +40,15 @@ operations again and never touches a path CP-01 changes; PR #122's test checks t
 | Chosen behavior | Section 3 and the delta. |
 | Rejected | Writing CP-02 in the vendored registry or `apps/api/openapi.json` (D-34 §1.3); domain events for B10 corporate aggregates (D10-EVT-1: claims and outreach requests are commercial transitions); a public read that reveals the budget; identity proved by name and e-mail (CP-01.12 as the owner modified it). |
 | Deferred | The items classed CONDITIONAL, PROPOSED and BLOCKED_EXTERNAL (section 5), registered for a later version without holding back the approved ones. |
-| Impacted ids | 52 new registry contracts and one extended (CommissionStatement); commands CMD065–CMD081 (17); text of CMD041, CMD002, CMD027 (proposed and blocked items only); state machines ClaimReview, OutreachAuthorizationRequest; screen UI57 (conditional); 132 cases with their requirements; gates' case lists. No existing contract field is removed, retyped or made required by CP-02. |
-| Producers and consumers | Producer: the authority re-issue. Consumers: `@kauro/contracts` (regenerated), the application's request and response schemas and outcome catalogues, `apps/api/openapi.json`, `apps/web/src/api/generated.ts`, the domain event registry and its migrations; the consumers of each coordinated change are listed in `CP-02.compatibility.json`. |
+| Impacted ids | 54 new registry contracts and one extended (CommissionStatement); commands CMD065–CMD081 (17); text of CMD041, CMD002, CMD027 (proposed and blocked items only); state machines ClaimReview, OutreachAuthorizationRequest; screen UI57 (conditional); 132 cases with their requirements; gates' case lists. No existing contract field is removed, retyped or made required by CP-02. |
+| Producers and consumers | Producer: the authority re-issue. Consumers: `@kauro/contracts` (regenerated), the application's request and response schemas and outcome catalogues, `apps/api/openapi.json`, `apps/web/src/api/generated.ts`, the domain event registry, its payload allowlists and migrations; the consumers of each coordinated change are listed in `CP-02.compatibility.json` (found in the code at each generation, left out of the drift comparison so unrelated work never makes CP-02 stale). |
 | Security and privacy | Audiences and field visibility per identity are part of the contract (section 2) and tested; the effective authorization, roles, RLS and the cross-workspace owner scope are Order 15's. No read exposes a cell value, a provider identifier, a tombstone or the free-check budget. Consent, processing authorization, session and step-up are four distinct things (CP-02.05). |
 | Price and commission | None to prices. Commission: reads of figures CP-01.05 and CP-01.13 define, the retainer and offset items on the statement, the closed refusal; no rate or rule changes. |
 | Data migrations | None at adoption. The implementing orders add append-only migrations (event types, aggregate kinds, tables for reviews, refusals, consents, preferences, requests, identity decisions) with their tests first. |
 | Migration and transition | Prospective. Existing statements read their balance from their own items; existing audits keep their target; issued quotes keep their terms; accrued obligations are never removed. |
 | Rollback limits | A contract can be withdrawn prospectively; records written under it (consents, reviews, refusals, identity decisions) stay as evidence. |
 | Activation | Every item lists in `activation` what must be implemented, tested or published before the adopted item takes effect (README of PR #122): adoption is not deployment. |
-| Implementation mandate | The orders after 17 by component (Order 17 report, section 9): C4 backend, C5 payments, C6 retention, C7 cores, C8 identity, C9 web, with Order 15 for authorization. Handlers and screens are not part of CP-02. |
+| Implementation mandate | The orders after 17 by component (Order 17 report, section 10): C4 backend, C5 payments, C6 retention, C7 cores, C8 identity, C9 web, with Order 15 for authorization. Handlers and screens are not part of CP-02. |
 | Owner action | Decide each item (section 8); decide the points of section 5. |
 
 ## 2. Classes, rules, audiences
@@ -79,8 +79,8 @@ reads the server's evidence hash; the public never reads an id, a count or money
 | Item | O17 | Class | Requires | Registry | Api |
 |---|---|---|---|---|---|
 | CP-02.01 | O17-01 | APPROVED_AWAITING_REISSUE | CP-01.01 | 5 acceptance cases | StartAudit: `targetContractId` optional; reasons TARGET_CONTRACT_REQUIRED, TARGET_NOT_APPLICABLE |
-| CP-02.02 | O17-03 | APPROVED_AWAITING_REISSUE | — | ProjectDate, ProjectDates | GetProjectDates |
-| CP-02.03 | O17-02 | APPROVED_AWAITING_REISSUE | — | 13 read contracts | 12 reads: project summary, board, clients, findings, estimate, activity, billing profile, billing documents, package, support cases, deletion records, refunds |
+| CP-02.02 | O17-03 | APPROVED_AWAITING_REISSUE | CP-01.02 | ProjectDate, ProjectDates (the hold's tokens reserved for CP-02.17) | GetProjectDates |
+| CP-02.03 | O17-02 | APPROVED_AWAITING_REISSUE | — | 14 read contracts | 13 reads: project summary, board, clients, findings, estimate, activity, billing profile, billing documents, package, support cases, deletion records, refunds, the owner's refunds across workspaces |
 | CP-02.04 | O17-14 | APPROVED_AWAITING_REISSUE | CP-01.02 | RetentionExtension | RequestRetentionExtension reply states class and ceiling; three outcome meanings |
 | CP-02.05 | O17-12 | APPROVED_AWAITING_REISSUE | — | ConsentRecord, ConsentView; CMD065, CMD066 | RecordConsent, WithdrawConsent, ListMyConsents, ListConsentEvidence |
 | CP-02.06 | O17-13 | APPROVED_AWAITING_REISSUE | — | 3 contracts; CMD067 | SetNotificationPreferences, GetMyNotificationPreferences |
@@ -88,7 +88,7 @@ reads the server's evidence hash; the public never reads an id, a count or money
 | CP-02.08 | O17-04 | APPROVED_AWAITING_REISSUE | — | 7 contracts | ListSellers, GetSellerRecord, ListCustomers, ListStatementsByPeriod, ListClaimsAcrossSellers, GetSellerSchedule |
 | CP-02.09 | O17-04 | APPROVED_AWAITING_REISSUE | CP-01.13 | SellerMoneySummary | ListSellerMoney, GetMyMoney |
 | CP-02.10 | O17-06 | APPROVED_AWAITING_REISSUE | CP-01.05 | StatementBalance, StatementBalanceItem; CommissionStatement gains two optional members | GetCommissionStatement reply: `balance`, RETAINER, offset basis |
-| CP-02.11 | O17-07 | APPROVED_AWAITING_REISSUE | CP-01.06, CP-01.07 | AlertCondition, Alert | ListOwnerAlerts, ListMyAlerts (inactivity from material progress only) |
+| CP-02.11 | O17-07 | APPROVED_AWAITING_REISSUE | CP-01.06, CP-01.07 | AlertCondition, Alert, SellerAlertView | ListOwnerAlerts, ListMyAlerts (inactivity from material progress only) |
 | CP-02.12 | O17-08 | APPROVED_AWAITING_REISSUE | CP-01.14 | PolicyLegalStatus | ListPolicyLegalStatus |
 | CP-02.13 | O17-11 | APPROVED_AWAITING_REISSUE | — | 3 contracts; CMD069, CMD070; machine OutreachAuthorizationRequest | ExportCommissionStatement (CSV, PDF), RequestOutreachAuthorization, DeclineOutreachAuthorizationRequest, two lists |
 | CP-02.14 | O17-05 | APPROVED_AWAITING_REISSUE | CP-01.04, CP-01.14 | ClaimRefusal; CMD071, CMD072; machine ClaimReview | RefuseAttribution (evidence always, note for OTHER, a rule in force for OWNER_RULE), DecideClaimReview; legal effect PENDING_COUNSEL |
@@ -100,9 +100,9 @@ reads the server's evidence hash; the public never reads an id, a count or money
 | CP-02.20 | O17-18 | CONDITIONAL | CP-01.03 | 2 contracts; CMD081; screen UI57 | GetFreeCheckAvailability (public), RecordFreeCheckEligibility |
 | CP-02.21 | O17-19 | PROPOSED | — | CMD002 and CMD027 precondition text | ActivateAgency: `billingProfileRef` optional; CreateQuote outcome meaning |
 
-Totals: 15 approved, 1 conditional, 3 proposed, 2 blocked by an external party; 56 proposed operations (17 commands, 39 reads); 5 served
-operations modified (StartAudit, RequestRetentionExtension, GetCommissionStatement, ActivateAgency, CreateQuote); 52 new registry contracts,
-1 extended; 9 new event types and 2 new subscriptions; 2 state machines.
+Totals: 15 approved, 1 conditional, 3 proposed, 2 blocked by an external party; 57 proposed operations (17 commands, 40 reads); 5 served
+operations modified (StartAudit, RequestRetentionExtension, GetCommissionStatement, ActivateAgency, CreateQuote); 54 new registry contracts,
+1 extended; 9 new event types, 2 new subscriptions and 3 payload changes of registered events; 2 state machines.
 
 Every item carries positive, negative and adversarial acceptance cases (written as registry cases with their requirements and gates);
 every command carries the registry's own OK, DENY and RACE cases.
@@ -117,15 +117,19 @@ every command carries the registry's own OK, DENY and RACE cases.
   "required unless CLEAN" (the strict validator has no conditional keywords and the mode is not a request member), so the handler enforces it.
 - **Dates (CP-02.02).** One entry per date kind, each with its rule, anchor, state and the action and role available; `governingRetentionKind`
   points at the date that deletes the data and nothing adds two dates. The hold's kind is in the vocabulary (the five dates are the owner's
-  F-24) and is `NOT_APPLICABLE` until CP-02.17. Quote and order views get no link member: their clients reach the dates by `projectId`, so
-  no closed reply changes.
+  F-24) and is `NOT_APPLICABLE` until CP-02.17: the item declares that reservation (`reserves`: the tokens, CP-01.11, CP-02.17 and why), so
+  activating the hold never widens a closed reply. The retention label it shows is CP-01.02's, which it requires. Quote and order views get
+  no link member: their clients reach the dates by `projectId`, so no closed reply changes.
 - **Workspace reads (CP-02.03).** Each read is a registry contract of its own (no aggregate exposed whole): `RefundListItem` leaves
   `providerRefundId` out, `DeletionRecordItem` the tombstone, `FindingExampleRef` points at a cell the existing PreviewTable reads under its
-  own authorization instead of carrying a value. The estimate says `ESTIMATE` and reserves nothing.
+  own authorization instead of carrying a value; `PackageArtifactItem` has no role or privacy class for internal evidence. The estimate says
+  `ESTIMATE` and reserves nothing. The owner's refunds page (G-14) has its own read across workspaces.
 - **Extension (CP-02.04).** The reply states the record's class, the ceiling and which ceiling applied (17 days from sealing for UNPAID,
   never more); three outcome tokens keep their names with a new meaning (declared COORDINATED: the web copy follows).
 - **Consent (CP-02.05).** A consent record per act, kind and channel; marketing per channel as POL 8.3 lists them (e-mail, call, SMS,
-  messaging); withdrawable here only for marketing (the processing authorization goes through the Policy's rights procedure). The person's
+  messaging); withdrawable here only for marketing (revoking the processing authorization is a claim under the rights procedure, Decreto
+  1074 art. 2.2.2.25.2.6, CHECKLIST C-11). The approval rests on the law items of the CHECKLIST (C-04, C-05, C-11, C-51), not on the draft
+  Policy. The public contact form records its consent through its own route, not this authenticated command. The person's
   own view leaves the server's evidence hash out; the owner reads the proof for a rights request or an authority. Recording the processing
   authorization needs a published Policy version (CP-01.10, LR-05): until then the command refuses `DOCUMENT_VERSION_NOT_PUBLISHED`.
 - **Preferences (CP-02.06).** Essential topics cannot be disabled; marketing is not a topic.
@@ -140,9 +144,11 @@ every command carries the registry's own OK, DENY and RACE cases.
 - **Seller money (CP-02.09).** The four figures of OPS-1 with the periods the owner fixed in CP-01.13 (month of the confirmed capture; month
   the refund happened, never rewriting an earlier period); pending is split into held and payable, the amount states CP-01.13 keeps apart.
 - **Statements (CP-02.10).** `RETAINER` items carry the retainer accrual's line as `lineId`, so `lineId` stays required on the served item
-  view; the balance is computed for every statement from its own items; an accrued obligation is never removed.
+  view; the balance is optional in the stored record (older statements have none) and computed by the read for every statement from its
+  own items; an accrued obligation is never removed. The seller reads which refund and project an offset comes from (F-17, OPS-4).
 - **Alerts (CP-02.11).** Inactivity counts only from the material acts of `alerts.relevantProgress` (CP-01.07 as the owner modified it);
   the excluded acts never reset it, and nothing moves a retention, legal or quote date. `INACTIVE` alerts carry `lastMaterialProgressAt`.
+  A seller's alerts are `SellerAlertView`: claim subjects only, no agency, enforced by the contract rather than by a rule.
 - **Export and outreach request (CP-02.13).** The CSV neutralizes formula prefixes; a request to authorize outreach is neither an
   authorization nor a recipient's consent, and the seller's view of it omits the owner's decline code.
 - **Identity (CP-02.15).** Follows CP-01.12 as the owner modified it: `PROVEN_IDENTITY` only from Migration Core's proving keys (a source
@@ -159,11 +165,11 @@ source and the OpenAPI outcomes), (4) compatibility and migration, (5) cases, (6
 
 | Item | (1) Unlocks when | (4) Compatibility and migration | (5) Cases | (6) Why not yet |
 |---|---|---|---|---|
-| CP-02.16 refund notice | The owner decides B-07; counsel words the promise (LR-06), not blocking the contract | New contract, command and two subscriptions (ADDITIVE) | sent and recorded; approval never implies a message; wrong party refused | Who tells the customer and by when is a customer promise the owner has not made |
+| CP-02.16 refund notice | The owner decides B-07; counsel words the promise (LR-06), not blocking the contract | New contract, command and two subscriptions (ADDITIVE); the notice is billing information (AGENCY_BILLING) | sent and recorded; approval never implies a message; wrong party refused | Who tells the customer and by when is a customer promise the owner has not made |
 | CP-02.17 transfer proof | Wise Business enabled and the ACH route qualified with real evidence (PV1 §2); CP-01.11's pending points; counsel reviews LR-02. The values are the owner's since 2026-10-22: five US banking days (FedACH calendar), the earlier of that and 24 days from sealing, owner review from the third unpaid hold in 90 days, step-up | New command (ADDITIVE); RetentionRecord gains the hold class (CP-01.11, COORDINATED) | one bounded hold with its effective end; abuse (two orders, new quote, late proof, mismatch, races); the third unpaid hold needs the owner; never execution | The owner blocked activation on PV1: the matching rule depends on evidence the route has not shown yet |
 | CP-02.18 direct service | The owner decides B-06 | A separate command keeps CMD048's `sellerId` meaning (ADDITIVE) | rights kept; no retroactive date; owner only with step-up | It changes a seller's compensation; undecided |
 | CP-02.19 staged reconciliation | The Data Loader and HubSpot facts are verified on the real tools (B-14); the cores deliver the engine | New read and command (ADDITIVE); CMD041 effect text (TEXT) | proved IDs only; no guessed link; ID outside the evidence refused | Whether result files can prove an ID depends on what the tools write |
-| CP-02.20 self-serve free check | The owner signs the A3 §3.2 amendment (B-03) | New public read, command, screen UI57 (ADDITIVE) | eligible person reaches upload; paused offers no upload; the public read leaks nothing | A3 §3.2 in force binds the call to action to the fit form; a drawn screen does not approve a route |
+| CP-02.20 self-serve free check | The owner signs the A3 §3.2 amendment (B-03); the Terms' "exhausted" changes only through LR-11 | New public read, command, screen UI57 (ADDITIVE) | eligible person reaches upload; paused offers no upload; the public read leaks nothing | A3 §3.2 in force binds the call to action to the fit form; a drawn screen does not approve a route |
 | CP-02.21 billing at first quote | The owner decides B-09; the route that records a profile after activation is named | ActivateAgency request member becomes optional (ADDITIVE); CreateQuote outcome meaning (COORDINATED) | activation without profile; no quote without one; another agency's profile never used | It changes what activation requires; undecided, and today a profile reaches the agency only through CMD002 |
 
 A screen in the review never authorizes anything: the prototypes are evidence of design, not of approval. The owner's resolution of
@@ -171,28 +177,30 @@ A screen in the review never authorizes anything: the prototypes are evidence of
 
 ## 6. Proof
 
-`tools/test/cp02-api-contracts.test.mjs` (15 tests). Every rule runs on the proposal and on deliberately broken copies, and each broken
-copy must fail for the rule's own reason:
+`tools/test/cp02-api-contracts.test.mjs` (15 tests, 50 broken copies). Every rule runs on the proposal and on deliberately broken copies,
+and each broken copy must fail for the rule's own reason:
 
-1. procedure: ids, the four classes and their statuses, approvals, open points, unlock and reason for every non-approved item, the three
-   kinds of acceptance case, the change record lists each item with its class and a decision row, test-before-replace, no remove, no path
-   changed by two items;
+1. procedure: every O17 group has an item; ids, the four classes and their statuses, approvals, activation, open points, unlock and reason
+   for every non-approved item, the three kinds of acceptance case, the change record lists each item with its class and a decision row,
+   test-before-replace, no remove, no path changed by two items;
 2. application: base hashes equal PROVENANCE and the files on disk; CP-02 applies alone and after CP-01; every record and key is kept; ids
    stay unique; the contracts generator accepts both results in a temporary directory; the vendored registry is unchanged afterwards;
 3. CP-01: the pinned bytes, and no CP-02 operation on a path CP-01 changes;
 4. authority: every cited decision exists in its record with the cited words; every id cited anywhere in an item is a recorded decision,
    a CP-01 item or a CP-02 item; an approved item cites only approved decisions, requires only approved CP-01 items, depends only on
-   approved CP-02 items;
+   approved CP-02 items, and mentions a non-approved CP-01 item only in its activation or in a declared reservation;
 5. correspondence: command ↔ operation ↔ registry command with its three cases; case ↔ requirement ↔ gate; every new contract used by an
    operation; events new, named after their aggregate, payloads of safe kinds only, consumers registered, produced by a declaring
    operation; a command without an event only as a D10-EVT-1 commercial transition; subscriptions not already present;
-6. authorization: declared audiences and roles, route prefixes, forbidden fields reachable from each reply per audience, step-up for
-   money or step-up rules, and the four consent notions kept apart;
+6. authorization: declared audiences and roles, route prefixes, forbidden fields reachable from each reply per audience (new operations and
+   the members CP-02 adds to served replies), step-up for money or step-up rules, and the four consent notions kept apart;
 7. OpenAPI: committed files equal the generated ones; request members are the registry fields; replies are the registry contracts; every
    reference resolves; parameters and shapes are the served api's; no served route or operationId collides; modified components were
-   written against the served bytes; the web client generator translates the result;
-8. compatibility: every change that can affect a consumer is declared with the computed class, a migration, and for a break the approved
-   decision that accepted it; the classifier is itself tested on real breaks;
+   written against the served bytes and add only members of their registry contract; the web client generator translates the result, and
+   the committed web client is still the one generated from the served api alone;
+8. compatibility: every change that can affect a consumer (registry, served api, payloads of registered events) is declared with the computed
+   class, a migration, and for a break the approved decision that accepted it; each is attributed to the item that really makes it; the
+   classifier is itself tested on real breaks;
 9. examples: valid examples pass and invalid ones fail with the expected field and code under the api's strict validator.
 
 ## 7. Adoption with CP-01

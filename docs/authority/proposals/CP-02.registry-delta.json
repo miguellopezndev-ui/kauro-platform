@@ -285,7 +285,7 @@
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md" },
       "pending": [],
       "blockers": [],
-      "requires": [],
+      "requires": ["CP-01.02"],
       "dependsOn": [],
       "activation": ["the dates read built from the quote, retention and extension journals with its tests (C4, C6); the hold's entry stays NOT_APPLICABLE until CP-02.17 is active"],
       "component": "C4",
@@ -304,7 +304,7 @@
                   "name": "kind",
                   "type": "enum:QUOTE_PRICE_VALIDITY,FREE_CHECK_RETENTION,EXTENSION,PENDING_PAYMENT_HOLD,PAID_RETENTION",
                   "required": true,
-                  "description": "Which of the five dates (F-24); PENDING_PAYMENT_HOLD is NOT_APPLICABLE until CP-01.11 and CP-02.17 are adopted."
+                  "description": "Which of the five dates (F-24); PENDING_PAYMENT_HOLD is reserved (the item's reservation) and NOT_APPLICABLE until CP-02.17 is active."
                 },
                 {
                   "name": "state",
@@ -732,16 +732,38 @@
             "op": "add",
             "path": "/-",
             "value": {
+              "name": "PackageArtifactItem",
+              "owner": "13",
+              "flow": "Package manifest artifacts → delivery page",
+              "invariant": "Customer-facing artifacts only: the vocabulary has no EVIDENCE role and no INTERNAL_EVIDENCE privacy, so internal evidence cannot be listed.",
+              "fields": [
+                { "name": "artifactId", "type": "id", "required": true, "description": "Artifact." },
+                { "name": "relativePath", "type": "text", "required": true, "description": "Path inside the package." },
+                { "name": "role", "type": "enum:IMPORT_DATA,REJECTIONS,LINEAGE,MANIFEST,REPORT,INSTRUCTIONS", "required": true, "description": "Role." },
+                { "name": "sha256", "type": "hash", "required": true, "description": "Bytes digest." },
+                { "name": "bytes", "type": "count", "required": true, "description": "Size." },
+                { "name": "mediaType", "type": "label", "required": true, "description": "Media type." },
+                { "name": "recordCount", "type": "count", "required": false, "description": "Records." },
+                { "name": "privacy", "type": "enum:CUSTOMER_DATA,SAFE_SUMMARY", "required": true, "description": "Privacy class." },
+                { "name": "objectApiName", "type": "label", "required": false, "description": "CRM object, for import data." }
+              ],
+              "schemaRef": "urn:kauro:r2:contracts#/$defs/PackageArtifactItem"
+            }
+          },
+          {
+            "op": "add",
+            "path": "/-",
+            "value": {
               "name": "PackageSummary",
               "owner": "13",
               "flow": "Package version and manifest → delivery page (G-06)",
-              "invariant": "Lists customer-facing artifacts only (privacy CUSTOMER_DATA or SAFE_SUMMARY); INTERNAL_EVIDENCE never appears.",
+              "invariant": "Lists customer-facing artifacts only (PackageArtifactItem has no internal evidence).",
               "fields": [
                 { "name": "packageId", "type": "id", "required": true, "description": "Package." },
                 { "name": "projectId", "type": "id", "required": true, "description": "Project." },
                 { "name": "state", "type": "enum:STAGED,VERIFIED_PRIVATE,AVAILABLE,RETIRED,REVOKED,DELETED", "required": true, "description": "Package version state." },
                 { "name": "manifestVersion", "type": "text", "required": true, "description": "Manifest version." },
-                { "name": "artifacts", "type": "list:Artifact", "required": true, "description": "Customer-facing artifacts." },
+                { "name": "artifacts", "type": "list:PackageArtifactItem", "required": true, "description": "Customer-facing artifacts." },
                 { "name": "acceptedRowCount", "type": "count", "required": true, "description": "Rows in import data." },
                 { "name": "rejectedRowCount", "type": "count", "required": true, "description": "Rows in the rejections file." },
                 { "name": "availableUntil", "type": "utc", "required": false, "description": "Download availability end (the PAID_RETENTION date)." },
@@ -780,6 +802,7 @@
               "invariant": "A refund is a reconciled effect; REQUESTED or APPROVED is never shown as money returned.",
               "fields": [
                 { "name": "refundId", "type": "id", "required": true, "description": "Refund." },
+                { "name": "agencyId", "type": "id", "required": true, "description": "Agency of the order." },
                 { "name": "projectId", "type": "id", "required": true, "description": "Project." },
                 { "name": "orderId", "type": "id", "required": true, "description": "Payment order." },
                 { "name": "state", "type": "enum:REQUESTED,APPROVED,SUBMITTING,UNCERTAIN,COMPLETED,FAILED,REJECTED", "required": true, "description": "State." },
@@ -1301,12 +1324,15 @@
       "gaps": ["F-08"],
       "class": "APPROVED_AWAITING_REISSUE",
       "status": "APPROVED_AWAITING_REISSUE",
-      "approval": { "source": "law", "date": "2026-10-06", "record": "docs/legal/DATA_PROCESSING_POLICY.md" },
+      "approval": { "source": "law", "date": "2026-10-06", "record": "docs/legal/CHECKLIST.md" },
       "pending": [],
       "blockers": [],
       "requires": [],
       "dependsOn": [],
-      "activation": ["the identity order (C8) serves the commands with the registration flow; no DATA_PROCESSING_AUTHORIZATION is recorded before the Policy is published (CP-01.10, LR-05)"],
+      "activation": [
+        "the identity order (C8) serves the commands with the registration flow; no DATA_PROCESSING_AUTHORIZATION is recorded before the Policy is published (CP-01.10, LR-05)",
+        "the public contact form records its own consent through the inquiry route (createInquiry), not through this authenticated command; that route's evidence follows ConsentRecord (source CONTACT_FORM) in the web and identity orders (C8, C9)"
+      ],
       "component": "C8",
       "patch": {
         "contracts.json": [
@@ -1379,7 +1405,7 @@
                 { "name": "channel", "type": "enum:EMAIL,CALL,SMS,MESSAGING,NOT_APPLICABLE" },
                 { "name": "documentVersion", "type": "label" },
                 { "name": "documentHash", "type": "hash" },
-                { "name": "source", "type": "enum:REGISTRATION,CONTACT_FORM,PREFERENCES" }
+                { "name": "source", "type": "enum:REGISTRATION,PREFERENCES" }
               ],
               "precondition": "The caller is authenticated as the person; the document version and hash are the published ones of that kind; each kind and channel is its own request, never bundled.",
               "effect": "Append one GIVEN consent record with its evidence hash and journal it outside the restore boundary.",
@@ -3220,7 +3246,12 @@
           {
             "op": "add",
             "path": "/43/fields/-",
-            "value": { "name": "balance", "type": "ref:StatementBalance", "required": false, "description": "The statement's balance (F-17); present on statements issued after adoption." }
+            "value": {
+              "name": "balance",
+              "type": "ref:StatementBalance",
+              "required": false,
+              "description": "The statement's balance (F-17). Optional in the stored record, which predates adoption; the statement read computes it for every statement, old ones included, from the statement's own items."
+            }
           },
           {
             "op": "add",
@@ -3506,6 +3537,27 @@
                 { "name": "policyVersion", "type": "text", "required": true, "description": "Edition of the alerts policy applied." }
               ],
               "schemaRef": "urn:kauro:r2:contracts#/$defs/Alert"
+            }
+          },
+          {
+            "op": "add",
+            "path": "/-",
+            "value": {
+              "name": "SellerAlertView",
+              "owner": "17",
+              "flow": "Alert evaluation of the seller's own claims → seller home",
+              "invariant": "Only the seller's own claims; no project, agency or pilot alert.",
+              "fields": [
+                { "name": "alertKey", "type": "hash", "required": true, "description": "Deterministic key." },
+                { "name": "subjectKind", "type": "enum:CLAIM", "required": true, "description": "Always a claim." },
+                { "name": "claimId", "type": "id", "required": true, "description": "The seller's claim." },
+                { "name": "kind", "type": "enum:DEADLINE_PASSED,DEADLINE_SOON", "required": true, "description": "Claim end passed or within the alert days." },
+                { "name": "conditionCode", "type": "label", "required": true, "description": "CLAIM_END." },
+                { "name": "dueAt", "type": "utc", "required": true, "description": "The claim's end." },
+                { "name": "since", "type": "utc", "required": true, "description": "When the condition began." },
+                { "name": "policyVersion", "type": "text", "required": true, "description": "Edition of the alerts policy applied." }
+              ],
+              "schemaRef": "urn:kauro:r2:contracts#/$defs/SellerAlertView"
             }
           }
         ],
@@ -6412,7 +6464,10 @@
         "real, verifiable evidence a proof can be checked against",
         "implementation, abuse controls and competent legal review (LR-02) before adoption; CP-01.11 itself stays CONDITIONAL"
       ],
-      "blockers": [{ "kind": "EXTERNAL", "ref": "PV1", "what": "Wise route qualification" }, { "kind": "OWNER", "ref": "CP-01.11", "what": "hold values" }],
+      "blockers": [
+        { "kind": "EXTERNAL", "ref": "PV1", "what": "Wise route qualification" },
+        { "kind": "OWNER", "ref": "CP-01.11", "what": "CP-01.11 stays CONDITIONAL until PV1 (its values are decided)" }
+      ],
       "requires": ["CP-01.11"],
       "dependsOn": [],
       "activation": [

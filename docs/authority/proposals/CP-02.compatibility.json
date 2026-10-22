@@ -194,6 +194,15 @@
       "source": "CP-02.03"
     },
     {
+      "key": "REGISTRY:contracts.json:PackageArtifactItem:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:PackageArtifactItem",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "9 fields",
+      "source": "CP-02.03"
+    },
+    {
       "key": "REGISTRY:contracts.json:PackageSummary:CONTRACT_ADDED",
       "layer": "REGISTRY",
       "subject": "contracts.json:PackageSummary",
@@ -217,7 +226,7 @@
       "subject": "contracts.json:RefundListItem",
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
-      "detail": "9 fields",
+      "detail": "10 fields",
       "source": "CP-02.03"
     },
     {
@@ -416,6 +425,15 @@
       "change": "CONTRACT_ADDED",
       "class": "ADDITIVE",
       "detail": "11 fields",
+      "source": "CP-02.11"
+    },
+    {
+      "key": "REGISTRY:contracts.json:SellerAlertView:CONTRACT_ADDED",
+      "layer": "REGISTRY",
+      "subject": "contracts.json:SellerAlertView",
+      "change": "CONTRACT_ADDED",
+      "class": "ADDITIVE",
+      "detail": "8 fields",
       "source": "CP-02.11"
     },
     {
@@ -1868,6 +1886,15 @@
       "source": "CP-02.12"
     },
     {
+      "key": "OPENAPI:GET /api/v1/ops/refunds:OPERATION_ADDED",
+      "layer": "OPENAPI",
+      "subject": "GET /api/v1/ops/refunds",
+      "change": "OPERATION_ADDED",
+      "class": "ADDITIVE",
+      "detail": "ListRefundsAcrossWorkspaces (CP-02.03, APPROVED_AWAITING_REISSUE)",
+      "source": "CP-02.03"
+    },
+    {
       "key": "OPENAPI:GET /api/v1/ops/sales/claims:OPERATION_ADDED",
       "layer": "OPENAPI",
       "subject": "GET /api/v1/ops/sales/claims",
@@ -2651,6 +2678,89 @@
         "key": "OPENAPI:components/Problem.reason:ENUM_WIDENED",
         "class": "COORDINATED",
         "migration": "Every new reason enters packages/domain FAILURE_REASONS and the outcome catalogues with the handler that answers it, and the web client is regenerated; unknown reasons already fall back to the code (frontends branch on code, then reason). Only the reasons of adopted items are added at each re-issue."
+      }
+    },
+    {
+      "key": "EVENTS:audit.queued.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "layer": "EVENTS",
+      "subject": "audit.queued.v1:targetContractId",
+      "change": "KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "detail": "a CLEAN audit omits targetContractId and carries targetContractHash = CLEAN_ONLY_TARGET_HASH; AUDIT_ORCHESTRATION reads it as optional",
+      "source": "CP-02.01",
+      "consumers": [
+        "apps/api/test/cmd020-start-audit.test.ts",
+        "apps/control/src/audit/orchestration.ts",
+        "apps/control/test/audit-orchestration.test.ts",
+        "apps/control/test/b05-grant-dispatch.test.ts",
+        "apps/control/test/b05-reconciliation-clock.test.ts",
+        "apps/control/test/b16-deletion-executor.test.ts",
+        "apps/control/test/grant-reconciliation.test.ts",
+        "packages/domain/src/model/audit/events.ts",
+        "packages/domain/test/audit-model.test.ts",
+        "packages/persistence/src/audit/store.ts",
+        "packages/persistence/test/audit-adapters.test.ts",
+        "packages/persistence/test/audit-migrations.test.ts",
+        "packages/persistence/test/b05-effect-clock.test.ts",
+        "tools/matrix.mjs",
+        "tools/test/matrix.test.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:audit.queued.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+        "class": "COORDINATED",
+        "migration": "CP-02.01. The audit domain and AUDIT_ORCHESTRATION read the key as optional for CLEAN, in the backend order (C4), tests first."
+      }
+    },
+    {
+      "key": "EVENTS:retention_record.extended.v1:retentionClass:VALUES_WIDENED",
+      "layer": "EVENTS",
+      "subject": "retention_record.extended.v1:retentionClass",
+      "change": "VALUES_WIDENED",
+      "class": "COORDINATED",
+      "detail": "UNPAID: the AUTHORITY_JOURNAL consumer replays an UNPAID extension like a paid one",
+      "source": "CP-02.04",
+      "consumers": [
+        "apps/api/test/cmd060-request-retention-extension.test.ts",
+        "apps/control/src/consumers/authority-journal.ts",
+        "apps/control/src/recovery/journal-tail.ts",
+        "apps/control/src/recovery/restore-runner.ts",
+        "apps/control/test/b16-restore.test.ts",
+        "packages/application/src/ports/source-providers.ts",
+        "packages/application/src/sources/handlers/request-retention-extension.ts",
+        "packages/application/test/source-contracts.test.ts",
+        "packages/domain/src/model/events.ts",
+        "packages/domain/test/source-model.test.ts"
+      ],
+      "declared": {
+        "key": "EVENTS:retention_record.extended.v1:retentionClass:VALUES_WIDENED",
+        "class": "COORDINATED",
+        "migration": "CP-02.04. AUTHORITY_JOURNAL and the restore journal accept UNPAID extensions in the retention order (C6)."
+      }
+    },
+    {
+      "key": "EVENTS:quote.withdrawn.v1:withdrawalCode:KEY_ADDED",
+      "layer": "EVENTS",
+      "subject": "quote.withdrawn.v1:withdrawalCode",
+      "change": "KEY_ADDED",
+      "class": "COORDINATED",
+      "detail": "withdrawalCode PLAN_REVISED when a plan revision withdraws the open quote; the allowlist and its migration seed change together",
+      "source": "CP-02.15",
+      "consumers": [
+        "apps/api/test/b10-failure-cells-replacement.test.ts",
+        "apps/api/test/cmd027-create-quote.test.ts",
+        "apps/api/test/cmd043-close-agency.test.ts",
+        "packages/application/src/commercial/served.ts",
+        "packages/domain/src/commerce/events.ts",
+        "packages/domain/test/commerce-critique.test.ts",
+        "packages/persistence/test/b09-critique.test.ts",
+        "packages/persistence/test/b09-migrations.test.ts",
+        "packages/persistence/test/b10-recurrence-migrations.test.ts",
+        "tools/matrix.mjs"
+      ],
+      "declared": {
+        "key": "EVENTS:quote.withdrawn.v1:withdrawalCode:KEY_ADDED",
+        "class": "COORDINATED",
+        "migration": "CP-02.15. COMMERCE_EVENT_PAYLOAD_ALLOWLIST and the event-type seed migration change in the same commit (the persistence tests prove they are equal)."
       }
     }
   ]

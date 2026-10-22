@@ -316,10 +316,15 @@
     "POL-8.3": {
       "record": "docs/legal/DATA_PROCESSING_POLICY.md",
       "anchor": "8.3. **Commercial communications: separate and optional authorization.**",
-      "standing": "APPROVED",
+      "standing": "PROPOSED",
       "by": "law",
-      "date": "2026-10-06"
+      "date": "2026-10-06",
+      "waitsFor": "the Policy is a draft until its publication (CP-01.10, LR-05); the law it restates is LAW-C-04, LAW-C-05, LAW-C-51"
     },
+    "LAW-C-04": { "record": "docs/legal/CHECKLIST.md", "anchor": "| C-04 | Ley 1581 art. 9; Decreto 1074 art. 2.2.2.25.2.2 |", "standing": "APPROVED", "by": "law", "date": "2026-10-06" },
+    "LAW-C-05": { "record": "docs/legal/CHECKLIST.md", "anchor": "| C-05 | Decreto 1074 arts. 2.2.2.25.2.4–2.2.2.25.2.5 |", "standing": "APPROVED", "by": "law", "date": "2026-10-06" },
+    "LAW-C-11": { "record": "docs/legal/CHECKLIST.md", "anchor": "| C-11 | Decreto 1074 art. 2.2.2.25.2.6 |", "standing": "APPROVED", "by": "law", "date": "2026-10-06" },
+    "LAW-C-51": { "record": "docs/legal/CHECKLIST.md", "anchor": "| C-51 | Ley 2300 de 2023 arts. 2, 3, 5", "standing": "APPROVED", "by": "law", "date": "2026-10-06" },
     "D10-EVT-1": {
       "record": "docs/design/B10-commercial-domain.md",
       "anchor": "| D10-EVT-1 | Corporate B10 aggregates publish no domain event",
@@ -398,6 +403,12 @@
       "anchor": "## LR-06. Who tells the customer a refund decision, and when (F-33)",
       "standing": "EXTERNAL",
       "waitsFor": "competent legal review (L-20)"
+    },
+    "LR-11": {
+      "record": "pr122:docs/legal/CHANGE-REQUESTS-CP-01.md",
+      "anchor": "## LR-11. The free-check pause: 90% of the funded envelope or \"exhausted\"",
+      "standing": "EXTERNAL",
+      "waitsFor": "the owner and counsel (L-20)"
     },
     "L-12": {
       "record": "docs/legal/LAWYER_LATER.md",
@@ -515,7 +526,7 @@
     "SELF": "^/api/v1/me/",
     "PUBLIC": "^/api/v1/public/",
     "AGENCY": "^/api/v1/(agencies/\\{agencyId\\}|projects/\\{projectId\\}|audits/\\{auditId\\}|packages/\\{packageId\\}|revisions/\\{revisionId\\}|plans/\\{planId\\}|payment-orders/\\{orderId\\}|refunds/\\{refundId\\})(/|$)",
-    "AGENCY_BILLING": "^/api/v1/(agencies/\\{agencyId\\}|projects/\\{projectId\\}|payment-orders/\\{orderId\\}|quotes/\\{quoteId\\})(/|$)"
+    "AGENCY_BILLING": "^/api/v1/(agencies/{agencyId}|projects/{projectId}|payment-orders/{orderId}|quotes/{quoteId}|refunds/{refundId})(/|$)"
   },
   "caseTemplates": {
     "kernel": "Full public Intelligence API through durable journal and real MC adapter",
@@ -570,7 +581,8 @@
               "fieldCodes": ["UNKNOWN_FIELD"],
               "meaning": "a CLEAN project's audit names a targetContractId: CLEAN binds the one canonical CLEAN target hash and takes no target contract; nothing was written, no grant reserved, no provider called"
             }
-          ]
+          ],
+          "audience": "AGENCY"
         }
       ],
       "rules": [
@@ -631,8 +643,8 @@
       "eventPayloadChanges": [
         {
           "eventType": "audit.queued.v1",
-          "change": "targetContractId is absent for CLEAN (the key stays allowlisted; a CLEAN audit omits it and carries targetContractHash = CLEAN_ONLY_TARGET_HASH)",
-          "breaking": false
+          "optionalKeys": ["targetContractId"],
+          "note": "a CLEAN audit omits targetContractId and carries targetContractHash = CLEAN_ONLY_TARGET_HASH; AUDIT_ORCHESTRATION reads it as optional"
         }
       ],
       "activation": ["the StartAudit, CreatePlan, ApprovePlan and CreateQuote handlers take the CLEAN branch with the canonical CLEAN binding and their tests (C4), CP-01.01's activation"]
@@ -645,7 +657,7 @@
       "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-10-21", "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md" },
       "basis": ["F-24", "WS-1", "O16-HANDOFF"],
-      "requires": [],
+      "requires": ["CP-01.02"],
       "dependsOn": [],
       "pending": [],
       "blockers": [],
@@ -661,7 +673,7 @@
               "kind",
               "enum:QUOTE_PRICE_VALIDITY,FREE_CHECK_RETENTION,EXTENSION,PENDING_PAYMENT_HOLD,PAID_RETENTION",
               true,
-              "Which of the five dates (F-24); PENDING_PAYMENT_HOLD is NOT_APPLICABLE until CP-01.11 and CP-02.17 are adopted."
+              "Which of the five dates (F-24); PENDING_PAYMENT_HOLD is reserved (the item's reservation) and NOT_APPLICABLE until CP-02.17 is active."
             ],
             [
               "state",
@@ -756,7 +768,15 @@
         }
       ],
       "events": [],
-      "activation": ["the dates read built from the quote, retention and extension journals with its tests (C4, C6); the hold's entry stays NOT_APPLICABLE until CP-02.17 is active"]
+      "activation": ["the dates read built from the quote, retention and extension journals with its tests (C4, C6); the hold's entry stays NOT_APPLICABLE until CP-02.17 is active"],
+      "reserves": [
+        {
+          "tokens": ["PENDING_PAYMENT_HOLD", "PROOF_ACCEPTED", "RECORD_TRANSFER_PROOF"],
+          "for": "CP-02.17",
+          "requires": "CP-01.11",
+          "why": "The five dates are the owner's (F-24) and the hold is one of them; its values are decided (CP-01.11) but its activation is blocked by PV1. The kind is in the vocabulary from the start, always NOT_APPLICABLE until CP-02.17 is active, so that activating the hold never widens a closed reply."
+        }
+      ]
     },
     {
       "id": "CP-02.03",
@@ -920,16 +940,33 @@
           ]
         },
         {
+          "name": "PackageArtifactItem",
+          "owner": "13",
+          "flow": "Package manifest artifacts → delivery page",
+          "invariant": "Customer-facing artifacts only: the vocabulary has no EVIDENCE role and no INTERNAL_EVIDENCE privacy, so internal evidence cannot be listed.",
+          "fields": [
+            ["artifactId", "id", true, "Artifact."],
+            ["relativePath", "text", true, "Path inside the package."],
+            ["role", "enum:IMPORT_DATA,REJECTIONS,LINEAGE,MANIFEST,REPORT,INSTRUCTIONS", true, "Role."],
+            ["sha256", "hash", true, "Bytes digest."],
+            ["bytes", "count", true, "Size."],
+            ["mediaType", "label", true, "Media type."],
+            ["recordCount", "count", false, "Records."],
+            ["privacy", "enum:CUSTOMER_DATA,SAFE_SUMMARY", true, "Privacy class."],
+            ["objectApiName", "label", false, "CRM object, for import data."]
+          ]
+        },
+        {
           "name": "PackageSummary",
           "owner": "13",
           "flow": "Package version and manifest → delivery page (G-06)",
-          "invariant": "Lists customer-facing artifacts only (privacy CUSTOMER_DATA or SAFE_SUMMARY); INTERNAL_EVIDENCE never appears.",
+          "invariant": "Lists customer-facing artifacts only (PackageArtifactItem has no internal evidence).",
           "fields": [
             ["packageId", "id", true, "Package."],
             ["projectId", "id", true, "Project."],
             ["state", "enum:STAGED,VERIFIED_PRIVATE,AVAILABLE,RETIRED,REVOKED,DELETED", true, "Package version state."],
             ["manifestVersion", "text", true, "Manifest version."],
-            ["artifacts", "list:Artifact", true, "Customer-facing artifacts."],
+            ["artifacts", "list:PackageArtifactItem", true, "Customer-facing artifacts."],
             ["acceptedRowCount", "count", true, "Rows in import data."],
             ["rejectedRowCount", "count", true, "Rows in the rejections file."],
             ["availableUntil", "utc", false, "Download availability end (the PAID_RETENTION date)."],
@@ -958,6 +995,7 @@
           "invariant": "A refund is a reconciled effect; REQUESTED or APPROVED is never shown as money returned.",
           "fields": [
             ["refundId", "id", true, "Refund."],
+            ["agencyId", "id", true, "Agency of the order."],
             ["projectId", "id", true, "Project."],
             ["orderId", "id", true, "Payment order."],
             ["state", "enum:REQUESTED,APPROVED,SUBMITTING,UNCERTAIN,COMPLETED,FAILED,REJECTED", true, "State."],
@@ -1155,13 +1193,26 @@
           "outcomes": [
             { "status": 404, "code": "NOT_FOUND", "reason": null, "layer": "COMMAND", "meaning": "the agency is not one the caller may read billing of" }
           ]
+        },
+        {
+          "operationId": "ListRefundsAcrossWorkspaces",
+          "kind": "read",
+          "method": "GET",
+          "path": "/api/v1/ops/refunds",
+          "role": "KAURO_OWNER",
+          "audience": "KAURO_OWNER",
+          "scope": "OWNER",
+          "response": { "contract": "RefundListItem", "list": true },
+          "query": [{ "name": "state", "enum": ["REQUESTED", "APPROVED", "SUBMITTING", "UNCERTAIN", "COMPLETED", "FAILED", "REJECTED"], "description": "Filter by state." }],
+          "summary": "Refunds of every workspace, for the owner's refunds page (G-14).",
+          "outcomes": []
         }
       ],
       "modified": [],
       "rules": [
         "Every read is tenant-scoped by the path agency or by the agency selector over a tenant-resolved id; a foreign id answers as an id nobody holds (existing convention).",
         "The SupportCase list returns the registry contract; its state token WAITING_KAVO is emitted as WAITING_KAURO by the generator's brand rule (A2), as the live SupportCaseView does.",
-        "The owner's list of refunds across workspaces (G-14's owner page) is ListRefunds per agency for now; an owner-wide list is CP-02.08's ListCustomers detail and is not invented here."
+        "The owner's refunds page (G-14) reads ListRefundsAcrossWorkspaces; the agency reads its own with ListRefunds."
       ],
       "acceptance": [
         {
@@ -1292,7 +1343,8 @@
                   "required": true,
                   "schema": { "type": "string", "format": "date-time", "pattern": "Z$", "description": "Hard deadline before the extension." }
                 }
-              ]
+              ],
+              "registryContract": "RetentionExtension"
             }
           ],
           "outcomes": [
@@ -1321,7 +1373,7 @@
               "meaning": "the project already used its one extension, in any class: an extension used on the free check leaves none for the paid project; nothing resets a clock"
             }
           ],
-          "registryContract": "RetentionExtension"
+          "audience": "AGENCY"
         }
       ],
       "rules": [
@@ -1379,7 +1431,9 @@
         }
       ],
       "events": [],
-      "eventPayloadChanges": [{ "eventType": "retention_record.extended.v1", "change": "unchanged keys; retentionClass now also takes UNPAID", "breaking": false }],
+      "eventPayloadChanges": [
+        { "eventType": "retention_record.extended.v1", "widenValues": { "retentionClass": ["UNPAID"] }, "note": "the AUTHORITY_JOURNAL consumer replays an UNPAID extension like a paid one" }
+      ],
       "activation": ["CP-01.02's activation: the UNPAID soft deadline written, deletion, restoration, SQL policies and the dates read implemented and tested, the legal wording through LR-01 (C6)"]
     },
     {
@@ -1388,13 +1442,12 @@
       "title": "Versioned consent evidence: the processing authorization at registration and commercial communications per channel",
       "gaps": ["F-08"],
       "class": "APPROVED_AWAITING_REISSUE",
-      "approval": { "source": "law", "date": "2026-10-06", "record": "docs/legal/DATA_PROCESSING_POLICY.md" },
-      "basis": ["F-08", "POL-8.3", "O16-HANDOFF"],
+      "approval": { "source": "law", "date": "2026-10-06", "record": "docs/legal/CHECKLIST.md" },
+      "basis": ["F-08", "LAW-C-04", "LAW-C-05", "LAW-C-11", "LAW-C-51", "O16-HANDOFF"],
       "requires": [],
       "dependsOn": [],
       "pending": [],
       "blockers": [],
-      "adoptionNote": "Adoptable as a contract now. Recording a DATA_PROCESSING_AUTHORIZATION needs a published version of the Policy (CP-01.10, LR-05: operator facts and competent review); until then the command refuses DOCUMENT_VERSION_NOT_PUBLISHED and no registration can claim the authorization.",
       "component": "C8",
       "contracts": [
         {
@@ -1437,7 +1490,7 @@
             ["channel", "enum:EMAIL,CALL,SMS,MESSAGING,NOT_APPLICABLE"],
             ["documentVersion", "label"],
             ["documentHash", "hash"],
-            ["source", "enum:REGISTRATION,CONTACT_FORM,PREFERENCES"]
+            ["source", "enum:REGISTRATION,PREFERENCES"]
           ],
           "precondition": "The caller is authenticated as the person; the document version and hash are the published ones of that kind; each kind and channel is its own request, never bundled.",
           "effect": "Append one GIVEN consent record with its evidence hash and journal it outside the restore boundary.",
@@ -1568,7 +1621,8 @@
       "rules": [
         "Four different things, never confused: consent for commercial communications (this item, optional, per channel), the authorization to process data for the service (this item, required at registration, revoked only through the rights procedure), an authenticated session (proof of who calls, never consent) and step-up assurance for sensitive operations (proof of recent presence, never consent).",
         "A consent is never inferred from a sign-in, a purchase, a support message or a contact form submitted without its own unticked box.",
-        "Outreach to prospects (B12) keeps its own permission evidence (OutreachAuthorization.permissionEvidenceHash); a ConsentRecord is a platform user's, not a prospect's."
+        "Outreach to prospects (B12) keeps its own permission evidence (OutreachAuthorization.permissionEvidenceHash); a ConsentRecord is a platform user's, not a prospect's.",
+        "Withdrawal of the processing authorization is a claim under the rights procedure (Decreto 1074 art. 2.2.2.25.2.6, CHECKLIST C-11): free, at any time, except where a legal or contractual duty requires the data to remain; this command refuses it and names that route."
       ],
       "acceptance": [
         {
@@ -1624,7 +1678,10 @@
           "consumers": ["AUTHORITY_JOURNAL"]
         }
       ],
-      "activation": ["the identity order (C8) serves the commands with the registration flow; no DATA_PROCESSING_AUTHORIZATION is recorded before the Policy is published (CP-01.10, LR-05)"]
+      "activation": [
+        "the identity order (C8) serves the commands with the registration flow; no DATA_PROCESSING_AUTHORIZATION is recorded before the Policy is published (CP-01.10, LR-05)",
+        "the public contact form records its own consent through the inquiry route (createInquiry), not through this authenticated command; that route's evidence follows ConsentRecord (source CONTACT_FORM) in the web and identity orders (C8, C9)"
+      ]
     },
     {
       "id": "CP-02.06",
@@ -1633,7 +1690,7 @@
       "gaps": ["G-09"],
       "class": "APPROVED_AWAITING_REISSUE",
       "approval": { "source": "owner", "date": "2026-09-28", "record": "docs/authority/amendments/A5_CMD024_SPLIT.md" },
-      "basis": ["G-09", "A5", "POL-8.3", "O16-HANDOFF"],
+      "basis": ["G-09", "A5", "LAW-C-04", "O16-HANDOFF"],
       "requires": [],
       "dependsOn": [],
       "pending": [],
@@ -2386,7 +2443,12 @@
         {
           "contract": "CommissionStatement",
           "fields": [
-            ["balance", "ref:StatementBalance", false, "The statement's balance (F-17); present on statements issued after adoption."],
+            [
+              "balance",
+              "ref:StatementBalance",
+              false,
+              "The statement's balance (F-17). Optional in the stored record, which predates adoption; the statement read computes it for every statement, old ones included, from the statement's own items."
+            ],
             ["balanceItems", "list:StatementBalanceItem", false, "Offsets, retainer accruals and reviews (F-16, F-17)."]
           ]
         }
@@ -2404,7 +2466,8 @@
               "direction": "response",
               "edits": [
                 { "op": "addProperty", "property": "balance", "required": true, "schema": { "$ref": "#/components/schemas/StatementBalanceView" } }
-              ]
+              ],
+              "registryContract": "CommissionStatement"
             },
             {
               "name": "StatementBalanceItemView",
@@ -2442,7 +2505,8 @@
                   "required": false,
                   "schema": { "type": "string", "format": "date-time", "pattern": "Z$", "description": "RETAINER: the accrued month." }
                 }
-              ]
+              ],
+              "registryContract": "StatementBalanceItem"
             },
             {
               "name": "StatementBalanceView",
@@ -2461,17 +2525,20 @@
                   "heldCents": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$", "maxLength": 16 },
                   "payableCents": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$", "maxLength": 16 }
                 }
-              }
+              },
+              "registryContract": "StatementBalance"
             }
           ],
-          "outcomes": []
+          "outcomes": [],
+          "audience": "SELLER"
         }
       ],
       "rules": [
         "The retainer accrues monthly from the agreement's start while the engagement lasts, prorated only if the signed agreement says so; with commission.retainerDefaultCentsPerMonth 0 no item appears.",
         "An offset is applied only under the agreement in force and the applicable rules (OPS-4), never presented as automatic beyond that; one refund offsets a line once.",
         "RETAINER items carry the retainer accrual's statement line as lineId, so StatementBalanceItemView.lineId stays required (no break for readers).",
-        "A signed amount prevails under its dates and terms; an obligation already accrued is never removed (CP-01.05 as the owner approved it)."
+        "A signed amount prevails under its dates and terms; an obligation already accrued is never removed (CP-01.05 as the owner approved it).",
+        "A seller reads, on their own statement, which refund and project an offset comes from (F-17, OPS-4: the basis of each offset is shown); never the customer's CRM data."
       ],
       "acceptance": [
         {
@@ -2566,6 +2633,22 @@
             ["otherConditions", "list:AlertCondition", true, "The second line."],
             ["policyVersion", "text", true, "Edition of the alerts policy applied."]
           ]
+        },
+        {
+          "name": "SellerAlertView",
+          "owner": "17",
+          "flow": "Alert evaluation of the seller's own claims → seller home",
+          "invariant": "Only the seller's own claims; no project, agency or pilot alert.",
+          "fields": [
+            ["alertKey", "hash", true, "Deterministic key."],
+            ["subjectKind", "enum:CLAIM", true, "Always a claim."],
+            ["claimId", "id", true, "The seller's claim."],
+            ["kind", "enum:DEADLINE_PASSED,DEADLINE_SOON", true, "Claim end passed or within the alert days."],
+            ["conditionCode", "label", true, "CLAIM_END."],
+            ["dueAt", "utc", true, "The claim's end."],
+            ["since", "utc", true, "When the condition began."],
+            ["policyVersion", "text", true, "Edition of the alerts policy applied."]
+          ]
         }
       ],
       "extendContracts": [],
@@ -2591,14 +2674,14 @@
           "role": "OWN_SELLER_ANY_STATE",
           "audience": "SELLER",
           "scope": "SELLER",
-          "response": { "contract": "Alert", "list": true },
+          "response": { "contract": "SellerAlertView", "list": true },
           "summary": "The seller's own claims 14 and 3 days before their end.",
           "outcomes": []
         }
       ],
       "modified": [],
       "rules": [
-        "Seller alerts concern subjectKind CLAIM of the seller's own claims only; agencyId is absent on them.",
+        "Seller alerts are SellerAlertView: CLAIM subjects of the seller's own claims only, no agency.",
         "INACTIVE counts from the latest act of alerts.relevantProgress.counts only (CP-01.07 as the owner modified it): a material, verifiable change of the project or its deliverables; the acts of neverCounts never reset it.",
         "Progress affects the inactivity alert only: no alert, read or progress moves a retention, legal or quote-validity date."
       ],
@@ -3519,7 +3602,13 @@
           "consumers": []
         }
       ],
-      "eventPayloadChanges": [{ "eventType": "quote.withdrawn.v1", "change": "add withdrawalCode (token, e.g. PLAN_REVISED)", "breaking": false }],
+      "eventPayloadChanges": [
+        {
+          "eventType": "quote.withdrawn.v1",
+          "addKeys": ["withdrawalCode"],
+          "note": "withdrawalCode PLAN_REVISED when a plan revision withdraws the open quote; the allowlist and its migration seed change together"
+        }
+      ],
       "activation": [
         "the core intervention (C7): evidence classes from Migration Core's proving keys, the verification of a declared authoritative external id, CRM IDs and shared addresses; RevisePlan wired; adversarial fixtures (F-27, C11)"
       ]
@@ -3598,8 +3687,8 @@
           "kind": "read",
           "method": "GET",
           "path": "/api/v1/refunds/{refundId}/notice",
-          "role": "AGENCY_READER",
-          "audience": "AGENCY",
+          "role": "AGENCY_BILLING_READER",
+          "audience": "AGENCY_BILLING",
           "scope": "AGENCY_HEADER",
           "response": { "contract": "RefundDecisionNotice" },
           "summary": "The decision notice's state for the customer.",
@@ -3658,7 +3747,10 @@
         "real, verifiable evidence a proof can be checked against",
         "implementation, abuse controls and competent legal review (LR-02) before adoption; CP-01.11 itself stays CONDITIONAL"
       ],
-      "blockers": [{ "kind": "EXTERNAL", "ref": "PV1", "what": "Wise route qualification" }, { "kind": "OWNER", "ref": "CP-01.11", "what": "hold values" }],
+      "blockers": [
+        { "kind": "EXTERNAL", "ref": "PV1", "what": "Wise route qualification" },
+        { "kind": "OWNER", "ref": "CP-01.11", "what": "CP-01.11 stays CONDITIONAL until PV1 (its values are decided)" }
+      ],
       "unlock": "Wise Business is enabled and the ACH route qualified with real evidence (PV1 §2), CP-01.11's pending points hold, and counsel reviews LR-02. The values are already the owner's (2026-10-22).",
       "whyNotYet": "The owner decided the values but blocked activation on PV1: the proof is checked against evidence the route has not shown yet, so the matching rule (AMOUNT_OR_REFERENCE_MISMATCH) would be invented.",
       "component": "C5",
@@ -3772,7 +3864,7 @@
           "type": "transfer_proof.submitted.v1",
           "aggregateKind": "transfer_proof",
           "producer": "CMD078",
-          "payload": { "proofId": "id", "orderId": "id", "agencyId": "id", "amountCents": "count" },
+          "payload": { "proofId": "id", "orderId": "id", "agencyId": "id", "amountCents": "minorUnits" },
           "consumers": ["NOTIFICATIONS"]
         }
       ],
@@ -4032,7 +4124,7 @@
       "gaps": ["F-03"],
       "class": "CONDITIONAL",
       "approval": { "source": "owner", "date": "2026-10-20", "record": "docs/design/ORDER11-FUNCTIONAL-GAPS.md" },
-      "basis": ["F-03", "A3-3.2", "B-03", "O16-HANDOFF"],
+      "basis": ["F-03", "A3-3.2", "B-03", "O16-HANDOFF", "LR-11"],
       "requires": ["CP-01.03"],
       "dependsOn": [],
       "pending": [
@@ -4130,7 +4222,9 @@
         }
       ],
       "modified": [],
-      "rules": [],
+      "rules": [
+        "The public read says PAUSED at intelligence.freeAuditPauseBps (90%); the draft Terms §3.3 still say \"exhausted\": their wording changes only through LR-11, which this item does not touch."
+      ],
       "acceptance": [
         {
           "tag": "PAUSED",
@@ -4211,7 +4305,8 @@
           "method": "POST",
           "path": "/api/v1/agencies/{agencyId}/activate",
           "components": [{ "name": "ActivateAgencyRequest", "direction": "request", "edits": [{ "op": "unrequire", "property": "billingProfileRef" }] }],
-          "outcomes": []
+          "outcomes": [],
+          "audience": "AGENCY"
         },
         {
           "operationId": "CreateQuote",
@@ -4227,7 +4322,8 @@
               "change": "meaning",
               "meaning": "billingProfileRef is not the agency's current fiscal profile, or the agency has none yet: since activation no longer requires one, the first quote is where it is checked"
             }
-          ]
+          ],
+          "audience": "AGENCY_BILLING"
         }
       ],
       "rules": ["The billing profile check moves to CreateQuote (CMD027), which already reads one."],
@@ -4380,6 +4476,21 @@
       "key": "OPENAPI:components/Problem.reason:ENUM_WIDENED",
       "class": "COORDINATED",
       "migration": "Every new reason enters packages/domain FAILURE_REASONS and the outcome catalogues with the handler that answers it, and the web client is regenerated; unknown reasons already fall back to the code (frontends branch on code, then reason). Only the reasons of adopted items are added at each re-issue."
+    },
+    {
+      "key": "EVENTS:audit.queued.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "class": "COORDINATED",
+      "migration": "CP-02.01. The audit domain and AUDIT_ORCHESTRATION read the key as optional for CLEAN, in the backend order (C4), tests first."
+    },
+    {
+      "key": "EVENTS:retention_record.extended.v1:retentionClass:VALUES_WIDENED",
+      "class": "COORDINATED",
+      "migration": "CP-02.04. AUTHORITY_JOURNAL and the restore journal accept UNPAID extensions in the retention order (C6)."
+    },
+    {
+      "key": "EVENTS:quote.withdrawn.v1:withdrawalCode:KEY_ADDED",
+      "class": "COORDINATED",
+      "migration": "CP-02.15. COMMERCE_EVENT_PAYLOAD_ALLOWLIST and the event-type seed migration change in the same commit (the persistence tests prove they are equal)."
     }
   ],
   "examples": {
