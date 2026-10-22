@@ -173,7 +173,9 @@ defect:
 
 Minor points also closed: the pin's provenance label (revision 2 merged in `d38c00b2`, revision 3 on this branch); CP-01 §3.1's leftover line
 on the request schema (revision 3 text). The noisy outcome-consumer lists are left as they are (they over-report, never under-report).
-The re-review of the repaired commit is recorded below.
+The same reviewer re-reviewed the repaired commit (`a60e60eb`): both defects repaired, no regression, classes unchanged, the
+projection rule able to fail and covering every served projection that holds a changed member today; **VERDICT: ACCEPT**. Its one
+remaining label point (CMD075's `stateCheck` now names the preview hash, like CMD073 and CMD074) was aligned in the next commit.
 
 ## 9. Verification and CI
 

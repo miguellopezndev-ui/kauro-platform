@@ -3405,7 +3405,7 @@
           "failure": "An approved plan needs a new revision; a BLOCKED group cannot be unified; a stale preview or a missing approval rejects.",
           "gate": "G-IC-KERNEL",
           "idempotency": "REQUIRED",
-          "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION",
+          "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_AND_PREVIEW_HASH",
           "template": "kernel",
           "package": "C7"
         },
