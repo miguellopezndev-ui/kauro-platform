@@ -12,7 +12,8 @@
 // Owner's section review (2026-10-21), after the migration packages measured (SpotDev: a name, who it is for, three or four short points,
 // one shared action): the section is headed by the choice it asks for (by where the data goes) rather than repeating the H1; what each
 // service delivers is three short points, not one long sentence; and the sample delivery, which is one HubSpot project, is offered once
-// under the cards beside pricing rather than on every card.
+// under the cards beside pricing rather than on every card. The section sits on the sunken band, as How it works's stages do, so the head
+// and the services read as two parts (the head and the first section shared one colour); the sections below alternate from there.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Publication } from "../capabilities.ts";
@@ -102,7 +103,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
   return (
     <>
       <Head kind="path" accent={3} eyebrow={PUBLIC_COPY["nav.services.label"]} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} />
-      <Block id="services-availability" heading={PUBLIC_COPY["services.availability.heading"]} variant="kauro-r2-block--first">
+      <Block id="services-availability" heading={PUBLIC_COPY["services.availability.heading"]} tone="sunken">
         {publication.kind === "READ" ? (
           modes.length === 0 ? <p className="kauro-r2-callout">{PUBLIC_COPY["services.availability.none"]}</p> : null
         ) : (
@@ -127,7 +128,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
         {someClosed ? <p className="kauro-r2-after">{PUBLIC_COPY["services.unavailable.body"]}</p> : null}
         {publication.kind === "READ" && modes.length === 0 ? <p className="kauro-r2-after">{PUBLIC_COPY["services.none.body"]}</p> : null}
       </Block>
-      <Block id="services-scope" heading={PUBLIC_COPY["services.scope.heading"]} tone="sunken">
+      <Block id="services-scope" heading={PUBLIC_COPY["services.scope.heading"]}>
         <div className="kauro-r2-pair">
           <div className="kauro-r2-pair-item kauro-r2-pair-item--in">
             <h3>{PUBLIC_COPY["services.scope.in.label"]}</h3>
@@ -140,7 +141,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
         </div>
         <p className="kauro-r2-after">{PUBLIC_COPY["services.scope.unsupported"]}</p>
       </Block>
-      <Block id="services-limits" heading={PUBLIC_COPY["services.limits.heading"]} lead={PUBLIC_COPY["services.limits.lead"]} layout="split">
+      <Block id="services-limits" heading={PUBLIC_COPY["services.limits.heading"]} lead={PUBLIC_COPY["services.limits.lead"]} layout="split" tone="sunken">
         <GroupedTable
           caption={PUBLIC_COPY["services.limits.caption"]}
           groups={[

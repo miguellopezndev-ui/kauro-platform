@@ -8937,6 +8937,23 @@ body:has(> .kauro-site-header) {
   transform: rotate(8deg);
 }
 
+/* pointed at, the slip straightens and lifts a little and its stamp settles, as Home's ticket and cards answer the pointer; nothing moves
+   on its own or with the scroll (owner, Order 10), and a reduced-motion setting keeps it still */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .kauro-site-main .kauro-handover {
+    transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .kauro-site-main .kauro-handover-stamp {
+    transition: transform 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) 0.08s;
+  }
+  .kauro-site-main .kauro-handover-rock:hover .kauro-handover {
+    transform: rotate(0deg) translateY(-0.25rem);
+  }
+  .kauro-site-main .kauro-handover-rock:hover .kauro-handover-stamp {
+    transform: rotate(3deg) scale(0.96);
+  }
+}
+
 /* ---- state tags: the words always, a dot of colour beside them ---- */
 .kauro-site-main .kauro-r2-state {
   display: inline-flex;
