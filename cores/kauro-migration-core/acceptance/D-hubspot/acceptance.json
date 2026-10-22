@@ -4,37 +4,37 @@
       "byteLength": 214,
       "path": "01_IMPORT/hubspot/associations/company_to_deal.csv",
       "rowCount": 3,
-      "sha256": "d365ee59b082498d1d5fcb1fa3d6bd1744e1192830ca2e9fc409fd375f2746df"
+      "sha256": "026e8b51160c2d6455af48787d636b2baccb509ac4b041125f3fe0450da38892"
     },
     {
       "byteLength": 316,
       "path": "01_IMPORT/hubspot/associations/contact_to_company.csv",
       "rowCount": 5,
-      "sha256": "fa26f0ec53ee3d1330dbb1599e6cf4a033727c76c75f5c2b741cd3ffd7ac3bd5"
+      "sha256": "6692158cd6d4fd883484db81b45ca61435c013f4c81c0cba10e7438c60a7058b"
     },
     {
       "byteLength": 265,
       "path": "01_IMPORT/hubspot/associations/contact_to_deal.csv",
       "rowCount": 4,
-      "sha256": "eea7b38d6c5179a150c3d92875acf3e4ae46924b872acbe7c497f34812cf35ae"
+      "sha256": "a64cbc83387b057907c9f166e34ec77068d0b780e207cd5125f94480f35d5334"
     },
     {
       "byteLength": 374,
       "path": "01_IMPORT/hubspot/companies.csv",
       "rowCount": 4,
-      "sha256": "4f25fc4e9bf08189b631a745004b0b3f1285dea82cfd25df26827137828ec69c"
+      "sha256": "d9f4dda09ed2dcbe6023d9dd5ab73a14aab3a922eb0f94f333dd64cb59e094ed"
     },
     {
       "byteLength": 513,
       "path": "01_IMPORT/hubspot/contacts.csv",
       "rowCount": 5,
-      "sha256": "abacc983bf97a441da56819beeae18f4d44851b10cf9abd3e8f43cb0c85fdb49"
+      "sha256": "403634379884a9bd41235dddd3af255c0caa52839f7a9d81dceadff1f6f3f6be"
     },
     {
       "byteLength": 323,
       "path": "01_IMPORT/hubspot/deals.csv",
       "rowCount": 3,
-      "sha256": "e496f5e2842895b435e7c10d8367d19737ee0e16728e6a7f02a54046e9fa77f6"
+      "sha256": "955eb7536adbbcb884d9f471dd2cb238b75be421379c118edae2eb2fc5fe40a2"
     },
     {
       "byteLength": 77,
@@ -118,7 +118,7 @@
       "byteLength": 1496,
       "path": "03_TRACEABILITY/import-crosswalk.csv",
       "rowCount": 12,
-      "sha256": "958fa9eba2bfa1029fac36b33bbd95dd08dd677831682acdd2e318daba9d1e45"
+      "sha256": "109d7551126f7b843864aa7c92b56ae58794465daab802fc00a1eea86f9ea5b4"
     },
     {
       "byteLength": 3065,
@@ -136,7 +136,7 @@
       "byteLength": 1604,
       "path": "03_TRACEABILITY/reconciliation.json",
       "rowCount": null,
-      "sha256": "ba6fdfa01986cf26f155fdd4e8c307af4833b9205ae68f6f97692f4ef97bba00"
+      "sha256": "d6c79d4b7f05c2f52df83307d363b1e5b5a8f0d7edaa15fa815d18b51595bb49"
     },
     {
       "byteLength": 7169,
@@ -148,19 +148,19 @@
       "byteLength": 8375,
       "path": "04_DOCUMENTATION/audit.md",
       "rowCount": null,
-      "sha256": "20cf33b3f381d486a0054a3f51f7d447d841811e7a5f12801f77ef619c8fd916"
+      "sha256": "75d5a74ac9922a9342c857ab65af6dbfefcb6293b7a72970198703230626614f"
     },
     {
       "byteLength": 518,
       "path": "04_DOCUMENTATION/data-view/hubspot/contacts.csv",
       "rowCount": 5,
-      "sha256": "83ee6e77391aa9bc9e70795b80321019eb53ab089b995dc7f30faf3243964d6c"
+      "sha256": "41cf9c5f675de4600938bce01695dc4f446e594aafbdb61b1433d4132442b4f4"
     },
     {
-      "byteLength": 3495,
+      "byteLength": 5059,
       "path": "04_DOCUMENTATION/import-instructions.md",
       "rowCount": null,
-      "sha256": "1261aa92c7e306a13e303909e279d4386ff9bebf019bce583d26a6a6ccd8b0d3"
+      "sha256": "d9e552167c94630e01b1f46ee12e6afc7249475ea90bae5788e3b04b17ad7ba6"
     }
   ],
   "associations": {
@@ -183,7 +183,7 @@
     "unmappedPreserved": 4
   },
   "configHash": "d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0",
-  "coreVersion": "3.0.0",
+  "coreVersion": "3.1.0",
   "destination": {
     "instanceVerificationItems": 10,
     "keyConflicts": 0,
@@ -198,7 +198,7 @@
     "provenMerges": 0
   },
   "intent": "One shared source bundle rendered for HubSpot.",
-  "manifestSha256": "6177cda1ce9bacc728b25bb38a7250321a3615cd6dc6818b2cea623b4be82241",
+  "manifestSha256": "b3db3ade09ebcfe20ecf228ac94901a458d4e7af5c3f8c08d0d52d1c14bf8457",
   "records": {
     "byObject": {
       "COMPANY": 4,
@@ -208,7 +208,7 @@
     },
     "total": 12
   },
-  "runId": "run_7de4954394a3ebfe70462bc4",
+  "runId": "run_b092454560a38b9920fb268d",
   "sourceRows": {
     "byDisposition": {
       "ISOLATED": 0,

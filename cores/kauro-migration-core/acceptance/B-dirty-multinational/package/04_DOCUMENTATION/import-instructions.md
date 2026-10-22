@@ -1,6 +1,6 @@
 # Import instructions — CLEAN_ONLY
 
-Run `run_13174ec28740b76d61f91a28`, core 3.0.0, package format 2.1.0.
+Run `run_81cbc43492af10a6bff552b9`, core 3.1.0, package format 2.1.0.
 
 Import the files under `01_IMPORT/` and nothing else. Every other directory is evidence:
 `02_EXCEPTIONS/` is what did not go and why, `03_TRACEABILITY/` is the record of what this run

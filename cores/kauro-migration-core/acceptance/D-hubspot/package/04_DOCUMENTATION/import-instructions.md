@@ -1,6 +1,6 @@
 # Import instructions — HUBSPOT
 
-Run `run_7de4954394a3ebfe70462bc4`, core 3.0.0, package format 2.1.0.
+Run `run_b092454560a38b9920fb268d`, core 3.1.0, package format 2.1.0.
 
 Import the files under `01_IMPORT/` and nothing else. Every other directory is evidence:
 `02_EXCEPTIONS/` is what did not go and why, `03_TRACEABILITY/` is the record of what this run
@@ -34,13 +34,13 @@ did, and `04_DOCUMENTATION/` is this file and the audit. None of them is import 
 
 ## Associations
 
-- `01_IMPORT/hubspot/associations/company_to_deal.csv` — COMPANY to DEAL. Each row pairs the `Association Key` value from the COMPANY file with the `Associated Association Key` value from the DEAL file.
-- `01_IMPORT/hubspot/associations/contact_to_company.csv` — CONTACT to COMPANY. Each row pairs the `Association Key` value from the CONTACT file with the `Associated Association Key` value from the COMPANY file.
-- `01_IMPORT/hubspot/associations/contact_to_deal.csv` — CONTACT to DEAL. Each row pairs the `Association Key` value from the CONTACT file with the `Associated Association Key` value from the DEAL file.
+- `01_IMPORT/hubspot/associations/company_to_deal.csv` — COMPANY to DEAL. Each row pairs the `Association Key` value from the COMPANY file with the `Associated Association Key` value from the DEAL file. 3 relationships.
+- `01_IMPORT/hubspot/associations/contact_to_company.csv` — CONTACT to COMPANY. Each row pairs the `Association Key` value from the CONTACT file with the `Associated Association Key` value from the COMPANY file. 5 relationships.
+- `01_IMPORT/hubspot/associations/contact_to_deal.csv` — CONTACT to DEAL. Each row pairs the `Association Key` value from the CONTACT file with the `Associated Association Key` value from the DEAL file. 4 relationships.
 
-Strategy: run a multiple-object import. Add the association key column from the association file to both object files as a common column, then select it under "Common column headers found in your files". The column is a join key for this import only; do not map it to a property.
+Strategy: importing the object files alone creates the records and no association. HubSpot associates two files only through a common column that is a unique identifier of one of the two objects: Record ID, Email for contacts, Company domain name for companies, or a custom property that requires unique values. The `Association Key` column is not a unique identifier and is never mapped to a property; both object files carry a column under that header with different values, so do not select it as a common column. Associations are made in the same multiple-object import that creates the records: do not import an object file a second time to add them, because a record that carries no unique identifier HubSpot matches on, such as every deal, is created again. The step run against a real portal is a contact and its company: add the company's `Company domain name` to the contact's row in the contacts file, under that header, and import the two files together, choosing that column as the common column and as the unique key of companies. It needs the contact to be paired with exactly one company, and that company to carry a domain. A deal has no unique identifier before it exists, and one row holds one value per column, so a contact with more than one company, a deal with more than one contact or company, and a pair whose records carry no unique identifier cannot be associated through these files: they stay listed in their association file, for a person to add in HubSpot after the import. Afterwards download the import's errors: an association HubSpot did not make is listed there with an error type such as ASSOCIATION_RECORD_NOT_FOUND, and the records are created without it.
 
-Expect 12 relationships to be created. 0 could not be resolved and are listed in `02_EXCEPTIONS/unresolved-associations.csv` with the reason for each.
+The association files deliver 12 relationships, and they exist in the destination only once the linking step above has been carried out. 0 could not be resolved and are listed in `02_EXCEPTIONS/unresolved-associations.csv` with the reason for each.
 
 ## What to expect afterwards
 

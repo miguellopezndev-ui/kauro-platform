@@ -20,7 +20,7 @@
     "unmappedPreserved": 7
   },
   "configHash": "c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0",
-  "coreVersion": "3.0.0",
+  "coreVersion": "3.1.0",
   "destination": {
     "instanceVerificationItems": 7,
     "keyConflicts": 0,
@@ -54,7 +54,7 @@
     },
     "deliveredTotal": 15
   },
-  "runId": "run_1f14da073d9785022620c861",
+  "runId": "run_c27043352bd1394a35283f13",
   "sourceRows": {
     "accountedFor": 19,
     "byDisposition": {

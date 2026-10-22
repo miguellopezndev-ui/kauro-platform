@@ -2,13 +2,13 @@
 // What every review page draws (Order 11): the review strip (synthetic data, who the application is shown to, a way to change it, the way
 // back to the review's index), then the screen inside the real application shell. A real screen arrives as `children` (its own page,
 // rendered by the server); a prototype is drawn here from the state the review asks for.
-import { type ReactElement, type ReactNode, useMemo } from "react";
+import { type MouseEvent, type ReactElement, type ReactNode, useMemo } from "react";
 import { CONTEXTS, type ContextKey } from "./contexts.ts";
 import { proposalOf } from "./proposals.ts";
 import { agencyFor } from "./world.ts";
 import { agencyOfPathname, projectOfPathname } from "@web/screens.ts";
 import { projectOf } from "./world-projects.ts";
-import { asHref, REVIEW } from "./links.ts";
+import { asHref, contextHref, REVIEW } from "./links.ts";
 import { ReviewShell } from "./review-shell.tsx";
 import { scriptOf } from "./scenario.ts";
 import { screenDef } from "./screens.tsx";
@@ -30,6 +30,21 @@ export function FrameHost({ id, context, state, pathname, children }: { readonly
     return () => fixed;
   }, [stateDef, context, project]);
   const Prototype = def.Prototype;
+  // Prototypes also contain native anchors and Next links outside AnchorContext.
+  // Scope those at the review boundary, without changing any product component.
+  const keepContext = (event: MouseEvent<HTMLDivElement>): void => {
+    const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+    if (!(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute("download")) return;
+    const href = anchor.getAttribute("href");
+    if (href === null) return;
+    const scoped = contextHref(href, context);
+    if (scoped === href) return;
+    anchor.setAttribute("href", scoped);
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target === "_blank") return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.location.assign(scoped);
+  };
   return (
     <>
       <div className="kauro-review-strip" role="note" aria-label="Review">
@@ -66,9 +81,11 @@ export function FrameHost({ id, context, state, pathname, children }: { readonly
           All screens and states
         </a>
       </div>
-      <ReviewShell appPath={proposalOf(id)?.anonymous === true ? "/login" : pathname} context={context} script={script}>
+      <div onClickCapture={keepContext} onAuxClickCapture={keepContext} onContextMenuCapture={keepContext}>
+      <ReviewShell id={id} appPath={proposalOf(id)?.anonymous === true ? "/login" : pathname} context={context} script={script}>
         {children ?? (Prototype === undefined ? <NotDesigned id={id} /> : <Prototype ctx={ctx} state={stateDef?.key ?? "normal"} project={project} />)}
       </ReviewShell>
+      </div>
     </>
   );
 }

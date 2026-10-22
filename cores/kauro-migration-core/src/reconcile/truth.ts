@@ -1,5 +1,5 @@
 import type { CanonicalObject } from '../domain/canonical.js';
-import type { EdgeDisposition, RowDisposition } from '../domain/disposition.js';
+import type { ContributionKind, EdgeDisposition, RowDisposition } from '../domain/disposition.js';
 import type { RelationshipType } from '../domain/associations.js';
 import type { ReasonCode } from '../domain/reason-codes.js';
 import type { IdentityEvidence } from '../domain/identity.js';
@@ -33,7 +33,7 @@ export interface RowAddress {
  * a row on a relationship-only sheet contributes associations. Keeping these
  * apart lets the reconciliation check both counts without conflating them.
  */
-export type ContributionKind = 'RECORD' | 'ASSOCIATION' | 'NONE';
+export type { ContributionKind };
 
 export interface LineageEntry {
   readonly address: RowAddress;

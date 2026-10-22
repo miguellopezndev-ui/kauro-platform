@@ -95,6 +95,24 @@ on trust.
 `source-lineage.csv` holds one line per source row, with its file, sheet, row
 number, row hash, disposition, reason code and the destination record it fed.
 
+**What a reader of the package may rely on (N1-1).** The vocabulary is closed and
+stated here, so a consumer does not have to infer it from the packages it happens
+to have seen:
+
+- `contribution_kind` is `RECORD` (the row is addressed by a record mapping),
+  `ASSOCIATION` (by association mappings only) or `NONE` (by no mapping at all).
+  `NONE` is written for every `REJECTED_INPUT` row and for every `LEFTOVER` row
+  of a sheet no mapping covers; it is never written for an `OUTPUT`,
+  `MERGED_PROVEN` or `ISOLATED` row.
+- Each sheet in `manifest.json` carries `readerRowCount`, `dataRowCount` and
+  `rejectedRowCount`. `readerRowCount = dataRowCount + rejectedRowCount`: data
+  rows are the rows read as well-formed rows of their sheet, rejected rows are the
+  ones that were not. `SOURCE_ROWS` — `reconciliation.json`'s `sourceRows.total`,
+  and the number of lines of `source-lineage.csv` — is the sum of
+  `readerRowCount` over every sheet, so it counts rejected rows too. Comparing it
+  with the sum of `dataRowCount` alone fails for every package that holds a
+  rejected row.
+
 ### How a disposition is chosen
 
 A row is addressed by exactly one record mapping or, for relationship-only
@@ -527,7 +545,11 @@ apart.
 Everything else is supporting evidence: a shared email address, a shared phone
 number, the same name, the same company domain. Supporting evidence produces a
 duplicate candidate in `duplicate-candidates.csv` and changes nothing. It does
-not accumulate into proof, however much of it there is.
+not accumulate into proof, however much of it there is. The person signals —
+email, phone in international form, full name — are read for a Contact and for a
+Lead alike, each within its own object, so two leads from one web form are
+reported and a Lead and a Contact sharing an email are still not one cluster
+(N1-1, D78; 3.0.0 read them for contacts only).
 
 Consequences:
 
@@ -653,6 +675,19 @@ itself, which is what an unconverted lead is.
   exactly once; the duplicate is `DEDUPLICATED` and points at the survivor.
 - An edge the destination cannot express through file import is `LEFTOVER` with
   the adapter's reason.
+
+**`OUTPUT` means delivered in the package, not created in the destination.** A
+delivered edge is a row of an association file pairing two association keys. No
+supported destination creates a relationship from that pairing alone: HubSpot
+associates two files only through a common column that is one object's unique
+identifier, and Salesforce links a child to its Account only through an
+`AccountId` the package cannot hold, because the Account has none until it is
+loaded. `import-instructions.md` therefore says that importing the object files
+alone creates no relationship, and describes the linking step the destination
+offers, with the vendor's own names for its columns and errors (D78). Generating
+the linked files — from the Account ids Data Loader's success file proves, or from
+an identifier the destination already keys on — is a separate capability that is
+not part of this version (`docs/work/N1-1_MIGRATION_CORE.md`).
 
 ## 10. Isolated vs leftover
 

@@ -1,7 +1,7 @@
 # Migration audit
 
-- Core version: 3.0.0
-- Run id: run_1ea3b00c381f2c04712ae01f
+- Core version: 3.1.0
+- Run id: run_804277973579c4fc441f3ff5
 - Bundle id: B-be4960c54b201b76
 - Configuration hash: b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369
 - Destination: HUBSPOT, import mode CREATE_ONLY

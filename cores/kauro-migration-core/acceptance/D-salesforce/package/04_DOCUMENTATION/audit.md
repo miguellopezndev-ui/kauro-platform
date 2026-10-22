@@ -1,7 +1,7 @@
 # Migration audit
 
-- Core version: 3.0.0
-- Run id: run_1f14da073d9785022620c861
+- Core version: 3.1.0
+- Run id: run_c27043352bd1394a35283f13
 - Bundle id: B-5aa7638ee54fbb15
 - Configuration hash: c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0
 - Destination: SALESFORCE, import mode CREATE_ONLY
@@ -115,3 +115,4 @@ These cannot be decided from files. They are stated here so nobody mistakes sile
 - https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/sforce_api_calls_upsert.htm (reviewed 2026-09-01) — Upsert matching, case sensitivity, duplicate keys within a batch.
 - https://developer.salesforce.com/docs/atlas.en-us.dataLoader.meta/dataLoader/supported_data_types.htm (reviewed 2026-09-01) — Boolean spellings, id lengths, numeric formats, the 1700-4000 date range.
 - https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_platform_bulkapi.htm (reviewed 2026-09-01) — Bulk API limits: 131,072 characters per field, 5,000 fields per record, the daily record allowance.
+- https://github.com/forcedotcom/dataloader/blob/v67.0.0/src/main/java/com/salesforce/dataloader/action/AbstractAction.java (reviewed 2026-10-22) — Data Loader result files, read in the vendor source of v67.0.0 (openSuccessWriter, openErrorWriter; AbstractLoadAction.getStatusColumns): the success file is ID, every column of the input row whether mapped or not, then STATUS; the error file is every input column, then ERROR. SOAP and Bulk API 1.0 paths; not run.

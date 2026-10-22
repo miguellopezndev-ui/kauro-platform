@@ -20,6 +20,8 @@ import type { DestinationAdapter, RelationshipSupport, VendorFieldSpec, VendorOb
  */
 
 const REVIEWED_ON = '2026-09-01';
+/** The source N1-1 added, for the Data Loader step the import instructions describe (D78). */
+const N1_REVIEWED_ON = '2026-10-22';
 
 function field(canonicalField: CanonicalFieldName, header: string, maxLength: number | null = null): VendorFieldSpec {
   return { canonicalField, header, maxLength };
@@ -239,7 +241,7 @@ const HUBSPOT_ADAPTER: DestinationAdapter = {
   ],
   relationships: allRelationships(
     'TWO_FILE_COMMON_COLUMN',
-    'Run a multiple-object import. Add the key column from the association file to both object files as a common column, then select it in the "Common column headers found in your files" menu. Association labels are outside the V1 support envelope, so a two-file import without labels is what this package expects.',
+    'Run a multiple-object import of the two object files, which creates the records and associates them in one import. The common column must be a unique identifier of one of the two objects (Record ID, Email, Company domain name, or a property requiring unique values), never the association key, which is not mapped to any property: for a contact and its one company, the company\'s Company domain name is added to the contact\'s row. A pair that one row cannot express (a record with several partners of the other object, or no unique identifier on either side) is not associated by the files and is added in HubSpot after the import. Association labels are outside the V1 support envelope, so a two-file import without labels is what this package expects.',
   ),
   instanceVerification: [
     {
@@ -529,7 +531,7 @@ const SALESFORCE_ADAPTER: DestinationAdapter = {
               kind: 'SUPPORTED',
               strategy: 'RELATIONSHIP_HEADER_BY_DECLARED_MATCH_FIELD',
               operatorInstructions:
-                'Load the parent object first, then load the child addressing the parent by an indexed field rather than by Id. Contact-to-Account and Opportunity-to-Account are standard relationships named Account, so the parent is addressed as Account plus the field; the __r form applies only to custom-object relationships. The two supported import paths spell that differently, and getting it wrong is refused rather than ignored: a Bulk API CSV uses a dot, "Account.Kauro_Key__c", while Data Loader\'s mapping file uses a colon, "Account:Kauro_Key__c", and rejects the dotted form as an invalid mapping. Data Loader is the qualified path for this envelope. The named field must already exist on the parent and carry the attributes the lookup needs; Kauro does not create it.',
+                'Load the parent object first. The files of this package link a child to its Account only through AccountId, taken by hand from the parent load\'s Data Loader success file, which starts with ID and repeats the unmapped association key (see import-instructions.md); a child with no single proven Account Id is not linked. A second route addresses the parent by an indexed field rather than by Id, where the org already carries one holding a key the child row also carries; this package does not generate that column. Contact-to-Account and Opportunity-to-Account are standard relationships named Account, so the parent is addressed as Account plus the field; the __r form applies only to custom-object relationships. The two supported import paths spell that differently, and getting it wrong is refused rather than ignored: a Bulk API CSV uses a dot, "Account.Kauro_Key__c", while Data Loader\'s mapping file uses a colon, "Account:Kauro_Key__c", and rejects the dotted form as an invalid mapping. Data Loader is the qualified path for this envelope. The named field must already exist on the parent and carry the attributes the lookup needs; Kauro does not create it.',
             } as RelationshipSupport)
           : ({
               kind: 'UNSUPPORTED',
@@ -640,6 +642,12 @@ const SALESFORCE_ADAPTER: DestinationAdapter = {
       url: 'https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_platform_bulkapi.htm',
       reviewedOn: REVIEWED_ON,
       scope: 'Bulk API limits: 131,072 characters per field, 5,000 fields per record, the daily record allowance.',
+    },
+    {
+      url: 'https://github.com/forcedotcom/dataloader/blob/v67.0.0/src/main/java/com/salesforce/dataloader/action/AbstractAction.java',
+      reviewedOn: N1_REVIEWED_ON,
+      scope:
+        'Data Loader result files, read in the vendor source of v67.0.0 (openSuccessWriter, openErrorWriter; AbstractLoadAction.getStatusColumns): the success file is ID, every column of the input row whether mapped or not, then STATUS; the error file is every input column, then ERROR. SOAP and Bulk API 1.0 paths; not run.',
     },
   ],
   customFieldHeader: (label) => label,

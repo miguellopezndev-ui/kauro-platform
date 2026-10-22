@@ -363,3 +363,22 @@ platform (the reader reads whole files into memory; stream or bound it); data-pl
 Recorded, not changed. **Fixed by Order 14** (branch `order14/reports-reader`): the reader scans each table once; the same
 147.5 MB package reads in 1.3 s within a 35 MB V8 heap (it needed 2.8 GB). The worker's 256 MiB in-memory package cap
 (`DEFAULT_MAX_PACKAGE_BYTES`) is now the limit, not the reader.
+
+## F-33. Refund decision notifications have no recorded sender or send state (round 3, Oct 22, 2026)
+
+**Source:** Refunds final critique fix pass, G-R9 (`research/round3-owner/refunds/final/NOTES.md` in Kauro.archive).
+The canonical request records the promise to write by Nov 4, 2026, but the owner refund review packet does not identify who sends the
+post-decision customer message or expose its due/sent fields (`ApproveRefundRequest`, `RefundReviewView`, `RefundView`). This is a
+gap in that packet, not a claim that no notification subsystem exists elsewhere. Approval must not imply customer notification.
+**Opens:** owner/counsel decision about responsibility and wording; notification read/state and owning service; tests of approval
+versus transfer completion versus notification. **Status:** unknown ownership/timing is stated in the design; no sender, command,
+deadline time or delivered message is invented. Existing OQ-R1 to OQ-R4 remain open.
+
+## F-34. Serving a customer directly has no reassignment command (round 3, Oct 22, 2026)
+
+**Source:** Customers critique fix pass, `research/round3-owner/customers/final/NOTES.md` §8 in Kauro.archive.
+CMD048 requires `sellerId`, `serviceAssignmentRef` and `expectedVersion`; `PrepareServiceAssignment` requires `agencyId`,
+`compensation` and `termsHash` (and an agreement for `ASSISTANCE_AGREEMENT`). Neither represents assignment to Kauro's owner or
+unassignment from a seller. **Opens:** owner decision on direct service assignment, then contract/domain transition and tests.
+**Status:** seller-to-seller prepared/review/result states are explicitly hypothetical; no reference, hash or version is fabricated.
+"Serve them yourself" remains unavailable with "Needs a command". Acquisition, commission and residual rights are unchanged.

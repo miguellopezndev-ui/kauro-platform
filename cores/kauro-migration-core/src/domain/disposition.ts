@@ -38,6 +38,23 @@ export const EDGE_DISPOSITIONS = [
 
 export type EdgeDisposition = (typeof EDGE_DISPOSITIONS)[number];
 
+/**
+ * What a source row contributed, as `source-lineage.csv` writes it in
+ * `contribution_kind`. A closed vocabulary, published in the machine contract so
+ * a package reader does not have to learn it from the packages it has seen
+ * (N1-1: the platform's report reader refused `NONE`, F-31).
+ */
+export const CONTRIBUTION_KINDS = [
+  /** The row is addressed by a record mapping. */
+  'RECORD',
+  /** The row is addressed by association mappings only. */
+  'ASSOCIATION',
+  /** The row is addressed by no mapping: every REJECTED_INPUT row, and every LEFTOVER row of a sheet no mapping covers. */
+  'NONE',
+] as const;
+
+export type ContributionKind = (typeof CONTRIBUTION_KINDS)[number];
+
 /** Dispositions whose rows contributed content to a delivered destination record. */
 export const DELIVERING_ROW_DISPOSITIONS: readonly RowDisposition[] = ['OUTPUT', 'MERGED_PROVEN'];
 

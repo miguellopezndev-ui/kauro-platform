@@ -1,6 +1,6 @@
 # Import instructions — CLEAN_ONLY
 
-Run `run_1e78f48c07a50c92162685d9`, core 3.0.0, package format 2.1.0.
+Run `run_a833c27b4f0a52a3c1725472`, core 3.1.0, package format 2.1.0.
 
 Import the files under `01_IMPORT/` and nothing else. Every other directory is evidence:
 `02_EXCEPTIONS/` is what did not go and why, `03_TRACEABILITY/` is the record of what this run
@@ -42,13 +42,13 @@ did, and `04_DOCUMENTATION/` is this file and the audit. None of them is import 
 
 ## Associations
 
-- `01_IMPORT/clean-only/associations/company_to_deal.csv` — COMPANY to DEAL. Each row pairs the `from_association_key` value from the COMPANY file with the `to_association_key` value from the DEAL file.
-- `01_IMPORT/clean-only/associations/contact_to_company.csv` — CONTACT to COMPANY. Each row pairs the `from_association_key` value from the CONTACT file with the `to_association_key` value from the COMPANY file.
-- `01_IMPORT/clean-only/associations/contact_to_deal.csv` — CONTACT to DEAL. Each row pairs the `from_association_key` value from the CONTACT file with the `to_association_key` value from the DEAL file.
+- `01_IMPORT/clean-only/associations/company_to_deal.csv` — COMPANY to DEAL. Each row pairs the `from_association_key` value from the COMPANY file with the `to_association_key` value from the DEAL file. 3 relationships.
+- `01_IMPORT/clean-only/associations/contact_to_company.csv` — CONTACT to COMPANY. Each row pairs the `from_association_key` value from the CONTACT file with the `to_association_key` value from the COMPANY file. 5 relationships.
+- `01_IMPORT/clean-only/associations/contact_to_deal.csv` — CONTACT to DEAL. Each row pairs the `from_association_key` value from the CONTACT file with the `to_association_key` value from the DEAL file. 4 relationships.
 
 Strategy: nothing is imported anywhere. The association files are the delivered representation of the relationships, and the association key column is what pairs the rows.
 
-Expect 12 relationships to be created. 0 could not be resolved and are listed in `02_EXCEPTIONS/unresolved-associations.csv` with the reason for each.
+The association files deliver 12 relationships. 0 could not be resolved and are listed in `02_EXCEPTIONS/unresolved-associations.csv` with the reason for each.
 
 ## What to expect afterwards
 

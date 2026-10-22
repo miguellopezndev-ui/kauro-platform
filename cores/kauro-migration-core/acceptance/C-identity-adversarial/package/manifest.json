@@ -124,7 +124,7 @@
       "kind": "DOCUMENT",
       "path": "03_TRACEABILITY/reconciliation.json",
       "rowCount": null,
-      "sha256": "aeed2b27eea3a5471fd59b11b57431ff9b0fb4b6db4a5dcb9990006c9f99c0c2"
+      "sha256": "8ce2fb8b9c376f65e35b0e72a54b97c6eceb4bebf395a82083f039287b55412a"
     },
     {
       "byteLength": 5801,
@@ -138,19 +138,19 @@
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/audit.md",
       "rowCount": null,
-      "sha256": "35fa9c8f64c7ff9e69196cf4891fdb34aadf4275ee777339e5e8b9db0fab2dd9"
+      "sha256": "9e6f7ca58701f16dc5748fcfe5f0afeda106957eee1ab192297b88441840a2a2"
     },
     {
       "byteLength": 1690,
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/import-instructions.md",
       "rowCount": null,
-      "sha256": "67ffec0258566b233f9434bd620e778d99814cf8bfc0255835646c2e22947abf"
+      "sha256": "5c72a94a5e43da7607d904941d091249d67e2ad7f26c6d97522a9b6568a965ad"
     }
   ],
   "bundleId": "B-be4960c54b201b76",
   "configHash": "b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369",
-  "coreVersion": "3.0.0",
+  "coreVersion": "3.1.0",
   "inputs": [
     {
       "byteLength": 527,
@@ -195,9 +195,9 @@
   ],
   "manifestVersion": "2.1.0",
   "relationshipCandidates": 0,
-  "runId": "run_1ea3b00c381f2c04712ae01f",
+  "runId": "run_804277973579c4fc441f3ff5",
   "sourceProfileHash": null,
-  "sourceRegistryVersion": "2026-09-06",
+  "sourceRegistryVersion": "2026-10-22",
   "target": {
     "adapterVersion": "2.0.0",
     "importMode": "CREATE_ONLY",
