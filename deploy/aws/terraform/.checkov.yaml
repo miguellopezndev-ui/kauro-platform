@@ -1,0 +1,41 @@
+# Checkov over deploy/aws/terraform (Order 25 §8; .github/workflows/aws-iac.yml). Each skipped check is a reviewed design decision,
+# with the contract or decision that makes it so (docs/design/B14-B-aws-infrastructure.md). A new finding fails CI until it is fixed
+# or reviewed here.
+framework:
+  - terraform
+skip-path:
+  - .terraform
+compact: true
+quiet: true
+skip-download: true
+skip-check:
+  # Encryption with a customer-managed KMS key: SSE-S3 / AWS-managed keys everywhere (B14-A qualification §4: a KMS key and its
+  # interface endpoint are a fixed cost no contract requires; Object Lock does not depend on it).
+  - CKV_AWS_145  # S3 default encryption with KMS
+  - CKV_AWS_158  # CloudWatch log group with KMS (logs carry identifiers only)
+  - CKV_AWS_136  # ECR with KMS
+  - CKV_AWS_35   # CloudTrail with KMS
+  - CKV_AWS_26   # SNS alarm topic with KMS (alarm text, no customer data)
+  # Retention and logging volumes fixed by contract (policy.json: ordinary logs 30 days, security logs 180), not one year.
+  - CKV_AWS_338
+  # S3 server access logging: CloudTrail S3 data events cover the protected buckets (D-19); an Object Lock bucket cannot receive
+  # server access logs (S3 Object Lock considerations).
+  - CKV_AWS_18
+  # Cross-Region replication: A9 excludes permanent HA before a contract requires it; RPO/RTO are BLOCKED_OWNER (ACTIVATION gate 8).
+  - CKV_AWS_144
+  # S3 event notifications: the guard alarms use CloudTrail events through EventBridge (modules/audit-trail).
+  - CKV2_AWS_62
+  # CloudTrail to CloudWatch Logs and an SNS topic per delivery: paid duplicates of what the audit bucket and the EventBridge guard
+  # rules already provide.
+  - CKV2_AWS_10
+  - CKV_AWS_252
+  # Container Insights: a paid CloudWatch feature; the worker reports its own peaks (B14-A executor §5).
+  - CKV_AWS_65
+  # VPC flow logs: no contract requires them at rest; QUALIFICATION part C proves the worker's egress denials live. Revisit with the
+  # runtime decision.
+  - CKV2_AWS_11
+  # Security groups created for tasks that RunTask (worker) or the future runtime (platform, database) attach: not attached in IaC.
+  - CKV2_AWS_5
+  # The owner's administrator permission set (D-21 A): the one human administrator session, MFA on every sign-in, bounded in the
+  # member accounts by the guard SCPs and RCP.
+  - CKV_AWS_274

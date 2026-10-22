@@ -1,0 +1,27 @@
+{
+  "$comment": "Order 25 (D-19, D-21 A): the identity policy of one environment's retention/deletion identity (role kauro-deletion/kauro-<env>-retention-deletion), the only principal any policy lets bypass governance retention. Its code is published only in the owner's session, signed. What it deletes and when is B16's (that logic is not built here).",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RemoveAndRetainProtectedObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:BypassGovernanceRetention", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:GetObjectLegalHold", "s3:GetObjectRetention",
+        "s3:GetObjectVersion", "s3:PutObjectLegalHold", "s3:PutObjectRetention"
+      ],
+      "Resource": ["arn:aws:s3:::${OBJECT_BUCKET}/*", "arn:aws:s3:::${JOURNAL_BUCKET}/*"]
+    },
+    {
+      "Sid": "ListProtectedObjects",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:ListBucketVersions"],
+      "Resource": ["arn:aws:s3:::${OBJECT_BUCKET}", "arn:aws:s3:::${JOURNAL_BUCKET}"]
+    },
+    {
+      "Sid": "OwnLogGroup",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:${REGION}:${DATA_ACCOUNT_ID}:log-group:/kauro/${ENVIRONMENT}/retention-deletion:*"
+    }
+  ]
+}

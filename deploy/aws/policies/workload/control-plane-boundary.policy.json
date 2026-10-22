@@ -1,0 +1,31 @@
+{
+  "$comment": "Order 25: the permissions boundary of the control plane's role (kauro-runtime/kauro-<env>-control-plane). Its ceiling: run, observe and stop worker tasks; the attempt roles' life cycle (still only within the attempt boundary, by the SCP); the platform's objects; its own logs and secrets. Never other IAM, never STS into another account, never the actions the data account reserves to its deletion identity (which the data account's RCP and bucket policies deny anyway).",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RuntimeCeiling",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeTasks", "ecs:ListTasks", "ecs:RunTask", "ecs:StopTask", "ecs:TagResource",
+        "logs:CreateLogStream", "logs:PutLogEvents",
+        "s3:AbortMultipartUpload", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:GetObject", "s3:GetObjectAttributes",
+        "s3:GetObjectLegalHold", "s3:GetObjectRetention", "s3:GetObjectVersion", "s3:GetObjectVersionAttributes", "s3:ListBucket",
+        "s3:ListBucketMultipartUploads", "s3:ListBucketVersions", "s3:ListMultipartUploadParts", "s3:PutObject", "s3:PutObjectRetention",
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AttemptRoleLifeCycle",
+      "Effect": "Allow",
+      "Action": ["iam:CreateRole", "iam:DeleteRole", "iam:DeleteRolePolicy", "iam:PassRole", "iam:PutRolePolicy"],
+      "Resource": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-attempts/kauro-attempt-*"
+    },
+    {
+      "Sid": "PassTheWorkerExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-*-worker-execution"
+    }
+  ]
+}

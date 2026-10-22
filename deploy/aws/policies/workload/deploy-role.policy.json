@@ -1,0 +1,16 @@
+{
+  "$comment": "Order 25: the GitHub OIDC deploy identity of the workload account (role kauro-deploy/kauro-<env>-image-publisher). It pushes worker images to the one repository and reads them back; it changes no infrastructure, no IAM and no data. Terraform is applied in the owner's administrator session (procedures/PROVISIONING.md). A stolen workflow token therefore reaches one ECR repository, whose tags are immutable and whose image runs only once the owner pins its digest.",
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "EcrToken", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Sid": "PushWorkerImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:CompleteLayerUpload", "ecr:DescribeImageScanFindings",
+        "ecr:DescribeImages", "ecr:GetDownloadUrlForLayer", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart"
+      ],
+      "Resource": "${ECR_REPOSITORY_ARN}"
+    }
+  ]
+}

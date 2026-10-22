@@ -1,0 +1,106 @@
+{
+  "$comment": "Order 25 (D-19, D-21 A, B07/B08 zones): the data account's statements on one environment's customer-data bucket. The worker protocol's own statements (deploy/aws/worker/bucket-policy.template.json, where ACCOUNT_ID is the workload account) are appended to these by the manifest. Cross-account grants go to exactly three workload principals: the per-attempt roles (their boundary's six prefixes), the control plane (the platform's zones and protocol keys, deletion only under staging/), and nothing else. Deletion outside staging, legal holds and the governance bypass belong to the data account's deletion identity alone; the bucket's own guards change only in the owner's administrator session.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AttemptRolesWithinTheirCeiling",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:root" },
+      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:AbortMultipartUpload"],
+      "Resource": [
+        "arn:aws:s3:::${OBJECT_BUCKET}/tickets/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/accepted/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/staging/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/claims/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/results/*",
+        "arn:aws:s3:::${OBJECT_BUCKET}/heartbeat/*"
+      ],
+      "Condition": { "ArnLike": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-attempts/kauro-attempt-*" } }
+    },
+    {
+      "Sid": "ControlPlaneObjects",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:root" },
+      "Action": [
+        "s3:AbortMultipartUpload", "s3:GetObject", "s3:GetObjectAttributes", "s3:GetObjectLegalHold", "s3:GetObjectRetention",
+        "s3:GetObjectVersion", "s3:GetObjectVersionAttributes", "s3:ListMultipartUploadParts", "s3:PutObject", "s3:PutObjectRetention"
+      ],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/*",
+      "Condition": { "ArnEquals": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-${ENVIRONMENT}-control-plane" } }
+    },
+    {
+      "Sid": "ControlPlaneListing",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:root" },
+      "Action": ["s3:ListBucket", "s3:ListBucketVersions", "s3:ListBucketMultipartUploads"],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}",
+      "Condition": { "ArnEquals": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-${ENVIRONMENT}-control-plane" } }
+    },
+    {
+      "Sid": "ControlPlaneCleansStagingOnly",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:root" },
+      "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/staging/*",
+      "Condition": { "ArnEquals": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-${ENVIRONMENT}-control-plane" } }
+    },
+    {
+      "Sid": "DeletesOutsideStagingOnlyByTheDeletionIdentity",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "NotResource": "arn:aws:s3:::${OBJECT_BUCKET}/staging/*",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*" } }
+    },
+    {
+      "Sid": "StagingDeletesOnlyByControlPlaneOrDeletionIdentity",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/staging/*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*",
+            "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-${ENVIRONMENT}-control-plane"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "GovernanceBypassAndLegalHoldOnlyByTheDeletionIdentity",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:BypassGovernanceRetention", "s3:PutObjectLegalHold"],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/*",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*" } }
+    },
+    {
+      "Sid": "BucketGuardsChangeOnlyInTheOwnerSession",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": [
+        "s3:DeleteBucket", "s3:DeleteBucketPolicy", "s3:PutBucketAcl", "s3:PutBucketCORS", "s3:PutBucketLogging",
+        "s3:PutBucketObjectLockConfiguration", "s3:PutBucketOwnershipControls", "s3:PutBucketPolicy", "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketVersioning", "s3:PutEncryptionConfiguration", "s3:PutLifecycleConfiguration", "s3:PutReplicationConfiguration"
+      ],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+    },
+    {
+      "Sid": "NeverComplianceMode",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:PutObject", "s3:PutObjectRetention"],
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/*",
+      "Condition": { "StringEquals": { "s3:object-lock-mode": "COMPLIANCE" } }
+    },
+    {
+      "Sid": "NoObjectAcls",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObjectAcl",
+      "Resource": "arn:aws:s3:::${OBJECT_BUCKET}/*"
+    }
+  ]
+}

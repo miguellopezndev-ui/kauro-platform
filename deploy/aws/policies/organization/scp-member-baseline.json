@@ -1,0 +1,53 @@
+{
+  "$comment": "Order 25 (D-21 A): SCP attached to the Data and Workloads OUs (never to the management account, which no SCP restricts). Members never leave the organization; the member root user does nothing; every regional action stays in the one allowed US Region (legal checklist A-06); no IAM user or static key exists (A9: GitHub OIDC, no static keys); nobody but AWS creates a role under the reserved Identity Center path that the guard policies use as the owner's identity.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyLeavingTheOrganization",
+      "Effect": "Deny",
+      "Action": "organizations:LeaveOrganization",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyMemberRootUser",
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": { "ArnLike": { "aws:PrincipalArn": "arn:aws:iam::*:root" } }
+    },
+    {
+      "Sid": "DenyOutsideTheAllowedRegion",
+      "Effect": "Deny",
+      "NotAction": [
+        "account:*", "aws-portal:*", "billing:*", "budgets:*", "ce:*", "cloudfront:*", "cur:*", "freetier:*", "health:*",
+        "iam:*", "identitystore:*", "invoicing:*", "notifications:*", "organizations:*", "payments:*", "pricing:*",
+        "route53:*", "route53domains:*", "s3:GetAccountPublicAccessBlock", "s3:ListAllMyBuckets", "s3:PutAccountPublicAccessBlock",
+        "shield:*", "signin:*", "sso:*", "sso-directory:*", "sts:*", "support:*", "tax:*", "trustedadvisor:*"
+      ],
+      "Resource": "*",
+      "Condition": { "StringNotEquals": { "aws:RequestedRegion": "${ALLOWED_REGION}" } }
+    },
+    {
+      "Sid": "DenyIamUsersAndStaticKeys",
+      "Effect": "Deny",
+      "Action": ["iam:CreateUser", "iam:CreateAccessKey", "iam:CreateLoginProfile", "iam:UpdateLoginProfile"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyReservedRolePaths",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:UpdateAssumeRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:PutRolePermissionsBoundary", "iam:DeleteRolePermissionsBoundary"
+      ],
+      "Resource": "arn:aws:iam::*:role/aws-reserved/*"
+    },
+    {
+      "Sid": "DenyAccountPublicAccessBlockChanges",
+      "Effect": "Deny",
+      "Action": "s3:PutAccountPublicAccessBlock",
+      "Resource": "*",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+    }
+  ]
+}
