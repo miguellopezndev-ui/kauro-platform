@@ -110,3 +110,18 @@ in `ORDER11-ROUND3-MASTER-PLAN.md`, and every record is the page's `AUDITIONS.md
 - **`gates.mjs`:** gates, run through Edge (`gates-edge.mjs` in each page's `build\`).
 - **`anatomy.mjs`:** checks values against the type and spacing scales.
 - **`colour-share.mjs`:** measures wine and the other colour shares.
+
+## 6. What changed in the product code, and when (from git; the owner asked)
+
+All of it is on `order11/private-review` and **not yet in `main`**. Main ends at PR #117 (Order 10).
+
+| When (Bogotá) | Work | Code changed | Record |
+|---|---|---|---|
+| Oct 20, 12:56–23:38 | Order 11 round 1: the private-screen review environment, then groups A–E of the private screens redesigned on the owner's decisions; public-site variants at `/__variants` | `tools/review/private` (prototypes and the review shell), parts of `apps/web` (Finance, settings) | `ORDER11-PRIVATE-DESIGN.md`, `ORDER11-REVIEW-LOG.md` |
+| Oct 21, 11:07–18:04 | Order 11 round 2, after the owner's walk ("results, not proposals; every page rebuilt except Home"): **the public pages except Home** on one type scale and one closing band; the public header and footer; one dark theme; the owner and seller consoles and the agency workspace rebuilt in the review prototypes | `apps/web/src/public/*`, `app/(public)/*`, `copy/*`; `tools/review/private/*` | `ORDER11-ROUND2-PUBLIC.md`, `ORDER11-ROUND2-OPS.md`, `ORDER11-ROUND2-WORKSPACE.md` |
+| Oct 21, 18:08–20:55 | Section-by-section work on **How it works** and **Supported services** (the stages timeline, the closing band, the scope lists; amendment R2-2, recorded as approved by the owner) | `apps/web/src/public/pages/how-it-works.tsx`, `supported-services.tsx` and the shared parts | the commit messages; `research\round3-how-*`, `research\round3-services-*` |
+| Oct 21, 21:29 – Oct 22, 06:46 | **Round 3** (this handoff): plans, foundations, kit, owner console studies, deliverables | **No product code.** Only `docs/design/*` and the canonical world (`tools/review/private/lib/canon`) | this file |
+
+**So the public-site changes the owner noticed were made on Oct 21 in round 2 and in the section work, not in round 3.** The owner
+says some of them were not authorised. Before this branch merges, the owner should confirm which public changes to keep. Any of them
+can be reverted on the branch, file by file, from the commits above.
