@@ -5,14 +5,14 @@
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/salesforce/Account.csv",
       "rowCount": 4,
-      "sha256": "f67571aa38f82a714cf4d7e8aa23d69fb98ee6fc314f90de1a0e2b3eb4cbf3c8"
+      "sha256": "0084bea22bf93af04c05df52ce976932251b285f9cdd4e9a2f891f1c5a182978"
     },
     {
       "byteLength": 509,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/salesforce/Contact.csv",
       "rowCount": 5,
-      "sha256": "16d0818b7890681fa9f37b105c55829af45d4385200b5a82543a3f5066544b91"
+      "sha256": "6dd8890e6f33fb0be8631c5efe4600a6bc1df9ca863a85e5a9f35f4597ae13a9"
     },
     {
       "byteLength": 280,
@@ -26,21 +26,21 @@
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/salesforce/Opportunity.csv",
       "rowCount": 3,
-      "sha256": "bc5cff1c925f2fb28e09fccf126a8704f26e7001e2516eae1cb2cfa23643f7f7"
+      "sha256": "6cb128ccefb0d5bc79db2b05e5c61d6570a894008d784f53c001306e1ee82698"
     },
     {
       "byteLength": 229,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/salesforce/associations/company_to_deal.csv",
       "rowCount": 3,
-      "sha256": "2043fb59027be142459e4eb0dcb5e5812bcc243a3edd56b338971a79ae01b632"
+      "sha256": "5b7fa3db6aa386ca9e0e20943a75f7b43c87f01325bfb2a5b38909461ee92672"
     },
     {
       "byteLength": 331,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/salesforce/associations/contact_to_company.csv",
       "rowCount": 5,
-      "sha256": "c401764814e7387498ec69c5f9d8e2ed9d38c89fa7fce0cdede72cd0d6ccfbc8"
+      "sha256": "0104d698ecff9cc60d85347df3c3b0d96bdf43cd3c9bb7133d8d2c20f28b5fdd"
     },
     {
       "byteLength": 76,
@@ -145,7 +145,7 @@
       "kind": "MACHINE_EVIDENCE_CSV",
       "path": "03_TRACEABILITY/import-crosswalk.csv",
       "rowCount": 15,
-      "sha256": "48a95b654b76257a3509952b7d15cc964c85ebf1b64c961991f02741af708016"
+      "sha256": "326cc6b62d7df84037022d98b0f090e03e56ab29bcbf4d070e832a62d0724c56"
     },
     {
       "byteLength": 2197,
@@ -166,7 +166,7 @@
       "kind": "DOCUMENT",
       "path": "03_TRACEABILITY/reconciliation.json",
       "rowCount": null,
-      "sha256": "7d2305a9c30f8ba08074a415d92c3fa88be6cf643e70b0509e76019984555ae3"
+      "sha256": "970b2be796dfbf518b80d281728ad87ec54bb174b3efe7bc94597a425928bd25"
     },
     {
       "byteLength": 9147,
@@ -176,18 +176,18 @@
       "sha256": "eec21760ef84c9385d545e6af29ba6f24dd59cd59546aa91ad4fb5fd99f8c86e"
     },
     {
-      "byteLength": 10352,
+      "byteLength": 10818,
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/audit.md",
       "rowCount": null,
-      "sha256": "20a06663ca7f3985689db6103e276d1acad28db5e51303f41a23f484c7878b07"
+      "sha256": "1cbba42c8516ad9714698ab4fe58396cde8b4b41f4364a5882d61077e08c5211"
     },
     {
       "byteLength": 514,
       "kind": "HUMAN_VIEW_CSV",
       "path": "04_DOCUMENTATION/data-view/salesforce/Contact.csv",
       "rowCount": 5,
-      "sha256": "4df3d3887d63e5f033fadc906d7d578d8bb0aed52eda3696533436b4a91b8ecc"
+      "sha256": "8b2e5bbf2e36022aa592480b688ccd661e2ce1fabbe3d36cf97b8fa4962704d2"
     },
     {
       "byteLength": 283,
@@ -197,16 +197,16 @@
       "sha256": "f14c238ee3affa7fee386cf418b23eb96517e52c638a8d9a32e7fc3d5d17b66e"
     },
     {
-      "byteLength": 3880,
+      "byteLength": 5202,
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/import-instructions.md",
       "rowCount": null,
-      "sha256": "5ac29d9458ea3b09c42a514784a3b05b68e86eb0f914713a88236fc7612bcde0"
+      "sha256": "ed7bfd7d1106a4ae82cc3b907babfbc283933a806b024895ffa35094a5bd9509"
     }
   ],
   "bundleId": "B-5aa7638ee54fbb15",
   "configHash": "c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0",
-  "coreVersion": "3.0.0",
+  "coreVersion": "3.1.0",
   "inputs": [
     {
       "byteLength": 458,
@@ -311,9 +311,9 @@
   ],
   "manifestVersion": "2.1.0",
   "relationshipCandidates": 12,
-  "runId": "run_1f14da073d9785022620c861",
+  "runId": "run_c27043352bd1394a35283f13",
   "sourceProfileHash": null,
-  "sourceRegistryVersion": "2026-09-06",
+  "sourceRegistryVersion": "2026-10-22",
   "target": {
     "adapterVersion": "2.0.0",
     "importMode": "CREATE_ONLY",

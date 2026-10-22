@@ -5,42 +5,42 @@
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/clean-only/associations/company_to_deal.csv",
       "rowCount": 3,
-      "sha256": "176a6f4e4fa2b94df34f6b80f0852fbe5a59b3ab0b8ec10e011988ca7f88497a"
+      "sha256": "c48776f500a5b4b6e3fca7010b78840c042e17c12f370abcedb886e035f01ef1"
     },
     {
       "byteLength": 313,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/clean-only/associations/contact_to_company.csv",
       "rowCount": 5,
-      "sha256": "4de62b0205ad10810697a7509d16e759fa0faf09b69cab7852953d188802fc7f"
+      "sha256": "084b379e9355709ee8dae9cdfa756e65e4b831b6f6bb05383e8bfe39ef33cb78"
     },
     {
       "byteLength": 262,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/clean-only/associations/contact_to_deal.csv",
       "rowCount": 4,
-      "sha256": "6af50f1164597f2e855fd1ba2205d1ced568d3478f3737b33f7294953002e74e"
+      "sha256": "5c418b3152381f53b20c6da778e37ca7dc20e47a3deb2ac72d9a208b710bfdcb"
     },
     {
       "byteLength": 423,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/clean-only/companies.csv",
       "rowCount": 4,
-      "sha256": "fea35359dd7b2fd11368c9bb3056100c38383ef995956deb91f1f7f7ec81b5a5"
+      "sha256": "96d70378cded4681daf7f15307a756d8770a5b567febd7adf0cf17cc987bbb14"
     },
     {
       "byteLength": 543,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/clean-only/contacts.csv",
       "rowCount": 5,
-      "sha256": "c7defc44f3eedcb60c0b0f513829d59fe9052bd68eb24eaf6e1fe4625e14c2bb"
+      "sha256": "3f98f31fb01b95404f270cd6d420b8edea313a4f725ffbea855c4dc65daa5c42"
     },
     {
       "byteLength": 337,
       "kind": "MACHINE_IMPORT_CSV",
       "path": "01_IMPORT/clean-only/deals.csv",
       "rowCount": 3,
-      "sha256": "98ec83b57e80539d4b543a05a7cf34211717ea761cc2a90d4868be5e5819e45b"
+      "sha256": "5386e940b653b24efcf596e2f1efba0a3758cfbf6906eab845d3f3aaa004162a"
     },
     {
       "byteLength": 310,
@@ -145,7 +145,7 @@
       "kind": "MACHINE_EVIDENCE_CSV",
       "path": "03_TRACEABILITY/import-crosswalk.csv",
       "rowCount": 15,
-      "sha256": "b1a359f9ed4bb77bf90173100a5b3df92885ee24f6377929e708bad524c82c64"
+      "sha256": "29ba92f5606e71c9f5843bef423bff34224fc7edd71d58b65a80b2821639ef90"
     },
     {
       "byteLength": 36,
@@ -166,7 +166,7 @@
       "kind": "DOCUMENT",
       "path": "03_TRACEABILITY/reconciliation.json",
       "rowCount": null,
-      "sha256": "c4d3229c5e297c649751c2ece911b9eee20616a4bf5c4d9e0e88fad0ba45eb4e"
+      "sha256": "5380a4112949211d1abac425ae7954854b8e739ed9e2883a984574824e62893e"
     },
     {
       "byteLength": 8531,
@@ -180,14 +180,14 @@
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/audit.md",
       "rowCount": null,
-      "sha256": "b6c6a10a93a6d6d198ac71a5f9473de1daaed71c02656863a42041586304922a"
+      "sha256": "562f037bb55e7877e2263f7e47e7d7748138405af0bea17b3a3bbb98fc1d44c6"
     },
     {
       "byteLength": 548,
       "kind": "HUMAN_VIEW_CSV",
       "path": "04_DOCUMENTATION/data-view/clean-only/contacts.csv",
       "rowCount": 5,
-      "sha256": "6d4ed88a4be27bc4d6f5ba963e40891a57d9351bf1aa925daeac8e163bbfa5ff"
+      "sha256": "a9bb5aa486599e8cd3de64d7ee0577d2a2ebef0404957dec3a99448c69956084"
     },
     {
       "byteLength": 313,
@@ -197,16 +197,16 @@
       "sha256": "ed1cd7b76248c2de75fa6581ca5014f7b51bacb37a52417c3682056322ddb87c"
     },
     {
-      "byteLength": 3630,
+      "byteLength": 3690,
       "kind": "DOCUMENT",
       "path": "04_DOCUMENTATION/import-instructions.md",
       "rowCount": null,
-      "sha256": "afd3a10aa9cc5f8de8c3051c04ec7a894e8f313bd911e979deafae7edfe3a64c"
+      "sha256": "e13f46c522dc6675253059078cd6f76b262aedcf5c73a76d5b037d5e996d689b"
     }
   ],
   "bundleId": "B-5aa7638ee54fbb15",
   "configHash": "159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab",
-  "coreVersion": "3.0.0",
+  "coreVersion": "3.1.0",
   "inputs": [
     {
       "byteLength": 458,
@@ -311,9 +311,9 @@
   ],
   "manifestVersion": "2.1.0",
   "relationshipCandidates": 12,
-  "runId": "run_1e78f48c07a50c92162685d9",
+  "runId": "run_a833c27b4f0a52a3c1725472",
   "sourceProfileHash": null,
-  "sourceRegistryVersion": "2026-09-06",
+  "sourceRegistryVersion": "2026-10-22",
   "target": {
     "adapterVersion": "1.0.0",
     "importMode": "CREATE_ONLY",

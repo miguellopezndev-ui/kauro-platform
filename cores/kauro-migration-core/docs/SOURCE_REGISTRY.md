@@ -12,7 +12,16 @@ import wizard at the other end, so it carries no vendor documentation. Only the
 two vendor modes have pages below.
 
 The machine-readable form is `spec/vendor/source-registry.json`, generated from
-the adapter definitions. Registry version: **2026-09-06**.
+the adapter definitions. Registry version: **2026-10-22**.
+
+What was revised on **2026-10-22** (N1-1, D78): one source was added and two
+facts were read again, for the steps `import-instructions.md` now describes for
+relationships. One `KAURO_DECISION` was corrected, the HubSpot common column below. The source is the Data Loader v67.0.0
+code that writes the success and error files, because the Salesforce
+documentation pages still answer 403. That is a reading of the vendor's source,
+not a run: the qualification campaign never loaded a file carrying an unmapped
+column. The two facts are HubSpot's, on pages already listed: which identifiers a
+common column may be, and the association errors of the downloaded error file.
 
 The version records when the registry was last revised, not a claim that every
 page below was swept on that date — each section carries its own review date.
@@ -191,11 +200,16 @@ Reviewed 2026-09-04. All pages below resolved.
   itself does not. Association identifier values must contain no line breaks and
   be at most 100 characters.
 - `KAURO_DECISION`. The adapter uses the two-file form, and labels are outside the
-  support envelope, so that subscription gate is not relied on. The common column
-  is `Association Key` on the object files, and `Association Key` and
-  `Associated Association Key` on the association file. HubSpot does not name
-  those columns; Kauro does, and the operator selects the object-file one in the
-  "Common column headers found in your files" menu.
+  support envelope, so that subscription gate is not relied on. The object files
+  carry `Association Key`, and the association file `Association Key` and
+  `Associated Association Key`, so that the pairs can be read; HubSpot does not
+  name those columns, and they are not a common column it accepts, because a
+  common column must be a unique identifier (below). The operator never selects
+  or maps them. The common column is the parent's own identifier — for a contact
+  and its one company, the company's `Company domain name` added to the contact's
+  row (qualification case I7). Corrected 2026-10-22 (N1-1, D78): until then this
+  bullet said the operator selects `Association Key` in the "Common column headers
+  found in your files" menu.
 - `DOCUMENTED`. The documentation names contact-to-company, contact-to-deal,
   deal-to-company and call-to-contact as association pairs, and does not
   enumerate the rest.
@@ -222,6 +236,16 @@ Reviewed 2026-09-04. All pages below resolved.
   imports cleanly, reports no error, and leaves the value exactly where it was.
   The adapter refuses rather than emitting one, and `docs/CONTRACT.md` section 5b
   states the rule.
+- `DOCUMENTED` 2026-10-22 (N1-1). Records in two files are associated through
+  a common column, and that column must be a unique identifier of one of the two
+  objects: Record ID, Email for contacts, Company domain name for companies, or a
+  custom property that requires unique values ("Set up your import file"; the
+  Imports API guide states the same for `associationIdentifierColumn`). Kauro's
+  association key is none of them, so the instructions never offer it as one.
+- `DOCUMENTED` 2026-10-22 (N1-1). The downloaded error file lists associations
+  that were not made — "Association record not found" and the other association
+  errors — and the records themselves are still imported ("Troubleshoot import
+  errors").
 - `DOCUMENTED`. Import mode, the date format and the column-header language are
   chosen by the operator in the wizard. **A file cannot declare them**, so the
   package states which mode it was produced for and the operator must select it.
@@ -299,6 +323,7 @@ carried, and is cited in its own right below:
 | URL | Scope | Status 2026-09-04 |
 | --- | --- | --- |
 | https://github.com/forcedotcom/dataloader/releases | The Data Loader release itself: version, date, API version, JRE requirement, supported platforms. | 200 |
+| https://github.com/forcedotcom/dataloader/blob/v67.0.0/src/main/java/com/salesforce/dataloader/action/AbstractAction.java | The success and error files Data Loader writes (read 2026-10-22, N1-1): `openSuccessWriter` puts `ID` first and `STATUS` last around every column of the input row, mapped or not (`AbstractLoadAction.getStatusColumns` returns the input file's columns); `openErrorWriter` adds `ERROR` last. SOAP and Bulk API 1.0 paths; Bulk API 2.0 downloads the server's results instead and is not established. | 200 |
 
 ### Normative facts used
 

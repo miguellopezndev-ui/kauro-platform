@@ -683,19 +683,34 @@ function memberSignalValues(record: ResolvedRecord, signal: Signal): string[] {
   return [...found];
 }
 
+/**
+ * A person's field, read from whichever person family the record belongs to.
+ *
+ * A Contact and a Lead are two objects with two field families (section 0), and
+ * both are people: a shared email, phone or full name is the same supporting
+ * evidence on either. The signals used to read only `contact.*`, so two web-form
+ * leads from one person were never reported at all (N1-1, D78). A record holds
+ * fields of its own object only, so at most one of the two names is present, and
+ * the bucket a signal is grouped in carries the object: a Lead and a Contact that
+ * share an email are still never one cluster.
+ */
+function personValue(values: ReadonlyMap<string, { intent: ValueIntent }>, field: string): string | null {
+  return nonEmpty(carried(values.get(`contact.${field}`) ?? values.get(`lead.${field}`)));
+}
+
 const SIGNALS: readonly Signal[] = [
   {
     kind: 'EMAIL_EXACT',
     reasonCode: 'IDENTITY_CANDIDATE_EMAIL_EXACT',
     describe: 'the records share an email address',
-    extract: (values) => nonEmpty(carried(values.get('contact.email'))),
+    extract: (values) => personValue(values, 'email'),
   },
   {
     kind: 'PHONE_E164',
     reasonCode: 'IDENTITY_CANDIDATE_PHONE_E164',
     describe: 'the records share a phone number in international form',
     extract: (values) => {
-      const value = nonEmpty(carried(values.get('contact.phone')));
+      const value = personValue(values, 'phone');
       return value !== null && value.startsWith('+') ? value : null;
     },
   },
@@ -704,8 +719,8 @@ const SIGNALS: readonly Signal[] = [
     reasonCode: 'IDENTITY_CANDIDATE_NAME_EXACT',
     describe: 'the records share a full name',
     extract: (values) => {
-      const first = nonEmpty(carried(values.get('contact.firstName')));
-      const last = nonEmpty(carried(values.get('contact.lastName')));
+      const first = personValue(values, 'firstName');
+      const last = personValue(values, 'lastName');
       if (first === null || last === null) return null;
       return `${first.toLowerCase()} ${last.toLowerCase()}`;
     },

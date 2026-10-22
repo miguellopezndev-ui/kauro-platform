@@ -1562,3 +1562,68 @@ run is selected. Only GitHub Actions check runs say which suite the legs ran in,
 and the receipt job's own check run is GitHub Actions' as well as its id; another
 app's green check run carrying a leg's name is ordinary, and the shape check, the
 dossier and the chain accept it alike.
+
+## D78 — A Lead is a person to the duplicate signals, and the instructions describe only steps the importer offers (3.1.0, unreleased; N1-1)
+
+Order 13 (N1-1) opened this core once for the defects of its own contract that
+the functional inventory (F-25, F-27 to F-32 in the platform's
+`docs/design/ORDER11-FUNCTIONAL-GAPS.md`) reproduced. Everything else those
+entries ask for is a new capability that waits for a platform contract or an
+owner decision, and is recorded, not built, in `docs/work/N1-1_MIGRATION_CORE.md`.
+
+**The person signals read a Lead.** Section 7 makes a shared email, phone or full
+name supporting evidence for any record, and section 0 makes LEAD a first-class
+object, but the signals read `contact.*` only, so two leads from one web form —
+the commonest duplicate a Salesforce or clean-only customer has — were never
+reported (`test/unit/identity-adversarial.test.ts`, three cases failing on
+3.0.0). The bucket a signal groups in already carries the object, so a Lead and a
+Contact that share an email are still not one cluster. Nothing merges that did not
+merge before: the change adds candidate rows and nothing else, and
+`IDENTITY_RULE_VERSION` — the merge rule — is unchanged. One refusal reaches
+leads with it, the one contacts already had: more than
+`MAX_IDENTITY_GROUP_MEMBERS` (250,000) leads sharing one email, phone or name
+stops the run with `IDENTITY_GROUP_TOO_LARGE`. A sheet holds at most 250,000 rows
+by default, so it takes several sheets of one placeholder to get there.
+
+**The instructions describe only steps the destination offers.** 3.0.0 told a
+HubSpot operator to choose the association key as the common column; HubSpot
+accepts a common column only for a unique identifier of one object (Record ID,
+Email, Company domain name, a property requiring unique values; knowledge base
+"Set up your import file", Imports API guide), and both object files carry a
+column under that header with different values. The qualification campaign
+associated contacts and companies through the company's domain (I7), not through
+the key. It told a Salesforce operator to "use the pairing to populate the lookup
+field" without saying where a Salesforce Id comes from; the Account has none until
+it is loaded, and Data Loader's success file is where it appears, with `ID` first,
+every input column repeated (an unmapped one included) and `STATUS` last
+(forcedotcom/dataloader v67.0.0, `AbstractAction.openSuccessWriter`,
+`AbstractLoadAction.getStatusColumns`; read in the source, not run). And it listed
+an unsupported relationship's empty file as a pairing beside the supported ones.
+Each association line now carries its own count, an unsupported one says so with
+the adapter's reason and its leftovers, and "relationships to be created" became
+"relationships delivered", which is what `OUTPUT` means (section 9).
+
+The files, their columns, the package format (2.1.0) and the configuration schema
+(3.0.0) are unchanged. The import files and the instructions are what an operator
+reads; generating the linked files is the capability F-28 and F-29 describe and is
+deliberately not attempted here, because its output is the platform's import-stage
+contract, which does not exist yet.
+
+**Version.** These change the bytes of packages that have a duplicate lead or a
+declared relationship, so they are a new core version, 3.1.0. It is prepared and
+tested, not released: no tag, no release, no vendored tarball. 3.0.0 stays the
+immutable reference — `vendor/kauro-migration-core-3.0.0.tgz` in the platform,
+tag `v3.0.0` in `cores/archive/kauro-migration-core.bundle`.
+
+Amended after the independent review (N1-1): the HubSpot step first drafted for
+3.1.0 told the operator to copy one record's identifier into the other's row for
+any pair. A deal has no unique identifier before it exists and one row holds one
+value per column, so for a deal with two contacts that would either create the
+deal twice or drop an association no error file reports. The instructions now
+offer only the step run against a portal (a contact and its one company, through
+the company's domain), say the association is made in the creating import and
+never by importing an object file again, and name the pairs these files cannot
+express. The Salesforce step refuses a child paired with more than one Account,
+and says it is manual: no linked file and no Id is generated. The adapters'
+`operatorInstructions` and the source registry's HubSpot common-column decision,
+which still carried the 3.0.0 wording, say the same.

@@ -25,28 +25,28 @@ comes from; this directory is where the claim that they are reproducible does.
 
 Contacts, companies, deals and leads with all three relationship shapes in one run, and nothing wrong in the source. Everything is delivered and every relationship resolves.
 
-Run id `run_1e78f48c07a50c92162685d9`, configuration hash `159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab`.
+Run id `run_a833c27b4f0a52a3c1725472`, configuration hash `159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab`.
 
 ## B-dirty-multinational — Dirty multinational data
 
 Phone numbers from five countries with and without evidence, whitespace, mixed email case, Unicode names, an unparseable date and postal codes with leading zeros. Nothing is guessed and nothing is blanked.
 
-Run id `run_13174ec28740b76d61f91a28`, configuration hash `40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404`.
+Run id `run_81cbc43492af10a6bff552b9`, configuration hash `40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404`.
 
 ## C-identity-adversarial — Identity under adversarial conditions
 
 A proven duplicate, a proven duplicate that disagrees with itself, two different people sharing an address, a shared mailbox used by two people, and the same record id in two different source systems. Only the provable duplicate is combined.
 
-Run id `run_1ea3b00c381f2c04712ae01f`, configuration hash `b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369`.
+Run id `run_804277973579c4fc441f3ff5`, configuration hash `b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369`.
 
 ## D-hubspot — HubSpot destination package
 
 One shared source bundle rendered for HubSpot.
 
-Run id `run_7de4954394a3ebfe70462bc4`, configuration hash `d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0`.
+Run id `run_b092454560a38b9920fb268d`, configuration hash `d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0`.
 
 ## D-salesforce — Salesforce destination package
 
 The same source bundle rendered for Salesforce, which carries a Lead object HubSpot does not, and supports fewer relationships: a contact on an opportunity is an OpportunityContactRole, which is outside this envelope.
 
-Run id `run_1f14da073d9785022620c861`, configuration hash `c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0`.
+Run id `run_c27043352bd1394a35283f13`, configuration hash `c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0`.
