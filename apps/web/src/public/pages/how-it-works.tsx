@@ -7,11 +7,13 @@
 // Order 11 round 2: a process page is understood before it reassures (eight of ten process pages in the round-2 sample use short numbered
 // steps). Owner's section review (2026-10-21): the six stages are one section, not an overview followed by six sheets. They are a timeline
 // that runs down (StagePath); choosing a stage opens what happens, what you get and what stops it, beside the timeline on a wide screen and
-// under the stage on a narrow one. Who acts, what it needs and what happens at each stage sit once, folded, above the call to action
-// that closes the section. The invented project is not retold here (Home and Sample delivery show it): the stage of the quote says the
-// price counts the units sealed and leads to Pricing, and the stage of the delivery leads to the sample. What Kauro does not do is not a
-// section of its own here (Home has it, and no process page in the round-3 sample has one): the stages say who acts at each step, and the
-// closing band says what stays with your team.
+// under the stage on a narrow one. Who acts, what it needs and what happens at each stage sit once, folded, under the stages.
+//
+// The closing band carries the page's one call to action (owner, 2026-10-21: no second button right above it), beside a handover slip.
+// The invented project is not retold here (Home and Sample delivery show it): the stage of the quote says the price counts the units
+// sealed and leads to Pricing, and the stage of the delivery leads to the sample. What Kauro does not do is not a section of its own here
+// (Home has it, and no process page in the round-3 sample has one): the stages say who acts at each step, and the closing band says what
+// stays with your team.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type CopyValues, type PublicCopyId } from "../../copy/public.ts";
 import { INPUT_LIMITS } from "../limits.ts";
@@ -283,12 +285,6 @@ export function HowItWorksPage(): ReactElement {
       <Block id="how-stages" heading={PUBLIC_COPY["how.stages.heading"]} lead={PUBLIC_COPY["how.stages.lead"]} tone="sunken">
         <StagePath stages={PATH} />
         <StageDetails />
-        <div className="kauro-r2-inline-cta kauro-path-cta">
-          <a className="kauro-site-button kauro-site-button--primary" href={ROUTE.contact}>
-            {PUBLIC_COPY["public.cta.request-health-check.cta"]}
-          </a>
-          <p className="kauro-r2-hint">{PUBLIC_COPY["pricing.answer.free"]}</p>
-        </div>
       </Block>
       <Closing
         id="how-responsibility"

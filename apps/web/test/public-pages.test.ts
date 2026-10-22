@@ -238,7 +238,7 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   const stageNames = ["Upload and seal your files", "The free data health check", "Review and approve the plan", "Quote and payment", "Preparation and verification", "Delivery and your import"];
   assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text).slice(0, 6), stageNames);
   // without a script nothing is hidden: every stage is open, in order, and no control pretends to work
-  const path = html.slice(html.indexOf('class="kauro-path"'), html.indexOf("kauro-path-cta"));
+  const path = html.slice(html.indexOf('class="kauro-path"'), html.indexOf("kauro-path-details"));
   assert.doesNotMatch(path, /<[^>]+\shidden[\s=>]/, "no stage is hidden before the script runs");
   assert.equal(count(path, "aria-expanded"), 0, "no stage says it is open or closed before the script can open or close it");
   assert.equal(count(path, "kauro-path-turn"), 0, "previous and next appear only with the script");
@@ -254,7 +254,7 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   const answers = [...details.matchAll(/<li>[\s\S]*?<\/dl><\/li>/g)].map((item) => item[0]);
   assert.equal(answers.length, 6);
   for (const answer of answers) assert.deepEqual([...answer.matchAll(/<dt>([^<]*)<\/dt>/g)].map((match) => match[1]), ["Who acts", "What it needs", "What happens"]);
-  assert.ok(html.indexOf("kauro-path-details") < html.indexOf("kauro-path-cta"), "the detail sits above the call to action");
+  assert.ok(html.indexOf("kauro-path-details") < html.indexOf('id="how-responsibility"'), "the detail closes the stages, before the closing band");
   assert.doesNotMatch(html, /kauro-flow|kauro-scene/, "the long animation of the process is retired: Home tells it");
   for (const claim of [
     "free and creates no obligation to buy",
@@ -276,8 +276,8 @@ test("How it works is the buyer's guide: the six stages in one timeline, each op
   assert.doesNotMatch(text, /you decide at each one|payment provider/i, "the lead no longer contradicts the stages, and a payment is not said to come from a provider");
   assert.ok(hrefsOf(html).includes(ROUTE.services), "review supported services");
   const primary = linkTexts(html).filter((link) => link.cls.includes("kauro-site-button--primary"));
-  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "one call to action, closing the stages and again at the end (A3 3.2)");
-  assert.ok(primary.length <= 2);
+  assert.deepEqual([...new Set(primary.map((link) => `${link.text}|${link.href}`))], [`${HEALTH_CHECK_CTA}|${ROUTE.contact}`], "one call to action (A3 3.2)");
+  assert.equal(primary.length, 1, "the closing band is the page's one call to action: no second button right above it (owner, 2026-10-21)");
   for (const stage of ["files", "check", "decide", "quote", "prepare", "import"]) {
     assert.ok(html.includes(`id="stage-${stage}"`), `a link to #stage-${stage} reaches stage ${stage}`);
     assert.ok(html.includes(`aria-controls="stage-${stage}-panel"`) && html.includes(`id="stage-${stage}-panel"`), `stage ${stage} opens its own panel`);

@@ -9576,9 +9576,6 @@ body:has(> .kauro-site-header) {
   outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
   outline-offset: 2px;
 }
-.kauro-site-main .kauro-path-cta {
-  margin-block-start: var(--kauro-space-6);
-}
 /* a narrow screen, with the script: a sign says whether a stage is open, and a closed stage keeps the rule short */
 @media (max-width: 61.99rem) {
   .kauro-site-main .kauro-path[data-ready] .kauro-path-sign {
@@ -9717,12 +9714,6 @@ body:has(> .kauro-site-header) {
 .kauro-site-main .kauro-r2-actor--kauro::before {
   border-radius: 2px;
   background: var(--kauro-color-primary);
-}
-.kauro-site-main .kauro-r2-inline-cta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--kauro-space-3) var(--kauro-space-5);
 }
 .kauro-site-main .kauro-r2-stage-keys,
 .kauro-site-main .kauro-r2-stage-detail {
