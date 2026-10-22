@@ -499,7 +499,7 @@ test("O15 census: every route of the contract is classified once in the access m
 });
 
 test("O15 refusal: every identity a route's principal class does not admit is refused by authorization, with nothing written", async () => {
-  const before = await tableCounts();
+  const before = await tableDigests();
   const cells: string[] = [];
   const failures: string[] = [];
   const routes = new Set(served());
@@ -523,7 +523,7 @@ test("O15 refusal: every identity a route's principal class does not admit is re
   }
   process.stdout.write(`# o15 refusal cells: ${cells.length}\n${cells.map((c) => `#   ${c}`).join("\n")}\n`);
   assert.deepEqual(failures, []);
-  const after = await tableCounts();
+  const after = await tableDigests();
   const changed = Object.keys(after).filter((t) => after[t] !== before[t] && !REFUSAL_WRITES.has(t));
   assert.deepEqual(changed, [], "no table but the security facts changed");
 });
@@ -543,9 +543,16 @@ test("O15 control: the identity each class admits passes the same identity, memb
 /** The table a refusal may write: the durable security fact it leaves (08 "Audit events"). */
 const REFUSAL_WRITES: ReadonlySet<string> = new Set(["security_events"]);
 
-async function tableCounts(): Promise<Record<string, number>> {
+/**
+ * Each table's content digest (every row's text, in a stable order), read by the superuser oracle: an inserted, updated or deleted row
+ * of any table changes its digest, so a refusal that wrote anything but its security fact is seen whatever it wrote.
+ */
+async function tableDigests(): Promise<Record<string, string>> {
   const tables = await w.h.oracle.query<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema = 'kauro' AND table_type = 'BASE TABLE' ORDER BY 1");
-  const out: Record<string, number> = {};
-  for (const { table_name } of tables.rows) out[table_name] = Number((await w.h.oracle.query<{ n: string }>(`SELECT count(*)::text AS n FROM kauro."${table_name}"`)).rows[0]?.n ?? 0);
+  const out: Record<string, string> = {};
+  for (const { table_name } of tables.rows) {
+    const r = await w.h.oracle.query<{ d: string }>(`SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t::text), '')) AS d FROM kauro."${table_name}" t`);
+    out[table_name] = r.rows[0]?.d ?? "";
+  }
   return out;
 }
