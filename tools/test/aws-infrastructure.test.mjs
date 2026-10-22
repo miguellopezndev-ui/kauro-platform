@@ -51,6 +51,18 @@ test("evaluator: across accounts both the identity and the resource must allow; 
   assert.equal(evaluate(bucketOnly, { principal: P.controlPlane, action: "s3:GetObject", resource: accepted, resourceAccount: IDS.data, context: {} }).decision, "ALLOW");
 });
 
+test("evaluator: in one account a grant to the account root only delegates; RCPs bind AWS service principals; ForAnyValue on an absent key is false", () => {
+  const rootGrant = { Statement: [{ Sid: "Root", Effect: "Allow", Principal: { AWS: `arn:aws:iam::${IDS.data}:root` }, Action: "s3:GetObject", Resource: "*" }] };
+  const w = { managementAccountId: IDS.management, scps: {}, rcps: {}, resourcePolicyOf: () => rootGrant };
+  const noIdentity = { arn: `arn:aws:iam::${IDS.data}:role/x`, account: IDS.data, orgId: IDS.org, type: "role", identityPolicies: [] };
+  assert.equal(evaluate(w, { principal: noIdentity, action: "s3:GetObject", resource: accepted, resourceAccount: IDS.data, context: {} }).decision, "DENY");
+  const service = { account: undefined, type: "service", service: "cloudtrail.amazonaws.com", identityPolicies: [] };
+  const r = evaluate({ ...WORLD, resourcePolicyOf: () => null }, { principal: service, action: "s3:GetObject", resource: accepted, resourceAccount: IDS.data, context: { "aws:SecureTransport": "false" } });
+  assert.equal(r.layer, "RCP");
+  const doc = { Statement: [{ Sid: "S", Effect: "Allow", Action: "s3:GetObject", Resource: "*", Condition: { "ForAnyValue:StringNotEquals": { "aws:TagKeys": ["a"] } } }] };
+  assert.equal(policyEffect(doc, { principal: {}, action: "s3:GetObject", resource: "*", context: {} }), null);
+});
+
 // ---- Rendering --------------------------------------------------------------------------------------------------------------------
 
 test("render: an unbound placeholder fails, as Terraform's templatefile() does", () => {
@@ -125,6 +137,15 @@ test("static guards detect what they forbid (negative controls)", () => {
   assert.deepEqual(guards.scanSecretsText("key AKIAABCDEFGHIJKLMNOP"), ["an AWS access key id"]);
   assert.deepEqual(guards.scanSecretsText('password = "hunter2"'), ["a literal password"]);
   assert.deepEqual(guards.scanSecretsText("manage_master_user_password = true"), []);
+});
+
+test("Terraform and OpenTofu run the same plan tests: each .tofutest.hcl is its .tftest.hcl without override_during", () => {
+  const tests = guards.terraformTestPairs();
+  assert.ok(tests.length >= 6);
+  for (const { tftest, tofutest, path } of tests) {
+    const strip = (text) => text.split("\n").filter((line) => !line.trim().startsWith("override_during") && !line.startsWith("#")).map((line) => line.replace(/\s+/g, " ").trim()).join("\n");
+    assert.equal(strip(tofutest), strip(tftest), path);
+  }
 });
 
 // ---- Cost --------------------------------------------------------------------------------------------------------------------

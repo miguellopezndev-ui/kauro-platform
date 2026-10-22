@@ -113,6 +113,15 @@ module "cost_guardrails" {
   alert_email              = var.alert_email
   workloads_ou_id          = module.organization.workloads_ou_id
   owner_admin_role_pattern = module.organization.owner_admin_role_pattern
+  management_account_id    = var.management_account_id
+}
+
+module "management_alarms" {
+  source = "../../modules/management-alarms"
+
+  region                = var.region
+  management_account_id = var.management_account_id
+  alarm_email           = var.alert_email
 }
 
 module "state" {
@@ -156,6 +165,10 @@ output "guard_attachments" {
 
 output "spend_stop_policy" {
   value = module.cost_guardrails.spend_stop_policy
+}
+
+output "management_alarm_patterns" {
+  value = module.management_alarms.rule_patterns
 }
 
 output "state_bucket" {

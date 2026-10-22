@@ -50,7 +50,6 @@ variable "security_log_days" {
 
 locals {
   function_name  = "kauro-${var.environment}-retention-deletion"
-  function_arn   = "arn:aws:lambda:${var.region}:${var.data_account_id}:function:${local.function_name}"
   signing_bucket = "kauro-signing-${var.data_account_id}"
 }
 
@@ -66,11 +65,9 @@ data "aws_iam_policy_document" "trust" {
       variable = "aws:SourceAccount"
       values   = [var.data_account_id]
     }
-    condition {
-      test     = "ArnLike"
-      variable = "aws:SourceArn"
-      values   = [local.function_arn, "${local.function_arn}:*"]
-    }
+    # No aws:SourceArn condition: AWS does not document that Lambda sends it when assuming an execution role, and without it the
+    # role could never be assumed. Who may hand this role to a function is the data account's SCP (PassRole: the owner's sessions
+    # only) and which function may run with it is the code-signing configuration (QUALIFICATION part D).
   }
 }
 

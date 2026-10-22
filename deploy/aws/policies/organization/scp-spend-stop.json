@@ -1,19 +1,32 @@
 {
-  "$comment": "Order 25 (R2-075): the SCP that AWS Budgets attaches to the Workloads OU when actual spend reaches the owner's monthly ceiling. It stops new spend-creating launches (worker tasks, services, instances, databases, model invocations) and keeps everything else, data and recovery included, untouched. It is a backstop that acts on billing data hours late: the application's reservations and job limits remain the cap (R2-075), and an attempt already running ends at its own 8 h wall.",
+  "$comment": "Order 25 (R2-075): the SCP that AWS Budgets attaches to the Workloads OU when actual spend reaches the owner's monthly ceiling. It stops new spend-creating launches (worker tasks, new services, instances, databases, model invocations: Bedrock's Converse calls are authorized as bedrock:InvokeModel*) while scaling a service down stays possible, and keeps everything else, data and recovery included, untouched. It is a backstop that acts on billing data hours late: the application's reservations and job limits remain the cap (R2-075), and an attempt already running ends at its own 8 h wall.",
   "Version": "2012-10-17",
   "Statement": [
     {
       "Sid": "StopNewSpendCreatingLaunches",
       "Effect": "Deny",
       "Action": [
-        "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock:Converse", "bedrock:ConverseStream",
-        "ec2:RunInstances", "ec2:CreateNatGateway", "ec2:CreateVpcEndpoint",
-        "ecs:CreateService", "ecs:RunTask", "ecs:StartTask", "ecs:UpdateService",
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "ec2:RunInstances",
+        "ec2:CreateNatGateway",
+        "ec2:CreateVpcEndpoint",
+        "ecs:CreateService",
+        "ecs:RunTask",
+        "ecs:StartTask",
         "lambda:CreateFunction",
-        "rds:CreateDBCluster", "rds:CreateDBInstance", "rds:ModifyDBInstance", "rds:RestoreDBInstanceFromDBSnapshot", "rds:RestoreDBInstanceToPointInTime"
+        "rds:CreateDBCluster",
+        "rds:CreateDBInstance",
+        "rds:ModifyDBInstance",
+        "rds:RestoreDBInstanceFromDBSnapshot",
+        "rds:RestoreDBInstanceToPointInTime"
       ],
       "Resource": "*",
-      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}"
+        }
+      }
     }
   ]
 }

@@ -16,7 +16,7 @@ export const IDS = Object.freeze({
 
 export const OWNER_ADMIN_SET = "KauroOwnerAdministrator";
 export const DELETION_PUBLISHER_SET = "KauroDeletionPublisher";
-const ssoPattern = (set) => `arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_${set}_*`;
+const ssoPattern = (set) => `arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_${set}_${"?".repeat(16)}`;
 const ssoRole = (account, set) => `arn:aws:iam::${account}:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_${set}_0123456789abcdef`;
 
 export const BUCKETS = Object.freeze({
@@ -52,6 +52,7 @@ export const TEMPLATE_VARS = Object.freeze({
   IMAGE_DIGEST: `sha256:${"0".repeat(64)}`,
   JOB_ID: ATTEMPT.job,
   JOURNAL_BUCKET: BUCKETS.journal,
+  MANAGEMENT_ACCOUNT_ID: IDS.management,
   OBJECT_BUCKET: BUCKETS.object,
   ORG_ID: IDS.org,
   OWNER_ADMIN_ROLE_PATTERN: ssoPattern(OWNER_ADMIN_SET),
@@ -65,7 +66,7 @@ export const TEMPLATE_VARS = Object.freeze({
   TASK_DEFINITION_ARN: `arn:aws:ecs:${IDS.region}:${IDS.workload}:task-definition/kauro-migration-worker:1`,
   TASK_DEFINITION_ARN_WITHOUT_REVISION: `arn:aws:ecs:${IDS.region}:${IDS.workload}:task-definition/kauro-migration-worker`,
   TICKET_SHA256: "a".repeat(64),
-  TRAIL_ARN: `arn:aws:cloudtrail:${IDS.region}:${IDS.data}:trail/kauro-organization`,
+  TRAIL_ARN: `arn:aws:cloudtrail:${IDS.region}:${IDS.management}:trail/kauro-organization`,
   WORKER_SECURITY_GROUP_ID: "sg-0123456789abcdef0",
   WORKLOAD_ACCOUNT_ID: IDS.workload,
 });

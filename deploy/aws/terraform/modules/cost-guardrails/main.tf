@@ -59,6 +59,10 @@ variable "owner_admin_role_pattern" {
   type = string
 }
 
+variable "management_account_id" {
+  type = string
+}
+
 module "spend_stop" {
   source    = "../policy-template"
   templates = ["${var.policies_dir}/organization/scp-spend-stop.json"]
@@ -106,6 +110,12 @@ data "aws_iam_policy_document" "budgets_trust" {
     principals {
       type        = "Service"
       identifiers = ["budgets.amazonaws.com"]
+    }
+    # Confused-deputy guard: only this account's budgets assume the role.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.management_account_id]
     }
   }
 }

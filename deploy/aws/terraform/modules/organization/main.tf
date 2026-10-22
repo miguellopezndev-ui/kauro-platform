@@ -97,8 +97,10 @@ resource "aws_organizations_account" "workload" {
 locals {
   # Identity Center creates one role per permission set in each member account, under the reserved path that only AWS can write
   # (and that scp-member-baseline also closes): arn:aws:iam::<account>:role/aws-reserved/sso.amazonaws.com/[<region>/]AWSReservedSSO_<set>_<suffix>.
-  owner_admin_role_pattern        = "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_${var.owner_admin_permission_set}_*"
-  deletion_publisher_role_pattern = "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_${var.deletion_publisher_permission_set}_*"
+  # The suffix is matched as exactly sixteen characters, so a permission set named KauroOwnerAdministrator_x does not match
+  # (QUALIFICATION A3 checks the real format).
+  owner_admin_role_pattern        = "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_${var.owner_admin_permission_set}_????????????????"
+  deletion_publisher_role_pattern = "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_${var.deletion_publisher_permission_set}_????????????????"
 
   template_vars = {
     ALLOWED_REGION                  = var.allowed_region

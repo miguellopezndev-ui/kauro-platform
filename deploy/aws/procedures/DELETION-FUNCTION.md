@@ -4,7 +4,7 @@ The deletion function is the only code that may bypass governance retention (its
 is the only principal the guards let do it). Its creation and every publication are **the owner's act, in the owner's Identity
 Center session with MFA**: the data account's SCP (`scp-data-identity-guard.json`) denies every other principal the function, its
 alias, its role, its code-signing configuration and the signing profiles, and the code-signing configuration is in `Enforce` mode,
-so only a package signed by the owner's profile deploys. No GitHub token, pipeline or builder credential is in this path
+so only a package signed by the owner's profile deploys. The same SCP binds the owner's sessions too in one respect: nobody can create the function without a code-signing configuration, detach it, or relax a configuration. No GitHub token, pipeline or builder credential is in this path
 (D-21: GitHub Pro has no required reviewers for private repositories, so the approval cannot depend on GitHub).
 
 **Status: NOT_IMPLEMENTED.** The function's code is B16's (what it deletes, when, from which authorization record) and does not

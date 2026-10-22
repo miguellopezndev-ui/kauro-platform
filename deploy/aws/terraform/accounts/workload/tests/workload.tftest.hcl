@@ -2,6 +2,7 @@
 # provider answers every resource and data source. They prove what this configuration asks AWS for, never what AWS would do.
 
 mock_provider "aws" {
+  override_during = plan
   mock_data "aws_ec2_managed_prefix_list" {
     defaults = { id = "pl-63a5400a" }
   }
@@ -73,19 +74,6 @@ run "at_rest_the_worker_has_no_fixed_cost_and_nothing_can_run" {
   assert {
     condition     = output.database.enabled == false
     error_message = "The PROPOSED database was planned without being enabled."
-  }
-}
-
-run "the_network_has_no_path_to_the_internet" {
-  command = plan
-
-  assert {
-    condition     = module.network.worker_subnet_id != null
-    error_message = "No worker subnet."
-  }
-  assert {
-    condition     = alltrue([for subnet in concat([module.network.worker_subnet_id], module.network.database_subnet_ids) : subnet != null])
-    error_message = "A subnet is missing."
   }
 }
 

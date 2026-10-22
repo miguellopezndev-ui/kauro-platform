@@ -1,5 +1,5 @@
 {
-  "$comment": "Order 25 (D-19: CloudTrail data events; D-21: the trail lives in the data account; policy.json securityLogsDays): the audit bucket in the data account. The organization trail, created by the data account as CloudTrail's delegated administrator, writes the management events of every account and the data events of the protected buckets here, and nothing else writes. Nobody deletes a log: the lifecycle expires it when its governance retention ends; the guards change only in the owner's administrator session.",
+  "$comment": "Order 25 (D-19: CloudTrail data events; D-21; policy.json securityLogsDays): the audit bucket in the data account. The organization trail is created by the data account as CloudTrail's delegated administrator but OWNED by the management account (CloudTrail user guide, delegated administrator), so its ARN and its log prefix name the management account. It writes the management events of every account and the data events of the protected buckets here, and nothing else writes. Nobody deletes a log: the lifecycle expires it when its governance retention ends; the guards change only in the owner's administrator session.",
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -24,7 +24,7 @@
       },
       "Action": "s3:PutObject",
       "Resource": [
-        "arn:aws:s3:::${AUDIT_BUCKET}/AWSLogs/${DATA_ACCOUNT_ID}/*",
+        "arn:aws:s3:::${AUDIT_BUCKET}/AWSLogs/${MANAGEMENT_ACCOUNT_ID}/*",
         "arn:aws:s3:::${AUDIT_BUCKET}/AWSLogs/${ORG_ID}/*"
       ],
       "Condition": {

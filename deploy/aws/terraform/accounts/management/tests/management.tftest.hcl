@@ -2,6 +2,7 @@
 # configuration renders and where it attaches them, never how AWS evaluates them (deploy/aws/checks evaluates the same documents).
 
 mock_provider "aws" {
+  override_during = plan
   mock_resource "aws_organizations_organization" {
     defaults = {
       id                = "o-abcdefghij"
@@ -18,6 +19,9 @@ mock_provider "aws" {
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::000000000000:role/kauro-guard/kauro-budgets-spend-stop" }
   }
+  mock_resource "aws_sns_topic" {
+    defaults = { arn = "arn:aws:sns:us-east-1:000000000000:kauro-guard-alarms" }
+  }
   mock_resource "aws_ce_anomaly_monitor" {
     defaults = { arn = "arn:aws:ce::000000000000:anomalymonitor/mock" }
   }
@@ -33,13 +37,15 @@ mock_provider "aws" {
 }
 
 override_resource {
-  target = module.organization.aws_organizations_account.data
-  values = { id = "222222222222" }
+  override_during = plan
+  target          = module.organization.aws_organizations_account.data
+  values          = { id = "222222222222" }
 }
 
 override_resource {
-  target = module.organization.aws_organizations_account.workload
-  values = { id = "111111111111" }
+  override_during = plan
+  target          = module.organization.aws_organizations_account.workload
+  values          = { id = "111111111111" }
 }
 
 variables {
@@ -115,6 +121,15 @@ run "the_guards_name_the_real_accounts_and_the_owners_sessions" {
   assert {
     condition     = alltrue([for doc in values(output.guard_policies) : !strcontains(doc, "$comment") && !strcontains(doc, "$${")])
     error_message = "A rendered guard keeps a comment or an unbound placeholder."
+  }
+}
+
+run "the_management_accounts_own_actions_on_the_guards_alarm" {
+  command = plan
+
+  assert {
+    condition     = toset(keys(output.management_alarm_patterns)) == toset(["kauro-guard-organization-trail", "kauro-guard-organization-policies"])
+    error_message = "No SCP binds the management account: stopping the trail or detaching a guard must at least alarm."
   }
 }
 

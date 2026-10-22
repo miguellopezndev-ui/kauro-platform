@@ -1,6 +1,7 @@
-# The organization's audit trail and the retention guard's alarms, both in the data account (D-21: "CloudTrail, alarms and the
-# deletion function" live there). The data account is CloudTrail's delegated administrator (organization module), so it owns one
-# organization trail: every account's management events (the first copy is free) and the data events of the protected buckets
+# The organization's audit trail and the retention guard's alarms, managed from the data account (D-21: "CloudTrail, alarms and the
+# deletion function" live there). The data account is CloudTrail's delegated administrator (organization module), so it creates and
+# manages the organization trail, which AWS makes a resource OWNED by the management account (its ARN names that account; the
+# management account's own principals, outside every SCP, could stop it: the management root alarms on that). The trail records every account's management events (the first copy is free) and the data events of the protected buckets
 # (D-19), into an Object Lock audit bucket kept for policy.json securityLogsDays. Alarms go by e-mail, outside AWS's consoles.
 
 terraform {
@@ -24,6 +25,11 @@ variable "organization_id" {
 
 variable "data_account_id" {
   type = string
+}
+
+variable "management_account_id" {
+  description = "The organization trail a delegated administrator creates is owned by the management account (CloudTrail user guide): its ARN and log prefix name that account."
+  type        = string
 }
 
 variable "owner_admin_role_pattern" {
@@ -58,7 +64,7 @@ variable "alarm_email" {
 locals {
   audit_bucket = "kauro-audit-${var.data_account_id}"
   trail_name   = "kauro-organization"
-  trail_arn    = "arn:aws:cloudtrail:${var.region}:${var.data_account_id}:trail/${local.trail_name}"
+  trail_arn    = "arn:aws:cloudtrail:${var.region}:${var.management_account_id}:trail/${local.trail_name}"
 }
 
 module "audit_bucket" {
@@ -73,6 +79,7 @@ module "audit_bucket" {
     AUDIT_BUCKET             = local.audit_bucket
     TRAIL_ARN                = local.trail_arn
     DATA_ACCOUNT_ID          = var.data_account_id
+    MANAGEMENT_ACCOUNT_ID    = var.management_account_id
     ORG_ID                   = var.organization_id
     OWNER_ADMIN_ROLE_PATTERN = var.owner_admin_role_pattern
   }
@@ -133,7 +140,8 @@ locals {
         "detail-type" = ["AWS API Call via CloudTrail"]
         detail = {
           eventName = [
-            "DeleteBucket", "DeleteBucketPolicy", "DeleteBucketPublicAccessBlock", "PutBucketAcl", "PutBucketCors", "PutBucketEncryption",
+            "DeleteBucket", "DeleteBucketCors", "DeleteBucketEncryption", "DeleteBucketLifecycle", "DeleteBucketOwnershipControls",
+            "DeleteBucketPolicy", "DeleteBucketPublicAccessBlock", "DeleteBucketReplication", "PutBucketAcl", "PutBucketCors", "PutBucketEncryption",
             "PutBucketLifecycle", "PutBucketObjectLockConfiguration", "PutBucketOwnershipControls", "PutBucketPolicy",
             "PutBucketPublicAccessBlock", "PutBucketReplication", "PutBucketVersioning"
           ]
@@ -151,7 +159,7 @@ locals {
       }
     }
     "kauro-guard-holds-by-others" = {
-      description = "A legal hold or retention was set by a principal other than a deletion identity."
+      description = "A legal hold was placed or lifted by a principal other than a deletion identity."
       pattern = {
         source        = ["aws.s3"]
         "detail-type" = ["AWS API Call via CloudTrail"]

@@ -2,6 +2,7 @@
 # for — D-19's bucket settings, the composed bucket policies, the trail's data events, the alarms — never what AWS would enforce.
 
 mock_provider "aws" {
+  override_during = plan
   mock_resource "aws_s3_bucket" {
     defaults = { arn = "arn:aws:s3:::kauro-mock" }
   }
@@ -23,18 +24,21 @@ mock_provider "aws" {
 }
 
 override_resource {
-  target = module.customer_data.aws_s3_bucket.this
-  values = { id = "kauro-qualification-customer-data-222222222222", arn = "arn:aws:s3:::kauro-qualification-customer-data-222222222222" }
+  override_during = plan
+  target          = module.customer_data.aws_s3_bucket.this
+  values          = { id = "kauro-qualification-customer-data-222222222222", arn = "arn:aws:s3:::kauro-qualification-customer-data-222222222222" }
 }
 
 override_resource {
-  target = module.journal.aws_s3_bucket.this
-  values = { id = "kauro-qualification-journal-222222222222", arn = "arn:aws:s3:::kauro-qualification-journal-222222222222" }
+  override_during = plan
+  target          = module.journal.aws_s3_bucket.this
+  values          = { id = "kauro-qualification-journal-222222222222", arn = "arn:aws:s3:::kauro-qualification-journal-222222222222" }
 }
 
 variables {
   organization_id                 = "o-abcdefghij"
   data_account_id                 = "222222222222"
+  management_account_id           = "000000000000"
   workload_account_id             = "111111111111"
   s3_gateway_endpoint_id          = "vpce-0123456789abcdef0"
   owner_admin_role_pattern        = "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_KauroOwnerAdministrator_*"
@@ -67,7 +71,7 @@ run "the_customer_bucket_policy_composes_the_data_and_worker_statements" {
       "AttemptRolesWithinTheirCeiling", "ControlPlaneObjects", "ControlPlaneListing", "ControlPlaneCleansStagingOnly",
       "DeletesOutsideStagingOnlyByTheDeletionIdentity", "StagingDeletesOnlyByControlPlaneOrDeletionIdentity",
       "GovernanceBypassAndLegalHoldOnlyByTheDeletionIdentity", "BucketGuardsChangeOnlyInTheOwnerSession", "NeverComplianceMode",
-      "NoObjectAcls", "TlsOnly", "AttemptsOnlyThroughTheEndpoint", "CreateOnce", "AttemptsNeverDelete",
+      "NoObjectAcls", "NoOverwriteOutsideHeartbeats", "TlsOnly", "AttemptsOnlyThroughTheEndpoint", "CreateOnce", "AttemptsNeverDelete",
     ])
     error_message = "The customer bucket's statements differ from the data template plus the B14-A worker contract."
   }
@@ -104,6 +108,15 @@ run "the_deletion_identity_alone_bypasses_and_its_function_is_not_created_here" 
   assert {
     condition     = strcontains(output.deletion.policy, "s3:BypassGovernanceRetention")
     error_message = "The deletion identity holds the bypass."
+  }
+}
+
+run "the_audit_bucket_admits_the_management_owned_organization_trail" {
+  command = plan
+
+  assert {
+    condition     = strcontains(output.audit_bucket_policy, "arn:aws:cloudtrail:us-east-1:000000000000:trail/kauro-organization") && strcontains(output.audit_bucket_policy, "AWSLogs/000000000000/*")
+    error_message = "The organization trail is owned by the management account even when the data account manages it."
   }
 }
 

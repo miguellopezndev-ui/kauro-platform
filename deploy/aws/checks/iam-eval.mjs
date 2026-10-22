@@ -60,23 +60,24 @@ function matchesResource(statement, resource) {
   throw new Error(`${statement.Sid}: neither Resource nor NotResource`);
 }
 
-function matchesPrincipal(statement, principal) {
+/** "NAMED" (the principal's own ARN or a service), "ACCOUNT" (its account root: a delegation to that account's IAM), "ANY" or false. */
+function principalMatch(statement, principal) {
   if (statement.Principal === undefined) throw new Error(`${statement.Sid}: a resource-based statement without Principal`);
-  if (statement.Principal === "*") return true;
+  if (statement.Principal === "*") return "ANY";
   for (const [kind, values] of Object.entries(statement.Principal)) {
     for (const value of list(values)) {
       if (kind === "AWS") {
-        if (value === "*") return true;
+        if (value === "*") return "ANY";
         if (/^arn:aws:iam::\d{12}:root$/.test(value) || /^\d{12}$/.test(value)) {
           const account = value.match(/\d{12}/)[0];
-          if (principal.account === account && principal.type !== "service") return true;
+          if (principal.account === account && principal.type !== "service") return "ACCOUNT";
         } else if (principal.arn === value) {
-          return true;
+          return "NAMED";
         }
       } else if (kind === "Service") {
-        if (principal.type === "service" && principal.service === value) return true;
+        if (principal.type === "service" && principal.service === value) return "NAMED";
       } else if (kind === "Federated") {
-        if (principal.type === "federated" && principal.provider === value) return true;
+        if (principal.type === "federated" && principal.provider === value) return "NAMED";
       } else {
         throw new Error(`${statement.Sid}: principal kind ${kind} is not modelled`);
       }
@@ -145,6 +146,7 @@ function evaluateCondition(rawOperator, key, policyValues, context) {
   }
   if (!present) {
     if (setOperator === "ForAllValues") return true;
+    if (setOperator === "ForAnyValue") return false;
     if (ifExists) return true;
     // "If the policy condition requires that the key is not matched, such as StringNotLike or ArnNotLike, and the right key is not
     // present, the condition is true" (IAM user guide, condition operators).
@@ -169,18 +171,22 @@ function conditionsHold(statement, context) {
 
 // ---- Policies ------------------------------------------------------------------------------------------------------------------
 
-/** "ALLOW", "DENY" or null (not applicable) for one policy and one request. */
+/**
+ * "ALLOW", "DENY" or null (not applicable) for one policy and one request. A resource-based Allow records how the principal was
+ * named: an account root only delegates to that account's identity policies (IAM user guide, "Specifying a principal").
+ */
 export function policyEffect(policy, request, { resourceBased = false } = {}) {
-  let allowed = false;
+  let allowed = null;
   for (const statement of policy.Statement) {
-    if (resourceBased && !matchesPrincipal(statement, request.principal)) continue;
+    const named = resourceBased ? principalMatch(statement, request.principal) : "NAMED";
+    if (!named) continue;
     if (!matchesAction(statement, request.action)) continue;
     if (!matchesResource(statement, request.resource)) continue;
     if (!conditionsHold(statement, request.context)) continue;
     if (statement.Effect === "Deny") return { effect: "DENY", sid: statement.Sid };
-    if (statement.Effect === "Allow") allowed = statement.Sid;
+    if (statement.Effect === "Allow" && (!allowed || named !== "ACCOUNT")) allowed = { sid: statement.Sid, named };
   }
-  return allowed ? { effect: "ALLOW", sid: allowed } : null;
+  return allowed ? { effect: "ALLOW", sid: allowed.sid, named: allowed.named } : null;
 }
 
 /**
@@ -205,17 +211,20 @@ export function evaluate(world, input) {
   const trail = [];
   const deny = (layer, sid) => ({ decision: "DENY", explicit: true, layer, sid, trail });
 
-  const exemptFromOrgPolicies = principal.type === "service-linked" || principal.type === "service";
+  // SCPs bind the IAM users and roles of member accounts: never a service-linked role, and an AWS service principal is no IAM
+  // principal of the account. RCPs bind every caller of a member account's resource except service-linked roles.
+  const scpApplies = principal.type !== "service-linked" && principal.type !== "service";
+  const rcpApplies = principal.type !== "service-linked";
 
   // SCPs: the principal's account, if it is a member account.
-  if (!exemptFromOrgPolicies && principal.account !== world.managementAccountId) {
+  if (scpApplies && principal.account !== world.managementAccountId) {
     for (const scp of world.scps[principal.account] ?? []) {
       const r = policyEffect(scp, request);
       if (r?.effect === "DENY") return deny("SCP", r.sid);
     }
   }
   // RCPs: the resource's account, if it is a member account.
-  if (!exemptFromOrgPolicies && input.resourceAccount !== world.managementAccountId) {
+  if (rcpApplies && input.resourceAccount !== world.managementAccountId) {
     for (const rcp of world.rcps[input.resourceAccount] ?? []) {
       const r = policyEffect(rcp, request, { resourceBased: true });
       if (r?.effect === "DENY") return deny("RCP", r.sid);
@@ -240,7 +249,9 @@ export function evaluate(world, input) {
 
   const sameAccount = principal.account === input.resourceAccount;
   const resourceAllow = resourceResult?.effect === "ALLOW" ? resourceResult.sid : null;
-  const allowed = sameAccount ? Boolean(identityAllow || resourceAllow) : Boolean(identityAllow && resourceAllow);
+  // In one account a grant to the principal itself suffices; a grant to the account root only delegates to the identity policies.
+  const resourceAlone = resourceAllow && resourceResult.named !== "ACCOUNT";
+  const allowed = sameAccount ? Boolean(identityAllow || resourceAlone) : Boolean(identityAllow && resourceAllow);
   trail.push(`identity:${identityAllow ?? "none"}`, `resource:${resourceAllow ?? "none"}`, sameAccount ? "same-account" : "cross-account");
   return allowed ? { decision: "ALLOW", trail } : { decision: "DENY", explicit: false, layer: "IMPLICIT", trail };
 }

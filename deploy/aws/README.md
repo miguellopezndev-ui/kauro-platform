@@ -14,7 +14,7 @@ the live qualification ([procedures/ACTIVATION.md](procedures/ACTIVATION.md)). T
 | `policies/workload/` | The GitHub image publisher's policy, the control plane's boundary and storage policy |
 | `worker/` | The B14-A worker contracts (Order 9), unchanged in substance: Terraform renders them, it does not restate them |
 | `terraform/accounts/{management,data,workload}/` | One root per account; each refuses any other account and any plan without the owner's activation reference |
-| `terraform/modules/` | organization, identity-center, cost-guardrails, protected-bucket, audit-trail, deletion-function, network, worker, deploy-identity, database (PROPOSED), state-backend, policy-template |
+| `terraform/modules/` | organization, identity-center, cost-guardrails, management-alarms, protected-bucket, audit-trail, deletion-function, network, worker, deploy-identity, database (PROPOSED), state-backend, policy-template |
 | `checks/` | The offline IAM/SCP/RCP evaluator, the authority matrix, the static guards |
 | `cost/` | Prices from AWS's Price List API, the labelled assumptions, the generated estimate |
 | `procedures/` | Activation gates, provisioning and rollback, the deletion function's publication, the live qualification |

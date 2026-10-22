@@ -42,6 +42,8 @@ export const ROWS = [
   ["Object deletion", "deployRole", "s3:DeleteObject", staging, IDS.data, {}, "DENY", "the deploy identity"],
   ["Object deletion", "deletionRole", "s3:DeleteObject", object("claims/kauro-attempt-x"), IDS.data, {}, "ALLOW", "the deletion identity (a delete marker reopens If-None-Match: B16 deletes protocol keys only after the creation horizon)"],
   ["Object deletion", "controlPlane", "s3:DeleteObject", object("claims/kauro-attempt-x"), IDS.data, {}, "DENY", "no delete marker on a claim from the workload"],
+  ["Object deletion", "controlPlane", "s3:PutObject", accepted, IDS.data, { "s3:ObjectCreationOperation": "true" }, "DENY", "no overwrite retires an unretained version (create-once everywhere but heartbeats; independent review C2)"],
+  ["Object deletion", "controlPlane", "s3:PutObject", object("accepted/a1b2c3d4-0000-4000-8000-000000000001/new.csv"), IDS.data, createOnce, "ALLOW", "a new object, created once"],
 
   // ---- Retention and holds ---------------------------------------------------------------------------------------------------
   ["Retention and holds", "controlPlane", "s3:PutObjectRetention", accepted, IDS.data, { "s3:object-lock-mode": "GOVERNANCE" }, "ALLOW", "the platform sets or extends GOVERNANCE retention (shortening needs the bypass)"],
@@ -76,10 +78,15 @@ export const ROWS = [
   ["Deletion function", "dataAdmin", "lambda:UpdateCodeSigningConfig", `arn:aws:lambda:${IDS.region}:${IDS.data}:code-signing-config:csc-0123456789abcdef0`, IDS.data, {}, "DENY", "nobody else relaxes code signing"],
   ["Deletion function", "dataAdmin", "signer:StartSigningJob", `arn:aws:signer:${IDS.region}:${IDS.data}:/signing-profiles/kauroqualificationdeletion`, IDS.data, {}, "DENY", "nobody else signs"],
   ["Deletion function", "deletionRole", "lambda:UpdateFunctionCode", deletionFunction, IDS.data, {}, "DENY", "the function cannot rewrite itself"],
+  ["Deletion function", "ownerPublisherData", "lambda:CreateFunction", deletionFunction, IDS.data, {}, "DENY", "never created without a code-signing configuration, not even by the owner (independent review M1)"],
+  ["Deletion function", "ownerPublisherData", "lambda:CreateFunction", deletionFunction, IDS.data, { "lambda:CodeSigningConfigArn": `arn:aws:lambda:${IDS.region}:${IDS.data}:code-signing-config:csc-0123456789abcdef0` }, "ALLOW", "created with its code-signing configuration"],
+  ["Deletion function", "ownerAdminData", "lambda:DeleteFunctionCodeSigningConfig", deletionFunction, IDS.data, {}, "DENY", "code signing is never detached"],
+  ["Deletion function", "ownerAdminData", "lambda:UpdateCodeSigningConfig", `arn:aws:lambda:${IDS.region}:${IDS.data}:code-signing-config:csc-0123456789abcdef0`, IDS.data, {}, "DENY", "a configuration is never relaxed (a new one is created and reviewed)"],
 
   // ---- Audit and alarms -------------------------------------------------------------------------------------------------------
   ["Audit and alarms", "dataAdmin", "cloudtrail:StopLogging", `arn:aws:cloudtrail:${IDS.region}:${IDS.data}:trail/kauro-organization`, IDS.data, {}, "DENY", "the trail stays on"],
   ["Audit and alarms", "dataAdmin", "events:DisableRule", `arn:aws:events:${IDS.region}:${IDS.data}:rule/kauro-guard-iam`, IDS.data, {}, "DENY", "the alarms stay on"],
+  ["Audit and alarms", "dataAdmin", "sns:SetSubscriptionAttributes", `arn:aws:sns:${IDS.region}:${IDS.data}:kauro-guard-alarms:0f8fad5b`, IDS.data, {}, "DENY", "no filter policy silences the alarm e-mail"],
   ["Audit and alarms", "ownerAdminData", "cloudtrail:UpdateTrail", `arn:aws:cloudtrail:${IDS.region}:${IDS.data}:trail/kauro-organization`, IDS.data, {}, "ALLOW", "the owner's administrator session"],
 
   // ---- The worker's attempt capability (B14-A contracts) ----------------------------------------------------------------------
@@ -102,6 +109,12 @@ export const ROWS = [
   ["Workload guards", "workloadAdmin", "iam:CreatePolicyVersion", `arn:aws:iam::${IDS.workload}:policy/kauro-guard/kauro-attempt-boundary`, IDS.workload, {}, "DENY", "the attempt ceiling changes only in the owner's session"],
   ["Workload guards", "ownerAdminWorkload", "iam:CreatePolicyVersion", `arn:aws:iam::${IDS.workload}:policy/kauro-guard/kauro-attempt-boundary`, IDS.workload, {}, "ALLOW", "the owner's administrator session"],
   ["Workload guards", "workloadAdmin", "iam:UpdateAssumeRolePolicy", P.deployRole.arn, IDS.workload, {}, "DENY", "the GitHub trust changes only in the owner's session"],
+  ["Workload guards", "workloadAdmin", "iam:UpdateAssumeRolePolicy", P.controlPlane.arn, IDS.workload, {}, "DENY", "nobody else can make the control plane's role assumable (independent review C2)"],
+  ["Workload guards", "workloadAdmin", "iam:DeleteRolePermissionsBoundary", P.controlPlane.arn, IDS.workload, {}, "DENY", "nor lift its boundary"],
+  ["Workload guards", "workloadAdmin", "iam:PassRole", P.controlPlane.arn, IDS.workload, { "iam:PassedToService": "ecs-tasks.amazonaws.com" }, "DENY", "nor run a task or function as the control plane"],
+  ["Workload guards", "ownerAdminWorkload", "iam:PassRole", P.controlPlane.arn, IDS.workload, { "iam:PassedToService": "ecs-tasks.amazonaws.com" }, "ALLOW", "the owner deploys the control plane"],
+  ["Workload guards", "workloadAdmin", "iam:CreateRole", `arn:aws:iam::${IDS.workload}:role/kauro-runtime/kauro-forged-control-plane`, IDS.workload, {}, "DENY", "nor forge another control-plane role that could make attempt roles"],
+  ["Workload guards", "workloadAdmin", "iam:CreatePolicyVersion", `arn:aws:iam::${IDS.workload}:policy/kauro-runtime/kauro-${IDS.environment}-launcher`, IDS.workload, {}, "DENY", "nor widen the launcher policy"],
   ["Workload guards", "workloadAdmin", "ec2:CreateNatGateway", `arn:aws:ec2:${IDS.region}:${IDS.workload}:natgateway/*`, IDS.workload, {}, "DENY", "no internet path (and no fixed cost) without the owner"],
   ["Workload guards", "ownerAdminWorkload", "ecs:ExecuteCommand", `arn:aws:ecs:${IDS.region}:${IDS.workload}:task/kauro-${IDS.environment}/abc`, IDS.workload, {}, "DENY", "no shell into a task, for anyone"],
   ["Workload guards", "workloadAdmin", "ec2:RunInstances", `arn:aws:ec2:us-west-2:${IDS.workload}:instance/*`, IDS.workload, { "aws:RequestedRegion": "us-west-2" }, "DENY", "one US Region (A-06)"],

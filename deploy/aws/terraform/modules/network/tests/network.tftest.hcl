@@ -1,6 +1,7 @@
 # Offline plan tests of the workload network (mocked provider): no public address, endpoints in one zone, the worker's only egress.
 
 mock_provider "aws" {
+  override_during = plan
   mock_data "aws_ec2_managed_prefix_list" {
     defaults = { id = "pl-63a5400a" }
   }

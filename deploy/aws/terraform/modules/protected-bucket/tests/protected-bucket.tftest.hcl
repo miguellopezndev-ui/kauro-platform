@@ -1,6 +1,7 @@
 # Offline plan tests of the protected bucket (D-19), mocked provider: what the configuration asks S3 for, not what S3 enforces.
 
 mock_provider "aws" {
+  override_during = plan
   mock_resource "aws_s3_bucket" {
     defaults = { arn = "arn:aws:s3:::kauro-qualification-customer-data-222222222222", id = "kauro-qualification-customer-data-222222222222" }
   }
@@ -45,15 +46,15 @@ run "d19_noncurrent_versions_expire_after_one_day_and_uploads_abort" {
   command = plan
 
   assert {
-    condition     = one(aws_s3_bucket_lifecycle_configuration.this.rule).noncurrent_version_expiration[0].noncurrent_days == 1
+    condition     = aws_s3_bucket_lifecycle_configuration.this.rule[0].noncurrent_version_expiration[0].noncurrent_days == 1
     error_message = "D-19: noncurrent versions expire one day after they become noncurrent (the real lag is measured, A-20)."
   }
   assert {
-    condition     = one(aws_s3_bucket_lifecycle_configuration.this.rule).abort_incomplete_multipart_upload[0].days_after_initiation == 1
+    condition     = aws_s3_bucket_lifecycle_configuration.this.rule[0].abort_incomplete_multipart_upload[0].days_after_initiation == 1
     error_message = "Incomplete multipart uploads are aborted after a day (worker contract)."
   }
   assert {
-    condition     = coalesce(one(aws_s3_bucket_lifecycle_configuration.this.rule).expiration[0].days, 0) == 0
+    condition     = aws_s3_bucket_lifecycle_configuration.this.rule[0].expiration[0].expired_object_delete_marker == true
     error_message = "Current versions never expire on a bucket holding the worker's protocol keys (a delete marker reopens If-None-Match)."
   }
 }

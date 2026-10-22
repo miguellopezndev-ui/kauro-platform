@@ -14,7 +14,7 @@ result. A row fails closed: an unexpected ALLOW stops the qualification and beco
 | A3 | The Identity Center session roles' ARNs match the guards' patterns (`aws-reserved/sso.amazonaws.com/[region/]AWSReservedSSO_<set>_…`) in each member account | the owner's admin and publisher sessions pass the exceptions; nothing else does |
 | A4 | Identity Center asks for MFA at every sign-in (aws:MultiFactorAuthPresent is absent for federated sessions, so no policy checks it) | a sign-in without the second factor is refused |
 | A5 | A role created at `aws-reserved/…` by a member-account administrator | refused (SCP and AWS's reserved path) |
-| A6 | RCPs enabled and effective: the management account's administrator calls `s3:GetObject` and `sts:AssumeRole` into the data account | denied by the RCP |
+| A6 | RCPs enabled and effective: the management account's administrator calls `sts:AssumeRole` into a data-account role | denied by the RCP (a plain `s3:GetObject` from the management account is denied by the absence of a bucket grant and proves nothing about the RCP) |
 | A7 | `aws:ResourceAccount` is present for the workload's cross-account S3 calls (the workload guard relies on it) | the workload guard's denies apply; record any S3 operation where the key is absent |
 | A8 | The spend stop: a test budget of USD 0.01 with `MANUAL` approval; the owner approves; `ecs:RunTask` by the control plane is denied; the owner detaches | as stated; then delete the test budget |
 | A9 | The GitHub image publisher: assumed from `environment:aws-qualification` of the repository (allowed); from a branch, a pull request, a fork, another environment (denied) | as stated; the role can push to the one repository and nothing else |
@@ -47,17 +47,17 @@ result. A row fails closed: an unexpected ALLOW stops the qualification and beco
 | D1 | Every object version reports SSE-S3 (`ServerSideEncryption: AES256`) | yes |
 | D2 | A version under GOVERNANCE retention: delete by the control plane, the owner's admin session and the data administrator | denied |
 | D3 | The same by the deletion identity with `x-amz-bypass-governance-retention: true` | deleted; the `kauro-guard-retention-bypass` alarm e-mails the owner |
-| D4 | `PutObjectRetention` with `COMPLIANCE` by any principal | denied by the bucket policy |
+| D4 | `PutObjectRetention` with `COMPLIANCE`, a `PutObject` with `COMPLIANCE`, and a multipart upload started with `COMPLIANCE`, by any principal | each denied by the bucket policy (record whether the multipart case is refused at CreateMultipartUpload) |
 | D5 | **A-20**: the lag between a version becoming noncurrent and its removal by the lifecycle rule (several samples, with dates) | measured and recorded; the legal texts state the measured or AWS-documented maximum, never "one day" |
 | D6 | A locked version is not removed by the lifecycle rule before its retention ends | not removed |
-| D7 | The deletion function's publication, signing enforcement and refusal of unsigned code (DELETION-FUNCTION.md checks) | as stated |
+| D7 | The deletion function's publication, signing enforcement and refusal of unsigned code (DELETION-FUNCTION.md checks); `CreateFunction` without a code-signing configuration refused even for the owner's sessions; Lambda assumes the deletion role whose trust carries only `aws:SourceAccount` | as stated |
 | D8 | The journal bucket refuses an overwrite of an existing entry | 412 or AccessDenied |
 
 ## E. Audit and alarms
 
 | # | Test | Expected |
 |---|---|---|
-| E1 | The data account, as CloudTrail delegated administrator, owns the organization trail; files from every account arrive in the audit bucket (Object Lock with default GOVERNANCE retention) | delivered, retention set, log file validation passes |
+| E1 | The data account, as CloudTrail delegated administrator, creates the organization trail (owned by the management account: its ARN names that account); files from every account arrive in the audit bucket under `AWSLogs/<management>/` and `AWSLogs/<org id>/` (Object Lock with default GOVERNANCE retention) | delivered, retention set, log file validation passes; the management account's alarm fires on a test `UpdateTrail` |
 | E2 | S3 data events of cross-account calls (the workload's control plane on the data bucket) reach the trail | recorded |
 | E3 | Each `kauro-guard-*` rule fires on its event and the SNS e-mail arrives; whether cross-account data events reach the data account's EventBridge bus | as stated; record the gaps |
 | E4 | `StopLogging` by the data administrator | denied |

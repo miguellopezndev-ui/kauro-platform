@@ -41,6 +41,16 @@ variable "data_account_id" {
   }
 }
 
+variable "management_account_id" {
+  description = "Output of the management root (it owns the organization trail this root creates as delegated administrator)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.management_account_id))
+    error_message = "A 12-digit AWS account id."
+  }
+}
+
 variable "workload_account_id" {
   type = string
 
@@ -148,6 +158,7 @@ module "audit" {
   region                   = var.region
   organization_id          = var.organization_id
   data_account_id          = var.data_account_id
+  management_account_id    = var.management_account_id
   owner_admin_role_pattern = var.owner_admin_role_pattern
   protected_bucket_arns    = [module.customer_data.arn, module.journal.arn]
   deletion_role_names      = [module.deletion.role_name]

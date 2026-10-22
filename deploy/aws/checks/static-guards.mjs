@@ -22,6 +22,14 @@ function walk(dir, keep) {
 
 const rel = (path) => relative(REPO, path).replaceAll("\\", "/");
 export const terraformFiles = () => walk(TERRAFORM_DIR, (p) => p.endsWith(".tf"));
+
+/** Each Terraform test file with its OpenTofu twin (OpenTofu reads the .tofutest.hcl and ignores the .tftest.hcl of the same name). */
+export function terraformTestPairs() {
+  return walk(TERRAFORM_DIR, (p) => p.endsWith(".tftest.hcl")).map((path) => {
+    const twin = path.replace(/\.tftest\.hcl$/, ".tofutest.hcl");
+    return { path: rel(path), tftest: readFileSync(path, "utf8"), tofutest: existsSync(twin) ? readFileSync(twin, "utf8") : "" };
+  });
+}
 const allAwsFiles = () => walk(AWS_DIR, () => true);
 
 const DANGEROUS_TERRAFORM = [

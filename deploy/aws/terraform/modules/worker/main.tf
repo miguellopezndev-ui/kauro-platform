@@ -125,15 +125,11 @@ resource "aws_ecr_lifecycle_policy" "worker" {
   policy = jsonencode({
     rules = [
       {
+        # Only untagged images expire. Tagged images are never expired by count: pushing ten new images must not be a way for the
+        # image publisher to expire the digest the owner pinned (independent review, Order 25).
         rulePriority = 1
-        description  = "Untagged layers and images go after one day."
-        selection    = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 1 }
-        action       = { type = "expire" }
-      },
-      {
-        rulePriority = 2
-        description  = "Keep the ten most recent images (the pinned digest and its rollback candidates)."
-        selection    = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 10 }
+        description  = "Untagged images go after fourteen days."
+        selection    = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 14 }
         action       = { type = "expire" }
       }
     ]

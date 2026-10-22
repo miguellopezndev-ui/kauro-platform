@@ -1,30 +1,57 @@
 {
-  "$comment": "Order 25 (D-21 A): SCP on the Workloads OU. No workload principal — the deploy identity, the control plane, an attempt role, an administrator — can bypass retention, place holds or retention, delete anything but staging, or reconfigure a bucket in the data account, nor assume a role there. Attempt roles exist only as the launcher creates them, under the boundary; the guardrail policies, the deploy role and the GitHub trust change only in the owner's administrator session. No internet path (gateway, NAT, Elastic IP) and no shell into a task.",
+  "$comment": "Order 25 (D-21 A): SCP on the Workloads OU. No workload principal — the deploy identity, the control plane, an attempt role, an administrator — can bypass retention, place holds or retention, delete anything but staging, or reconfigure a bucket in the data account, nor assume a role there. Attempt roles exist only as the launcher creates them, under the boundary; the guardrail policies, the runtime roles and policies (the control plane's above all), the deploy role and the GitHub trust change only in the owner's administrator session, and only that session hands the control plane's role to a task or function. No internet path (gateway, NAT, Elastic IP) and no shell into a task.",
   "Version": "2012-10-17",
   "Statement": [
     {
       "Sid": "DenyDataAccountGuardActions",
       "Effect": "Deny",
       "Action": [
-        "s3:BypassGovernanceRetention", "s3:DeleteBucket", "s3:DeleteBucketPolicy", "s3:PutBucketAcl", "s3:PutBucketCORS",
-        "s3:PutBucketLogging", "s3:PutBucketObjectLockConfiguration", "s3:PutBucketOwnershipControls", "s3:PutBucketPolicy",
-        "s3:PutBucketPublicAccessBlock", "s3:PutBucketVersioning", "s3:PutEncryptionConfiguration", "s3:PutLifecycleConfiguration",
-        "s3:PutObjectAcl", "s3:PutObjectLegalHold", "s3:PutReplicationConfiguration"
+        "s3:BypassGovernanceRetention",
+        "s3:DeleteBucket",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketAcl",
+        "s3:PutBucketCORS",
+        "s3:PutBucketLogging",
+        "s3:PutBucketObjectLockConfiguration",
+        "s3:PutBucketOwnershipControls",
+        "s3:PutBucketPolicy",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketVersioning",
+        "s3:PutEncryptionConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:PutObjectAcl",
+        "s3:PutObjectLegalHold",
+        "s3:PutReplicationConfiguration"
       ],
       "Resource": "*",
-      "Condition": { "StringEquals": { "aws:ResourceAccount": "${DATA_ACCOUNT_ID}" } }
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceAccount": "${DATA_ACCOUNT_ID}"
+        }
+      }
     },
     {
       "Sid": "DenyDataAccountDeletesOutsideStaging",
       "Effect": "Deny",
-      "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Action": [
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion"
+      ],
       "NotResource": "arn:aws:s3:::kauro-*-customer-data-*/staging/*",
-      "Condition": { "StringEquals": { "aws:ResourceAccount": "${DATA_ACCOUNT_ID}" } }
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceAccount": "${DATA_ACCOUNT_ID}"
+        }
+      }
     },
     {
       "Sid": "DenyAssumingDataAccountRoles",
       "Effect": "Deny",
-      "Action": ["sts:AssumeRole", "sts:TagSession", "sts:SetSourceIdentity"],
+      "Action": [
+        "sts:AssumeRole",
+        "sts:TagSession",
+        "sts:SetSourceIdentity"
+      ],
       "Resource": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/*"
     },
     {
@@ -32,45 +59,106 @@
       "Effect": "Deny",
       "Action": "iam:CreateRole",
       "Resource": "arn:aws:iam::*:role/kauro-attempts/*",
-      "Condition": { "StringNotEquals": { "iam:PermissionsBoundary": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:policy/kauro-guard/kauro-attempt-boundary" } }
+      "Condition": {
+        "StringNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:policy/kauro-guard/kauro-attempt-boundary"
+        }
+      }
     },
     {
       "Sid": "AttemptRolesOnlyByTheLauncher",
       "Effect": "Deny",
       "Action": [
-        "iam:AttachRolePolicy", "iam:CreateRole", "iam:DeleteRole", "iam:DeleteRolePermissionsBoundary", "iam:DeleteRolePolicy",
-        "iam:DetachRolePolicy", "iam:PassRole", "iam:PutRolePermissionsBoundary", "iam:PutRolePolicy", "iam:TagRole",
-        "iam:UpdateAssumeRolePolicy", "iam:UpdateRole"
+        "iam:AttachRolePolicy",
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PassRole",
+        "iam:PutRolePermissionsBoundary",
+        "iam:PutRolePolicy",
+        "iam:TagRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:UpdateRole"
       ],
       "Resource": "arn:aws:iam::*:role/kauro-attempts/*",
-      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-*-control-plane" } }
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-*-control-plane"
+        }
+      }
     },
     {
       "Sid": "GuardrailsChangeOnlyInTheOwnerSession",
       "Effect": "Deny",
       "Action": [
-        "iam:AttachRolePolicy", "iam:CreateOpenIDConnectProvider", "iam:CreatePolicyVersion", "iam:DeleteOpenIDConnectProvider",
-        "iam:DeletePolicy", "iam:DeletePolicyVersion", "iam:DeleteRole", "iam:DeleteRolePermissionsBoundary", "iam:DeleteRolePolicy",
-        "iam:DetachRolePolicy", "iam:PutRolePermissionsBoundary", "iam:PutRolePolicy", "iam:SetDefaultPolicyVersion",
-        "iam:UpdateAssumeRolePolicy", "iam:UpdateOpenIDConnectProviderThumbprint", "iam:AddClientIDToOpenIDConnectProvider",
-        "iam:RemoveClientIDFromOpenIDConnectProvider"
+        "iam:AddClientIDToOpenIDConnectProvider",
+        "iam:AttachRolePolicy",
+        "iam:CreateOpenIDConnectProvider",
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:CreateRole",
+        "iam:DeleteOpenIDConnectProvider",
+        "iam:DeletePolicy",
+        "iam:DeletePolicyVersion",
+        "iam:DeleteRole",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:PutRolePolicy",
+        "iam:RemoveClientIDFromOpenIDConnectProvider",
+        "iam:SetDefaultPolicyVersion",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:UpdateOpenIDConnectProviderThumbprint",
+        "iam:UpdateRole"
       ],
       "Resource": [
         "arn:aws:iam::*:policy/kauro-guard/*",
+        "arn:aws:iam::*:policy/kauro-runtime/*",
         "arn:aws:iam::*:role/kauro-deploy/*",
+        "arn:aws:iam::*:role/kauro-runtime/*",
         "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
       ],
-      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}"
+        }
+      }
+    },
+    {
+      "Sid": "OnlyTheOwnerPassesTheControlPlaneRole",
+      "Effect": "Deny",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/kauro-runtime/kauro-*-control-plane",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}"
+        }
+      }
     },
     {
       "Sid": "NoInternetPathWithoutTheOwner",
       "Effect": "Deny",
       "Action": [
-        "ec2:AllocateAddress", "ec2:AssociateAddress", "ec2:AttachInternetGateway", "ec2:CreateEgressOnlyInternetGateway",
-        "ec2:CreateInternetGateway", "ec2:CreateNatGateway", "ec2:CreateVpcPeeringConnection", "ec2:AcceptVpcPeeringConnection"
+        "ec2:AllocateAddress",
+        "ec2:AssociateAddress",
+        "ec2:AttachInternetGateway",
+        "ec2:CreateEgressOnlyInternetGateway",
+        "ec2:CreateInternetGateway",
+        "ec2:CreateNatGateway",
+        "ec2:CreateVpcPeeringConnection",
+        "ec2:AcceptVpcPeeringConnection"
       ],
       "Resource": "*",
-      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}"
+        }
+      }
     },
     {
       "Sid": "NoShellIntoTasks",
