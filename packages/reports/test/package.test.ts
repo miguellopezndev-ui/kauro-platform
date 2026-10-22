@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readMigrationPackage, ReportModelError } from "../src/index.js";
 import type { ProblemCode } from "../src/index.js";
-import { parseCsv } from "../src/csv.js";
+import { parseCsv, scanTable } from "../src/csv.js";
 import { CASES, fileText, forge, loadPackage, manifestOf, ORACLE, writeManifest } from "./support/fixtures.js";
 
 const R = "03_TRACEABILITY/reconciliation.json";
@@ -357,5 +357,16 @@ describe("CSV records", () => {
   it("an unterminated quote and a bare carriage return are refused", () => {
     assert.throws(() => parseCsv('a\n"x'), /unterminated/);
     assert.throws(() => parseCsv("a\rb"), /bare carriage return/);
+  });
+  it("a table decoded a few bytes at a time gives the same records wherever a slice cuts a CRLF, an escaped quote or a character", () => {
+    const text = '﻿id,note\r\n1,"x\r\ny, ""é"""\r\n2,😀\n3,\n';
+    const bytes = new TextEncoder().encode(text);
+    const whole = parseCsv(text.slice(1));
+    for (let slice = 1; slice <= 8; slice++) {
+      const rows: string[][] = [];
+      const table = scanTable(bytes, () => (row) => rows.push([...row]), slice);
+      assert.deepEqual([table.header, ...rows], whole, `slice ${slice}`);
+    }
+    for (let slice = 1; slice <= 4; slice++) assert.throws(() => scanTable(new TextEncoder().encode('a\n"x\r\n'), undefined, slice), /unterminated/);
   });
 });

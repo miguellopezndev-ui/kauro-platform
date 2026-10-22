@@ -12,7 +12,22 @@ export type CaseName = (typeof CASES)[number];
 const root = fileURLToPath(new URL("../../../test/fixtures/mc-3.0.0/", import.meta.url));
 
 export function loadPackage(name: CaseName): Map<string, Uint8Array> {
-  const dir = join(root, name);
+  return loadDirectory(join(root, name));
+}
+
+/** A package the vendored core 3.0.0 wrote with rows it could not read and rows no mapping covers (mc-3.0.0-rejected/PROVENANCE.json). */
+export const REJECTED_CASE = {
+  dir: fileURLToPath(new URL("../../../test/fixtures/mc-3.0.0-rejected/E-rejected-rows/package/", import.meta.url)),
+  manifestSha256: "7839c079d2cf4c0193f725b3f312117bcaa4e054d46cb8de4417e43a1604be37",
+  packageDigest: "8d58776ea802e309ccb2fe38e75a6f613a642dfb46ca6cce64e924d959ebb14c",
+  files: 30,
+} as const;
+
+export function loadRejectedPackage(): Map<string, Uint8Array> {
+  return loadDirectory(REJECTED_CASE.dir);
+}
+
+function loadDirectory(dir: string): Map<string, Uint8Array> {
   const files = new Map<string, Uint8Array>();
   const walk = (d: string): void => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
@@ -38,14 +53,18 @@ export function writeManifest(files: Map<string, Uint8Array>, manifest: unknown)
 
 /** Replaces one file and re-declares it in the manifest (length, hash and, for CSV, record count). */
 export function forge(files: Map<string, Uint8Array>, path: string, content: string): void {
-  const bytes = bytesOf(content);
+  forgeBytes(files, path, bytesOf(content), path.endsWith(".csv") ? content.split("\n").filter((l) => l.length > 0).length - 1 : null);
+}
+
+/** `forge` for bytes built outside the JavaScript heap (a large table), with the record count the caller knows. */
+export function forgeBytes(files: Map<string, Uint8Array>, path: string, bytes: Uint8Array, rowCount: number | null): void {
   files.set(path, bytes);
   const manifest = manifestOf(files);
   const entry = manifest.artifacts.find((a) => a["path"] === path);
   if (entry === undefined) throw new Error(`no manifest entry for ${path}`);
   entry["byteLength"] = bytes.byteLength;
   entry["sha256"] = createHash("sha256").update(bytes).digest("hex");
-  if (path.endsWith(".csv")) entry["rowCount"] = content.split("\n").filter((l) => l.length > 0).length - 1;
+  if (rowCount !== null) entry["rowCount"] = rowCount;
   writeManifest(files, manifest);
 }
 
