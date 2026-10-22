@@ -20,6 +20,7 @@ function text(row: Readonly<Record<string, unknown>>, field: string): string {
  * §1.4 does for UI07 and UI18): each entry names its record, and only these screens may differ from screens.json.
  */
 export const AMENDED_PRIMARY_COPY: Readonly<Record<string, { readonly text: string; readonly record: string }>> = {
+  UI03: { text: "Three services for your exported CRM files.", record: "docs/design/ORDER11-ROUND2-PUBLIC.md, amendment R2-2 (owner's section review, 2026-10-21)" },
   UI07: { text: "Request a free data health check.", record: "docs/design/ORDER11-ROUND2-PUBLIC.md, amendment R2-1 (owner's approval, 2026-10-21)" },
 };
 

@@ -20,7 +20,7 @@ interface PageUnderTest {
 const PAGES: readonly PageUnderTest[] = [
   { route: "/", h1: "Prepare and verify CRM data from files.", reads: true },
   { route: "/how-it-works", h1: "From source files to a reviewed import package.", reads: false },
-  { route: "/supported-services", h1: "Check your files and target before you start.", reads: true },
+  { route: "/supported-services", h1: "Three services for your exported CRM files.", reads: true },
   { route: "/pricing", h1: "One scoped project, priced by source units.", reads: true },
   { route: "/sample-delivery", h1: "See a synthetic delivery package.", reads: false },
   { route: "/security", h1: "Know what is processed and when it is deleted.", reads: false },

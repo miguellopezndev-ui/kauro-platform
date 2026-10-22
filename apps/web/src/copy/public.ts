@@ -316,8 +316,8 @@ export const PUBLIC_COPY = {
   // ---- UI03 Supported services --------------------------------------------------------------------------------------------------------
   "services.meta.title": "Supported services",
   "services.meta.description": "The services Kauro is open for right now, read from the same capability publication that decides which projects are accepted.",
-  "services.title": "Check your files and target before you start.",
-  "services.lead": "This page reads the publication that decides which projects Kauro accepts. A service that is not listed as available cannot be bought, whatever an older page or a cached copy says.",
+  "services.title": "Three services for your exported CRM files.",
+  "services.lead": "Prepared for an import into HubSpot or Salesforce, or cleaned with no destination. Each service below says whether it is open for new projects now.",
   "services.availability.heading": "The three services",
   "services.destination.label": "Destination",
   "services.receive.label": "You receive",

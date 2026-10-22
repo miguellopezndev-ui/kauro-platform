@@ -75,6 +75,15 @@ ORDER11-ROUND2-OPS.md and the customer workspace in ORDER11-ROUND2-WORKSPACE.md.
 | How | Like amendment A3 §1.4: `packages/contracts/registry/screens.json` is not edited (it is byte-identical to the authority and pinned by PROVENANCE.json and the evidence ledger). The amended text governs the rendered copy; the web's tests read it through `AMENDED_PRIMARY_COPY` in `apps/web/test/support/registry.ts`, which names this record. A later registry version may take the text in through a ChangeProposal (28 §How a change is made). |
 | Side effect | The review viewer's "Contract (registry)" panel still shows the registry's record for UI07, as it should: it is the registry. |
 
+## Amendment R2-2: the Supported services heading
+
+| Field | Content |
+|---|---|
+| Change | UI03's rendered heading becomes "Three services for your exported CRM files." (was "Check your files and target before you start.") |
+| Reason | Measured in the owner's section review (2026-10-21): 7 of 8 comparable "supported platforms / connectors" pages head the page with what moves and where to; an instruction says neither. The heading names no destination, so it never presents a service as open: each card still reads its state from the capability publication (UI03's exception on planned or internal capability and stale caches is kept by the cards, not by the heading). Record: Kauro.archive/Deliveries/Visual/order11/research/round3-services-head. |
+| Approval | Owner's section review, 2026-10-21 (pending until the owner approves the section). |
+| How | As R2-1: the registry is not edited; the web's tests read the amended text through `AMENDED_PRIMARY_COPY` in `apps/web/test/support/registry.ts`, which names this record. |
+
 ## Not done here, and why
 - **New public pages** (For agencies, Check a file free). They need registry routes (contracts) and, for the free check, an amendment to
   A3 §3.2; they stay as proposals at /__variants with Contact's consent variant (F-08).
