@@ -109,5 +109,5 @@ The design audits found these against the canon and the contracts. They are prod
 1. Read `ROUND3-PROGRESS.md`, then each page's `AUDITIONS.md`.
 2. Finish the cut-off passes first: the Refunds fixes, the Claims accept field, the Sellers final, the Customers fixes and the report
    fixes.
-3. Use a cheaper method: 2 judges per pair for Tier B, one outside critic per site, at most 6 agents at a time.
+3. Use master plan version 8: the same depth, organised more cheaply (adaptive judging, the truth audit before judging, a shared page generator, the pre-critic checklist).
 4. Implement in `apps/web` only after a site's pages are final, one coordinated change per component (D-34).
