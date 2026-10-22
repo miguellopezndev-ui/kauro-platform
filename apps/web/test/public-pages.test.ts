@@ -318,7 +318,8 @@ test("Supported services: three peers as equal cards, the qualified destinations
   for (const name of SERVICES) assert.match(card(html, name), /Available for new projects/);
   // the read time is not shown on this page (owner review, Order 10)
   assert.doesNotMatch(textOf(html), /Read from the capability publication at/);
-  assert.match(card(html, "Prepare for HubSpot"), /Publication version 2026\.10\.0, available since 2026-10-01 15:00 UTC\./);
+  // the publication's version is not printed on the cards (owner, 2026-10-21; amendment R2-3)
+  for (const name of SERVICES) assert.doesNotMatch(card(html, name), /Publication version|available since/);
   assert.match(card(html, "Clean your data"), /Kauro qualifies imports only for HubSpot and Salesforce\./);
   assert.match(card(html, "Prepare for HubSpot"), /marketing-contact status and paid enrichment stay switched off/);
   assert.match(card(html, "Prepare for Salesforce"), /does not deploy fields, validation rules, automations or external identifier settings/);

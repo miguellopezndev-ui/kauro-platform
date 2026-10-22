@@ -8658,8 +8658,9 @@ body:has(> .kauro-site-header) {
    ends in the same closing band with the one call to action. The rules are scoped under .kauro-site-main so they win over the earlier
    layers of this sheet without !important. */
 
+/* the space under the head's last line equals the space between the navigation and its first line (owner, 2026-10-21) */
 .kauro-site-main .kauro-r2-head {
-  padding-block: clamp(2.5rem, 1.5rem + 3.5vw, 4.5rem) clamp(2rem, 1rem + 2.5vw, 3rem);
+  padding-block: clamp(2.5rem, 1.5rem + 3.5vw, 4.5rem);
 }
 .kauro-site-main .kauro-r2-head h1 {
   max-inline-size: 20ch;
@@ -9054,15 +9055,6 @@ body:has(> .kauro-site-header) {
   font-size: 0.9375rem;
   line-height: 1.5;
 }
-.kauro-site-main .kauro-r2-service-foot {
-  display: grid;
-  gap: var(--kauro-space-2);
-  margin-block-start: auto;
-}
-.kauro-site-main .kauro-r2-card-meta {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.8125rem;
-}
 /* under the cards: how a service is priced, then pricing and the sample delivery, once for all three */
 .kauro-site-main .kauro-r2-services-after {
   display: grid;
@@ -9082,13 +9074,13 @@ body:has(> .kauro-site-header) {
   /* the rows of the three cards line up across the grid: a card is a subgrid of the row's tracks */
   .kauro-site-main .kauro-r2-services {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(6, auto);
+    grid-template-rows: repeat(5, auto);
     column-gap: var(--kauro-space-5);
     row-gap: 0;
   }
   .kauro-site-main .kauro-r2-service {
     display: grid;
-    grid-row: span 6;
+    grid-row: span 5;
     grid-template-rows: subgrid;
     row-gap: var(--kauro-space-4);
   }

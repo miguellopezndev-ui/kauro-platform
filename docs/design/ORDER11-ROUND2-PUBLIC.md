@@ -84,6 +84,16 @@ ORDER11-ROUND2-OPS.md and the customer workspace in ORDER11-ROUND2-WORKSPACE.md.
 | Approval | Owner, 2026-10-21: "Aprobada la cabecera de Supported services." |
 | How | As R2-1: the registry is not edited; the web's tests read the amended text through `AMENDED_PRIMARY_COPY` in `apps/web/test/support/registry.ts`, which names this record. |
 
+## Amendment R2-3: Supported services no longer prints the publication's version
+
+| Field | Content |
+|---|---|
+| Change | The service cards no longer show "Publication version {version}, available since {time}." |
+| Registry text it touches | UI03's action "Inspect the exact profile". The page no longer prints the version and start time of each service's profile. |
+| What still holds | Each card's state is still read from the capability publication, a service it does not list is never shown as open, and a publication that cannot be read shows no service as available (UI03's exception). The version stays in the publication itself. |
+| Approval | Owner, 2026-10-21: "elimina esto Publication version 2026.10.0, available since 2026-10-01 15:00 UTC." |
+| How | Copy `services.mode.version` removed; the web's test asserts the line is absent. The registry is not edited (as R2-1). |
+
 ## Not done here, and why
 - **New public pages** (For agencies, Check a file free). They need registry routes (contracts) and, for the free check, an amendment to
   A3 §3.2; they stay as proposals at /__variants with Contact's consent variant (F-08).

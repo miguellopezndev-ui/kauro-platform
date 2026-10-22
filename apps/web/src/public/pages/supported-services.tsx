@@ -12,11 +12,12 @@
 // Owner's section review (2026-10-21), after the migration packages measured (SpotDev: a name, who it is for, three or four short points,
 // one shared action): the section is headed by the choice it asks for (by where the data goes) rather than repeating the H1; what each
 // service delivers is three short points, not one long sentence; and the sample delivery, which is one HubSpot project, is offered once
-// under the cards beside pricing rather than on every card. The section sits on the sunken band, as How it works's stages do, so the head
+// under the cards beside pricing rather than on every card. The publication's version and start time are no longer printed on each card
+// (owner, 2026-10-21; amendment R2-3): the state each card shows is still read from the publication. The section sits on the sunken band, as How it works's stages do, so the head
 // and the services read as two parts (the head and the first section shared one colour); the sections below alternate from there.
 import type { ReactElement } from "react";
-import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
-import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Publication } from "../capabilities.ts";
+import { PUBLIC_COPY, type PublicCopyId } from "../../copy/public.ts";
+import { availabilityOf, cleanQualifiesId, publishedModes, type Publication } from "../capabilities.ts";
 import { INPUT_LIMITS } from "../limits.ts";
 import type { ServiceMode } from "../pricing-bands.ts";
 import { Block, CHECK_CTA, Closing, GroupedTable, Head, SERVICE_ORDER, StateTag } from "../r2.tsx";
@@ -60,7 +61,6 @@ function Particular({ mode, publication }: { readonly mode: ServiceMode; readonl
 
 function ServiceCard({ mode, publication }: { readonly mode: ServiceMode; readonly publication: Publication }): ReactElement {
   const availability = availabilityOf(publication, mode);
-  const listed = publishedModes(publication).find((entry) => entry.mode === mode);
   const headingId = `${CARD_ID[mode]}-heading`;
   const closed = availability === "CLOSED";
   return (
@@ -90,9 +90,6 @@ function ServiceCard({ mode, publication }: { readonly mode: ServiceMode; readon
           </div>
         </>
       )}
-      <div className="kauro-r2-service-foot">
-        {listed === undefined ? null : <p className="kauro-r2-card-meta">{copy("services.mode.version", { version: listed.version, time: formatInstant(listed.validFrom) })}</p>}
-      </div>
     </article>
   );
 }

@@ -328,7 +328,6 @@ export const PUBLIC_COPY = {
   "services.mode.limited": "Available for new projects, within the published limits",
   "services.mode.unavailable": "Not available for purchase",
   "services.mode.unread": "Availability cannot be read right now",
-  "services.mode.version": "Publication version {version}, available since {time}.",
   "services.clean.name": "Clean your data",
   "services.clean.destination": "None needed: another CRM, spreadsheets only, a cleanup before a migration, or a destination not chosen yet.",
   "services.clean.limit": "A cleaned file is not a promise about how another CRM will read it.",
