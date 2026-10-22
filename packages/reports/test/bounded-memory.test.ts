@@ -35,6 +35,14 @@ describe("F-32: a table is scanned, not held", () => {
     assert.equal(result.read, result.rows, "every record of the table was counted");
     assert.ok(result.heapLimitBytes <= 54 * 1024 * 1024, `the child ran under the small heap (${result.heapLimitBytes} bytes)`);
   });
+
+  it("a forged lineage of 64 MB of distinct delivered rows is refused in the same heap: no more rows are kept than the reconciliation declares", () => {
+    const child = spawnSync(process.execPath, [...HEAP, CHILD, "64", "lineage"], { encoding: "utf8", maxBuffer: 1 << 20 });
+    assert.equal(child.status, 0, `the reader ran out of its heap or failed: ${child.stderr.slice(-1500)}`);
+    const result = JSON.parse(child.stdout);
+    assert.ok(result.rows > 100_000, `${result.rows} forged rows`);
+    assert.ok(result.refused.includes("lineage RECORD/OUTPUT rows exceed records.deliveredTotal"), JSON.stringify(result.refused.slice(0, 5)));
+  });
 });
 
 describe("F-32: crafted tables are refused within their bounds", () => {

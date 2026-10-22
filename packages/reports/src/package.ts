@@ -357,6 +357,19 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
   };
   const isRecordImport = (a: { path: string; kind: ArtifactKind }): boolean => a.kind === "MACHINE_IMPORT_CSV" && !a.path.split("/").includes("associations");
   const counted = new Map<string, number>();
+  // What is kept per row is bounded by what the reconciliation declares, read here ahead of the tables (and again, with its refusals,
+  // after them): a forged table with more delivered or exception rows than declared is refused without being held (review of Order 14).
+  const declaredCounts = readReconciliation(files, new Problems(), { runId: runId as string, bundleId: bundleId as string, configHash: configHash as string });
+  const keep = {
+    records: declaredCounts?.records.deliveredTotal ?? 0,
+    exceptions: declaredCounts === null ? 0 : EXCEPTION_TABLES.reduce((s, [, d]) => s + declaredCounts.sourceRows.byDisposition[d], 0),
+    keys: 0,
+  };
+  const beyond = new Set<string>();
+  const overflow = (subject: string, detail: string): void => {
+    if (!beyond.has(detail)) mismatch(subject, detail);
+    beyond.add(detail);
+  };
 
   // record import files: the association key of each row, for the crosswalk (the one column it is checked against)
   const importKeys = new Map<string, { columns: number; keys: string[] }>();
@@ -365,7 +378,13 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
     const entry = { columns: at.length, keys: [] as string[] };
     importKeys.set(path, entry);
     const keyAt = at[0];
-    return at.length === 1 && keyAt !== undefined ? (row) => entry.keys.push(row[keyAt] as string) : null;
+    if (at.length !== 1 || keyAt === undefined) return null;
+    return (row) => {
+      if (keep.keys < keep.records) {
+        keep.keys++;
+        entry.keys.push(row[keyAt] as string);
+      } else overflow(path, "the record import files hold more records than records.deliveredTotal");
+    };
   };
 
   // lineage: one row per source row, with its contribution kind, disposition, object and migration key
@@ -394,11 +413,13 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
       const locator = row[locatorAt] as string;
       if (kind === "RECORD" && disposition === "OUTPUT") {
         if (survivors.has(locator)) mismatch(LINEAGE_PATH, "two rows share a row locator");
-        survivors.set(locator, { object: row[objectAt] as string, migrationKey: row[keyAt] as string, named: false });
+        if (survivors.size < keep.records || survivors.has(locator)) survivors.set(locator, { object: row[objectAt] as string, migrationKey: row[keyAt] as string, named: false });
+        else overflow(LINEAGE_PATH, "lineage RECORD/OUTPUT rows exceed records.deliveredTotal");
       }
       if (EXCEPTION_TABLES.some(([, d]) => d === disposition)) {
         if (exceptionRows.has(locator)) mismatch(LINEAGE_PATH, "two rows share a row locator");
-        exceptionRows.set(locator, disposition);
+        if (exceptionRows.size < keep.exceptions || exceptionRows.has(locator)) exceptionRows.set(locator, disposition);
+        else overflow(LINEAGE_PATH, "lineage ISOLATED, LEFTOVER and REJECTED_INPUT rows exceed the reconciliation");
       }
     };
   };

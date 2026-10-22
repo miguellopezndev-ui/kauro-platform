@@ -149,10 +149,11 @@ export type TableVisitor = (header: readonly string[]) => ((row: readonly string
 
 /**
  * Reads a table from its bytes without holding it: the header goes to `visit`, then each data record, in order, to the function
- * `visit` returned. A file that is not UTF-8, has no header, or has a record of another width than the header is refused.
+ * `visit` returned, decoding `sliceBytes` at a time (tests lower it to cut records anywhere). A file that is not UTF-8, has no
+ * header, or has a record of another width than the header is refused.
  * Returns the header and the number of data records.
  */
-export function scanTable(bytes: Uint8Array, visit: TableVisitor = () => null): { readonly header: readonly string[]; readonly rows: number } {
+export function scanTable(bytes: Uint8Array, visit: TableVisitor = () => null, sliceBytes: number = SLICE_BYTES): { readonly header: readonly string[]; readonly rows: number } {
   const table: { header: readonly string[] | null; onRow: ((row: readonly string[]) => void) | null; rows: number } = { header: null, onRow: null, rows: 0 };
   const splitter = new RecordSplitter((record) => {
     if (table.header === null) {
@@ -172,7 +173,7 @@ export function scanTable(bytes: Uint8Array, visit: TableVisitor = () => null): 
       throw new CsvError("not valid UTF-8");
     }
   };
-  for (let at = 0; at < bytes.byteLength; at += SLICE_BYTES) splitter.push(decode(bytes.subarray(at, Math.min(at + SLICE_BYTES, bytes.byteLength)), true));
+  for (let at = 0; at < bytes.byteLength; at += sliceBytes) splitter.push(decode(bytes.subarray(at, Math.min(at + sliceBytes, bytes.byteLength)), true));
   splitter.push(decode(new Uint8Array(0), false));
   splitter.end();
   if (table.header === null) throw new CsvError("no header record");
