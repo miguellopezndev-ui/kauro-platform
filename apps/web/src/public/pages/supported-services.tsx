@@ -8,6 +8,11 @@
 // same order on each (state, name, destination, what you receive, the one setting or limit of that service, the sample). The two qualified
 // destinations come first and the cleanup without a destination last, all on one surface, so none is the headline. Prices stay on Pricing
 // (each figure once on the site). The limits are one table at reading size, grouped by what they apply to.
+//
+// Owner's section review (2026-10-21), after the migration packages measured (SpotDev: a name, who it is for, three or four short points,
+// one shared action): the section is headed by the choice it asks for (by where the data goes) rather than repeating the H1; what each
+// service delivers is three short points, not one long sentence; and the sample delivery, which is one HubSpot project, is offered once
+// under the cards beside pricing rather than on every card.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Publication } from "../capabilities.ts";
@@ -24,23 +29,27 @@ const DESTINATION: Readonly<Record<ServiceMode, PublicCopyId>> = {
   SALESFORCE: "services.salesforce.destination",
 };
 
-/** What the service delivers, in one sentence; Clean your data's sentence names only the destinations the publication lists. */
-function receives(mode: ServiceMode, publication: Publication): string {
+/** What the service delivers, as three short points. */
+function receives(mode: ServiceMode): readonly string[] {
   switch (mode) {
     case "CLEAN":
-      return PUBLIC_COPY[cleanQualifiesId(publication)];
+      return [PUBLIC_COPY["services.clean.receive.files"], PUBLIC_COPY["services.clean.receive.report"], PUBLIC_COPY["services.clean.receive.tools"]];
     case "HUBSPOT":
-      return PUBLIC_COPY["services.hubspot.summary"];
+      return [PUBLIC_COPY["services.hubspot.receive.files"], PUBLIC_COPY["services.hubspot.receive.steps"], PUBLIC_COPY["services.hubspot.receive.checked"]];
     case "SALESFORCE":
-      return PUBLIC_COPY["services.salesforce.summary"];
+      return [PUBLIC_COPY["services.salesforce.receive.files"], PUBLIC_COPY["services.salesforce.receive.steps"], PUBLIC_COPY["services.salesforce.receive.checked"]];
   }
 }
 
-/** The one setting or limit that belongs to this service alone. */
-function Particular({ mode }: { readonly mode: ServiceMode }): ReactElement {
+/** The setting or limit that belongs to this service alone; Clean your data's names only the destinations the publication lists. */
+function Particular({ mode, publication }: { readonly mode: ServiceMode; readonly publication: Publication }): ReactElement {
   switch (mode) {
     case "CLEAN":
-      return <p className="kauro-r2-card-note">{PUBLIC_COPY["services.clean.limit"]}</p>;
+      return (
+        <p className="kauro-r2-card-note">
+          {PUBLIC_COPY[cleanQualifiesId(publication)]} {PUBLIC_COPY["services.clean.limit"]}
+        </p>
+      );
     case "HUBSPOT":
       return <p className="kauro-r2-card-note">{PUBLIC_COPY["services.hubspot.cost"]}</p>;
     case "SALESFORCE":
@@ -67,20 +76,21 @@ function ServiceCard({ mode, publication }: { readonly mode: ServiceMode; readon
           </dl>
           <dl className="kauro-r2-service-row">
             <dt>{PUBLIC_COPY["services.receive.label"]}</dt>
-            <dd>{receives(mode, publication)}</dd>
+            <dd>
+              <ul className="kauro-r2-service-list">
+                {receives(mode).map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </dd>
           </dl>
           <div className="kauro-r2-service-particular">
-            <Particular mode={mode} />
+            <Particular mode={mode} publication={publication} />
           </div>
         </>
       )}
       <div className="kauro-r2-service-foot">
         {listed === undefined ? null : <p className="kauro-r2-card-meta">{copy("services.mode.version", { version: listed.version, time: formatInstant(listed.validFrom) })}</p>}
-        {closed ? null : (
-          <a className="kauro-site-arrow" href={ROUTE.sample}>
-            {PUBLIC_COPY["services.sample.cta"]}
-          </a>
-        )}
       </div>
     </article>
   );
@@ -103,10 +113,17 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
             <ServiceCard key={mode} mode={mode} publication={publication} />
           ))}
         </div>
-        <p className="kauro-r2-after">
-          {PUBLIC_COPY["services.price.line"]}{" "}
-          <a href={ROUTE.pricing}>{PUBLIC_COPY["services.price.cta"]}</a>
-        </p>
+        <div className="kauro-r2-services-after">
+          <p className="kauro-r2-after">{PUBLIC_COPY["services.price.line"]}</p>
+          <p className="kauro-r2-services-links">
+            <a className="kauro-site-arrow" href={ROUTE.pricing}>
+              {PUBLIC_COPY["services.price.cta"]}
+            </a>
+            <a className="kauro-site-arrow" href={ROUTE.sample}>
+              {PUBLIC_COPY["services.sample.cta"]}
+            </a>
+          </p>
+        </div>
         {someClosed ? <p className="kauro-r2-after">{PUBLIC_COPY["services.unavailable.body"]}</p> : null}
         {publication.kind === "READ" && modes.length === 0 ? <p className="kauro-r2-after">{PUBLIC_COPY["services.none.body"]}</p> : null}
       </Block>

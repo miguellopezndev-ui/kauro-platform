@@ -9002,6 +9002,29 @@ body:has(> .kauro-site-header) {
   font-size: 1rem;
   line-height: 1.5;
 }
+/* what a service delivers: three short points, each with a tick */
+.kauro-site-main .kauro-r2-service-list {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-main .kauro-r2-service-list li {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  gap: var(--kauro-space-2);
+  line-height: 1.45;
+}
+.kauro-site-main .kauro-r2-service-list li::before {
+  content: "";
+  inline-size: 0.3125rem;
+  block-size: 0.5625rem;
+  margin: 0.3125rem 0 0 0.25rem;
+  border: solid var(--kauro-color-success-text);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
 .kauro-site-main .kauro-r2-service-particular {
   display: grid;
   gap: var(--kauro-space-3);
@@ -9023,8 +9046,20 @@ body:has(> .kauro-site-header) {
   color: var(--kauro-color-text-muted);
   font-size: 0.8125rem;
 }
-.kauro-site-main .kauro-r2-service-foot .kauro-site-arrow {
-  min-block-size: 2.25rem;
+/* under the cards: how a service is priced, then pricing and the sample delivery, once for all three */
+.kauro-site-main .kauro-r2-services-after {
+  display: grid;
+  gap: var(--kauro-space-2);
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-site-main .kauro-r2-services-after .kauro-r2-after {
+  margin: 0;
+}
+.kauro-site-main .kauro-r2-services-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--kauro-space-5);
+  margin: 0;
 }
 @media (min-width: 62rem) {
   /* the rows of the three cards line up across the grid: a card is a subgrid of the row's tracks */

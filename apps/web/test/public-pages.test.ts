@@ -324,6 +324,13 @@ test("Supported services: three peers as equal cards, the qualified destinations
   assert.match(card(html, "Prepare for Salesforce"), /does not deploy fields, validation rules, automations or external identifier settings/);
   assert.match(card(html, "Clean your data"), /A cleaned file is not a promise about how another CRM will read it\./);
   for (const name of SERVICES) assert.match(card(html, name), /Destination .* You receive /, `${name}: the same rows in the same order`);
+  // owner's section review (2026-10-21): what a service delivers is three short points; the sample delivery is offered once, under the
+  // cards beside pricing (it is one HubSpot project), and the section's heading asks the choice instead of repeating the H1
+  const markup = (name: string): string => [...html.matchAll(/<article[^>]*>[\s\S]*?<\/article>/g)].map((match) => match[0]).find((article) => headings(article)[0]?.text === name) ?? "";
+  for (const name of SERVICES) assert.equal(count(markup(name), "<li>"), 3, `${name}: three points`);
+  for (const name of SERVICES) assert.ok(!hrefsOf(markup(name)).includes(ROUTE.sample), `${name}: no sample link on the card`);
+  assert.equal(hrefsOf(html.slice(html.indexOf('class="kauro-r2-services-after"'))).filter((href) => href === ROUTE.sample).length >= 1, true);
+  assert.ok(headings(html).some((heading) => heading.level === 2 && heading.text === "Choose by where the data goes"));
   assert.doesNotMatch(textOf(html), /compatible|works with any/i, "no compatibility claim");
   assert.doesNotMatch(textOf(html), /USD \d/, "prices stay on Pricing: each figure once on the site");
 });
