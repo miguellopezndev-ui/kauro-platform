@@ -2,7 +2,7 @@
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "urn:kauro:r2:contracts",
  "title": "Kauro R2 contract registry",
- "description": "Generated from the vendored authority registry (Kauro authority edition R2 (KAVO_REINICIO_20260913, restored 2026-09-13), registry directory authority_r2/registry as installed read-only at /srv/kavo/authority/reinicio/authority_r2/registry on the owner's host; packet manifest PACKET_MANIFEST_SHA256.json sha256 prefix e806ef4e7339fa7a); the R2 text references these definitions as urn:kavo:r2:contracts#/$defs/<Name>.",
+ "description": "Generated from the vendored authority registry (CANDIDATE REISSUE-CANDIDATE-01 (build profile), NOT ADOPTED; base: Kauro authority edition R2 (KAVO_REINICIO_20260913, restored 2026-09-13), registry directory authority_r2/registry as installed read-only at /srv/kavo/authority/reinicio/authority_r2/registry on the owner's host; packet manifest PACKET_MANIFEST_SHA256.json sha256 prefix e806ef4e7339fa7a); the R2 text references these definitions as urn:kavo:r2:contracts#/$defs/<Name>.",
  "$defs": {
   "TenantScope": {
    "type": "object",

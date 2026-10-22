@@ -18,6 +18,12 @@ explicit approval of that PR at that SHA.
 | `REISSUE-CANDIDATE.json` | Generated. The manifest: the bytes in force (15 files, by SHA-256), the input pins, per profile its items, the candidate registry hashes and record counts, the hash of every generated consumer, its planned operations, its compatibility summary; per item its state, decision, legal effect, conditions with their satisfiers, implementing orders and coordinated changes; the 20 resolved meeting points; the adoption gates. |
 | `adoption/`, `build/` | Generated, per profile: `registry.provenance.json` (the candidate registry's hashes), `contracts/types.ts` and `contracts/schemas.json` (the authority's own generator, unchanged, run on the candidate registry), `api/openapi.json` (the served document as the candidate would have it), `web/generated.ts` (the closed web client generator's output for that document). |
 
+No generated candidate file can pass for the authority in force: the candidate registry's provenance source begins `CANDIDATE
+REISSUE-CANDIDATE-01 (<profile> profile), NOT ADOPTED; base: …` with `status: CANDIDATE_NOT_ADOPTED`, so the contracts' headers quote
+it; the document carries `info.x-kauro-candidate`; the web client's first two lines say it is a candidate generated from the candidate
+document (the closed generator's own header, kept unchanged below them, names `apps/api/openapi.json`); `materialize` writes the same
+marked provenance.
+
 `node tools/reissue/reissue.mjs generate` rebuilds every generated file; `check` fails when one is stale or a byte in force moved;
 `materialize <adoption|build> <dir>` writes a profile's registry (with a candidate `PROVENANCE.json`), contracts, document and client
 into an empty directory, for an implementing order that builds against the candidate. All three need the workspace built, like
@@ -40,6 +46,21 @@ Order 19B PR at its SHA; for a CP-02 item the owner fills its row of CP-02 secti
 on earlier decisions, and CP-02 section 7.1 makes that block the adoption act); every one of the item's conditions is satisfied with
 evidence by the order or gate the manifest names; the items it requires or depends on enter with it (the profile closure is tested). An
 item whose conditions do not hold stays out with its state. Adoption of a value is never a deployment and never changes a legal text.
+
+**Held by Order 19B's own exclusions.** Order 19B adopts no elevated retention and nothing `PENDING_COUNSEL`. Five adoption items
+fall under those exclusions; their states stay as recorded, but each is adoptable only after the condition below has recorded evidence
+(`o19bExclusions` in the source and the manifest; every item also carries `adoptableOnlyAfter`), and an item that requires one is held
+with it (`adoptableOnlyWith`):
+
+| Item | Exclusion | Adoptable only after |
+|---|---|---|
+| CP-01.02 | elevated retention (17 days for UNPAID, only through the one extension) | `LEGAL_PROCEDURE_C2` records LR-01's competent wording, and O21 has delivered and tested the ceiling, deletion and no resurrection |
+| CP-02.04 | elevated retention (the extension reply serves the 17-day ceiling) | CP-01.02 is adoptable |
+| CP-01.04, CP-01.14, CP-02.14 | `PENDING_COUNSEL` (the claim rules) | `COUNSEL_REVIEW_CP01_14` records the competent review (L-12, L-19) as CP-01.14's validation |
+| CP-02.02 (requires CP-01.02), CP-02.12 (requires CP-01.14) | held with the item they require | that item is adoptable |
+
+The test refuses a `PENDING_COUNSEL` adoption item or the writer of the retention exception left unflagged, a condition that names none
+of the item's satisfiers, and a flag on an item outside the adoption profile.
 
 **The build profile is never adopted as a whole.** It is the contract O20, O21, O22, O24, O27A and O29 build and test against with the
 activation off: a CONDITIONAL item's principle and values are decided, its adoption is blocked by a named condition (PV1 and Wise for the
@@ -100,13 +121,13 @@ one CP-02 declares with the same class, no served projection is left behind, and
 
 ## 6. Proof
 
-`tools/test/reissue-candidate.test.mjs`, 18 tests, each rule also run on broken copies that must fail for the rule's reason: bytes in force
+`tools/test/reissue-candidate.test.mjs`, 20 tests, each rule also run on broken copies that must fail for the rule's reason: bytes in force
 (and equal to CP-02's recorded base); pinned inputs; freshness of every generated file; disjoint patches; declared conflicts; component
 renames; states against both records; profile closure; satisfiers; legal effect; CP-01's decided values on each candidate registry (no
 existing policy value changes, UI03 and UI07 equal the web's amended copy, nothing conditional or deferred in adoption); CP-02's commands,
 cases, requirements, gates and contracts following their items, and the registry's own invariants; the served document (every served route
 as it is, planned operations exactly the profile's, every reference resolves); the web clients; CP-02's examples on each candidate (and
-the left-out ones not passing there); the compatibility revalidation; `materialize`.
+the left-out ones not passing there); the compatibility revalidation; the items held by Order 19B's exclusions; the candidate markers; `materialize`.
 
 ## 7. Left to others
 

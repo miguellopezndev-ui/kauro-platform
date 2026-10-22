@@ -23,13 +23,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   IN_FORCE, OUTPUTS, PATHS, PROFILES, ROOT, buildAll, candidateDocument, changesDigest, checkClosed, checkCompatibility, checkConflicts,
-  checkInForce, checkInputs, checkSatisfiers, checkStates, compatibilityCore, componentCollisions, computeConflicts, generateContracts,
-  generatedOutputs, isCurrent, itemsOf, pendingCounselItems, profileItems, recordedStates, registryFiles, webClientInput,
+  candidateProvenance, checkInForce, checkInputs, checkSatisfiers, checkStates, compatibilityCore, componentCollisions, computeConflicts, generateContracts,
+  generatedOutputs, heldItems, isCurrent, itemsOf, pendingCounselItems, profileItems, recordedStates, registryFiles, webClientInput,
 } from "../reissue/reissue.mjs";
 import { renderClient, digestOf } from "../web-client.mjs";
 
 const built = await buildAll();
 const { source, spec, registry, cp01, cp02, items, conflicts, profiles, fullChanges, manifest, live, application } = built;
+/** The manifest as committed (the record a reviewer read), beside the one `buildAll` regenerates from the bytes on disk. */
+const committed = JSON.parse(readFileSync(PATHS.manifest, "utf8"));
 const clone = (v) => structuredClone(v);
 const createHashHex = (b) => createHash("sha256").update(b).digest("hex");
 const RANK = { ADDITIVE: 0, TEXT: 0, COORDINATED: 1, BREAKING: 2 };
@@ -47,13 +49,13 @@ const substitute = (path, bytes) => (p) => (p === path ? bytes : readFileSync(p)
 // --- 1. in force and inputs ----------------------------------------------------------------------------------------------------
 
 test("in force: the registry, the served api, the generated web client and contracts are byte-identical to the recorded ones", () => {
-  checkInForce(manifest.inForce);
+  // the committed manifest's record, never the one regenerated from the bytes on disk (which would compare them with themselves)
+  checkInForce(committed.inForce);
   // the same bytes CP-02 was written against (Order 17's base): Order 19A changed none of them
   const cp02Base = JSON.parse(readFileSync(PATHS.cp02Openapi, "utf8")).info["x-kauro-base"];
-  assert.equal(manifest.inForce["apps/api/openapi.json"], cp02Base.openapi, "the served api is CP-02's base");
-  assert.equal(manifest.inForce["apps/web/src/api/generated.ts"], cp02Base.webClient, "the web client is CP-02's base");
-  for (const [file, hash] of Object.entries(cp02Base.registry)) assert.equal(manifest.inForce[`packages/contracts/registry/${file}`], hash, `${file} is CP-02's base`);
-  // and the committed web client is still the one generated from the served api alone: no candidate operation reached it
+  assert.equal(committed.inForce["apps/api/openapi.json"], cp02Base.openapi, "the served api is CP-02's base");
+  assert.equal(committed.inForce["apps/web/src/api/generated.ts"], cp02Base.webClient, "the web client is CP-02's base");
+  for (const [file, hash] of Object.entries(cp02Base.registry)) assert.equal(committed.inForce[`packages/contracts/registry/${file}`], hash, `${file} is CP-02's base`);  // and the committed web client is still the one generated from the served api alone: no candidate operation reached it
   const served = readFileSync(IN_FORCE.openapi, "utf8");
   assert.equal(renderClient(JSON.parse(served), digestOf(served)).text, readFileSync(IN_FORCE.webClient, "utf8"));
   assert.doesNotMatch(readFileSync(IN_FORCE.webClient, "utf8"), /\bProjectDates\b|\bOwnerSellerRecordView\b/, "no candidate type in the client in force");
@@ -63,18 +65,24 @@ test("in force: the registry, the served api, the generated web client and contr
     bytes[bytes.length - 2] ^= 1;
     return bytes;
   };
-  mustFail(() => checkInForce(manifest.inForce, substitute(IN_FORCE.openapi, flip(IN_FORCE.openapi))), /apps\/api\/openapi\.json in force/, "an edited served api");
-  mustFail(() => checkInForce(manifest.inForce, substitute(IN_FORCE.webClient, flip(IN_FORCE.webClient))), /generated\.ts in force/, "an edited web client");
-  mustFail(() => checkInForce(manifest.inForce, substitute(IN_FORCE.contractsTypes, flip(IN_FORCE.contractsTypes))), /types\.ts in force/, "edited generated contracts");
+  mustFail(() => checkInForce(committed.inForce, substitute(IN_FORCE.openapi, flip(IN_FORCE.openapi))), /apps\/api\/openapi\.json in force/, "an edited served api");
+  mustFail(() => checkInForce(committed.inForce, substitute(IN_FORCE.webClient, flip(IN_FORCE.webClient))), /generated\.ts in force/, "an edited web client");
+  mustFail(() => checkInForce(committed.inForce, substitute(IN_FORCE.contractsTypes, flip(IN_FORCE.contractsTypes))), /types\.ts in force/, "edited generated contracts");
   const policy = join(IN_FORCE.registry, "policy.json");
-  mustFail(() => checkInForce(manifest.inForce, substitute(policy, flip(policy))), /no longer matches its PROVENANCE/, "an edited registry file");
+  mustFail(() => checkInForce(committed.inForce, substitute(policy, flip(policy))), /no longer matches its PROVENANCE/, "an edited registry file");
   const provenance = join(IN_FORCE.registry, "PROVENANCE.json");
   const reVendored = JSON.parse(readFileSync(provenance, "utf8"));
   reVendored.source = "a silent re-vendor";
-  mustFail(() => checkInForce(manifest.inForce, substitute(provenance, Buffer.from(JSON.stringify(reVendored, null, 2)))), /PROVENANCE\.json in force/, "a re-vendored provenance");
-  const fewer = { ...manifest.inForce };
+  mustFail(() => checkInForce(committed.inForce, substitute(provenance, Buffer.from(JSON.stringify(reVendored, null, 2)))), /PROVENANCE\.json in force/, "a re-vendored provenance");
+  mustFail(() => checkInForce(committed.inForce, substitute(IN_FORCE.contractsSchemas, flip(IN_FORCE.contractsSchemas))), /schemas\.json in force/, "an edited generated schema bundle");
+  const fewer = { ...committed.inForce };
   delete fewer["apps/api/openapi.json"];
   mustFail(() => checkInForce(fewer), /not recorded/, "a file in force the candidate does not record");
+  // the regenerated manifest follows the disk, so only the committed record can catch an edit of a generated contracts file
+  const edited = flip(IN_FORCE.contractsTypes);
+  const regenerated = { ...committed.inForce, "packages/contracts/src/generated/types.ts": createHashHex(edited) };
+  checkInForce(regenerated, substitute(IN_FORCE.contractsTypes, edited));
+  mustFail(() => checkInForce(committed.inForce, substitute(IN_FORCE.contractsTypes, edited)), /types\.ts in force/, "the same edit against the committed record");
 });
 
 test("inputs: the candidate is prepared from the pinned proposals and records, and refuses any other bytes", () => {
@@ -241,6 +249,60 @@ test("conditions: every activation and pending condition names the orders or gat
   const empty = clone(source);
   empty.items["CP-02.17"].pendingBy[0] = [];
   mustFail(() => checkSatisfiers(empty, items), /names no satisfier/, "an empty satisfier list");
+});
+
+test("held from adoption: the items Order 19B's own exclusions name are flagged with the condition after which they are adoptable", () => {
+  const held = heldItems(source, items, ids("adoption"));
+  assert.deepEqual(Object.keys(held.declared).sort(), ["CP-01.02", "CP-01.04", "CP-01.14", "CP-02.04", "CP-02.14"]);
+  assert.deepEqual(held.heldWith, { "CP-02.02": ["CP-01.02"], "CP-02.12": ["CP-01.14"] }, "an item that requires a held one is held with it");
+  for (const [id, d] of Object.entries(held.declared)) {
+    const item = manifest.items.find((i) => i.id === id);
+    assert.equal(item.state, "APPROVED_AWAITING_REISSUE", `${id}: flagged, its state unchanged`);
+    assert.equal(item.o19bExclusion, d.exclusion);
+    assert.equal(item.adoptableOnlyAfter, d.adoptableOnlyAfter, `${id}: the manifest says after what it is adoptable`);
+  }
+  assert.match(held.declared["CP-01.02"].adoptableOnlyAfter, /LEGAL_PROCEDURE_C2.*O21/);
+  for (const id of ["CP-01.04", "CP-01.14", "CP-02.14"]) assert.match(held.declared[id].adoptableOnlyAfter, /COUNSEL_REVIEW_CP01_14/);
+  assert.deepEqual(manifest.items.find((i) => i.id === "CP-02.02").adoptableOnlyWith, ["CP-01.02"]);
+  assert.deepEqual(manifest.profiles.adoption.heldByOrder19BExclusions, ["CP-01.02", "CP-01.04", "CP-01.14", "CP-02.02", "CP-02.04", "CP-02.12", "CP-02.14"]);
+  assert.ok(manifest.adoptionGates.some((g) => /Not the adoption profile wholesale/.test(g)), "an adoption gate says the profile is not adopted wholesale");
+  const design = readFileSync(join(ROOT, source.document), "utf8");
+  for (const id of [...Object.keys(held.declared), ...Object.keys(held.heldWith)]) assert.ok(design.includes(id), `the design note names ${id}`);
+
+  const without = (id) => {
+    const copy = clone(source);
+    delete copy.o19bExclusions.items[id];
+    return copy;
+  };
+  mustFail(() => heldItems(without("CP-02.14"), items, ids("adoption")), /PENDING_COUNSEL are CP-01\.04, CP-01\.14, CP-02\.14; held for it: CP-01\.04, CP-01\.14$/, "a PENDING_COUNSEL item not flagged");
+  mustFail(() => heldItems(without("CP-01.02"), items, ids("adoption")), /CP-01\.02 writes the elevated retention exception and is not held/, "the elevated retention not flagged");
+  const vague = clone(source);
+  vague.o19bExclusions.items["CP-01.04"].adoptableOnlyAfter = "later";
+  mustFail(() => heldItems(vague, items, ids("adoption")), /names none of the satisfiers/, "a condition that names no satisfier");
+  const unrelated = clone(source);
+  unrelated.o19bExclusions.items["CP-02.09"] = { exclusion: "ELEVATED_RETENTION", adoptableOnlyAfter: "O22 delivers the figures" };
+  mustFail(() => heldItems(unrelated, items, ids("adoption")), /neither writes the retention exception nor requires CP-01\.02/, "a retention flag on an item that has none");
+  const outside = clone(source);
+  outside.o19bExclusions.items["CP-02.17"] = { exclusion: "PENDING_COUNSEL", adoptableOnlyAfter: "O27A" };
+  mustFail(() => heldItems(outside, items, ids("adoption")), /not in the adoption profile/, "a flag on an item that is not adoptable at all");
+});
+
+test("candidate markers: no generated candidate file can pass for the authority in force", () => {
+  for (const p of PROFILES) {
+    const marker = new RegExp(`CANDIDATE ${source.candidate} \\(${p} profile\\), NOT ADOPTED; base: `);
+    const types = readFileSync(join(PATHS.dir, p, OUTPUTS.contractsTypes), "utf8").split("\n")[1];
+    assert.match(types, new RegExp(`^// Registry provenance: ${marker.source}`), `${p}: the contracts types' header names the candidate`);
+    assert.match(JSON.parse(readFileSync(join(PATHS.dir, p, OUTPUTS.contractsSchemas), "utf8")).description, marker, `${p}: the schema bundle's description names the candidate`);
+    assert.equal(JSON.parse(readFileSync(join(PATHS.dir, p, OUTPUTS.openapi), "utf8")).info["x-kauro-candidate"].status, "CANDIDATE_NOT_ADOPTED", `${p}: the document says it is a candidate`);
+    assert.equal(JSON.parse(readFileSync(join(PATHS.dir, p, OUTPUTS.registryProvenance), "utf8")).status, "CANDIDATE_NOT_ADOPTED", `${p}: the registry provenance says it is a candidate`);
+    assert.match(readFileSync(join(PATHS.dir, p, OUTPUTS.webClient), "utf8"), /^\/\/ CANDIDATE .* NOT ADOPTED/, `${p}: the web client says it is a candidate`);
+  }
+  for (const path of [IN_FORCE.contractsTypes, IN_FORCE.contractsSchemas, IN_FORCE.webClient, join(IN_FORCE.registry, "PROVENANCE.json")]) {
+    assert.doesNotMatch(readFileSync(path, "utf8"), /CANDIDATE REISSUE|CANDIDATE_NOT_ADOPTED/, `${path}: the file in force carries no candidate marker`);
+  }
+  const provenance = candidateProvenance(profiles.build.files, { candidate: source.candidate, profile: "build" });
+  assert.equal(provenance.status, "CANDIDATE_NOT_ADOPTED");
+  assert.deepEqual(provenance.files, manifest.profiles.build.registry.files, "the marker changes the source and status only, never the hashes");
 });
 
 test("legal effect: the claim rules (CP-01.04, CP-01.14, CP-02.14) stay PENDING_COUNSEL, without validation, in every profile", () => {
@@ -437,7 +499,10 @@ test("web client: each profile's client is the closed generator's output for its
     assert.deepEqual(manifest.profiles[p].webClientAdaptations, adaptations, `${p}: the manifest records it`);
     const adapted = renderClient(input, digestOf(documentText));
     assert.deepEqual(adapted.failures, []);
-    assert.equal(adapted.text, readFileSync(join(PATHS.dir, p, OUTPUTS.webClient), "utf8"), `${p}: the committed client is the generated one`);
+    const committedClient = readFileSync(join(PATHS.dir, p, OUTPUTS.webClient), "utf8");
+    assert.equal(committedClient, profiles[p].clientMarker + adapted.text, `${p}: the committed client is the candidate marker and the generated module`);
+    assert.match(committedClient.split("\n")[0], new RegExp(`^// CANDIDATE ${source.candidate} \\(${p} profile\\), NOT ADOPTED \\(status CANDIDATE_NOT_ADOPTED\\)`), `${p}: the first line says it is a candidate`);
+    assert.match(committedClient.split("\n")[1], new RegExp(`reissue-candidate/${p}/api/openapi\\.json, not from apps/api/openapi\\.json`), `${p}: the marker names the client's real source`);
     assert.match(adapted.text, new RegExp(`and ${manifest.profiles[p].plannedOperations} planned operations`), `${p}: every planned operation is described`);
     assert.match(adapted.text, /\bisProjectDates\b/, `${p}: CP-02.02's type reaches the candidate client`);
   }
@@ -538,6 +603,8 @@ test("materialize: a profile is written into an empty directory with the recorde
     const provenance = JSON.parse(readFileSync(join(out, "registry", "PROVENANCE.json"), "utf8"));
     assert.deepEqual(provenance.files, manifest.profiles.adoption.registry.files);
     assert.equal(provenance.profile, "adoption");
+    assert.equal(provenance.status, "CANDIDATE_NOT_ADOPTED", "the materialized provenance says it is not adopted");
+    assert.match(provenance.source, new RegExp(`^CANDIDATE ${source.candidate} \\(adoption profile\\), NOT ADOPTED; base: `), "its source names the candidate first");
     const again = spawnSync(process.execPath, [join(ROOT, "tools", "reissue", "reissue.mjs"), "materialize", "adoption", out], { encoding: "utf8" });
     assert.notEqual(again.status, 0);
     assert.match(again.stderr, /is not empty/);

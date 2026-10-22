@@ -84,6 +84,7 @@
         "CP-02.15"
       ],
       "leftOut": ["CP-01.09", "CP-01.10", "CP-01.11", "CP-02.16", "CP-02.17", "CP-02.18", "CP-02.19", "CP-02.20", "CP-02.21"],
+      "heldByOrder19BExclusions": ["CP-01.02", "CP-01.04", "CP-01.14", "CP-02.02", "CP-02.04", "CP-02.12", "CP-02.14"],
       "registry": {
         "changedFiles": ["contracts.json", "commands.json", "state_transitions.json", "gates.json", "screens.json", "policy.json", "cases.json", "requirements.json"],
         "files": {
@@ -112,10 +113,10 @@
       },
       "outputs": {
         "adoption/registry.provenance.json": "c585874dd238344dd51490db25f8e6ae2c63a613076d0b6b7b7a253d507b2e89",
-        "adoption/contracts/types.ts": "e9a21c0fcc964cad1d787b9ed2e229ca86ef4dfcb36d3c61cf8debdeda8d42fe",
-        "adoption/contracts/schemas.json": "3f60268ced49ac5bd6655fe8d0369a8950d121c4d2a270672e42e96ec5880626",
+        "adoption/contracts/types.ts": "124bb148a749088c8b133636c9788dfcbbefc66f443ac120e2fed6d694318e72",
+        "adoption/contracts/schemas.json": "cc181e1710208e6bb7e5b55007d6e23882703e68b884560ace61a95568d5432d",
         "adoption/api/openapi.json": "a7fdb53586fd3f3b1987bfccfe70037261f41230e994b3a1ea36928f35ecf467",
-        "adoption/web/generated.ts": "da7991dd43c32029f4246c6769e4802f9258b6c02d42e90e2175e2500de9e73b"
+        "adoption/web/generated.ts": "04df7c1415de1b1ff5865fe7d27f1f6dd6382d2da5b27367dfde8ae8140cb09b"
       },
       "plannedOperations": 49,
       "webClientAdaptations": [
@@ -234,10 +235,10 @@
       },
       "outputs": {
         "build/registry.provenance.json": "d71f4fed769025e4d890a2740c77dca3799f2b3089fe25845751e42ab2ce5a1f",
-        "build/contracts/types.ts": "e1047c72c2d91fbfe2195369f97ff3ce4311ab2f4ea3fef0ca78e905f005a640",
-        "build/contracts/schemas.json": "6905a3be91a025ed2b080526422bcb4771d0e3bfa2e2f11478dd9508f73a7b9c",
+        "build/contracts/types.ts": "f4c3a7f84c97c204c1ec4db643d67de4425e34811c3dcc4caf13b623aa25b1b0",
+        "build/contracts/schemas.json": "a549703f6984b20a4f2031bf2ac38501cd4c1bade653d3489bd067d27cb8b081",
         "build/api/openapi.json": "bbcea81ca488a69ee604f5eb03c6e471e062be94025c84762bdcb51aeb9e93b2",
-        "build/web/generated.ts": "1ee040006513c4314e1d9f33f4da2fdae1aad05af06ca005a42f05289b131b4f"
+        "build/web/generated.ts": "1f3c543f41151820e784bc8d6ede4b2b0848a722096075026b5243459a92b34b"
       },
       "plannedOperations": 54,
       "webClientAdaptations": [
@@ -547,9 +548,33 @@
     "The owner's explicit approval of the Order 19B PR at its SHA (OWNER_EXPLICIT_PER_PR); the general technical authorization GA-2026-10-22 does not cover adoption.",
     "For each CP-02 item, the owner's decision in CP-02 section 8 (empty today): Order 17 classed fifteen items approved on earlier decisions, and CP-02 section 7.1 makes that block the adoption act.",
     "Only items of the adoption profile, each with the items it requires or depends on, and each with every condition below satisfied with evidence; any other item stays out and keeps its state.",
+    "Not the adoption profile wholesale: CP-01.02 and CP-02.04 (elevated retention) and CP-01.04, CP-01.14 and CP-02.14 (PENDING_COUNSEL) fall under Order 19B's own exclusions and are adoptable only after the condition o19bExclusions names (the legal procedure for LR-01 and O21; the competent review of the claim rules); an item that requires one of them is held with it (CP-02.02 requires CP-01.02; CP-02.12 requires CP-01.14).",
     "The candidate is current on the SHA Order 19B starts from (node tools/reissue/reissue.mjs check); if a proposal, the registry, the served api or a generated consumer moved, the candidate is regenerated and reviewed again first.",
     "In the same change (README adoption steps 2 to 4): the new edition label, PROVENANCE source and hashes; @kauro/contracts regenerated; every copy of a changed value with its drift test; the web client regenerated with the server for each coordinated change; the registry's own test counts updated; adopted items moved to ADOPTED and checked against the registry by the proposal tests."
   ],
+  "o19bExclusions": {
+    "basis": "Order 19B's own exclusions: it adopts no legal policy, Terms or elevated retention, and no CONDITIONAL, PENDING_COUNSEL or PROPOSED item. The items below are APPROVED_AWAITING_REISSUE (their states are unchanged) and sit in the adoption profile, but Order 19B leaves them out until the condition named here has recorded evidence; an item that requires one of them is held with it.",
+    "held": [
+      {
+        "id": "CP-01.02",
+        "exclusion": "ELEVATED_RETENTION",
+        "adoptableOnlyAfter": "LEGAL_PROCEDURE_C2 records the competent wording of LR-01, and O21 has delivered and tested the 17-day UNPAID ceiling through the one extension, deletion at the extended date and no resurrection from backups (the item's activation)"
+      },
+      {
+        "id": "CP-02.04",
+        "exclusion": "ELEVATED_RETENTION",
+        "adoptableOnlyAfter": "CP-01.02 is adoptable (LEGAL_PROCEDURE_C2 for LR-01, O21 for the ceiling, deletion and restoration): the extension reply serves the 17-day ceiling"
+      },
+      { "id": "CP-01.04", "exclusion": "PENDING_COUNSEL", "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review of the claim rules (L-12, L-19) as CP-01.14's validation" },
+      {
+        "id": "CP-01.14",
+        "exclusion": "PENDING_COUNSEL",
+        "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review's evidence in validation; until then the state stays PENDING_COUNSEL"
+      },
+      { "id": "CP-02.14", "exclusion": "PENDING_COUNSEL", "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review of the claim rules, as for CP-01.04 and CP-01.14" }
+    ],
+    "heldWith": { "CP-02.02": ["CP-01.02"], "CP-02.12": ["CP-01.14"] }
+  },
   "items": [
     {
       "id": "CP-01.01",
@@ -577,6 +602,8 @@
       "state": "APPROVED_AWAITING_REISSUE",
       "decision": "APPROVED",
       "basis": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+      "o19bExclusion": "ELEVATED_RETENTION",
+      "adoptableOnlyAfter": "LEGAL_PROCEDURE_C2 records the competent wording of LR-01, and O21 has delivered and tested the 17-day UNPAID ceiling through the one extension, deletion at the extended date and no resurrection from backups (the item's activation)",
       "profiles": ["adoption", "build"],
       "requires": [],
       "conditions": [
@@ -615,6 +642,8 @@
       "decision": "CONTENT_APPROVED_LEGAL_EFFECT_CONDITIONAL",
       "basis": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "legalEffect": "PENDING_COUNSEL",
+      "o19bExclusion": "PENDING_COUNSEL",
+      "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review of the claim rules (L-12, L-19) as CP-01.14's validation",
       "profiles": ["adoption", "build"],
       "requires": [],
       "conditions": [
@@ -814,6 +843,8 @@
       "decision": "APPROVED",
       "basis": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
       "legalEffect": "PENDING_COUNSEL",
+      "o19bExclusion": "PENDING_COUNSEL",
+      "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review's evidence in validation; until then the state stays PENDING_COUNSEL",
       "profiles": ["adoption", "build"],
       "requires": [],
       "conditions": [
@@ -864,6 +895,7 @@
       "class": "APPROVED_AWAITING_REISSUE",
       "decision": "OWNER_DECISION_PENDING_CP-02_SECTION_8",
       "basis": "docs/design/ORDER11-FUNCTIONAL-GAPS.md",
+      "adoptableOnlyWith": ["CP-01.02"],
       "profiles": ["adoption", "build"],
       "requires": ["CP-01.02"],
       "conditions": [
@@ -900,6 +932,8 @@
       "class": "APPROVED_AWAITING_REISSUE",
       "decision": "OWNER_DECISION_PENDING_CP-02_SECTION_8",
       "basis": "docs/design/ORDER11-ROUND2-WORKSPACE.md",
+      "o19bExclusion": "ELEVATED_RETENTION",
+      "adoptableOnlyAfter": "CP-01.02 is adoptable (LEGAL_PROCEDURE_C2 for LR-01, O21 for the ceiling, deletion and restoration): the extension reply serves the 17-day ceiling",
       "profiles": ["adoption", "build"],
       "requires": ["CP-01.02"],
       "conditions": [
@@ -1053,6 +1087,7 @@
       "class": "APPROVED_AWAITING_REISSUE",
       "decision": "OWNER_DECISION_PENDING_CP-02_SECTION_8",
       "basis": "docs/design/ORDER11-ROUND2-OPS.md",
+      "adoptableOnlyWith": ["CP-01.14"],
       "profiles": ["adoption", "build"],
       "requires": ["CP-01.14"],
       "conditions": [{ "kind": "activation", "text": "the read served from policy.legalStatus (C4)", "by": ["O22"] }],
@@ -1082,6 +1117,8 @@
       "decision": "OWNER_DECISION_PENDING_CP-02_SECTION_8",
       "basis": "docs/design/ORDER11-ROUND2-OPS.md",
       "legalEffect": "PENDING_COUNSEL",
+      "o19bExclusion": "PENDING_COUNSEL",
+      "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review of the claim rules, as for CP-01.04 and CP-01.14",
       "profiles": ["adoption", "build"],
       "requires": ["CP-01.04", "CP-01.14", "CP-02.07"],
       "conditions": [
