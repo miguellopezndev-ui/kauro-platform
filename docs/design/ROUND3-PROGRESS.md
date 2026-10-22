@@ -25,14 +25,15 @@ both from the first line to the last. Then this ledger.
 | Step | Status | Record |
 |---|---|---|
 | Plans (web v7, deliverables) | Done, committed | the two plan files |
-| Foundations 1: decisions register | Next | ROUND3-DECISIONS-REGISTER.md |
-| Foundations 2: Day-0 feasibility and dry runs | Pending | ROUND3-FEASIBILITY.md |
+| Foundations 1: decisions register | Done: ~255 entries, 45 conflicts in its §7 (to resolve where they arise) | ROUND3-DECISIONS-REGISTER.md |
+| Foundations 2: Day-0 feasibility and dry runs | In progress (agent) | ROUND3-FEASIBILITY.md |
 | Foundations 3: canonical fixtures | Pending | — |
-| Foundations 4: voice and terms | Pending | ROUND3-VOICE-AND-TERMS.md |
-| Foundations 5: tooling | Pending | — |
-| Foundations 6: "before" captures | Pending | Kauro.archive/…/round3-before |
-| Foundations 7: Home DNA | Pending | HOME-DNA.md |
-| Foundations 8: L1 concepts and the vertical slice | Pending | — |
+| Foundations 4: voice and terms | In progress (agent) | ROUND3-VOICE-AND-TERMS.md |
+| Foundations 5: tooling | colour-share, anatomy, capture-all built | Kauro.archive/…/tools/round3 |
+| Foundations 6: "before" captures | Done: 71 screens × 1280 and 375, 0 failures | Kauro.archive/…/research/round3-before |
+| Foundations 7: Home DNA | Drafted (colour, type, space, vocabulary, audit) | HOME-DNA.md |
+| Foundations 8: L1 concepts and the vertical slice | Research running (owner consoles; multi-role systems and density) | research/round3-owner-research, round3-system-research |
+| Judges' calibration | Pilot (not blind) discarded; blind set of 40 pairs being judged | Kauro.archive/…/round3-foundations/calibration |
 | Foundations 9: the kit, frozen | Pending | ROUND3-KIT.md |
 | Owner console | Pending | — |
 | Agency/company workspace | Pending | — |
