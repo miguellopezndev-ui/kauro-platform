@@ -297,3 +297,4 @@ one, and the record says so.
 | # | From | Part | Change | Reason | State |
 |---|---|---|---|---|---|
 | CR-1 | Owner console · Today, L4 (`research/round3-owner/today/AUDITIONS.md`) | Folds (`k-fold`, K37) | On the phone, the "+" marker stays on the summary's first line beside its title (`flex-wrap: nowrap` on the marker; the title wraps) | Seen in all 15 L4 variants: a long fold title leaves the "+" alone on its own line | Open: apply at kit build, then recapture every finished screen |
+| CR-2 | Owner console · Today final (`research/round3-owner/today/final/NOTES.md`) | Icons (§9) | Add an "already in another list" glyph (an up-arrow in a circle, 16 px, 1.5 px stroke) for rows that point to an item listed elsewhere on the page | Health groups items "Already in Needs you" apart from "Open, nothing for you to decide" (the clock); two groups need two shapes (K21) | Open: add to the icon set at kit build |
