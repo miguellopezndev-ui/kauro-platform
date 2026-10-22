@@ -96,7 +96,7 @@ The reference code is the c4 stylesheet, `research/round3-slice/concepts/c4-synt
 | Tool | label, stamp, footnote marker (**the floor**) | 12/16 | 600–700 |
 | Tool | ledger figure · key figure on wine · slip figure | 22/28 · 30/34 · 44/48 | 600 · 700 · 300 |
 | Print | title · subtitle · section | 28/32 · 16/22 · 16/20 | 700 · 500 · 700 |
-| Print | chart title · body and tables (floor) · glance figure | 13/18 · 12/14–16 · 18/22 | 700 · 400 · 650 |
+| Print | chart title · body and summary · tables, notes, appendix (floor) · glance figure | 13/18 · 13.33/18 (10 pt) · 12/14–16 (9 pt) · 18/22 | 700 · 400 · 400 · 650 |
 
 - **One size per role.** No size outside this table. Weight carries hierarchy in the tool tier, so sizes stay close.
 - **Line length.** Body text runs 45–75 characters. Long-form text (K41) holds a measure of about 68 characters.
