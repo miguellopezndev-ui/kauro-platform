@@ -1,7 +1,7 @@
 # Round 3: progress ledger
 
 Read first, every time a session starts or after any compaction:
-1. [ORDER11-ROUND3-MASTER-PLAN.md](ORDER11-ROUND3-MASTER-PLAN.md) (version 7);
+1. [ORDER11-ROUND3-MASTER-PLAN.md](ORDER11-ROUND3-MASTER-PLAN.md) (version 8);
 2. [ORDER11-ROUND3-DELIVERABLES-PLAN.md](ORDER11-ROUND3-DELIVERABLES-PLAN.md);
 
 both from the first line to the last. Then this ledger.
@@ -22,6 +22,26 @@ both from the first line to the last. Then this ledger.
 
 ## State
 
+### Continuation authorised on Oct 22, 2026
+
+The owner supplied `ROUND3-HANDOFF.md` as the resume instruction: continue version 8 to its full end condition, implement, then deliver.
+The historical stopped state below remains evidence of the interruption; it is no longer an instruction to pause.
+
+- **HD-1 / HD-2:** reproduced seller Commissions changing to the owner when a `review-as=seller` preview followed a plain link.
+  Review links now retain their persona, existing object queries and fragments. Both the route and shell refuse owner-only previews
+  to sellers. No product authorisation or backend code changed. The owner knows of no other specific failed link and asked for the
+  audit to identify the rest. Edge audit: **302 checks, zero failures**, across all 11 personas, project navigation for all seven
+  workspace roles and all three services, shell/account destinations, two real Commissions clicks and 12 owner-route denials.
+  Evidence: `Kauro.archive/Deliveries/Visual/order11/research/round3-link-audit/audit.json`; repeatable harness in
+  `tools/round3/audit-review-links.mjs` in that archive. Review server running on `127.0.0.1:4400`.
+  Validation: review typecheck and inventory/link unit checks passed; web and UI unit suites passed; **47 public browser tests passed
+  in installed Edge**, including the public navigation walk. The TLS harness used the already installed Git OpenSSL on the test
+  process PATH; no installation or system setting changed.
+- **Interrupted fixes resumed:** Refunds and Customers critique fix passes are complete and verified (F-33 and F-34 recorded);
+  Claims acceptance-field correction is built and verified, with its outside critique recorded (fix pass next). Sellers final, Support
+  cases final, Owner actions final and the report fix pass remain.
+
+
 | Step | Status | Record |
 |---|---|---|
 | Plans (web v7, deliverables) | Done, committed | the two plan files |
@@ -35,11 +55,11 @@ both from the first line to the last. Then this ledger.
 | Foundations 8: L1 concepts and the vertical slice | **Done.** System chosen: c4 "one ledger with four mastheads" (300 blind judgements; 60 of 60 in its final round; gates pass) | research/round3-slice/AUDITIONS.md; PD-05 |
 | Judges' calibration | **Passed, prompt version 1 frozen:** public pages 95% of 80 judgements, tool screens 88% of 60, documents (own prompt) 100% of 60 (bar 85%); guards added (wine preference, line length, widows) | Kauro.archive/…/round3-foundations/calibration/CALIBRATION.md |
 | Foundations 9: the kit, frozen | Inventory done (42 families). Auditions decided for groups A (144 judgements), C (150) and D (180): 13 families. Group B (panels, facts, interactive table, filters) being judged. Kit record drafted (version 0.9); frozen as version 1 after group B | research/round3-kit/DECISIONS.md; ROUND3-KIT.md |
-| Owner console | **L2 decided** (nav V1, inventory I-A). **Today:** L3, L4, L5, critic and copy fix pass 2 done. **Finance:** L3 f1, L4 incumbents kept; final built; critic done, fix pass running (OWN-10 flagged). **Payouts:** L3 p1, L4 incumbents kept; final, critic and fix pass done (an invented approval cut-off rejected; G-P8 open). **Claims (A):** L3 c2 (36 judgements, every pair clear); L4 (120): queue keeps s0 plus 4 fixes, ending section s4 (the dated list) wins every pair; final being built. **Refunds (A):** L3 u1 (36); L4 (120): both incumbents kept, plus a phone link to the decision; final being built. **Customers (B):** L3 k2 (36, every pair clear); final built (phone filter folded, Finance money word); outside critic running. **Sellers (B):** L3 s1 (every pair clear); final being built. **Support cases (B):** L3 v1 (tie with v2 broken on consistency). **Owner actions (A):** L3 built, judging. **Prospects, Outreach, Resources, Jobs, Incidents, Deletion, Operating review, Releases, Settings:** L3 started with round3-owner/L3-TASK.md, then **paused on 2026-10-22 to save the week's quota (owner's request)**; partial work is in each folder, and each builder can be resumed. **Kit group B:** auditions built, 24 judging batches ready, not launched (paused). Every judge prompt now forbids installing anything (a judge installed Pillow; undone) | research/round3-owner (each page folder: BRIEF, CONTENT, COMPOSITIONS, AUDITIONS, final) |
+| Owner console | **L2 decided** (nav V1, inventory I-A). **Today:** final, critique and fixes done. **Finance:** final, critic and fix pass done. **Payouts:** final, critic and fix pass done (G-P8 open). **Claims (A):** L3 c2; L4 queue s0 + 4 fixes, ending s4; final built; acceptance field corrected to the contract (free text); critic done (1 High + 3 Medium); **fix pass next**. **Refunds (A):** L3 u1; L4 incumbents kept; final built; critic and fix pass done (F-33, G-R9 recorded). **Customers (B):** L3 k2; final built; critic and fix pass done (F-34 recorded). **Sellers (B):** L3 s1; **final not built yet**. **Support cases (B):** L3 v1; **final built; L5 + critic + fix pass next**. **Owner actions (A):** L3 a3; **final not built yet**. **Prospects, Outreach, Resources, Jobs, Incidents, Deletion, Operating review, Releases, Settings:** not started in the archive (no folders yet); run from round3-owner/L3-TASK.md after the shared page generator is built. **Kit group B:** auditions built, 24 judging batches ready (144 judgements), not judged. Every judge prompt forbids installing anything | research/round3-owner (each page folder: BRIEF, CONTENT, COMPOSITIONS, AUDITIONS, final) |
 | Agency/company workspace | Pending | — |
 | Seller portal | Pending | — |
 | Public site | Pending | — |
-| Deliverables track | Research, 24 briefs, canon packages done. **Package entry (Tier A): e2 decided** (36 judgements), finished, critic, fix pass done. **Importer guide (Tier A): g1 decided** (36 judgements), finished, critic, fix pass done; the HubSpot association steps need a qualification import before the engine patch ships (open). **PDF report (Tier A): r2 decided** (36 judgements); final being built; PD-08 (tabular font) proposed | research/round3-docs-package-entry, round3-docs-import-instructions, round3-docs-report (AUDITIONS.md, final/) |
+| Deliverables track | Research, 24 briefs, canon packages done. **Package entry (Tier A): e2 decided** (36 judgements), finished, critic, fix pass done. **Importer guide (Tier A): g1 decided** (36 judgements), finished, critic, fix pass done; the HubSpot association steps need a qualification import before the engine patch ships (open). **PDF report (Tier A): r2 decided** (36 judgements); final built; critic done (F1-F17); **fix pass next**; PD-08 (tabular font) proposed | research/round3-docs-package-entry, round3-docs-import-instructions, round3-docs-report (AUDITIONS.md, final/) |
 | All four together | Pending | — |
 | Push and merge | Pending (end only) | — |
 

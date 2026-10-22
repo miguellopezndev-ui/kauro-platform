@@ -359,3 +359,22 @@ acceptance case with rejected rows). **Status.** Recorded, not changed: round 3 
 rendered with `--max-old-space-size=8192`, peaking at about 3.4 GB. **Effect:** large real projects may fail in the worker. **Opens.**
 platform (the reader reads whole files into memory; stream or bound it); data-plane worker limits; tests at scale. **Status.**
 Recorded, not changed.
+
+## F-33. Refund decision notifications have no recorded sender or send state (round 3, Oct 22, 2026)
+
+**Source:** Refunds final critique fix pass, G-R9 (`research/round3-owner/refunds/final/NOTES.md` in Kauro.archive).
+The canonical request records the promise to write by Nov 4, 2026, but the owner refund review packet does not identify who sends the
+post-decision customer message or expose its due/sent fields (`ApproveRefundRequest`, `RefundReviewView`, `RefundView`). This is a
+gap in that packet, not a claim that no notification subsystem exists elsewhere. Approval must not imply customer notification.
+**Opens:** owner/counsel decision about responsibility and wording; notification read/state and owning service; tests of approval
+versus transfer completion versus notification. **Status:** unknown ownership/timing is stated in the design; no sender, command,
+deadline time or delivered message is invented. Existing OQ-R1 to OQ-R4 remain open.
+
+## F-34. Serving a customer directly has no reassignment command (round 3, Oct 22, 2026)
+
+**Source:** Customers critique fix pass, `research/round3-owner/customers/final/NOTES.md` §8 in Kauro.archive.
+CMD048 requires `sellerId`, `serviceAssignmentRef` and `expectedVersion`; `PrepareServiceAssignment` requires `agencyId`,
+`compensation` and `termsHash` (and an agreement for `ASSISTANCE_AGREEMENT`). Neither represents assignment to Kauro's owner or
+unassignment from a seller. **Opens:** owner decision on direct service assignment, then contract/domain transition and tests.
+**Status:** seller-to-seller prepared/review/result states are explicitly hypothetical; no reference, hash or version is fabricated.
+"Serve them yourself" remains unavailable with "Needs a command". Acquisition, commission and residual rights are unchanged.

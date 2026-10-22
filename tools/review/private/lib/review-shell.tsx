@@ -17,6 +17,7 @@ import { fixtureFetch, type ReviewCall, type Script } from "./fixture-fetch.ts";
 import { PRIVATE_IDS } from "./inventory.ts";
 import { worldProject } from "./world-projects.ts";
 import { projectOfPathname } from "@web/screens.ts";
+import { contextHref, mayPreviewOps, SELLER_SCREENS } from "./links.ts";
 
 const CHECKING: SessionPhase = { kind: "CHECKING" };
 const LOADING: AgencyContext = { kind: "LOADING" };
@@ -64,9 +65,9 @@ function reviewPage(appPath: string, script: () => Script): BrowserPage {
 }
 
 /** What a seller may open in operations (GetSellerHome and the sales screens); the owner sees every entry. */
-const SELLER_SCREENS: ReadonlySet<string> = new Set(["UI33", "UI34", "UI36", "UI53", "UI54"]);
 
 export interface ReviewShellProps {
+  readonly id: string;
   /** The path the screen has in the application, e.g. /agencies/{id}/settings. */
   readonly appPath: string;
   readonly context: string;
@@ -74,7 +75,7 @@ export interface ReviewShellProps {
   readonly children: ReactNode;
 }
 
-export function ReviewShell({ appPath, context, script, children }: ReviewShellProps): ReactElement {
+export function ReviewShell({ id, appPath, context, script, children }: ReviewShellProps): ReactElement {
   const [shell, setShell] = useState<Shell | null>(null);
   useEffect(() => {
     const made = createShell(reviewPage(appPath, script));
@@ -92,15 +93,18 @@ export function ReviewShell({ appPath, context, script, children }: ReviewShellP
   const found = inside === null ? null : worldProject(inside.agencyId, inside.projectId);
   const base = viewOf({ phase, agency, pathname: appPath, activeAgency: shell === null ? null : shell.session.activeAgency(), implemented: ALL_PRIVATE, ...(context === "seller" ? { allowedOps: SELLER_SCREENS } : {}), ...(found === null ? {} : { project: found }) });
   // the person's own settings are proposals (P-01, P-03, P-04): the review links them from the menu, where they would live
-  const view = base.signOut ? { ...base, accountHref: base.ops ? "/ops/settings" : "/account" } : base;
+  const scoped = base.ops && !mayPreviewOps(context, id)
+    ? { ...base, gate: { kind: "REFUSED" as const, title: "state.DENIED.title" as const, body: "shell.agency.unavailable.body" as const, action: { kind: "NONE" as const } }, navigation: [], accountHref: null }
+    : base;
+  const view = scoped.signOut && scoped.gate.kind === "OPEN" ? { ...scoped, accountHref: scoped.ops ? "/ops/settings" : "/account" } : scoped;
   // the application's own links: the review serves every private path, so they are followed exactly as in the product
   const Anchor: AnchorComponent = useCallback(
     ({ href, "aria-current": current, children: label }: AnchorProps) => (
-      <Link href={href} prefetch={false} {...(current === undefined ? {} : { "aria-current": current })}>
+      <Link href={contextHref(href, context)} prefetch={false} {...(current === undefined ? {} : { "aria-current": current })}>
         {label}
       </Link>
     ),
-    [],
+    [context],
   );
   const actions = {
     signOut: () => void shell?.session.signOut(),

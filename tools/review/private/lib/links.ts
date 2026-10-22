@@ -3,6 +3,21 @@
 export const REVIEW = "/__review/private";
 export const AS_COOKIE = "kauro_review_as";
 
+/** Keep the preview's person on navigation, including existing queries and fragments. */
+export function contextHref(href: string, context: string): string {
+  if (!/^\/(?:ops|agencies|account|onboarding|login|signup|invitations)(?:[/?#]|$)/.test(href)) return href;
+  const url = new URL(href, "http://127.0.0.1");
+  url.searchParams.set("review-as", context);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Review presentation only; production authorisation remains the API's responsibility. */
+export const SELLER_SCREENS: ReadonlySet<string> = new Set(["UI33", "UI34", "UI36", "UI53", "UI54", "P-03"]);
+
+export function mayPreviewOps(context: string, id: string): boolean {
+  return context === "owner" || (context === "seller" && SELLER_SCREENS.has(id));
+}
+
 export function viewerHref(id: string, context?: string, state?: string): string {
   const query = new URLSearchParams();
   if (context !== undefined) query.set("ctx", context);

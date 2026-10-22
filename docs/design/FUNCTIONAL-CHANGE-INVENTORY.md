@@ -69,6 +69,7 @@ Reads:
 - owner: F-11 sellers, seller record, customers, statements by period, claims; F-12 the four money figures; G-13; F-15 alerts;
 - seller: G-11 home additions;
 - identity: G-01 the person's name (with C8).
+- refunds: F-33 exposes notification responsibility, due time and send state in the owner review packet; approval is not notification.
 
 Commands and fields:
 - CMD020 (F-01); CMD060 on an unpaid revision (F-19);
@@ -78,6 +79,7 @@ Commands and fields:
 - the claim refusal reason code, evidence reference and note (F-13); a seller's review request and the owner's decision (F-14);
 - statement items for the retainer, offsets and the balance (F-16, F-17); statement PDF and CSV, the ask-for-authorisation command (G-12);
 - notification preferences (G-09).
+- direct customer service assignment (F-34), if the owner wants it; current seller-only reassignment cannot represent the owner.
 
 ### C4. Backend domain and application
 
@@ -88,6 +90,7 @@ Commands and fields:
 - F-21 to F-23 the hold and its limits; preparation never on a hold.
 - F-25, F-26 the plan read, batch decisions with a preview hash, RevisePlan wired; a new revision withdraws the open quote.
 - F-29 the reconciliation engine: one success row per source key, the object's ID prefix, generated dependent and top-up files.
+- F-33 the agreed refund notification workflow and its recorded send state; F-34 direct service assignment, preserving acquisition rights.
 
 ### C5. Payments (the enabled route and its evidence, PV1)
 
