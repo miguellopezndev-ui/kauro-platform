@@ -227,7 +227,9 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => p
 function prepare(copy) {
   removeCopy(copy);
   mkdirSync(copy, { recursive: true });
-  for (const entry of ['src', 'test', 'tools', 'vendor', 'package.json', 'package-lock.json', 'tsconfig.json', '.npmrc']) cpSync(join(root, entry), join(copy, entry), { recursive: true });
+  // corpus/ too: the B04 suites read the sealed corpus and its validity record, and a copy without it fails 27 tests
+  // before any mutation, so no sabotage run could ever pass its baseline (BLK-MC, found by the first core gate run).
+  for (const entry of ['src', 'test', 'tools', 'vendor', 'corpus', 'package.json', 'package-lock.json', 'tsconfig.json', '.npmrc']) cpSync(join(root, entry), join(copy, entry), { recursive: true });
   // Main's design checks read the release documents as test input.
   if (existsSync(join(root, 'docs'))) cpSync(join(root, 'docs'), join(copy, 'docs'), { recursive: true });
   // node_modules by junction/symlink: the same dependencies, no reinstall.

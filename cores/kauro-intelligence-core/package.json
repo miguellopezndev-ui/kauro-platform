@@ -25,7 +25,7 @@
     "sabotage": "node tools/sabotage.mjs",
     "consumer:check": "node tools/consumer-check.mjs",
     "campaign": "node tools/campaign/run.mjs",
-    "design:check": "node --test tools/test/b03-case-map.test.mjs tools/test/b04-case-map.test.mjs",
+    "design:check": "node --test tools/test/b03-case-map.test.mjs tools/test/b04-case-map.test.mjs tools/test/consumer-observation.test.mjs",
     "gate": "npm run build && npm run typecheck && npm run contracts:check && npm run design:check && npm run test && npm run consumer:check && npm run architecture"
   },
   "devDependencies": {

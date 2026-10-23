@@ -36,6 +36,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { currentContext, sha256File, verifySabotageReport } from './lib/verify-sabotage-report.mjs';
+import { consumerObservation } from './lib/consumer-observation.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
@@ -190,14 +191,7 @@ for (const name of FACT_NAMES) if (!facts.some((entry) => entry.name === name)) 
  * digests of its own they must agree with the ones computed here.
  */
 function bindConsumer(consumer) {
-  const observed = (() => {
-    const match = consumer.stdout.match(/\{.*\}/u);
-    try {
-      return match === null ? null : JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
-  })();
+  const observed = consumerObservation(consumer.stdout);
   const packDir = join(tmpdir(), `kauro-ic-gate-pack-${String(process.pid)}`);
   rmSync(packDir, { recursive: true, force: true });
   mkdirSync(packDir, { recursive: true });
