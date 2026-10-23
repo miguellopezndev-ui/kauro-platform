@@ -26,8 +26,8 @@
       "name": "kauro-intelligence-core",
       "version": "0.6.0",
       "file": "vendor/kauro-intelligence-core-0.6.0.tgz",
-      "bytes": 354100,
-      "sha256": "34d94680c1503818f6403c1f0a4bb3d310917acbfa2e7deb4dc641b0c4d453cd",
+      "bytes": 358295,
+      "sha256": "ba8bd172ce029bcbaf6181cbca805bcd36487103f312cbf2144bcb6a5065e11d",
       "status": "PROVISIONAL_UNRELEASED",
       "provisional": true,
       "wrapper": "packages/intelligence-core",
@@ -35,11 +35,11 @@
         "repository": "miguellopezndev-ui/kauro-intelligence-core",
         "commit": "the Order 18B change that carries this manifest (cores/kauro-intelligence-core at that tree)",
         "branchHead": "ic-b04",
-        "builtFrom": "cores/kauro-intelligence-core of this monorepo at the commit named: npm ci && npm run build && npm pack (file list holds dist/src/index.js)",
+        "builtFrom": "cores/kauro-intelligence-core of this monorepo at the commit named: npm ci && npm run build && npm pack (file list holds dist/src/index.js); the same bytes on two packs",
         "sourceTree": "cores/kauro-intelligence-core",
         "archive": "cores/archive/kauro-intelligence-core.bundle"
       },
-      "note": "provisional pin until the IC 0.6.0 release; Order 18B re-packed it from cores/kauro-intelligence-core after moving it to Migration Core 3.1.0 (peer dependency 3.1.0, corpus and validity record resealed); vendor-cores check --release refuses it"
+      "note": "provisional pin until the IC 0.6.0 release; BLK-MC (Orders 18B and 26A) re-packed it from cores/kauro-intelligence-core on Migration Core 3.1.0 (peer dependency 3.1.0, SUPPORTED_MIGRATION_CORE 3.1.0, corpus resealed, validity record on the 3.1.0 tarball) with the Order 26A exports (bedrockDeploymentProblems, bedrockActivation, quotaLimitedTransport); vendor-cores check --release refuses it"
     }
   ]
 }
