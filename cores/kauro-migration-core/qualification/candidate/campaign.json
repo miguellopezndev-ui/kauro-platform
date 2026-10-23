@@ -1,11 +1,11 @@
 {
   "campaignVersion": "2.0.0",
   "artifactKind": "MIGRATION_CORE_CAMPAIGN",
-  "campaignId": "c_d5743d46c84d7343",
-  "sealedAt": "2026-10-23T01:35:39Z",
-  "subjectDigest": "f2b6d153940b8b03f983b44cb33b07c2af358420e9ad37ba394df679183f69ab",
+  "campaignId": "c_ceba120bc89e24a4",
+  "sealedAt": "2026-10-23T12:11:50Z",
+  "subjectDigest": "7c4b8b48e9463bf38de930de4c394a18703c4341db73d510c3a7102fa9faf84a",
   "subjectVersion": "1.0.0",
-  "codeDigest": "593527512b1693a2aac0b636ddadba568b1f1060dd7a2e58b2062402e3b2ea7a",
+  "codeDigest": "134d6fbf65202cbdf3b8d36d28b11251ddd7d1907483ca24da5e5b6c2d951c5e",
   "versions": {
     "coreVersion": "3.1.0",
     "packageFormatVersion": "2.1.0",
@@ -28,7 +28,7 @@
     },
     "EVIDENCE": {
       "files": 12,
-      "digest": "bc2ef60f3fdd7c1c3ffa4eabf4e3af529dae834e9f5e9cd1e166cb20129b6f10",
+      "digest": "ca2471be869b1046e0844948a6667108cafaa7e4a5b3bd4e95726560d6664df9",
       "inSubject": false
     },
     "GENERATED": {
@@ -52,8 +52,8 @@
       "inSubject": true
     },
     "SEMANTIC_HARNESS": {
-      "files": 122,
-      "digest": "19c95729b8473de0c50c2132a90764a6e408f9cd7bafda291c0b1195f355bb32",
+      "files": 123,
+      "digest": "a505d16788641e87f83b569749653c9d683285d1c1a048a10e70ce81ba314332",
       "inSubject": true
     },
     "EDITORIAL": {
@@ -99,8 +99,8 @@
       "kind": "VENDOR"
     },
     "tools/universe.mjs": {
-      "fingerprint": "905eabec41b239511afff83cca194f45bf896b58ce8ec429b6d1a6fe83b864f3",
-      "files": 448,
+      "fingerprint": "99afc1e430ab263e9ab73247274bdcab5303c2ce5c2e64802bd7b97b3cda5f9e",
+      "files": 449,
       "kind": "UNIVERSE"
     }
   },
