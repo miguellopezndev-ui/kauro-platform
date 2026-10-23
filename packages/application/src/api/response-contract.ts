@@ -18,6 +18,8 @@ import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.j
 import { HEADERS } from "./envelope.js";
 import { COMMAND_OUTCOMES, INTAKE_OUTCOMES, OPERATIONAL_OUTCOMES, READ_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
 import { problemOf, type Problem } from "./problems.js";
+import { CANDIDATE_CLEAN_OUTCOMES } from "../audit/outcomes.js";
+import type { CandidateActivation } from "../commands/runtime.js";
 import {
   ACCEPTED_RESPONSE_SCHEMA_ID,
   COMMAND_RESPONSES,
@@ -62,14 +64,16 @@ export const UNROUTED_RESPONSES: RouteResponses = Object.freeze({ operationId: "
  * The declared replies of a served command route: its COMPLETED status and schema — or, for a command whose completion remains
  * asynchronous (CMD014, B07 D-RUN-1), 202 and the ACCEPTED envelope — and problems otherwise.
  */
-export function commandRouteResponses(command: ServedCommandId, operationId: string): RouteResponses {
+export function commandRouteResponses(command: ServedCommandId, operationId: string, candidate?: CandidateActivation): RouteResponses {
   const success = COMMAND_RESPONSES[command];
   const schemaId = success.view === null ? ACCEPTED_RESPONSE_SCHEMA_ID : commandResponseSchemaId(command);
+  // the candidate's outcomes join the route's catalogue only when the deployment switched it on (Order 20, CP-02.01)
+  const extra = candidate?.cleanWithoutTarget === true ? (CANDIDATE_CLEAN_OUTCOMES as Readonly<Record<string, ReadonlyArray<ProblemOutcome> | undefined>>)[command] ?? [] : [];
   return Object.freeze({
     operationId,
     declared: Object.freeze({ [String(success.status)]: Object.freeze({ contentType: HEADERS.contentType, schemaId }) }),
     problem: PROBLEM_RESPONSE,
-    outcomes: COMMAND_OUTCOMES[command],
+    outcomes: extra.length === 0 ? COMMAND_OUTCOMES[command] : Object.freeze([...COMMAND_OUTCOMES[command], ...extra]),
   });
 }
 

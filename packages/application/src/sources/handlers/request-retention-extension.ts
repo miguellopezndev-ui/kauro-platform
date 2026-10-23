@@ -10,11 +10,22 @@
  * read in a statement after the last lock (rules 15/16): the soft deadline passed (SOFT_DEADLINE_PASSED), the hard cap already reached
  * (NO_EXTENSION_ROOM, not consumed) → the extension row and the record's soft and effective deadlines in one write sequence →
  * retention_record.extended.v1 (→ AUTHORITY_JOURNAL) → journal 200 RetentionExtensionView.
+ *
+ * CP-01.02 (R2-RETENTION-2; Order 21, activation OFF until Order 19B adopts it and LEGAL_PROCEDURE_C2 records LR-01): while the
+ * database's switch (kauro.retention_r2_2_active()) is on, a project with no paid record extends the UNPAID record of its current
+ * revision instead (each sealed revision has its own; the project's one extension buys time for the check the agency is working on, never
+ * for a superseded revision's): soft = least(previous soft + requested, seal + 17 days), the previous soft being the record's hard deadline
+ * while it has no soft deadline, and the record's hard deadline moves there when the end passes it (the one extension per project, across
+ * classes). The current revision has no UNPAID record: NO_EXTENDABLE_RECORD; it is not ACTIVE: RETENTION_EXPIRED. Refusals in the same
+ * order: EXTENSION_ALREADY_USED, STALE_VERSION, SOFT_DEADLINE_PASSED (the record's end already reached), NO_EXTENSION_ROOM (already
+ * extended). While the switch is off the answer is the earlier NO_EXTENDABLE_RECORD, unchanged.
  */
 import type { Id } from "@kauro/contracts";
-import type { ProjectId, RetentionExtensionId, RetentionRecordRow } from "@kauro/domain";
+import type { ProjectId, ResolvedMembership, RetentionExtensionId, RetentionRecordRow, SourceUnitOfWork } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
+import type { CommandEnvelope } from "../../api/envelope.js";
 import type { RetentionExtensionView } from "../../api/views.js";
+import type { CommandContext, CommandOutcome } from "../../commands/runtime.js";
 import { REQUEST_RETENTION_EXTENSION, type RequestDeletionHandler, type RequestRetentionExtensionBody, type RequestRetentionExtensionHandler } from "../../commands/contracts.js";
 import { checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { reachedOnServer, runSourceCommand, utc, type SourceRuntime } from "./shared.js";
@@ -50,6 +61,7 @@ export function requestRetentionExtensionHandler(runtime: SourceRuntime): Reques
           }
           const retention = uow.sources.retention;
           const records = await retention.lockPaidRecordsOfProject(projectId);
+          if (records.length === 0 && (await retention.retentionR22Active())) return extendUnpaid(uow, ctx, envelope, membership, projectId);
           if (records.length === 0) {
             throw new DomainFailure("PRECONDITION_FAILED", "the project has no paid retention record to extend", { reason: "NO_EXTENDABLE_RECORD" });
           }
@@ -120,4 +132,82 @@ export function requestRetentionExtensionHandler(runtime: SourceRuntime): Reques
         (view) => (view as RetentionExtensionView).retentionVersion,
       ),
   };
+
+}
+
+/** CP-01.02: the free check's one extension (only reached while the switch is on). */
+async function extendUnpaid(
+  uow: SourceUnitOfWork,
+  ctx: CommandContext,
+  envelope: CommandEnvelope<RequestRetentionExtensionBody>,
+  membership: ResolvedMembership,
+  projectId: ProjectId,
+): Promise<CommandOutcome<RetentionExtensionView>> {
+    const retention = uow.sources.retention;
+    const unpaid = await retention.lockUnpaidRecordsOfProject(projectId);
+    // the current revision, re-read after the records are locked (a replacement draft becomes current at CMD012; until it is sealed the
+    // current revision has no UNPAID record)
+    const project = await uow.projects.get(projectId);
+    const record = unpaid.find((r) => r.revisionId === project?.currentRevisionId);
+    if (!record) throw new DomainFailure("PRECONDITION_FAILED", "the project's current revision has no retention record to extend", { reason: "NO_EXTENDABLE_RECORD" });
+    if (record.state !== "ACTIVE") {
+      throw new DomainFailure("PRECONDITION_FAILED", "the retention record is no longer active; an expired scope is never extended", { reason: "RETENTION_EXPIRED", ...currentOf(record) });
+    }
+    if ((await retention.extensionOfProject(projectId)) !== null) {
+      throw new DomainFailure("PRECONDITION_FAILED", "the project already used its one extension", { reason: "EXTENSION_ALREADY_USED", ...currentOf(record) });
+    }
+    checkExpectedVersion(record, envelope.body.expectedVersion);
+    if (record.extendedHardDeadline !== undefined) {
+      throw new DomainFailure("PRECONDITION_FAILED", "the record's hard deadline was already moved by its extension", { reason: "NO_EXTENSION_ROOM", ...currentOf(record) });
+    }
+    const now = await retention.effectInstant();
+    if (reachedOnServer(record.effectiveDeadline, now)) {
+      throw new DomainFailure("PRECONDITION_FAILED", "the record's end has passed", { reason: "SOFT_DEADLINE_PASSED", ...currentOf(record) });
+    }
+    const extensionId = uow.ids.next() as RetentionExtensionId;
+    const { extension, record: moved } = await retention.extendUnpaidHardDeadline({
+      extensionId,
+      retentionId: record.retentionId,
+      expectedVersion: record.version,
+      requestedSeconds: envelope.body.requestedSeconds,
+      purpose: envelope.body.purpose,
+      termsVersion: envelope.body.termsVersion,
+      membershipId: membership.membershipId,
+    });
+    await uow.events.publish({
+      aggregateKind: "retention_record",
+      aggregateId: moved.retentionId,
+      aggregateVersion: moved.version,
+      agencyId: moved.agencyId,
+      eventType: "retention_record.extended.v1",
+      actor: { kind: "USER", userId: envelope.userId },
+      causationId: ctx.causationId,
+      correlationId: envelope.correlationId,
+      payload: {
+        retentionId: moved.retentionId,
+        agencyId: moved.agencyId,
+        projectId: moved.projectId,
+        ...(moved.revisionId === undefined ? {} : { revisionId: moved.revisionId }),
+        extensionId,
+        retentionClass: moved.class,
+        requestedSeconds: extension.requestedSeconds,
+        grantedSeconds: extension.grantedSeconds,
+        cappedAtHardDeadline: extension.cappedAtHardDeadline,
+      },
+    });
+    // the served view (the candidate's retentionClass, ceilingDeadline, ceilingRule and previousHardDeadline wait for CP-02.04's adoption)
+    const view: RetentionExtensionView = {
+      extensionId: extension.extensionId,
+      projectId: extension.projectId,
+      retentionId: extension.retentionId,
+      retentionVersion: moved.version,
+      requestedSeconds: extension.requestedSeconds,
+      grantedSeconds: extension.grantedSeconds,
+      previousSoftDeadline: utc(extension.previousSoftDeadline),
+      softDeadline: utc(extension.softDeadline),
+      hardDeadline: utc(moved.extendedHardDeadline ?? moved.hardDeadline),
+      effectiveDeadline: utc(moved.effectiveDeadline),
+      cappedAtHardDeadline: extension.cappedAtHardDeadline,
+    };
+    return { status: 200, view, version: moved.version, resourceKind: "retention_record", resourceId: moved.retentionId as Id };
 }

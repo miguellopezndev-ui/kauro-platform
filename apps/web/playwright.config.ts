@@ -9,6 +9,8 @@ const all = process.env["KAURO_E2E_ENGINES"] === "all";
 export default defineConfig({
   testDir: "e2e",
   testMatch: /.*\.spec\.ts$/,
+  // the private journey runs against a real api world of its own (e2e/private.config.ts, `pnpm run e2e:private`), never this fake-only edge
+  testIgnore: /private-journey\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   forbidOnly: true,

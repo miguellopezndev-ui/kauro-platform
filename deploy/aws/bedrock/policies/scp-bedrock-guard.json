@@ -1,0 +1,52 @@
+{
+  "$comment": "Order 26A: the SCP that keeps Bedrock inside A9 §4 for every principal of the Workloads OU, the owner's administrator included. Inputs and outputs are never stored (invocation logging cannot be turned on), nothing with a fixed or committed cost can be bought (provisioned throughput, model customization), only the owner's session can subscribe to a model (the model access step of the activation), no other way of calling a model exists (agents, flows, batch jobs, streaming, Converse, imported or custom models), nothing leaves the US Regions, and Opus 5.5 cannot be invoked until the owner approves it in a reviewed change of this file. Attached only when the bedrock module is enabled.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyStoringInvocations",
+      "Effect": "Deny",
+      "Action": ["bedrock:PutModelInvocationLoggingConfiguration", "bedrock:DeleteModelInvocationLoggingConfiguration"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyCommittedOrFixedCost",
+      "Effect": "Deny",
+      "Action": [
+        "bedrock:CreateProvisionedModelThroughput", "bedrock:UpdateProvisionedModelThroughput",
+        "bedrock:CreateModelCustomizationJob", "bedrock:CreateModelImportJob", "bedrock:CreateCustomModel",
+        "bedrock:CreateModelCopyJob", "bedrock:CreateMarketplaceModelEndpoint"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyModelSubscriptionsButTheOwner",
+      "Effect": "Deny",
+      "Action": ["aws-marketplace:Subscribe", "aws-marketplace:Unsubscribe"],
+      "Resource": "*",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+    },
+    {
+      "Sid": "DenyOtherInvocationPaths",
+      "Effect": "Deny",
+      "Action": [
+        "bedrock:InvokeModelWithResponseStream", "bedrock:Converse", "bedrock:ConverseStream", "bedrock:CreateModelInvocationJob",
+        "bedrock:InvokeAgent", "bedrock:CreateAgent", "bedrock:InvokeFlow", "bedrock:CreateFlow", "bedrock:RetrieveAndGenerate",
+        "bedrock:CreateInferenceProfile", "bedrock:ApplyGuardrail"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyBedrockOutsideTheUnitedStates",
+      "Effect": "Deny",
+      "Action": "bedrock:*",
+      "Resource": "*",
+      "Condition": { "StringNotEquals": { "aws:RequestedRegion": ["us-east-1", "us-east-2", "us-west-2"] } }
+    },
+    {
+      "Sid": "DenyOpusUntilTheOwnerApprovesIt",
+      "Effect": "Deny",
+      "Action": "bedrock:InvokeModel",
+      "Resource": ["arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-*", "arn:aws:bedrock:*:*:inference-profile/*anthropic.claude-opus-*"]
+    }
+  ]
+}

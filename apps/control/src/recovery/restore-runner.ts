@@ -324,11 +324,14 @@ export class RestoreRunner {
         if (existing.extensionId !== extensionId) throw new RestoreStepRefused("EXTENSION_CONFLICT", `project ${projectId} holds extension ${existing.extensionId}, the journal ${extensionId}`);
         return "ALREADY_APPLIED";
       }
-      const record = records.find((r) => r.retentionId === b["retentionId"]);
+      // CP-01.02 (Order 21): an extension of an UNPAID record (rule UNPAID_SEAL_17D) replays on that record; the database admits it only
+      // while the restored database's own switch says CP-01.02 is active, so a journal never extends past what its policy allows
+      const record = records.find((r) => r.retentionId === b["retentionId"]) ?? (await retention.lockUnpaidRecordsOfProject(projectId)).find((r) => r.retentionId === b["retentionId"]);
       if (record === undefined) return "ABSENT";
       if (record.state !== "ACTIVE") throw new RestoreStepRefused("EXTENSION_OF_ENDED_RECORD", `retention record ${record.retentionId} is ${record.state} in the backup`);
       const requestedSeconds = Number(b["requestedSeconds"]);
-      const { extension, record: moved } = await retention.extendSoftDeadline({
+      const extend = record.class === "UNPAID" ? retention.extendUnpaidHardDeadline.bind(retention) : retention.extendSoftDeadline.bind(retention);
+      const { extension, record: moved } = await extend({
         extensionId: extensionId as RetentionExtensionId,
         retentionId: record.retentionId as RetentionId,
         expectedVersion: record.version,

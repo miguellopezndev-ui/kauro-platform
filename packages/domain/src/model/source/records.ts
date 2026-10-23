@@ -651,6 +651,11 @@ export interface RetentionRecordRow extends Omit<RetentionRecord, "retentionId" 
   readonly version: number;
   /** When the retention sweeper took ACTIVE -> EXPIRED (effective_deadline_reached). */
   readonly expiredAt?: UtcInstant;
+  /**
+   * CP-01.02 (R2-RETENTION-2, activation OFF until Order 19B): the hard deadline the project's one extension moved an UNPAID record to,
+   * never past hardDeadline + 259200 s (seal + 17 days). Absent: the record's hard deadline is hardDeadline.
+   */
+  readonly extendedHardDeadline?: UtcInstant;
 }
 
 /**
@@ -671,6 +676,10 @@ export interface RetentionExtensionRow {
   readonly cappedAtHardDeadline: boolean;
   readonly purpose: string;
   readonly termsVersion: string;
+  /** HARD_CAP: a paid record's soft deadline within its unmoved hard cap; UNPAID_SEAL_17D: CP-01.02, an UNPAID record's hard deadline moved (`hardDeadline` is the ceiling). */
+  readonly ceilingRule: "HARD_CAP" | "UNPAID_SEAL_17D";
+  /** UNPAID_SEAL_17D: the hard deadline the extension moved (seal + 14 days). */
+  readonly previousHardDeadline?: UtcInstant;
 }
 
 /** DeletionRequest.state (registry contract DeletionRequest; table kauro.deletion_requests). */

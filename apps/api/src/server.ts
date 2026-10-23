@@ -60,6 +60,7 @@ import type {
   CommerceReadHandler,
   CommercialCommandHandler,
   CommercialReadHandler,
+  CandidateActivation,
   CompletedResponse,
   ExecutionHandlers,
   ExecutionReadHandlers,
@@ -169,6 +170,8 @@ export type OneTimeDelivery = (delivery: { readonly command: string; readonly vi
 
 export interface ApiServerOptions {
   readonly environment: Environment;
+  /** The behaviour built against the O19A candidate this deployment switched on (Order 20): its outcomes join their routes' catalogues. */
+  readonly candidate?: CandidateActivation;
   readonly oneTimeDelivery?: OneTimeDelivery;
   /**
    * The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11), the two B08 execution commands and the four B08
@@ -537,7 +540,7 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     const spec = handler.spec;
     if (!isServedCommand(spec.id)) throw new Error(`${spec.id} has a handler but no declared response contract (COMMAND_RESPONSES of @kauro/application)`);
     // the operation id is the registry command name (commands.json), as the OpenAPI document names it
-    registerCommand(app, options, spec, commandRouteResponses(spec.id, spec.name), (envelope) => handler.execute(envelope), sink, hashAddress);
+    registerCommand(app, options, spec, commandRouteResponses(spec.id, spec.name, options.candidate), (envelope) => handler.execute(envelope), sink, hashAddress);
   }
   for (const handler of Object.values(options.reads) as ReadonlyArray<ReadHandler<unknown>>) {
     registerRead(app, options, handler.spec, readRouteResponses(handler.spec.operationId), (request) => handler.execute(request), sink);

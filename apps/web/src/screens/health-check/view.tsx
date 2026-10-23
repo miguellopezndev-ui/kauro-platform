@@ -149,11 +149,12 @@ export function HealthCheckDetails({ audit, onRefresh, onCancel, cancelling, pla
 }
 
 /** No check has been requested for the project (no audit in the address). */
-export function NoHealthCheck(): ReactElement {
+/** `clean`: the project is "Clean your data", which needs no destination (CP-01.01): its check waits for the confirmed files only. */
+export function NoHealthCheck({ clean = false }: { readonly clean?: boolean }): ReactElement {
   return (
     <section>
       <h2>{message("screen.health.none.title")}</h2>
-      <p>{message("screen.health.none.body")}</p>
+      <p>{message(clean ? "screen.health.none.clean.body" : "screen.health.none.body")}</p>
     </section>
   );
 }

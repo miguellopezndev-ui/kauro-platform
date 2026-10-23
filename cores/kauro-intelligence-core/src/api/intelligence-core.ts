@@ -50,6 +50,7 @@ import type { CandidateConfiguration, ConfigFragmentAssociation, ConfigFragmentC
 import { DERIVED_CANDIDATE_TYPES, resolve } from '../resolver/deterministic-resolver.js';
 import type { Resolution, ResolvedDecision } from '../resolver/deterministic-resolver.js';
 import { associationOptionOf } from '../resolver/identity-families.js';
+import { BEDROCK_RETRY_WAITS_MS } from '../provider/bedrock-deployment.js';
 
 /**
  * Where the draft stands with Migration Core's validation of the whole dataset (the only validation there is).
@@ -356,7 +357,7 @@ export interface IntelligenceCore {
 }
 
 /** The wait before each transport retry (S8): 2 s, then 8 s, each plus a jitter of 0..25 % drawn from the request's idempotency digest, so a replay waits the same. */
-const RETRY_BACKOFF_MS = [2_000, 8_000] as const;
+const RETRY_BACKOFF_MS: readonly number[] = BEDROCK_RETRY_WAITS_MS;
 const RETRY_JITTER_MAX = 0.25;
 /** A Retry-After beyond this is a provider asking the run to wait out its own deadline; the run fails the task instead. */
 const MAX_RETRY_WAIT_MS = 60_000;

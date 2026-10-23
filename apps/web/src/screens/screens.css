@@ -1447,6 +1447,9 @@
 .kauro-main .kauro-ledger-item-head h3 {
   margin: 0;
   font-size: 1.0625rem;
+  /* a customer name with no break opportunity wraps instead of widening the flex item (Order 24 review M7) */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .kauro-main .kauro-ledger-facts {

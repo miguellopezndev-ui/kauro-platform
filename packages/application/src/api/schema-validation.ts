@@ -8,14 +8,15 @@
  * module needs no file system access.
  */
 import { CONTRACT_NAMES } from "@kauro/contracts";
-import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
+import { CANDIDATE_FAILURE_REASONS, DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import type { KnownSchemaId, SchemaValidator, ValidationOutcome } from "../ports/schema-validator.js";
 import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
 import { OPERATIONAL_ROUTES, buildResponseSchemas, operationalRequestSchemas, type OperationalRoute } from "./response-schemas.js";
 import { SELECTION_MANIFEST_SCHEMA, SELECTION_MANIFEST_SCHEMA_ID, SOURCE_REQUEST_SCHEMAS } from "../sources/request-schemas.js";
-import { AUDIT_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA, DECISION_ARTIFACT_SCHEMA_ID } from "../audit/request-schemas.js";
+import type { CandidateActivation } from "../commands/runtime.js";
+import { AUDIT_REQUEST_SCHEMAS, CANDIDATE_CLEAN_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA, DECISION_ARTIFACT_SCHEMA_ID } from "../audit/request-schemas.js";
 import { BRANDING_LOGO_SCHEMA, BRANDING_LOGO_SCHEMA_ID } from "../branding/request-schemas.js";
 import { EXECUTION_REQUEST_SCHEMAS } from "../execution/request-schemas.js";
 import { COMMERCE_REQUEST_SCHEMAS } from "../commerce/request-schemas.js";
@@ -90,9 +91,11 @@ export const PROBLEM_SCHEMA = Object.freeze({
  * Builds the closed validator: every registry contract, every request schema, every response schema and the Problem schema,
  * nothing else. The response views are compiled as definitions beside the registry's (`#/$defs/<View>`), derived from that
  * same bundle (api/response-schemas); `operational` is the list of operational routes whose replies are declared (the
- * application-owned OPERATIONAL_ROUTES unless a caller names the list explicitly).
+ * application-owned OPERATIONAL_ROUTES unless a caller names the list explicitly). `candidate` switches on behaviour built against the O19A
+ * re-issue candidate (Order 20): with cleanWithoutTarget, StartAudit is compiled from CANDIDATE_CLEAN_REQUEST_SCHEMAS and the Problem schema
+ * admits CANDIDATE_FAILURE_REASONS; absent, every schema is the in-force one.
  */
-export function createSchemaValidator(bundle: ContractSchemaBundle, operational: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES): SchemaValidator {
+export function createSchemaValidator(bundle: ContractSchemaBundle, operational: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES, candidate?: CandidateActivation): SchemaValidator {
   const roots: Record<string, unknown> = {};
   for (const name of CONTRACT_NAMES) {
     const def = bundle.$defs[name];
@@ -119,6 +122,9 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `request schema ${id} is declared twice`);
     roots[id] = schema;
   }
+  if (candidate?.cleanWithoutTarget === true) {
+    for (const [command, schema] of Object.entries(CANDIDATE_CLEAN_REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command}`] = schema;
+  }
   roots[DECISION_ARTIFACT_SCHEMA_ID] = DECISION_ARTIFACT_SCHEMA;
   // package B13 (order 7): the document of the logo intake
   roots[BRANDING_LOGO_SCHEMA_ID] = BRANDING_LOGO_SCHEMA;
@@ -138,6 +144,12 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
   const responses = buildResponseSchemas(bundle, operational);
   Object.assign(roots, responses.roots);
   const defs: Record<string, unknown> = { ...bundle.$defs, ...responses.defs };
+  // the candidate AuditView (CP-02.01): targetContractId optional, absent for a CLEAN audit; the served view keeps it required
+  if (candidate?.cleanWithoutTarget === true) {
+    const view = defs["AuditView"] as { readonly required?: ReadonlyArray<string> } | undefined;
+    if (view?.required === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the AuditView definition declares no required members");
+    defs["AuditView"] = { ...view, required: view.required.filter((m) => m !== "targetContractId") };
+  }
   const commerce = buildCommerceResponseSchemas(bundle);
   for (const [id, schema] of Object.entries(commerce.roots)) {
     if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 response schema ${id} collides with a B06 or B07 one`);
@@ -163,7 +175,7 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 view ${name} collides with an earlier package's or a registry definition`);
     defs[name] = schema;
   }
-  roots["Problem"] = PROBLEM_SCHEMA;
+  roots["Problem"] = candidate?.cleanWithoutTarget === true ? { ...PROBLEM_SCHEMA, properties: { ...PROBLEM_SCHEMA.properties, reason: { type: "string", enum: [...FAILURE_REASONS, ...CANDIDATE_FAILURE_REASONS] } } } : PROBLEM_SCHEMA;
   const compiled: CompiledSchemaSet = compileSchemaBundle({ defs, roots });
   const known = compiled.ids as ReadonlyArray<KnownSchemaId>;
   return {

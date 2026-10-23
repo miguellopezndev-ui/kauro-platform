@@ -12,6 +12,9 @@
 import type { AgencyId, PlanId, ProjectId, RequestId, RevisionId } from "../model/ids.js";
 import type { SourcePopulations } from "../model/source/records.js";
 import type { TargetBody } from "../model/target-contract.js";
+
+/** What a plan's validation is judged against: its target contract's body, or CLEAN_ONLY for a CLEAN plan, which binds none (Order 20). */
+export type ValidationTarget = TargetBody | "CLEAN_ONLY";
 import type { AuditId, CostGrantId } from "../model/audit/ids.js";
 import type { AuditRecord, AuditState, CostGrantRecord, PlanValidationRecord } from "../model/audit/records.js";
 import type { ExecutionSourceGeneration } from "./execution-discovery.js";
@@ -120,8 +123,10 @@ export interface AuditDiscovery {
   /**
    * The body of the target contract the plan binds (its project's contract with the plan's targetContractHash), in a unit bound to the
    * plan's agency; null when the control plane cannot see one. Read without a lock: the currency of the target is the database's (0084).
+   * CLEAN_ONLY for a plan of the canonical CLEAN hash whose own revision has a CLEAN audit (Order 20, CP-02.01; migration 0097): it binds
+   * no target contract, so there is no body to read.
    */
-  validationTarget(planId: PlanId): Promise<TargetBody | null>;
+  validationTarget(planId: PlanId): Promise<ValidationTarget | null>;
   /**
    * GRANT_RECONCILIATION's work, across agencies: a grant with a known usage to reconcile, an intent the database can no longer
    * send, an edge due on the server clock (expiry, exhaustion, room again) or a scope closed with nothing uncertain left.

@@ -73,6 +73,7 @@ import {
   type PlanValidationId,
   type SystemContext,
   type TargetBody,
+  type ValidationTarget,
   type ValidationReceiptId,
   type ValidationSource,
 } from "@kauro/domain";
@@ -119,7 +120,7 @@ interface Claim {
   /** VALIDATE: the sealed revision the draft binds (B05 L1v). */
   readonly validationSource: ValidationSource | null;
   /** VALIDATE: the target body the draft binds (M3). */
-  readonly validationTarget: TargetBody | null;
+  readonly validationTarget: ValidationTarget | null;
 }
 
 /** A step's result, recorded once under its fence, and the edges it takes in the same unit. */
@@ -134,6 +135,14 @@ interface Answer {
 async function advance(uow: AuditUnitOfWork, audit: AuditRecord, edge: AuditEdge): Promise<void> {
   const moved = await uow.audits.advanceAudit(audit.auditId, audit.version, edge);
   if (moved.kind !== "APPLIED") throw new StepRefused("STALE_VERSION");
+}
+
+/**
+ * The target the Intelligence core interprets against: none for a CLEAN audit (Order 20, CP-02.01: it names no target contract and binds
+ * CLEAN_ONLY_TARGET_HASH, which the core's CLEAN_ONLY draft carries back), else the confirmed contract's body hash.
+ */
+function interpretedTargetOf(audit: AuditRecord): Sha256Hex | null {
+  return audit.targetContractId === undefined ? null : audit.targetContractHash;
 }
 
 /** A step that ends the audit FAILED with a classified cause (fatal_integrity_error, fatal_contract_or_provider_error, fatal_contract_error). */
@@ -198,7 +207,7 @@ export class AuditOrchestration implements OutboxConsumer {
       let grant: CostGrantRecord | null = null;
       let draft: DraftValidation | null = null;
       let validationSource: ValidationSource | null = null;
-      let validationTarget: TargetBody | null = null;
+      let validationTarget: ValidationTarget | null = null;
       if (kind === "PROFILE") {
         // profile_worker_claims: the source SEALED and the grant AUTHORIZED and unexpired (a lost source is EXECUTION_CONTROL's)
         const source = await uow.auditDiscovery.auditSource(audit);
@@ -283,7 +292,7 @@ export class AuditOrchestration implements OutboxConsumer {
     const profileHash = profiled.profileHash;
     if (profiled.outcome !== "PROFILED" || !isSha256Hex(profileHash)) return failed("PROFILE_ANSWER_MALFORMED", profiled.evidenceClass);
     if (this.deps.documents !== undefined) await this.deps.documents.putDocument(audit.agencyId, "SOURCE_PROFILE", profileHash, profiled.profileDocument);
-    const manifest = await this.deps.interpret.planCandidates({ agencyId: audit.agencyId, revisionHash: audit.revisionHash, sourceProfileHash: profileHash, targetContractHash: audit.targetContractHash });
+    const manifest = await this.deps.interpret.planCandidates({ agencyId: audit.agencyId, revisionHash: audit.revisionHash, sourceProfileHash: profileHash, targetContractHash: interpretedTargetOf(audit) });
     if (!isSha256Hex(manifest.candidateSetHash)) return failed("CANDIDATE_MANIFEST_MALFORMED", manifest.evidenceClass);
     return {
       outcome: "COMPLETED",
@@ -302,7 +311,7 @@ export class AuditOrchestration implements OutboxConsumer {
       return failed("PROFILE_EVIDENCE_MISSING", "EXECUTED_LOCAL");
     }
     // the manifest re-derived with no dispatch and no spend, and bound to the one the PROFILE step recorded (D8-CAU-5)
-    const manifest: CandidateManifest = await this.deps.interpret.planCandidates({ agencyId: audit.agencyId, revisionHash: audit.revisionHash, sourceProfileHash: audit.profileEvidenceHash, targetContractHash: audit.targetContractHash });
+    const manifest: CandidateManifest = await this.deps.interpret.planCandidates({ agencyId: audit.agencyId, revisionHash: audit.revisionHash, sourceProfileHash: audit.profileEvidenceHash, targetContractHash: interpretedTargetOf(audit) });
     if (manifest.candidateSetHash !== audit.candidateManifestHash) return failed("CANDIDATE_MANIFEST_CHANGED", manifest.evidenceClass);
     // the platform's fenced journal of the audit's run: every append by this step at its fence, each call a unit of its own
     const context = boundSystem(SERVICE, audit.agencyId, this.deps.ids.next() as never);

@@ -31,6 +31,7 @@
     "@kauro/contracts": "workspace:*",
     "@kauro/data-plane": "workspace:*",
     "@kauro/domain": "workspace:*",
+    "@kauro/identity": "workspace:*",
     "@kauro/persistence": "workspace:*",
     "fastify": "5.12.5",
     "jose": "6.2.12"

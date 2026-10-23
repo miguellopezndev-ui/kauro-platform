@@ -11,7 +11,7 @@
  */
 import { DOMAINS, structuredDigest } from "@kauro/contracts";
 import type { Sha256Hex } from "@kauro/contracts";
-import { DomainFailure, type AgencyId, type PlanBody } from "@kauro/domain";
+import { CLEAN_ONLY_TARGET_HASH, DomainFailure, type AgencyId, type PlanBody } from "@kauro/domain";
 import { CanonicalAgreementError, MODEL_POLICY_HASH, PROMPT_BUNDLE_HASH, assertCanonicalAgreement, toMigrationConfig } from "@kauro/intelligence-core";
 import { loadConfig, MigrationError } from "@kauro/migration-core";
 import type { CoreDocumentStore, PlanCompilerPort } from "../../../ports/index.js";
@@ -24,8 +24,6 @@ export interface IntelligencePlanCompilerDeps {
   readonly documents: CoreDocumentStore;
 }
 
-/** The canonical hash a plan body carries for a CLEAN_ONLY draft, which has no target contract (registry Plan.targetContractHash is required). */
-const CLEAN_ONLY_TARGET_HASH = structuredDigest(DOMAINS.PLAN_BODY, 1, { cleanOnlyTarget: true }) as Sha256Hex;
 
 function isDecisions(value: unknown): value is IntelligenceDraftDecisions {
   const v = value as Partial<IntelligenceDraftDecisions> | null;
@@ -75,6 +73,7 @@ export class IntelligencePlanCompiler implements PlanCompilerPort {
         draft,
         configuration,
         revisionHash: candidateDecisions.revisionHash as Sha256Hex,
+        // a CLEAN_ONLY draft has no target contract: it carries the canonical CLEAN hash (registry Plan.targetContractHash is required)
         targetContractHash: (candidateDecisions.targetContractHash ?? CLEAN_ONLY_TARGET_HASH) as Sha256Hex,
         policyHash: policyHashOf(draft, { modelPolicyHash: MODEL_POLICY_HASH, promptBundleHash: PROMPT_BUNDLE_HASH }),
       });

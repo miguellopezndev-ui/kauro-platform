@@ -39,7 +39,7 @@
   "B08": ["apps/control/**", "packages/data-plane/**", "packages/persistence/**", "packages/application/src/execution/**", "packages/application/src/audit/**", "apps/api/src/**", "packages/domain/**", "apps/migration-worker/**", "deploy/**"],
   "B09": ["packages/persistence/**", "packages/application/src/commerce/**", "apps/api/src/payments/**", "apps/api/src/**", "packages/domain/**"],
   "B10": ["packages/persistence/**", "packages/application/src/commercial/**", "apps/api/src/commissions/**", "packages/domain/**"],
-  "B11": ["apps/web/**", "packages/ui/**", "packages/application/src/support/**", "packages/application/src/sessions/**", "packages/application/src/public/**", "apps/api/src/**"],
+  "B11": ["apps/web/**", "packages/ui/**", "packages/application/src/support/**", "packages/application/src/sessions/**", "packages/identity/**", "packages/application/src/public/**", "apps/api/src/**"],
   "B13": ["packages/reports/**", "apps/migration-worker/**", "deploy/**"]
  }
 }

@@ -1,0 +1,13 @@
+{
+  "$comment": "O28A: the alert rules of a Kauro deployment, declared once and evaluated offline by tools/ci/alerts.mjs over the api's own stderr lines (apps/api/src: kauro-api ..., packages/persistence/src: kauro-db pool=...). Every pattern matches a line the shipped code writes; none matches a customer value (the lines carry correlation ids, classes and codes only). Routing (who is paged) belongs to the deployment: the O25 management-alarms module on AWS; nothing is live until activation.",
+  "version": 1,
+  "rules": [
+    { "id": "API_START_FAILED", "severity": "page", "pattern": "^kauro-api failed to start: ", "threshold": 1, "windowSeconds": 300 },
+    { "id": "API_INTERNAL_ERROR", "severity": "page", "pattern": "^kauro-api internal error correlation=\\S+ class=", "threshold": 1, "windowSeconds": 300 },
+    { "id": "API_DATABASE_UNAVAILABLE", "severity": "page", "pattern": "^kauro-api unavailable correlation=\\S+ code=CAPACITY_UNAVAILABLE", "threshold": 3, "windowSeconds": 60 },
+    { "id": "API_NOT_READY", "severity": "page", "pattern": "^kauro-api not ready correlation=", "threshold": 2, "windowSeconds": 120 },
+    { "id": "BACKGROUND_FAILURE", "severity": "page", "pattern": "^kauro-api (commission|payment) background failure correlation=", "threshold": 1, "windowSeconds": 300 },
+    { "id": "DB_POOL_CONNECTION_ERRORS", "severity": "ticket", "pattern": "^kauro-db pool=\\S+ (idle|in-use) connection error class=", "threshold": 5, "windowSeconds": 60 },
+    { "id": "API_SHUTDOWN_DEADLINE", "severity": "ticket", "pattern": "^kauro-api shutdown deadline exceeded", "threshold": 1, "windowSeconds": 300 }
+  ]
+}

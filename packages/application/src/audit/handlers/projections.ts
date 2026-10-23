@@ -26,7 +26,8 @@ export function auditView(audit: AuditRecord, grant: CostGrantRecord, role: Memb
   return {
     auditId: audit.auditId,
     revisionId: audit.revisionId,
-    targetContractId: audit.targetContractId,
+    // absent for a CLEAN audit (CP-02.01: AuditView serves targetContractId as optional; candidate activation only)
+    ...(audit.targetContractId === undefined ? {} : { targetContractId: audit.targetContractId }),
     state: audit.state,
     version: audit.version,
     startedAt: utc(audit.startedAt),

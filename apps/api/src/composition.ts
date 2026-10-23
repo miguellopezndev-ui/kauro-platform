@@ -22,8 +22,8 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { LateFailureSink, BankEvidenceClassifier, BankEvidenceStore, BankInboundCollaborators, ObjectReadSigningPort, BankCreditClassifier, DestinationFingerprinter } from "@kauro/application";
 import { createBankEvidenceUpload, createBankInboundHandlers, createBankRouteHandlers, createBankSettlementHandlers, realProviderCallTimer, createBankRefundHandlers } from "@kauro/application";
-import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
-import { RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createProspectIntakeHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, createBrandingHandlers, createBrandingIntakeHandlers, type BrandingStores, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createOperationsReadHandlers, createQuoteHandlers, createStatementRequestHandlers, getSellerHomeHandler, problemOf, recordOperatorDenial, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, createOutreachAuthCommandHandlers, createOutreachAuthReadHandlers, createOutreachDraftCommandHandlers, createOutreachDraftReadHandlers, type OutreachSealer, createActivityCommandHandlers, createActivityReadHandlers, type OptOutKey, createOwnerToolHandlers } from "@kauro/application";
+import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, CandidateActivation, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
+import { CANDIDATE_OFF, RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createProspectIntakeHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, createBrandingHandlers, createBrandingIntakeHandlers, type BrandingStores, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createOperationsReadHandlers, createQuoteHandlers, createStatementRequestHandlers, getSellerHomeHandler, problemOf, recordOperatorDenial, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, createOutreachAuthCommandHandlers, createOutreachAuthReadHandlers, createOutreachDraftCommandHandlers, createOutreachDraftReadHandlers, type OutreachSealer, createActivityCommandHandlers, createActivityReadHandlers, type OptOutKey, createOwnerToolHandlers } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, CommerceUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
@@ -255,6 +255,11 @@ export interface ApiAssembly {
   readonly commerce?: Partial<CommerceRequestCollaborators>;
   /** The closed validator; loaded from the contract bundle when absent (a test passes the instance it asserts on). */
   readonly validator?: SchemaValidator;
+  /**
+   * Behaviour built against the O19A re-issue candidate that this deployment switches on (Order 20: CLEAN without a target contract); absent,
+   * every switch is off and the api serves the in-force contract and behaviour. The configuration accepts a switch in LOCAL only (config.ts).
+   */
+  readonly candidate?: CandidateActivation;
   readonly clock?: Clock;
   readonly ids?: IdGenerator;
   readonly logger?: ApiServerOptions["logger"];
@@ -361,11 +366,15 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
   const unitOfWork = reportingUnavailability(assembly.unitOfWork, assembly.onUnavailable ?? writeUnavailable);
+  const candidate = assembly.candidate ?? CANDIDATE_OFF;
+  // Order 20 (review M-6): the O19A candidate is not adopted; a switch on outside LOCAL is refused here too, not only by the configuration
+  if (candidate.cleanWithoutTarget && assembly.environment !== "LOCAL") throw new RangeError("the O19A candidate (cleanWithoutTarget) is accepted in the LOCAL environment only");
   const runtime: SourceRuntime = {
     unitOfWork,
     authorizer: createAuthorizer({ clock, assurance: createAssuranceVerifier() }),
     clock,
     ids,
+    candidate,
   };
   const cores = assembly.cores ?? unavailableCoreServices();
   const collaborators: B06Collaborators = {
@@ -404,8 +413,8 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   // package B08: the job commands run B06's pipeline in an execution unit of work of the same factory (design §12)
   const executionRuntime: ExecutionRuntime = { unitOfWork, authorizer: runtime.authorizer, clock, ids };
   // package B08: the audit commands on the same pipeline in an audit unit of work of the same factory (design §12)
-  const auditRuntime: AuditRuntime = { unitOfWork, authorizer: runtime.authorizer, clock, ids };
-  const validator = assembly.validator ?? loadContractSchemas();
+  const auditRuntime: AuditRuntime = { unitOfWork, authorizer: runtime.authorizer, clock, ids, candidate };
+  const validator = assembly.validator ?? loadContractSchemas(candidate);
   // package B09: the request side of the payments workflow over the same units of work and authorizer, with the corporate owner's
   // authorizer and the payment collaborators of the edition, replaced by the assembly's (D-REQ-B1). A bound payment service is the
   // one the request side's provider commands settle through (D-INT2-B3): their settle step (T3) runs in its SERVICE units of work on
@@ -417,6 +426,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     commerceAuthorizer: createCommerceAuthorizer({ clock, assurance: createAssuranceVerifier() }),
     clock,
     ids,
+    candidate,
   };
   const paymentService: Partial<CommerceRequestCollaborators> =
     assembly.payments === undefined ? {} : { payment: assembly.payments.runtime.assembly.commerce, paymentServiceId: PAYMENT_SERVICE_ID, provider: assembly.payments.runtime.assembly.provider };
@@ -547,6 +557,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     refuseCredentials: (action, request, failure) => refuseAnonymously(runtime, action, request, failure, SESSION_POLICY_VERSION),
     ...(sessions !== undefined ? { sessions } : {}),
     validator,
+    candidate,
     clock,
     ids,
     paymentRoutes: (app, kit) => {
@@ -640,6 +651,7 @@ export async function startApi(config: ApiConfig, options: StartOptions): Promis
           }
         : {}),
       environment: config.environment,
+      ...(config.candidate.cleanWithoutTarget ? { candidate: config.candidate } : {}),
       unitOfWork: database.unitOfWork,
       database,
       trustedProxyHops: config.http.trustedProxyHops,

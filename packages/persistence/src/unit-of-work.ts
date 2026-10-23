@@ -427,6 +427,16 @@ function transientSqlState(e: unknown): boolean {
   return isDatabaseError(source) && (source.code === SQLSTATE.SERIALIZATION_FAILURE || source.code === SQLSTATE.DEADLOCK_DETECTED);
 }
 
+const CONNECTION_LOSS_CODES: ReadonlySet<string> = new Set(["ECONNRESET", "EPIPE", "ECONNREFUSED", "57P01", "57P02", "57P03"]);
+
+/** A failure that means the connection itself is gone: node-postgres's client-side termination, a socket error, SQLSTATE class 08 or 57P01..03. */
+function connectionLost(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const code = (e as { code?: unknown }).code;
+  if (typeof code === "string") return CONNECTION_LOSS_CODES.has(code) || /^08/.test(code);
+  return /^Connection terminated( unexpectedly)?$/.test(e.message) || e.message === "Client has encountered a connection error and is not queryable";
+}
+
 function asFailure(e: unknown, correlationId: string): DomainFailure {
   if (isDomainFailure(e)) return e;
   const translated = translateDatabaseError(e);
@@ -589,6 +599,16 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
         } catch (rollbackError) {
           destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
         }
+      }
+      if (!isDomainFailure(e) && connectionLost(e)) {
+        // the connection died under the unit (a backend terminated while the client sat idle in the pool, a restart, a failover):
+        // node-postgres reports it client-side with no SQLSTATE. The client is destroyed and the caller gets the retryable capacity
+        // refusal, never INTERNAL_ERROR (O28A review F-2). A loss before COMMIT wrote nothing; a loss during COMMIT is settled by the
+        // command journal on the retry with the same key, as for any retryable refusal.
+        destroy ??= e instanceof Error ? e : new Error(String(e));
+        const failure = new DomainFailure("CAPACITY_UNAVAILABLE", `the database connection was lost; correlation ${context.correlationId}`, { retryAfterSeconds: 1 }, true);
+        failure.cause = e;
+        throw failure;
       }
       throw asFailure(e, context.correlationId);
     } finally {

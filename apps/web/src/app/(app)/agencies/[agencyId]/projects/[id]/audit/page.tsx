@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { message } from "../../../../../../../copy/en.ts";
+import { candidateCleanWithoutTarget } from "../../../../../../../server/config/candidate.ts";
 import { HealthCheckScreen } from "../../../../../../../screens/health-check/container.tsx";
 import { idOrNull } from "../../../../../../../screens/shared/params.ts";
 import { ProjectHeader } from "../../../../../../../screens/shared/project-header.tsx";
@@ -12,7 +13,7 @@ export default async function Page({ params, searchParams }: { readonly params: 
   return (
     <>
       <ProjectHeader stage="check" title={message("health-check.title")} lead={message("screen.health.lead.body")} />
-      <HealthCheckScreen auditId={idOrNull(audit)} agencyId={agencyId} projectId={id} />
+      <HealthCheckScreen auditId={idOrNull(audit)} agencyId={agencyId} projectId={id} cleanWithoutTarget={candidateCleanWithoutTarget()} />
     </>
   );
 }

@@ -56,6 +56,8 @@ const JUDGMENTS: ReadonlyArray<JudgmentSite> = [
   { site: "S1 CMD014", file: "handlers/complete-upload.ts", effect: "uow.sources.uploads.transition", between: [] },
   { site: "S6 revisionFacts", file: "handlers/projections.ts", effect: null, between: [] },
   { site: "RX CMD060", file: "handlers/request-retention-extension.ts", effect: "retention.extendSoftDeadline", between: [] },
+  // Order 21, CP-01.02: the free check's extension (only while the switch is on) judges its end at the effect instant read after its last lock
+  { site: "RX CMD060 UNPAID", file: "handlers/request-retention-extension.ts", effect: "retention.extendUnpaidHardDeadline", between: [] },
   // C-1: the session secret's INSERT (no wait: its FK KEY SHARE is on the row this unit holds FOR UPDATE); the DB re-judges at the edge
   { site: "S2 CMD013 unit 2", file: "handlers/reserve-upload.ts", effect: "uow.sources.uploads.transition", between: ["uow.sources.sessionSecrets.store"] },
   { site: "S3 CMD013 resume", file: "handlers/reserve-upload.ts", effect: "uow.sources.uploads.claimSessionAttempt", between: [] },

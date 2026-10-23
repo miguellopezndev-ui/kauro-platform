@@ -43,6 +43,7 @@ import type {
 } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, actorOf, beforeCommitOf, commandRequestDigest } from "@kauro/domain";
 import { judgedUnderHold } from "../../api/authority.js";
+import type { CandidateActivation } from "../../commands/runtime.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { ReadRequest, ReadResult, ReadSpec } from "../../queries/reads.js";
@@ -110,6 +111,8 @@ export interface CommerceRequestRuntime {
   readonly commerceAuthorizer: CommerceAuthorizer;
   readonly clock: Clock;
   readonly ids: IdGenerator;
+  /** The candidate behaviour this deployment switched on (CreateQuote's CLEAN binding, Order 20); absent is CANDIDATE_OFF. */
+  readonly candidate?: CandidateActivation;
 }
 
 // --- failures ------------------------------------------------------------------------------------------------------------------------

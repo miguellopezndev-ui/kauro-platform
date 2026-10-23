@@ -32,6 +32,7 @@ import {
   type RequestJournalRecord,
   type RevisionId,
   type TargetBody,
+  type ValidationTarget,
   type ValidationSubject,
 } from "@kauro/domain";
 import { execute, instant, int, type Queryable } from "../sql.js";
@@ -176,7 +177,7 @@ export class PgAuditDiscovery implements AuditDiscovery {
     };
   }
 
-  async validationTarget(planId: PlanId): Promise<TargetBody | null> {
+  async validationTarget(planId: PlanId): Promise<ValidationTarget | null> {
     // the plan's own project's contract of its hash (a body hash is unique per project, never across projects)
     const r = await execute<{ mode: TargetBody["mode"]; instance_id: string; importer_profile_id: string; importer_version: string; objects: TargetBody["objects"]; observed_at: unknown; authority_evidence_hash: string; capability_version: string }>(
       this.db,
@@ -186,7 +187,18 @@ export class PgAuditDiscovery implements AuditDiscovery {
       [planId],
     );
     const t = r.rows[0];
-    if (!t) return null;
+    if (!t) {
+      // a CLEAN plan (Order 20): the canonical CLEAN hash, on a revision with a CLEAN audit (no target contract, which 0097 admits on a CLEAN
+      // project only) — the same binding plans_clean_binding admits, narrowed to the plan's own revision
+      const clean = await execute(
+        this.db,
+        `SELECT 1 FROM kauro.plans p
+          WHERE p.plan_id = $1 AND p.target_contract_hash = kauro.clean_only_target_hash()
+            AND EXISTS (SELECT 1 FROM kauro.audits a WHERE a.agency_id = p.agency_id AND a.project_id = p.project_id AND a.revision_hash = p.revision_hash AND a.target_contract_id IS NULL)`,
+        [planId],
+      );
+      return clean.rows.length === 1 ? "CLEAN_ONLY" : null;
+    }
     return {
       mode: t.mode,
       instanceId: t.instance_id,

@@ -65,8 +65,9 @@ export interface AuditRecord {
   readonly revisionId: RevisionId;
   /** The sealed revision's manifest hash (KAURO_SOURCE_REVISION_V1). */
   readonly revisionHash: Sha256Hex;
-  readonly targetContractId: TargetContractId;
-  /** The confirmed target contract's body hash (KAURO_TARGET_BODY_V1). */
+  /** The exact target version; absent for CLEAN, whose audit binds CLEAN_ONLY_TARGET_HASH (CP-01.01, Order 20). */
+  readonly targetContractId?: TargetContractId;
+  /** The confirmed target contract's body hash (KAURO_TARGET_BODY_V1), or CLEAN_ONLY_TARGET_HASH for CLEAN. */
   readonly targetContractHash: Sha256Hex;
   readonly auditPolicyVersion: string;
   /** The operator who started it: the creator of its system draft plan. */

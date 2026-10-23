@@ -1,0 +1,45 @@
+{
+  "gate": "SABOTAGE",
+  "observedAt": "2026-10-23T02:20:50Z",
+  "scope": "PARTIAL",
+  "suiteFilter": "import-instructions",
+  "declared": 134,
+  "selected": 4,
+  "killed": 4,
+  "survived": 0,
+  "outcomes": {
+    "KILLED": 4
+  },
+  "cases": [
+    {
+      "id": "M132",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "1 of 11 tests failed"
+    },
+    {
+      "id": "M133",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "1 of 11 tests failed"
+    },
+    {
+      "id": "M134",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "1 of 11 tests failed"
+    },
+    {
+      "id": "M135",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "1 of 11 tests failed"
+    }
+  ],
+  "failures": [],
+  "result": "FAIL"
+}

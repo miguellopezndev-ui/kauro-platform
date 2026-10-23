@@ -1,14 +1,14 @@
 {
   "artifactKind": "MIGRATION_CORE_PROVENANCE",
   "provenanceVersion": "2",
-  "coreVersion": "3.0.0",
-  "packageVersion": "3.0.0",
+  "coreVersion": "3.1.0",
+  "packageVersion": "3.1.0",
   "packageFormatVersion": "2.1.0",
-  "sourceRegistryVersion": "2026-09-06",
+  "sourceRegistryVersion": "2026-10-22",
   "campaign": {
-    "campaignId": "c_c87b11a87f0014e3",
-    "sealedAt": "2026-10-02T12:30:16Z",
-    "subjectDigest": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505"
+    "campaignId": "c_d5743d46c84d7343",
+    "sealedAt": "2026-10-23T01:35:39Z",
+    "subjectDigest": "f2b6d153940b8b03f983b44cb33b07c2af358420e9ad37ba394df679183f69ab"
   },
   "freezeDecision": {
     "decidedBy": "tools/freeze-verdict.mjs",
@@ -271,7 +271,7 @@
       "path": "qualification/candidate/campaign.json",
       "required": true,
       "present": true,
-      "sha256": "dff2eb585d0f2130cf253a1e1ba6b8d3ca2e014ac62daa5e5c0c42ddeece5311",
+      "sha256": "611bf180761fa5fd51fff4fd974d383e0c21cbd5fbe39a2282f66942990d7dd7",
       "claim": "the campaign every measurement here belongs to"
     },
     {

@@ -128,3 +128,6 @@ export {
 } from "./served.js";
 export * from "./request/index.js";
 export * from "./bank/index.js";
+
+// Order 27A: receipt reconciliation and refund execution over simulators (activation OFF)
+export * from "./o27a/index.js";

@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
 import { AUDIT_COMMANDS, B06_COMMANDS, BRANDING_COMMANDS, B07_COMMANDS, TEAM_COMMANDS, COMMAND_OUTCOMES, EXECUTION_COMMANDS, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, RETENTION_COMMANDS, SERVED_COMMAND_IDS, SUPPORT_COMMANDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
-import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
+import { CANDIDATE_FAILURE_REASONS, DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
 import { auditRoutes, decidedBody, driveTo, fundPool, startedAudit, storeDecisionArtifact, storedCandidates, storedData } from "./audit-support.js";
 import { activate } from "./source-support.js";
@@ -293,7 +293,11 @@ test("N13: every failure site of the pipeline (transport, runtime, admission, au
       // the header selector is decided only on AGENCY_HEADER routes
       if (spec.scope !== "AGENCY_HEADER" && site.reason === "AGENCY_SELECTOR_INVALID") continue;
       if (spec.scope === "NONE" && site.reason === "PATH_ID_INVALID") continue;
-      assert.ok(outcomeOf(COMMAND_OUTCOMES[command], site.code, site.reason ?? undefined) !== null, `${command}: the failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is not in its catalogue`);
+      // a site of behaviour built against the O19A candidate (Order 20) is in the catalogue its route serves once the candidate is switched on;
+      // every other site is in the served catalogue
+      const candidateSite = site.reason !== null && (CANDIDATE_FAILURE_REASONS as ReadonlyArray<string>).includes(site.reason);
+      const catalogue = candidateSite ? (commandRouteResponses(command, spec.name, { cleanWithoutTarget: true }).outcomes ?? []) : COMMAND_OUTCOMES[command];
+      assert.ok(outcomeOf(catalogue, site.code, site.reason ?? undefined) !== null, `${command}: the failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is not in its catalogue`);
     }
   }
   assert.deepEqual([...unreachableSeen].sort(), UNREACHABLE_PIPELINE_SITES.map((u) => `${u.code}/${u.reason}`).sort(), "every named unreachable site still exists and is still unreachable");

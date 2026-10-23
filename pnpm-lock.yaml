@@ -37,6 +37,9 @@ importers:
       '@kauro/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@kauro/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@kauro/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -227,6 +230,28 @@ importers:
       '@kauro/contracts':
         specifier: workspace:*
         version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 24.3.1
+        version: 24.3.1
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
+  packages/identity:
+    dependencies:
+      '@kauro/application':
+        specifier: workspace:*
+        version: link:../application
+      '@kauro/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@kauro/domain':
+        specifier: workspace:*
+        version: link:../domain
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
     devDependencies:
       '@types/node':
         specifier: 24.3.1

@@ -36,4 +36,5 @@ export const HEALTH_CHECK_COPY = {
   "screen.health.cancel.working.body": "Cancelling. Do not repeat this step.",
   "screen.health.none.title": "No free data health check yet",
   "screen.health.none.body": "Request one from the project once its source files are confirmed and a destination is set.",
+  "screen.health.none.clean.body": "Request one from the project once its source files are confirmed. Clean your data needs no destination.",
 } as const satisfies Readonly<Record<string, string>>;

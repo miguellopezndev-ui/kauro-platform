@@ -341,7 +341,9 @@ export class PgExecutionStore implements ExecutionStore {
               (SELECT r.revision_id FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $6) AS revision_id,
               (SELECT r.state FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $6) AS revision_state,
               (SELECT t.contract_id FROM kauro.target_contracts t WHERE t.agency_id = $1 AND t.project_id = $2 AND t.body_hash = $7) AS target_contract_id,
-              EXISTS (SELECT 1 FROM kauro.target_contracts t WHERE t.agency_id = $1 AND t.project_id = $2 AND t.body_hash = $7 AND t.confirmed_at IS NOT NULL AND t.superseded_at IS NULL) AS target_current,
+              (EXISTS (SELECT 1 FROM kauro.target_contracts t WHERE t.agency_id = $1 AND t.project_id = $2 AND t.body_hash = $7 AND t.confirmed_at IS NOT NULL AND t.superseded_at IS NULL)
+               -- Order 20: a CLEAN job binds the canonical CLEAN hash and no target contract (CP-02.01, migration 0098)
+               OR ($7 = kauro.clean_only_target_hash() AND EXISTS (SELECT 1 FROM kauro.projects p WHERE p.agency_id = $1 AND p.project_id = $2 AND p.mode = 'CLEAN'))) AS target_current,
               NOT EXISTS (SELECT 1 FROM kauro.dataset_revisions r
                             JOIN kauro.sealed_revision_files s ON s.agency_id = r.agency_id AND s.revision_id = r.revision_id AND s.disposition = 'INCLUDED'
                             JOIN kauro.source_files f ON f.agency_id = s.agency_id AND f.file_id = s.file_id
@@ -542,15 +544,15 @@ export class PgExecutionStore implements ExecutionStore {
     let retentionId = existing.rows[0]?.retention_id;
     let retentionCreated = false;
     if (retentionId === undefined) {
-      const created = await execute<{ retention_id: string; version: string; client_id: string }>(
+      const created = await execute<{ retention_id: string; version: string; client_id: string; policy_version: string }>(
         this.db,
         `INSERT INTO kauro.retention_records (retention_id, agency_id, client_id, project_id, revision_id, version, class, anchor_id, anchor_evidence_hash, soft_deadline, hard_deadline,
             effective_deadline, policy_version, created_at, updated_at)
          SELECT $1, $2, p.client_id, $3, $4, 1, 'PAID_ORDINARY', a.anchor_id, a.evidence_hash, NULL, c.provider_completed_at + interval '1209600 seconds',
-                c.provider_completed_at + interval '1209600 seconds', $5, kauro.server_now(), kauro.server_now()
+                c.provider_completed_at + interval '1209600 seconds', CASE WHEN kauro.retention_r2_2_active() THEN 'R2-RETENTION-2' ELSE $5 END, kauro.server_now(), kauro.server_now()
            FROM kauro.retention_anchors a, kauro.projects p, kauro.capture_facts c
           WHERE a.agency_id = $2 AND a.anchor_id = $6 AND p.agency_id = $2 AND p.project_id = $3 AND c.agency_id = $2 AND c.capture_id = $7
-         RETURNING retention_id, version::text AS version, client_id`,
+         RETURNING retention_id, version::text AS version, client_id, policy_version`,
         [this.ctx.ids.next(), job.agencyId, job.projectId, revisionId, RETENTION_POLICY_VERSION, anchor.anchorId, job.captureId],
       );
       const record = one(created.rows, "PAID_ORDINARY retention record");
@@ -563,7 +565,8 @@ export class PgExecutionStore implements ExecutionStore {
         revisionId,
         retentionClass: "PAID_ORDINARY",
         anchorEvidenceHash: anchor.evidenceHash,
-        policyVersion: RETENTION_POLICY_VERSION,
+        // the label the database wrote: R2-RETENTION-2 once CP-01.02 is active (migration 0110), this edition's otherwise
+        policyVersion: record.policy_version,
       });
     }
     // the JOB_ATTEMPT lease at fence 1 (owner the attempt, subject the input binding, deadline the delivery deadline, cost the

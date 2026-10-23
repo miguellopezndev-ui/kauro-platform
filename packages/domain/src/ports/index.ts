@@ -229,7 +229,7 @@ export type {
   AuditUnitOfWorkFactory,
 } from "./audit-store.js";
 // the control plane's discovery of audit work (package B08, mandate B08-CONTROL-AUDIT)
-export type { AuditRef, GrantRef, AuditSource, ValidationSource, DraftValidation, ValidationSubject, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";
+export type { AuditRef, GrantRef, AuditSource, ValidationSource, DraftValidation, ValidationSubject, ValidationTarget, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";
 // import stages and their receipts (package B17: CMD040, CMD041)
 export type { ImportStageStore } from "./import-stage-store.js";
 // the stored core documents and plan bindings (package B05 L3, migration 0058)

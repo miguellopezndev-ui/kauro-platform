@@ -46,6 +46,15 @@ export const AUDIT_REQUEST_SCHEMAS = Object.freeze({
   CMD024: schema("CMD024", ["expectedVersion", "planHash"], { expectedVersion: VERSION, planHash: HASH }),
 } as const);
 
+/**
+ * The candidate StartAudit (CP-02.01, O19A build contract; Order 20): targetContractId is optional, because the project mode decides — CLEAN
+ * names none, HUBSPOT and SALESFORCE must (the handler answers TARGET_CONTRACT_REQUIRED, the closed schema cannot say "required unless
+ * CLEAN"). Compiled in place of CMD020 only when the deployment switched the candidate on (createSchemaValidator).
+ */
+export const CANDIDATE_CLEAN_REQUEST_SCHEMAS = Object.freeze({
+  CMD020: schema("CMD020", ["auditPolicyVersion"], { targetContractId: ID, auditPolicyVersion: LABEL }),
+} as const);
+
 export type AuditRequestSchemaCommand = keyof typeof AUDIT_REQUEST_SCHEMAS;
 export type AuditRequestSchemaId = `${typeof REQUEST_SCHEMA_PREFIX}${AuditRequestSchemaCommand}`;
 

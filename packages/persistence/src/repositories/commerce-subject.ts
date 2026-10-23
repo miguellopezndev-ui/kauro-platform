@@ -16,6 +16,7 @@
  * grants of 0013); a subject whose agency or project is not visible reads as null (it binds nothing).
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
+import { CLEAN_ONLY_TARGET_HASH } from "@kauro/domain";
 import type { AgencyId, AgencyState, ApprovalId, CapabilityId, PlanId, ProjectId, ServiceMode } from "@kauro/domain";
 import { execute, instant, type Queryable } from "../sql.js";
 import { awaitTransition } from "./tenancy.js";
@@ -82,10 +83,12 @@ export class PgPurchasedSubjects {
       const row = (await execute<{ state: string }>(this.db, "SELECT state FROM kauro.dataset_revisions WHERE agency_id = $1 AND revision_id = $2", [quote.agencyId, revisionId])).rows[0];
       revision = row === undefined ? null : { state: row.state };
     }
-    const contractId = (
-      await execute<{ contract_id: string }>(this.db, "SELECT contract_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND body_hash = $3", [quote.agencyId, quote.projectId, quote.targetContractHash])
-    ).rows[0]?.contract_id;
-    let target: PurchasedSubjectFacts["target"] = null;
+    // a CLEAN quote binds the canonical CLEAN hash and no target contract (Order 20, CP-02.01): that binding is always current, and no row is read
+    const cleanBinding = quote.mode === "CLEAN" && quote.targetContractHash === CLEAN_ONLY_TARGET_HASH;
+    const contractId = cleanBinding
+      ? undefined
+      : (await execute<{ contract_id: string }>(this.db, "SELECT contract_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND body_hash = $3", [quote.agencyId, quote.projectId, quote.targetContractHash])).rows[0]?.contract_id;
+    let target: PurchasedSubjectFacts["target"] = cleanBinding ? { confirmed: true, superseded: false } : null;
     if (contractId !== undefined) {
       await awaitTransition(this.db, "kauro.target_contracts", contractId);
       const row = (

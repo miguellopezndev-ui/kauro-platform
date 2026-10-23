@@ -61,7 +61,8 @@ export type TargetDriftPath = (typeof TARGET_DRIFT_PATHS)[number];
 export interface AuditView {
   readonly auditId: string;
   readonly revisionId: string;
-  readonly targetContractId: string;
+  /** Absent for a CLEAN audit under the candidate activation (CP-02.01); the in-force view always carries it. */
+  readonly targetContractId?: string;
   readonly state: AuditState;
   readonly version: number;
   readonly startedAt: UtcInstant;

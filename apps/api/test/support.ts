@@ -36,7 +36,7 @@ import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, LateFailureSink, OutreachSealer, ProviderCallTimer, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
 import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeReadSigner, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
-import type { BankCreditClassifier, BankEvidenceStore, DestinationFingerprinter } from "@kauro/application";
+import type { CandidateActivation, BankCreditClassifier, BankEvidenceStore, DestinationFingerprinter } from "@kauro/application";
 
 /**
  * The bank collaborators a world binds after start-up (read at call time by the api): the restricted evidence store (bankWorld binds its
@@ -611,6 +611,8 @@ export interface WorldOptions {
    * assembly. Absent: the test plan services, which every B06 acceptance test binds.
    */
   readonly realPlanServices?: boolean;
+  /** Order 20: the behaviour built against the O19A candidate the api switches on (CLEAN without a target); absent, the in-force behaviour. */
+  readonly candidate?: CandidateActivation;
 }
 
 export interface RawEvent {
@@ -659,7 +661,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   }
   const holds = new HoldPoints();
   const stats: UnitOfWorkStats = { runs: 0 };
-  const validator = loadContractSchemas();
+  const validator = loadContractSchemas(options.candidate);
   const plans = testPlanServices(holds);
   const tokens = new Map<string, AuthenticatedSubject>();
   const internalErrors: Array<{ correlationId: string; error: unknown }> = [];
@@ -714,6 +716,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     ...(payments !== null ? { payments: payments.service } : {}),
     ...(commissions !== null ? { commissions: commissions.binding } : {}),
     ...(options.cores !== undefined ? { cores: options.cores } : {}),
+    ...(options.candidate !== undefined ? { candidate: options.candidate } : {}),
     validator,
     clock: apiClock,
     ids,

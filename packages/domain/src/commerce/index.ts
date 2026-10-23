@@ -183,3 +183,11 @@ export { OUTBOUND_ATTEMPT_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_EVENT_TYPES, OUTBOUN
 
 export type { DestinationInput, NormalizedDestination, DestinationNormalization, FingerprintParameters } from "./destination.js";
 export { normalizeDestination, canonicalDestinationMessage, DESTINATION_FINGERPRINT_DOMAIN, HOLDER_NAME_MAX_CODE_POINTS } from "./destination.js";
+
+// Order 27A (offline, simulators only; every activation OFF: o27a-flags.ts)
+export * from "./o27a-flags.js";
+export * from "./o27a-fedach-calendar.js";
+export * from "./o27a-pending-hold.js";
+export * from "./o27a-receipts.js";
+export * from "./o27a-refund-execution.js";
+export * from "./o27a-invoice-rules.js";

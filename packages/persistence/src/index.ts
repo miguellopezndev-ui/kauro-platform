@@ -185,3 +185,5 @@ export { PgOutreachSenders, type SenderRecord, type RegisterSenderInput } from "
 // package B12 (lane L-ACT): CMD064, the reads, the diagnosis and the public opt-out (plan §2)
 export { PgActivityStore, PgOptOutStore, outreachActivityOf, OUTREACH_SERVICE_ID } from "./repositories/commercial-activity.js";
 export type { ActivityRequest, ActivityRow, MetricsRow, DiagnosisRequest } from "./repositories/commercial-activity.js";
+// Order 22 (seller money, retainer, claim refusals and reviews; migration 0120): candidate, activation OFF
+export { PgO22Repository, o22Of, type ClaimRow, type RefusalRow, type ReviewRow, type DecisionEntryRow, type RetainerAccrualRow } from "./o22-access.js";

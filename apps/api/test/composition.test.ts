@@ -124,7 +124,15 @@ test("configuration: every variable is validated and a missing or malformed one 
     cursorKeyFile: null,
     identity: null,
     publicApi: null,
+    candidate: { cleanWithoutTarget: false },
   });
+  // Order 20: the O19A candidate's CLEAN-without-target is OFF unless switched on, and only LOCAL accepts the switch until Order 19B adopts it
+  assert.deepEqual(loadConfig(envOf({ KAURO_CANDIDATE_CLEAN_NO_TARGET: "true" })).candidate, { cleanWithoutTarget: true });
+  assert.deepEqual(loadConfig(envOf({ KAURO_CANDIDATE_CLEAN_NO_TARGET: "false" })).candidate, { cleanWithoutTarget: false });
+  assert.throws(() => loadConfig(envOf({ KAURO_CANDIDATE_CLEAN_NO_TARGET: "yes" })), configError("KAURO_CANDIDATE_CLEAN_NO_TARGET"));
+  for (const environment of ["SANDBOX", "LIVE"]) {
+    assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_CANDIDATE_CLEAN_NO_TARGET: "true" })), configError("KAURO_CANDIDATE_CLEAN_NO_TARGET"), environment);
+  }
 });
 
 test("authentication of this edition: the LOCAL bearer-token file is a closed document; SANDBOX and LIVE refuse to start without the Identity Platform verifier (I-INT-3)", () => {
