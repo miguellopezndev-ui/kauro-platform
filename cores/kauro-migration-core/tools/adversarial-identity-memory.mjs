@@ -161,6 +161,10 @@ for (const testCase of chosen) {
     configVersion: '3.0.0',
     source: { system: 'generic_csv', namespace: `adv-${testCase.id.toLowerCase()}` },
     target: { mode: 'CLEAN_ONLY', importMode: 'CREATE_ONLY' },
+    // Above the shipped per-file input limits, as the capacity ladder does: the default `maxRowsPerSheet` (250,000) counts
+    // the header record, so it refuses a file of 250,000 leads with INPUT_LIMIT_EXCEEDED before identity is ever reached,
+    // and the subject here is the identity group limit, not the input limit. The first Linux run at scale 1 stopped there.
+    limits: { maxRowsPerSheet: 2_000_000, maxBytesPerFile: 4_294_967_296, maxTotalBytes: 17_179_869_184 },
     files,
     records,
   };
