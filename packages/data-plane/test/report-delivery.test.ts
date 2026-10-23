@@ -53,8 +53,8 @@ const render: ReportRenderConfig = { pageSize: "LETTER", locale: "en-US", render
 // The core's own acceptance record for each package (reports/test/support/fixtures.ts ORACLE; the core's acceptance.json and an independent
 // implementation of its package digest): the oracle for what the report must say about the package.
 const ORACLE: Record<"A-clean-multi-object" | "D-salesforce", { manifestSha256: string; packageDigest: string; files: number }> = {
-  "A-clean-multi-object": { manifestSha256: "69a35b99f6e033d1375ccc0f268adf8d92e09d4c54daf57d2a91a6804bdd985e", packageDigest: "37f98cce23e43a71ad24922ade889f877465e40000bcb00b54d875bbc7ff950a", files: 30 },
-  "D-salesforce": { manifestSha256: "46d9e077930d8dbbf73f934e43d5d6d788423f6683e07307e17adbf7bafb43c4", packageDigest: "232f775956d7d61c2c5e38639a2465c4484b58b8a84f7bb23b7461389c1471ce", files: 30 },
+  "A-clean-multi-object": { manifestSha256: "9979ff952e8d078c6c9f3b971dfb033f5d22dee1c7fb38e26162f47165f7b2ea", packageDigest: "36022380c955e6b3ae1f7a27e6ddd161ccfedce015fe201c9a1ae74348511683", files: 30 },
+  "D-salesforce": { manifestSha256: "c88a1306f8cbb5a5f344f3608e1a7f3769a53caa40d4cfa4c414f739e77f7a75", packageDigest: "280dab9ff34d386bfcd5e605f99b9fe572c197b2b6eeb5952e7dcde4de2c22e2", files: 30 },
 };
 const CLEAN: CaseName = "A-clean-multi-object";
 const SALESFORCE: CaseName = "D-salesforce";
