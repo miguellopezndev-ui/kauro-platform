@@ -1627,3 +1627,16 @@ express. The Salesforce step refuses a child paired with more than one Account,
 and says it is manual: no linked file and no Id is generated. The adapters'
 `operatorInstructions` and the source registry's HubSpot common-column decision,
 which still carried the 3.0.0 wording, say the same.
+
+Amended after the 3.1.0 qualification (Order 18A, BLK-MC; wording only, nothing
+in the engine changed): "These change the bytes of packages that have a
+duplicate lead or a declared relationship" understates it. Every package's
+`coreVersion`, `sourceRegistryVersion` and run id take the core version, so every
+association key value moves with 3.1.0, in every package, whatever its rows
+(`docs/work/N1-1_MIGRATION_CORE.md` §5). And "a sheet holds at most 250,000 rows
+by default" counts the header: `maxRowsPerSheet` bounds the records a reader
+produces, header included, so a default CSV holds at most 249,999 data rows
+(`src/ingest/csv-reader.ts`). The qualification's limit cases lift the input limits
+for that reason (`tools/adversarial-identity-memory.mjs`), and with them lifted
+250,001 leads sharing one email, one phone or one full name each stop the run
+with `IDENTITY_GROUP_TOO_LARGE` (`docs/qualification/mc31/` in the monorepo).

@@ -107,7 +107,9 @@ to have seen:
 - Each sheet in `manifest.json` carries `readerRowCount`, `dataRowCount` and
   `rejectedRowCount`. `readerRowCount = dataRowCount + rejectedRowCount`: data
   rows are the rows read as well-formed rows of their sheet, rejected rows are the
-  ones that were not. `SOURCE_ROWS` — `reconciliation.json`'s `sourceRows.total`,
+  ones that were not, plus every row of a file an `EXCLUDE_ONE` occurrence
+  decision excludes (`INGEST_OCCURRENCE_EXCLUDED`), well formed or not: an
+  excluded file's sheets carry `dataRowCount` 0. `SOURCE_ROWS` — `reconciliation.json`'s `sourceRows.total`,
   and the number of lines of `source-lineage.csv` — is the sum of
   `readerRowCount` over every sheet, so it counts rejected rows too. Comparing it
   with the sum of `dataRowCount` alone fails for every package that holds a
