@@ -1,7 +1,7 @@
 # Order 15: authorization, roles, sellers, owner and tenant isolation
 
 Branch `order15/security-authorization`, started from `main` at `3f6a8d32d32fe7d65888545a9b43960d97f13f53` (PR #118 merged) and rebased onto
-`main` at `da68c19862f8ff0e448dac36edc34d55fa3dfef4` (PRs #119 to #123 merged; none of them touches the files below). Final SHA: the PR head.
+`main` at `4faf8248` (PRs #119 to #123 and #126 merged; none of them touches the files below). Final SHA: the PR head.
 Scope: authorization and the authentication bound to it, permissions, isolation between agencies, and the security of the existing routes.
 Out of scope by the order: `cores/kauro-migration-core/` (Order 13), `cores/kauro-intelligence-core/`, `packages/reports/` and the package
 reader (Order 14), and design files owned by other sessions. None of them is touched (see "Non-interference").
