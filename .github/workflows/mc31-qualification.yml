@@ -1,0 +1,456 @@
+name: mc31-qualification
+
+# Order 18A / BLK-MC: the Migration Core 3.1.0 campaigns that do not fit the shared Windows host (capacity at a million rows,
+# adversarial identity at the declared group limit, the whole sabotage corpus, the suite and gate steps on Linux, the full
+# offline universe) and, for O26A, the Intelligence Core gate. Temporary: lives only on qual/** branches, never on main.
+# Which jobs run is chosen by the head commit message: [mc-campaigns] and/or [ic-gate].
+
+on:
+  push:
+    branches: ['qual/**']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CORE: cores/kauro-migration-core
+  EVIDENCE: /home/runner/evidence
+
+jobs:
+  capacity:
+    name: capacity ${{ matrix.profile }}
+    if: contains(github.event.head_commit.message, '[mc-campaigns]') || contains(github.event.head_commit.message, '[mc-capacity]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [FOUNDING-CLEAN-ONLY-1M, FOUNDING-HUBSPOT-1M, FOUNDING-SALESFORCE-1M]
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Free disk and place the scratch on the largest volume
+        run: |
+          set -eu
+          df -B1 / /mnt || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          df -B1 / /mnt || true
+          root_free=$(df -B1 --output=avail / | tail -1)
+          mnt_free=$(df -B1 --output=avail /mnt 2>/dev/null | tail -1 || echo 0)
+          if [ "${mnt_free:-0}" -gt "$root_free" ]; then base=/mnt; else base=/home/runner/scratch; fi
+          sudo mkdir -p "$base/capacity"
+          sudo chown -R "$(id -u):$(id -g)" "$base"
+          mkdir -p "$CORE/bench"
+          ln -s "$base/capacity" "$CORE/bench/capacity"
+          echo "SCRATCH_BASE=$base" >> "$GITHUB_ENV"
+          echo "scratch on $base"; df -B1 "$base"
+      - name: Install and build the core
+        working-directory: ${{ env.CORE }}
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Capacity founding, both passes
+        working-directory: ${{ env.CORE }}
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          ( while true; do echo "== $(date -u +%FT%TZ)"; free -b; df -B1 "$SCRATCH_BASE" | tail -1; sleep 60; done ) > "$EVIDENCE/host-${{ matrix.profile }}.log" 2>&1 &
+          sampler=$!
+          start=$(date +%s)
+          /usr/bin/time -v node tools/capacity.mjs --profile "${{ matrix.profile }}" --rows 1000000 --founding \
+            > "$EVIDENCE/capacity-${{ matrix.profile }}.log" 2> "$EVIDENCE/capacity-${{ matrix.profile }}.stderr.log"
+          status=$?
+          kill "$sampler" || true
+          echo "exit $status after $(( $(date +%s) - start )) s" | tee -a "$EVIDENCE/capacity-${{ matrix.profile }}.log"
+          tail -30 "$EVIDENCE/capacity-${{ matrix.profile }}.log"; tail -40 "$EVIDENCE/capacity-${{ matrix.profile }}.stderr.log"
+          exit "$status"
+      - name: Collect evidence
+        if: always()
+        working-directory: ${{ env.CORE }}
+        run: |
+          mkdir -p "$EVIDENCE/qualification-capacity" "$EVIDENCE/bench"
+          cp qualification/capacity/*.json "$EVIDENCE/qualification-capacity/" || true
+          cp bench/capacity/ladder.json "$EVIDENCE/bench/" || true
+          cp -r bench/capacity/logs "$EVIDENCE/bench/" || true
+          git status --porcelain > "$EVIDENCE/git-status.txt"; git rev-parse HEAD > "$EVIDENCE/commit.txt"
+          ls -la "$EVIDENCE"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: capacity-${{ matrix.profile }}
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
+
+  capacity-matrix:
+    name: capacity profile matrix P1-P14 at the 1M rung
+    if: contains(github.event.head_commit.message, '[mc-matrix]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Free disk and place the scratch on the largest volume
+        run: |
+          set -eu
+          df -B1 / /mnt || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          df -B1 / /mnt || true
+          root_free=$(df -B1 --output=avail / | tail -1)
+          mnt_free=$(df -B1 --output=avail /mnt 2>/dev/null | tail -1 || echo 0)
+          if [ "${mnt_free:-0}" -gt "$root_free" ]; then base=/mnt; else base=/home/runner/scratch; fi
+          sudo mkdir -p "$base/capacity"
+          sudo chown -R "$(id -u):$(id -g)" "$base"
+          mkdir -p "$CORE/bench"
+          ln -s "$base/capacity" "$CORE/bench/capacity"
+          echo "SCRATCH_BASE=$base" >> "$GITHUB_ENV"
+          echo "scratch on $base"; df -B1 "$base"
+      - name: Install and build the core
+        working-directory: ${{ env.CORE }}
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Capacity matrix, one invocation
+        working-directory: ${{ env.CORE }}
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          ( while true; do echo "== $(date -u +%FT%TZ)"; free -b; df -B1 "$SCRATCH_BASE" | tail -1; sleep 60; done ) > "$EVIDENCE/host-MATRIX.log" 2>&1 &
+          sampler=$!
+          start=$(date +%s)
+          /usr/bin/time -v node tools/capacity.mjs --profile P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12,P13,P14 --rows 1000000 --matrix \
+            > "$EVIDENCE/capacity-MATRIX.log" 2> "$EVIDENCE/capacity-MATRIX.stderr.log"
+          status=$?
+          kill "$sampler" || true
+          echo "exit $status after $(( $(date +%s) - start )) s" | tee -a "$EVIDENCE/capacity-MATRIX.log"
+          tail -30 "$EVIDENCE/capacity-MATRIX.log"; tail -40 "$EVIDENCE/capacity-MATRIX.stderr.log"
+          exit "$status"
+      - name: Collect evidence
+        if: always()
+        working-directory: ${{ env.CORE }}
+        run: |
+          mkdir -p "$EVIDENCE/qualification-capacity" "$EVIDENCE/bench"
+          cp qualification/capacity/*.json "$EVIDENCE/qualification-capacity/" || true
+          cp bench/capacity/ladder.json "$EVIDENCE/bench/" || true
+          cp -r bench/capacity/logs "$EVIDENCE/bench/" || true
+          git status --porcelain > "$EVIDENCE/git-status.txt"; git rev-parse HEAD > "$EVIDENCE/commit.txt"
+          ls -la "$EVIDENCE"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: capacity-MATRIX
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
+
+  adversarial:
+    name: adversarial identity L1-L5 at scale 1
+    if: contains(github.event.head_commit.message, '[mc-campaigns]') || contains(github.event.head_commit.message, '[mc-adversarial]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install and build the core
+        working-directory: ${{ env.CORE }}
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Cases L1-L5, scale 1
+        working-directory: ${{ env.CORE }}
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          ( while true; do echo "== $(date -u +%FT%TZ)"; free -b; sleep 30; done ) > "$EVIDENCE/host-adversarial.log" 2>&1 &
+          sampler=$!
+          node tools/adversarial-identity-memory.mjs --out "$EVIDENCE/adversarial-identity-memory.json" 2>&1 | tee "$EVIDENCE/adversarial-identity-memory.log"
+          status=${PIPESTATUS[0]}
+          kill "$sampler" || true
+          exit "$status"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: adversarial-identity-memory
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
+
+  sabotage:
+    name: sabotage shard ${{ matrix.shard }} of 10 (whole suite)
+    if: contains(github.event.head_commit.message, '[mc-campaigns]') || contains(github.event.head_commit.message, '[mc-sabotage]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install and build the core
+        working-directory: ${{ env.CORE }}
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Mutations of this shard, whole suite each
+        working-directory: ${{ env.CORE }}
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          all=$(grep -oE "^\s+id: 'M[0-9]+'" tools/sabotage.mjs | sed -E "s/.*'(M[0-9]+)'/\1/")
+          count=$(echo "$all" | wc -l)
+          echo "declared mutations: $count"
+          [ "$count" -eq 134 ] || { echo "expected 134 declared mutations"; exit 2; }
+          ids=$(echo "$all" | awk -v s=${{ matrix.shard }} '(NR-1)%10==s' | paste -sd, -)
+          echo "shard ${{ matrix.shard }}: $ids" | tee "$EVIDENCE/sabotage-shard-${{ matrix.shard }}.ids"
+          node tools/sabotage.mjs --only "$ids" --evidence "$EVIDENCE/sabotage-shard-${{ matrix.shard }}.json" 2>&1 | tee "$EVIDENCE/sabotage-shard-${{ matrix.shard }}.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sabotage-shard-${{ matrix.shard }}
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
+
+  linux-suite:
+    name: suite, gate steps, pack and cross-OS probe on Linux
+    if: contains(github.event.head_commit.message, '[mc-campaigns]') || contains(github.event.head_commit.message, '[mc-linux]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install
+        working-directory: ${{ env.CORE }}
+        run: npm ci --no-audit --no-fund
+      - name: Gate and the steps the gate omits
+        working-directory: ${{ env.CORE }}
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          summary="$EVIDENCE/linux-steps.txt"
+          : > "$summary"
+          failed=0
+          step() {
+            local name=$1; shift
+            local at=$(date +%s)
+            "$@" > "$EVIDENCE/step-$name.log" 2>&1
+            local status=$?
+            echo "$name exit=$status seconds=$(( $(date +%s) - at ))" | tee -a "$summary"
+            [ "$status" -eq 0 ] || failed=1
+            return 0
+          }
+          info() {
+            local name=$1; shift
+            "$@" > "$EVIDENCE/step-$name.log" 2>&1
+            echo "$name exit=$? (informational)" | tee -a "$summary"
+          }
+          step gate npm run gate
+          grep -E "^SUMMARY" "$EVIDENCE/step-gate.log" | tee -a "$summary"
+          cp tmp/test-results.tap "$EVIDENCE/test-results.tap" || true
+          step acceptance-unchanged bash -c 'test -z "$(git status --porcelain -- acceptance spec)"'
+          step provenance-check npm run provenance:check
+          step drift npm run drift
+          step evidence-selftest node tools/evidence-selftest.mjs
+          step campaign-check npm run campaign:check
+          step sabotage-preflight node tools/sabotage.mjs --preflight
+          info architecture npm run architecture
+          info release-candidate npm run release-candidate
+          step pack-1 node tools/pack.mjs --out "$RUNNER_TEMP/pack1"
+          step pack-2 node tools/pack.mjs --out "$RUNNER_TEMP/pack2"
+          sha256sum "$RUNNER_TEMP"/pack1/*.tgz "$RUNNER_TEMP"/pack2/*.tgz | tee -a "$summary"
+          cp "$EVIDENCE/step-pack-1.log" "$EVIDENCE/pack-linux.json"
+          step probe-kolkata node tools/determinism-cross-os.mjs --probe --out "$EVIDENCE/cross-os-probe-linux-kolkata.json" --tz Asia/Kolkata --lang de_DE.UTF-8
+          step probe-la node tools/determinism-cross-os.mjs --probe --out "$EVIDENCE/cross-os-probe-linux-la.json" --tz America/Los_Angeles --lang en_US.UTF-8
+          step compare-win-la-linux-kolkata node tools/determinism-cross-os.mjs --compare ../../docs/qualification/mc31/evidence/cross-os-probe-win32-la.json "$EVIDENCE/cross-os-probe-linux-kolkata.json" --out "$EVIDENCE/determinism-cross-os-win-la-linux-kolkata.json"
+          step compare-linux-la-win-kolkata node tools/determinism-cross-os.mjs --compare "$EVIDENCE/cross-os-probe-linux-la.json" ../../docs/qualification/mc31/evidence/cross-os-probe-win32-kolkata.json --out "$EVIDENCE/determinism-cross-os-linux-la-win-kolkata.json"
+          git status --porcelain > "$EVIDENCE/git-status.txt"; git rev-parse HEAD > "$EVIDENCE/commit.txt"
+          node --version > "$EVIDENCE/node-version.txt"
+          cat "$summary"
+          exit "$failed"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-suite
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
+
+  universe:
+    name: offline universe (full, incl. whole sabotage) on Linux
+    if: contains(github.event.head_commit.message, '[mc-campaigns]') || contains(github.event.head_commit.message, '[mc-universe]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install and build
+        working-directory: ${{ env.CORE }}
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: Universe
+        working-directory: ${{ env.CORE }}
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          node tools/universe.mjs --report "$EVIDENCE/universe.json" 2>&1 | tee "$EVIDENCE/universe.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: universe
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
+
+  ic-sabotage:
+    name: Intelligence Core sabotage shard ${{ matrix.shard }} of 12
+    if: contains(github.event.head_commit.message, '[ic-gate]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    defaults:
+      run:
+        working-directory: cores/kauro-intelligence-core
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+        working-directory: .
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Sabotage shard (QUALIFICATION-SHARD, whole suite per mutation)
+        run: node tools/sabotage.mjs --shard ${{ matrix.shard }}/12
+      - name: The working tree is unchanged after sabotage
+        run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
+      - name: Keep the shard report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ic-sabotage-shard-${{ matrix.shard }}
+          path: cores/kauro-intelligence-core/tmp/sabotage-shard-${{ matrix.shard }}-of-12.json
+          if-no-files-found: error
+          retention-days: 30
+
+  ic-gate:
+    name: Intelligence Core gate (sabotage merged from the 12 shards)
+    needs: ic-sabotage
+    if: always() && contains(github.event.head_commit.message, '[ic-gate]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: cores/kauro-intelligence-core
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+        working-directory: .
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Fetch the shard reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: ic-sabotage-shard-*
+          path: ${{ runner.temp }}/shards
+          merge-multiple: true
+      - name: Gate steps, merge, architecture
+        run: |
+          set +e -u
+          mkdir -p "$EVIDENCE"
+          summary="$EVIDENCE/ic-steps.txt"; : > "$summary"; failed=0
+          step() { local name=$1; shift; "$@" > "$EVIDENCE/ic-$name.log" 2>&1; local s=$?; echo "$name exit=$s" | tee -a "$summary"; [ "$s" -eq 0 ] || failed=1; return 0; }
+          step install npm ci --ignore-scripts --no-audit --no-fund
+          step build npm run build
+          step typecheck npm run typecheck
+          step contracts npm run contracts:check
+          step design npm run design:check
+          step test npm run test
+          grep -E "^ℹ (tests|pass|fail|skipped)|^TEST FILES" "$EVIDENCE/ic-test.log" | tee -a "$summary"
+          step consumer npm run consumer:check
+          step merge node tools/sabotage-merge.mjs --shards 12 --dir "$RUNNER_TEMP/shards" --out tmp/sabotage-report.json --expect-commit "$GITHUB_SHA"
+          cp tmp/sabotage-report.json "$EVIDENCE/ic-sabotage-report.json" || true
+          step architecture node tools/architecture-gate.mjs --out "$EVIDENCE/ic-architecture-gate.json" --sabotage-report tmp/sabotage-report.json
+          grep -E "^  [a-z_]+ +(true|false)|ARCHITECTURE_CLOSED" "$EVIDENCE/ic-architecture.log" | tee -a "$summary"
+          git status --porcelain > "$EVIDENCE/git-status.txt"; git rev-parse HEAD > "$EVIDENCE/commit.txt"
+          cat "$summary"
+          exit "$failed"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ic-gate
+          path: ${{ env.EVIDENCE }}
+          retention-days: 30
