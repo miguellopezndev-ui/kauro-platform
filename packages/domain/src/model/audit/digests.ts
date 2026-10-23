@@ -7,7 +7,7 @@
  * digests.
  */
 import type { Sha256Hex } from "@kauro/contracts";
-import { canonicalBytes, rawDigest } from "@kauro/contracts";
+import { DOMAINS, canonicalBytes, rawDigest, structuredDigest } from "@kauro/contracts";
 import type { DecisionArtifactKind } from "./records.js";
 
 export const AUDIT_DIGEST_DOMAINS = Object.freeze({
@@ -78,3 +78,10 @@ export function modelTaskCheckpointOf(task: PlannedModelTask): Sha256Hex {
   };
   return rawDigest(canonicalBytes({ domain: AUDIT_DIGEST_DOMAINS.MODEL_TASK_CHECKPOINT, version: 1, payload }));
 }
+
+/**
+ * The canonical target hash of "Clean your data" (CP-01.01, CP-02.01; Order 20): a CLEAN project's audit, plan, approval and quote bind
+ * this KAURO_PLAN_BODY_V1 digest of `{ cleanOnlyTarget: true }` as their targetContractHash and name no target contract. It is the hash the
+ * Intelligence adapter's plan compiler gives a CLEAN_ONLY draft; migration 0097's kauro.clean_only_target_hash() states the same value.
+ */
+export const CLEAN_ONLY_TARGET_HASH: Sha256Hex = structuredDigest(DOMAINS.PLAN_BODY, 1, { cleanOnlyTarget: true });

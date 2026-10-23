@@ -703,6 +703,66 @@ test("R2-126: a restored earlier deadline never deletes data promised by a journ
   }
 });
 
+// Order 21, CP-01.02 (activation OFF in the product; switched on here, in the primary before its backup, as its activation migration
+// will): a free check's journaled extension to seal + 17 days is replayed before the restored database's retention cleanup, so a backup
+// whose record ends at seal + 14 days never deletes the data the extension promised, and nothing past the extended end comes back.
+test("O21 CP-01.02: a restored UNPAID record keeps the end its journaled extension promised (seal + 17 days) through the cleanup", { timeout: 600_000 }, async () => {
+  const setSwitch = (c: SqlClient, on: boolean) => c.query(`CREATE OR REPLACE FUNCTION kauro.retention_r2_2_active() RETURNS boolean LANGUAGE sql STABLE SET search_path = pg_catalog AS $$ SELECT ${on ? "true" : "false"} $$`);
+  await setSwitch(w.h.oracle, true);
+  try {
+    const A = await w.agency("rs-unpaid");
+    const s = await w.subject(A, "rs-unpaid-kept");
+    const unpaidSql = "SELECT retention_id, state, hard_deadline, extended_hard_deadline, effective_deadline, version::text AS version FROM kauro.retention_records WHERE revision_id = $1 AND class = 'UNPAID'";
+    type UnpaidRow = { retention_id: string; state: string; hard_deadline: Date; extended_hard_deadline: Date | null; effective_deadline: Date; version: string };
+    const [before] = (await w.h.oracle.query<UnpaidRow>(unpaidSql, [s.revisionId])).rows;
+    assert.ok(before !== undefined && before.extended_hard_deadline === null, "the free check's UNPAID record, not extended");
+    const file = backup("unpaid");
+    // after the backup: the free check's one extension (three days), then the clock past its 14 days but before its 17
+    const terms = (await w.h.oracle.query<{ terms_version: string }>("SELECT terms_version FROM kauro.agencies WHERE agency_id = $1", [A.agencyId])).rows[0]!.terms_version;
+    await w.units.runSource(w.h.tenant(A.agencyId, A.ownerUserId), async (uow) => {
+      const retention = uow.sources.retention;
+      const record = (await retention.lockUnpaidRecordsOfProject(s.projectId)).find((r) => r.state === "ACTIVE");
+      assert.ok(record !== undefined);
+      const extensionId = uow.ids.next() as RetentionExtensionId;
+      const { extension, record: moved } = await retention.extendUnpaidHardDeadline({ extensionId, retentionId: record.retentionId as RetentionId, expectedVersion: record.version, requestedSeconds: 259_200, purpose: "CLIENT_REVIEW", termsVersion: terms, membershipId: A.ownerMembershipId });
+      await uow.events.publish({
+        aggregateKind: "retention_record",
+        aggregateId: moved.retentionId,
+        aggregateVersion: moved.version,
+        agencyId: moved.agencyId,
+        eventType: "retention_record.extended.v1",
+        actor: { kind: "USER", userId: A.ownerUserId },
+        causationId: ids.next() as CausationId,
+        correlationId: ids.next() as CorrelationId,
+        payload: { retentionId: moved.retentionId, agencyId: moved.agencyId, projectId: moved.projectId, ...(moved.revisionId === undefined ? {} : { revisionId: moved.revisionId }), extensionId, retentionClass: moved.class, requestedSeconds: extension.requestedSeconds, grantedSeconds: extension.grantedSeconds, cappedAtHardDeadline: extension.cappedAtHardDeadline },
+      });
+    });
+    const toPast = Math.ceil((before.hard_deadline.getTime() - Date.now()) / 1000) + 3_600 - w.units.offsetSeconds;
+    if (toPast > 0) w.advance(toPast);
+    await w.plane.sweepers.retention.sweep(w.units, 200);
+    assert.equal((await w.h.oracle.query<UnpaidRow>(unpaidSql, [s.revisionId])).rows[0]!.state, "ACTIVE", "past 14 days, the extension keeps the live record");
+    await journalNow();
+    const r = await restore(file, "unpaid");
+    try {
+      const due = await oracleOf<{ past: boolean }>(r, `SELECT effective_deadline <= now() + make_interval(secs => ${w.units.offsetSeconds}) AS past FROM kauro.retention_records WHERE revision_id = $1 AND class = 'UNPAID'`, [s.revisionId]);
+      assert.equal(due[0]!.past, true, "the restored record's end (seal + 14 days) is already past");
+      const runner = runnerFor(r);
+      const c = await runner.prepare(`local:${r.name}`);
+      await authorize(c.candidateId, c.deletionJournalHash);
+      const done = await runner.run(c.candidateId, c.plan, r);
+      assert.equal(done.kind, "RELEASED", JSON.stringify(done));
+      const [after] = await oracleOf<UnpaidRow>(r, unpaidSql, [s.revisionId]);
+      assert.equal(after?.state, "ACTIVE", "the journaled extension was replayed before the cleanup: the promised data is kept");
+      assert.equal(after?.extended_hard_deadline?.getTime(), before.hard_deadline.getTime() + 259_200_000, "the moved hard deadline is seal + 17 days");
+      assert.equal(after?.effective_deadline.getTime(), before.hard_deadline.getTime() + 259_200_000);
+    } finally {
+      await r.stop();
+    }
+  } finally {
+    await setSwitch(w.h.oracle, false);
+  }
+});
+
 // last of all: its deletion tombstone has no writer here (L3), so every later restore stops at it, fail closed
 test("S065: a membership revoked and a project deleted after the backup stay revoked and deleted before any request", { timeout: 600_000 }, async () => {
   const A = await w.agency("rs-s065");

@@ -1,0 +1,141 @@
+{
+ "scale10": {
+  "gate": "O18A-ADVERSARIAL-IDENTITY-MEMORY",
+  "coreVersion": "3.1.0",
+  "scale": 10,
+  "limit": 250000,
+  "meaningful": false,
+  "memoryBudgetBytes": 6012954214,
+  "heapFlag": "--max-old-space-size=8192",
+  "environment": {
+   "platform": "win32",
+   "arch": "x64",
+   "release": "10.0.26300",
+   "cpus": 12,
+   "totalMemoryBytes": 14893805568,
+   "node": "v24.20.0"
+  },
+  "results": [
+   {
+    "id": "L1",
+    "expected": "COMPLETED",
+    "sourceRows": 25000,
+    "outcome": "COMPLETED",
+    "code": null,
+    "exitStatus": 0,
+    "wallMs": 20283,
+    "peakRssBytes": 471670784,
+    "cpuUserMicroseconds": 13171000,
+    "cpuSystemMicroseconds": 1859000,
+    "clusters": [
+     {
+      "object": "LEAD",
+      "signal": "EMAIL_EXACT",
+      "members": 25000
+     }
+    ],
+    "details": null,
+    "problems": [],
+    "result": "PASS"
+   },
+   {
+    "id": "L3",
+    "expected": "COMPLETED",
+    "sourceRows": 50000,
+    "outcome": "COMPLETED",
+    "code": null,
+    "exitStatus": 0,
+    "wallMs": 36159,
+    "peakRssBytes": 593649664,
+    "cpuUserMicroseconds": 26531000,
+    "cpuSystemMicroseconds": 3078000,
+    "clusters": [
+     {
+      "object": "CONTACT",
+      "signal": "EMAIL_EXACT",
+      "members": 25000
+     },
+     {
+      "object": "LEAD",
+      "signal": "EMAIL_EXACT",
+      "members": 25000
+     }
+    ],
+    "details": null,
+    "problems": [],
+    "result": "PASS"
+   }
+  ],
+  "result": "PASS"
+ },
+ "scale100": {
+  "gate": "O18A-ADVERSARIAL-IDENTITY-MEMORY",
+  "coreVersion": "3.1.0",
+  "scale": 100,
+  "limit": 250000,
+  "meaningful": false,
+  "memoryBudgetBytes": 6012954214,
+  "heapFlag": "--max-old-space-size=8192",
+  "environment": {
+   "platform": "win32",
+   "arch": "x64",
+   "release": "10.0.26300",
+   "cpus": 12,
+   "totalMemoryBytes": 14893805568,
+   "node": "v24.20.0"
+  },
+  "results": [
+   {
+    "id": "L1",
+    "expected": "COMPLETED",
+    "sourceRows": 2500,
+    "outcome": "COMPLETED",
+    "code": null,
+    "exitStatus": 0,
+    "wallMs": 12577,
+    "peakRssBytes": 179220480,
+    "cpuUserMicroseconds": 1843000,
+    "cpuSystemMicroseconds": 343000,
+    "clusters": [
+     {
+      "object": "LEAD",
+      "signal": "EMAIL_EXACT",
+      "members": 2500
+     }
+    ],
+    "details": null,
+    "problems": [],
+    "result": "PASS"
+   },
+   {
+    "id": "L3",
+    "expected": "COMPLETED",
+    "sourceRows": 5000,
+    "outcome": "COMPLETED",
+    "code": null,
+    "exitStatus": 0,
+    "wallMs": 3093,
+    "peakRssBytes": 288514048,
+    "cpuUserMicroseconds": 3046000,
+    "cpuSystemMicroseconds": 578000,
+    "clusters": [
+     {
+      "object": "CONTACT",
+      "signal": "EMAIL_EXACT",
+      "members": 2500
+     },
+     {
+      "object": "LEAD",
+      "signal": "EMAIL_EXACT",
+      "members": 2500
+     }
+    ],
+    "details": null,
+    "problems": [],
+    "result": "PASS"
+   }
+  ],
+  "result": "PASS"
+ },
+ "note": "reduced-scale runs of tools/adversarial-identity-memory.mjs; the limit cases L2, L4, L5 (250,001 rows) and full-scale L1/L3 were not run tonight"
+}

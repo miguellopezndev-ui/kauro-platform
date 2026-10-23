@@ -83,7 +83,7 @@ import {
   type ValidationReceiptId,
   type VersionedWrite,
 } from "@kauro/domain";
-import { targetBodyDigest, type TargetBody } from "@kauro/domain";
+import { CLEAN_ONLY_TARGET_HASH, targetBodyDigest, type TargetBody } from "@kauro/domain";
 import { PgAuditUnitOfWorkFactory, PgValidationReceiptRecorder, type KauroPool, type PgAuditUnitOfWork } from "@kauro/persistence";
 import {
   activateAgency,
@@ -385,7 +385,8 @@ export interface ExecutionWorld {
   /** A confirmed, current target contract of the project (observation and confirmation leave it; the request handlers' write). */
   confirmTarget(agency: AgencyFixture, projectId: ProjectId, label: string, mode?: "HUBSPOT" | "SALESFORCE"): Promise<{ readonly contractId: string; readonly targetContractHash: Sha256Hex }>;
   /** A fresh project of the agency (HUBSPOT, or SALESFORCE), its revision sealed recently through B07's lifecycle and its target confirmed. */
-  subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE"; readonly target?: TargetShape }): Promise<AuditSubject>;
+  /** Order 20: mode CLEAN has no target contract (contractId "", targetContractHash CLEAN_ONLY_TARGET_HASH). */
+  subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "CLEAN" | "HUBSPOT" | "SALESFORCE"; readonly target?: TargetShape }): Promise<AuditSubject>;
   /** A paid purchase of a fresh project of the agency (HUBSPOT, or SALESFORCE under that mode's own offered capability). */
   paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE"; readonly report?: ReportFixture }): Promise<Purchase>;
   /**
@@ -671,7 +672,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
 
   /** A VALIDATED plan over a recently sealed source and a confirmed target, approved by the owner with a fresh step-up (CMD025). */
   const capabilities = new Map<string, string>([["HUBSPOT", capabilityId]]);
-  const capabilityOf = async (mode: "HUBSPOT" | "SALESFORCE"): Promise<string> => {
+  const capabilityOf = async (mode: "CLEAN" | "HUBSPOT" | "SALESFORCE"): Promise<string> => {
     const known = capabilities.get(mode);
     if (known !== undefined) return known;
     const offered = await h.offeredCapability(mode);
@@ -680,7 +681,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
   };
 
   /** A fresh project of the agency, its revision sealed recently through B07's lifecycle, and a confirmed, current target contract. */
-  async function subjectOf(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE", shape: TargetShape = {}, report?: ReportFixture): Promise<AuditSubject> {
+  async function subjectOf(ag: AgencyFixture, label: string, mode: "CLEAN" | "HUBSPOT" | "SALESFORCE", shape: TargetShape = {}, report?: ReportFixture): Promise<AuditSubject> {
     const withCapability = await capabilityOf(mode);
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
@@ -696,7 +697,7 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
         clientId,
         mode,
         purpose: "Execution control plane",
-        targetInstanceRef: uow.ids.next() as never,
+        ...(mode === "CLEAN" ? {} : { targetInstanceRef: uow.ids.next() as never }),
         capabilityId: withCapability as never,
         capabilityVersion,
         initialRevisionId: revisionId,
@@ -715,6 +716,8 @@ export async function startExecutionWorld(tag: string, worldOptions: ExecutionWo
       ...(bytes === undefined ? {} : { content: { bytes, plant: (objectName: string) => storage.plantObject(storage.location("ACCEPTED"), objectName, bytes).generation } }),
       ...(report === undefined ? {} : { billableSourceUnits: report.counts.billableSourceUnits, populations: { physicalSourceRows: report.counts.physicalSourceRows, logicalSourceRecords: report.counts.logicalSourceRecords, associationEdges: report.counts.associationEdges } }),
     });
+    // Order 20: a CLEAN subject has no target contract (contractId ""), it binds the canonical CLEAN hash
+    if (mode === "CLEAN") return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId: "", targetContractHash: CLEAN_ONLY_TARGET_HASH, capabilityId: withCapability };
     const { contractId, targetContractHash } = await confirmedTarget(ag, projectId, label, mode, shape);
     return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId, targetContractHash, capabilityId: withCapability };
   }

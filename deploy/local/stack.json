@@ -1,0 +1,24 @@
+{
+  "$comment": "O28A: the reproducible local deployment of the Kauro api, declared. tools: Node and pnpm as package.json pins them; PostgreSQL 17 from PGBIN, a fresh cluster (initdb, loopback only) with the runtime roles and every migration applied by the migrator role. The api runs as one process, `node apps/api/dist/src/main.js`, with exactly the environment below (placeholders in ${...} are filled by the runner: the cluster port, a free HTTP port, and the LOCAL bearer-token file of one synthetic person it writes). No provider, no credential, no remote host: the database is 127.0.0.1, the HTTP listener is 127.0.0.1, every provider port is a labelled contract fake or unbound. apps/api/test/o28a/local-deploy.test.ts deploys it, probes it, redeploys it and fails it.",
+  "version": 1,
+  "runtime": { "node": ">=24.0.0", "pnpm": "10.16.1", "postgresMajor": 17 },
+  "build": ["pnpm install --frozen-lockfile --offline", "pnpm run generate", "pnpm -r --workspace-concurrency=1 run build"],
+  "entrypoint": "apps/api/dist/src/main.js",
+  "environment": {
+    "KAURO_ENVIRONMENT": "LOCAL",
+    "KAURO_DB_HOST": "127.0.0.1",
+    "KAURO_DB_PORT": "${PG_PORT}",
+    "KAURO_DB_NAME": "kauro",
+    "KAURO_DB_USER": "kauro_app_test",
+    "KAURO_DB_POOL_MAX": "4",
+    "KAURO_AUTH_BEARER_TOKENS_FILE": "${BEARER_TOKENS_FILE}",
+    "KAURO_HTTP_HOST": "127.0.0.1",
+    "KAURO_HTTP_PORT": "${HTTP_PORT}",
+    "KAURO_SHUTDOWN_DEADLINE_MS": "5000"
+  },
+  "probes": { "liveness": "/livez", "readiness": "/readyz" },
+  "egress": "loopback only: the database and the listener are 127.0.0.1; the api binds no provider (apps/api/test/o28a/cross-tenant-sweep.test.ts observes every outbound socket)",
+  "alerts": "deploy/local/alerts.json",
+  "backup": "pg_dumpall --roles-only + pg_dump -Fc of the kauro database; restore: initdb, roles file, pg_restore -C (apps/api/test/o28a/continuity.test.ts)",
+  "rollback": "migrations are forward-only: a rollback redeploys the previous build against the same database when its migrations are a prefix of the applied ledger, otherwise restores the pre-deploy backup and redeploys the previous build (docs/operations/STAGE-A-OPERATIONS.md)"
+}

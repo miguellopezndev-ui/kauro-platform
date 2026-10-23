@@ -18,6 +18,17 @@ const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSIO
 /** No adapter of the Intelligence core is bound: CMD022 and CMD023 refuse inside their unit of work (D8-PORT-1). */
 export const CORE_SERVICES_UNAVAILABLE = outcome("COMMAND", "INTEGRITY_FAILURE", "CORE_SERVICES_UNAVAILABLE", "no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written");
 
+/**
+ * The outcomes of behaviour built against the O19A re-issue candidate (CP-02.01; Order 20), added to their route's catalogue only when the
+ * deployment switched the candidate on (commandRouteResponses): the served catalogue, the OpenAPI and the matrix stay the in-force ones.
+ */
+export const CANDIDATE_CLEAN_OUTCOMES: Readonly<Partial<Record<AuditCommandId, ReadonlyArray<ProblemOutcome>>>> = Object.freeze({
+  CMD020: [
+    outcome("COMMAND", "INVALID_REQUEST", "TARGET_CONTRACT_REQUIRED", "a HUBSPOT or SALESFORCE project's audit names no targetContractId: nothing was written", { fieldCodes: ["REQUIRED"] }),
+    outcome("COMMAND", "INVALID_REQUEST", "TARGET_NOT_APPLICABLE", "a CLEAN project's audit names a targetContractId: CLEAN binds the canonical CLEAN target hash and takes no target contract; nothing was written, no grant reserved, no provider called", { fieldCodes: ["UNKNOWN_FIELD"] }),
+  ],
+});
+
 /** The command-specific outcomes, by command (design §12; reference/COMMAND_CATALOGUE preconditions and failures). */
 const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD018: [

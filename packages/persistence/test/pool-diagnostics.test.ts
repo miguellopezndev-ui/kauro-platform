@@ -147,7 +147,8 @@ test("R38: a connection the server terminates while a unit of work holds it fail
       await uow.identities.getOwn(userId);
       assert.fail("a statement on a terminated connection cannot succeed");
     });
-    await assert.rejects(outcome, (e: unknown) => isDomainFailure(e) && e.code === "INTERNAL_ERROR", "the unit of work answers the loss, never a success");
+    // the loss is the retryable capacity refusal (O28A review F-2): the transaction died with its connection, nothing committed
+    await assert.rejects(outcome, (e: unknown) => isDomainFailure(e) && e.code === "CAPACITY_UNAVAILABLE" && e.retryable, "the unit of work answers the loss, never a success");
     assert.deepEqual(events[0], { pool: "kauro-pool-in-use", connection: "IN_USE", errorClass: "DatabaseError", code: "57P01" });
     const text = JSON.stringify(events);
     for (const secret of [PASSWORD, ROLES.appLogin, "127.0.0.1", String(pg.port), "terminating", "administrator"]) assert.ok(!text.includes(secret), `the events carry no ${secret}`);

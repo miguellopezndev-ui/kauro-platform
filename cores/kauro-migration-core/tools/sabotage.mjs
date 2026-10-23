@@ -1555,6 +1555,55 @@ const MUTATIONS = [
     from: '  for (const entry of distinctTargets(entries)) {\n    if (current !== null && current.k === entry.k) {',
     to: '  for (const entry of entries) {\n    if (current !== null && current.k === entry.k) {',
   },
+  // M130-M135 belong to 3.1.0 (N1-1, D78), written by O18A: the code Order 13 changed had no mutation of its own.
+  {
+    id: 'M130',
+    title: 'the person signals read a Contact only, so leads sharing an email, phone or name are never reported',
+    contract: 'CONTRACT.md 7 (supporting evidence for any person record), decision D78',
+    file: 'src/identity/resolve-identity.ts',
+    from: 'return nonEmpty(carried(values.get(`contact.${field}`) ?? values.get(`lead.${field}`)));',
+    to: 'return nonEmpty(carried(values.get(`contact.${field}`)));',
+  },
+  {
+    id: 'M131',
+    title: 'a duplicate bucket forgets the object, so a Lead and a Contact sharing an email form one cluster',
+    contract: 'CONTRACT.md 7 (a cluster never spans two objects), decision D78',
+    file: 'src/identity/resolve-identity.ts',
+    from: 'shared.add({ bucket: `${record.object}|${value}`, subject });',
+    to: 'shared.add({ bucket: `PERSON|${value}`, subject });',
+  },
+  {
+    id: 'M132',
+    title: 'an unsupported relationship file is described as a pairing beside the supported ones',
+    contract: 'CONTRACT.md 9 (an unsupported relationship is named as such), decision D78',
+    file: 'src/artifacts/import-instructions.ts',
+    from: "      if (support.kind === 'UNSUPPORTED') {",
+    to: "      if (support.kind === 'UNSUPPORTED' && type === '') {",
+  },
+  {
+    id: 'M133',
+    title: 'a supported relationship line counts the leftovers of its type instead of what it delivers',
+    contract: 'CONTRACT.md 9 (each supported line carries its own count), decision D78',
+    file: 'src/artifacts/import-instructions.ts',
+    from: "          ` ${String(count(type, 'OUTPUT'))} relationships.`,",
+    to: "          ` ${String(count(type, 'LEFTOVER'))} relationships.`,",
+  },
+  {
+    id: 'M134',
+    title: 'the HubSpot strategy no longer warns that the association key is not a common column',
+    contract: 'CONTRACT.md 9 (HubSpot common column is a unique identifier), decision D78',
+    file: 'src/artifacts/import-instructions.ts',
+    from: "        ' both object files carry a column under that header with different values, so do not select it as a' +",
+    to: "        ' both object files carry a column under that header with different values, so select it as a' +",
+  },
+  {
+    id: 'M135',
+    title: 'the Salesforce strategy no longer says where an Account Id comes from',
+    contract: 'CONTRACT.md 9 (an AccountId is proved by the success file), decision D78',
+    file: 'src/artifacts/import-instructions.ts',
+    from: "        ' the success file starts with an `ID` column holding each new Account Id, repeats every column of the' +",
+    to: "        ' the success file holds each new Account, repeats every column of the' +",
+  },
 ];
 
 function edits(mutation) {
@@ -1583,8 +1632,18 @@ function build() {
  */
 const SUITE_TIMEOUT_MS = 15 * 60 * 1000;
 
+/**
+ * `--suite-filter <part>` runs only the test files whose path holds `<part>` under each mutation (O18A). A mutation the
+ * named files kill is killed by the whole suite too, so a KILLED verdict stands; a SURVIVED one does not, and such a run is
+ * always PARTIAL. It exists for the mutations of one change, re-proved against the files that own them on a shared machine
+ * where the full corpus does not fit the time.
+ */
+const suiteFilterIndex = process.argv.indexOf('--suite-filter');
+const suiteFilter = suiteFilterIndex === -1 ? null : (process.argv[suiteFilterIndex + 1] ?? null);
+
 function suite() {
-  return run(process.execPath, [join(repoRoot, 'tools', 'run-tests.mjs')], { timeout: SUITE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+  const filter = suiteFilter === null ? [] : ['--filter', suiteFilter];
+  return run(process.execPath, [join(repoRoot, 'tools', 'run-tests.mjs'), ...filter], { timeout: SUITE_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
 }
 
 /**
@@ -1823,7 +1882,8 @@ if (evidenceIndex !== -1 && process.argv[evidenceIndex + 1] !== undefined) {
       {
         gate: 'SABOTAGE',
         observedAt: `${new Date().toISOString().slice(0, 19)}Z`,
-        scope: only === null ? 'FULL' : 'PARTIAL',
+        scope: only === null && suiteFilter === null ? 'FULL' : 'PARTIAL',
+        suiteFilter,
         declared: MUTATIONS.length,
         selected: selected.length,
         killed,
@@ -1831,7 +1891,7 @@ if (evidenceIndex !== -1 && process.argv[evidenceIndex + 1] !== undefined) {
         outcomes: byOutcome,
         cases: results.map((entry) => ({ id: entry.id, ok: entry.outcome === 'KILLED', expected: 'KILLED', observed: entry.outcome, detail: entry.detail ?? null })),
         failures: results.filter((entry) => entry.outcome !== 'KILLED').map((entry) => `${entry.id}: ${entry.outcome}`),
-        result: only === null && survivors === 0 && broken.length === 0 ? 'PASS' : 'FAIL',
+        result: only === null && suiteFilter === null && survivors === 0 && broken.length === 0 ? 'PASS' : 'FAIL',
       },
       null,
       2,

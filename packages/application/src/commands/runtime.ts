@@ -35,6 +35,7 @@ import type {
   IdGenerator,
   IdentityContext,
   IdempotencyIdentity,
+  ProjectId,
   ResolvedMembership,
   SecurityEvent,
   TenantContext,
@@ -42,7 +43,7 @@ import type {
   UnitOfWorkFactory,
   UserId,
 } from "@kauro/domain";
-import { DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
+import { CLEAN_ONLY_TARGET_HASH, DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
 import { unauthenticatedProblem } from "../api/admission.js";
 import { judgedUnderHold } from "../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../api/envelope.js";
@@ -51,6 +52,22 @@ import type { AllowDecision, AuthorizationDecision, AuthorizationRequest, Author
 import { AUTHORIZATION_POLICY_VERSION } from "../ports/authorizer.js";
 import type { CommandSpec } from "../ports/command-handler.js";
 
+/**
+ * Behaviour built against the O19A re-issue candidate (docs/authority/proposals/reissue-candidate/build/), each switch OFF unless the
+ * deployment turns it on: an absent or false switch answers the served contract and the in-force behaviour, unchanged (Order 20). Adopting
+ * the candidate is Order 19B's; until then only the LOCAL environment may switch one on (apps/api config).
+ */
+export interface CandidateActivation {
+  /**
+   * CP-01.01, CP-02.01: a CLEAN project's StartAudit takes no target contract (TARGET_NOT_APPLICABLE when one is named; a CRM project's
+   * omission is TARGET_CONTRACT_REQUIRED) and CreatePlan, ApprovePlan and CreateQuote bind CLEAN_ONLY_TARGET_HASH without reading a target.
+   */
+  readonly cleanWithoutTarget: boolean;
+}
+
+/** Every candidate switch off: the in-force behaviour. */
+export const CANDIDATE_OFF: CandidateActivation = Object.freeze({ cleanWithoutTarget: false });
+
 /** What every handler needs beside its own collaborators. */
 export interface CommandRuntime {
   readonly unitOfWork: UnitOfWorkFactory;
@@ -58,6 +75,28 @@ export interface CommandRuntime {
   readonly clock: Clock;
   /** Process id generator for identifiers minted outside a unit of work (correlation ids); aggregate ids come from `uow.ids` (D-PORT-1). */
   readonly ids: IdGenerator;
+  /** The candidate behaviour this deployment switched on; absent is CANDIDATE_OFF. */
+  readonly candidate?: CandidateActivation;
+}
+
+/** Whether CLEAN runs without a target contract here (CP-02.01): only when the deployment switched the candidate on. */
+export function cleanWithoutTarget(runtime: Pick<CommandRuntime, "candidate">): boolean {
+  return runtime.candidate?.cleanWithoutTarget === true;
+}
+
+/**
+ * Whether a plan's subject is bound by the canonical CLEAN hash (CP-02.01): the candidate switched on, exactly CLEAN_ONLY_TARGET_HASH and a
+ * CLEAN project of the agency (read only then). Such a subject reads no target contract; any other reads its confirmed, current target as
+ * before, so a CRM plan never binds the CLEAN hash (it finds no target: TARGET_STALE) and a CLEAN plan bound to a target keeps that target.
+ */
+export async function bindsCleanHash(
+  runtime: Pick<CommandRuntime, "candidate">,
+  uow: { readonly projects: { get(projectId: ProjectId): Promise<{ readonly agencyId: AgencyId; readonly mode: string } | null> } },
+  subject: { readonly agencyId: AgencyId; readonly projectId: ProjectId; readonly targetContractHash: string },
+): Promise<boolean> {
+  if (!cleanWithoutTarget(runtime) || subject.targetContractHash !== CLEAN_ONLY_TARGET_HASH) return false;
+  const project = await uow.projects.get(subject.projectId);
+  return project !== null && project.agencyId === subject.agencyId && project.mode === "CLEAN";
 }
 
 /** The facts a command body receives once the caller is authorized and the journal entry is reserved. */

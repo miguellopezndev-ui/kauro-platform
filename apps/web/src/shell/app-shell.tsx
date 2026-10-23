@@ -6,9 +6,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { SessionPhase } from "../client/session.ts";
-import { agencyOfPathname, matchRoute } from "../screens.ts";
+import { agencyOfPathname, matchRoute, projectOfPathname } from "../screens.ts";
 import type { AgencyContext } from "./agency-context.ts";
 import { browserPage } from "./browser-page.ts";
+import { type ProjectOfPage, readProjectOfPage } from "./project-of-page.ts";
 import { type AnchorComponent, ShellFrame } from "./frame.tsx";
 import { ShellContext } from "./shell-context.ts";
 import { createShell, type Shell } from "./shell-runtime.ts";
@@ -60,7 +61,34 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
 
   const phase = useStore(shell, sessionOf, CHECKING);
   const agency = useStore(shell, agencyOf, LOADING);
-  const view = viewOf({ phase, agency, pathname, activeAgency: shell === null ? agencyOfPathname(pathname) : shell.session.activeAgency() });
+
+  // Order 24: the project the page is inside, read once per project from GetProject and the agency's clients, for the header and the menu
+  const inside = projectOfPathname(pathname);
+  const insideKey = inside === null ? null : `${inside.agencyId}/${inside.projectId}`;
+  const agencyReady = agency.kind === "READY";
+  const [project, setProject] = useState<ProjectOfPage | null>(null);
+  useEffect(() => {
+    if (shell === null || inside === null || !agencyReady || inside.agencyId !== shell.session.activeAgency()) return;
+    if (project !== null && project.projectId === inside.projectId) return;
+    const abort = new AbortController();
+    readProjectOfPage(shell.client, inside.agencyId, inside.projectId, abort.signal).then(
+      (read) => {
+        if (!abort.signal.aborted) setProject(read);
+      },
+      // a client refusal (a malformed id) leaves the frame's fallback, like any unreadable project
+      () => undefined,
+    );
+    return () => abort.abort();
+    // the project is read again only when the page enters another project (insideKey) or the runtime or agency changes
+  }, [shell, insideKey, agencyReady]);
+
+  const view = viewOf({
+    phase,
+    agency,
+    pathname,
+    activeAgency: shell === null ? agencyOfPathname(pathname) : shell.session.activeAgency(),
+    ...(project === null ? {} : { project }),
+  });
   const actions = {
     signOut: () => {
       void shell?.session.signOut();

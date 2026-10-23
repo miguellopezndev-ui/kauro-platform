@@ -154,8 +154,8 @@ export type {
 export { INVITE_MEMBER, ACCEPT_INVITATION, CHANGE_MEMBERSHIP, REVOKE_MEMBERSHIP, TRANSFER_OWNERSHIP, TEAM_COMMANDS } from "./commands/contracts.js";
 export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS, CREATE_SUPPORT_CASE, SUPPORT_COMMANDS, REQUEST_RETENTION_EXTENSION, REQUEST_DELETION, RETENTION_COMMANDS } from "./commands/contracts.js";
 export type { RequestDeletionBody, RequestDeletionHandler, RequestRetentionExtensionBody, RequestRetentionExtensionHandler, RetentionCommandId } from "./commands/contracts.js";
-export type { CommandRuntime, CommandContext, CommandOutcome, AcceptedOutcome, UnitOfWorkRunner, VersionOfView, UnauthenticatedRequest, IdentityFact } from "./commands/runtime.js";
-export { runCommand, runCommandIn, settleCommandFailure, contextOf, identityOf, refuseUnauthenticated, refuseAnonymously, recordDenialFact, recordIdentityFact, ALLOW_REASONS } from "./commands/runtime.js";
+export type { CommandRuntime, CandidateActivation, CommandContext, CommandOutcome, AcceptedOutcome, UnitOfWorkRunner, VersionOfView, UnauthenticatedRequest, IdentityFact } from "./commands/runtime.js";
+export { CANDIDATE_OFF, bindsCleanHash, cleanWithoutTarget, runCommand, runCommandIn, settleCommandFailure, contextOf, identityOf, refuseUnauthenticated, refuseAnonymously, recordDenialFact, recordIdentityFact, ALLOW_REASONS } from "./commands/runtime.js";
 export type { PresentedCredential } from "./sessions/protocol.js";
 export {
   SESSION_COOKIE,

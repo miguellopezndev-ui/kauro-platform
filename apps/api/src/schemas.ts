@@ -4,11 +4,12 @@
  * registry, never a value received at runtime).
  */
 import { readFileSync } from "node:fs";
-import type { SchemaValidator } from "@kauro/application";
-import { createSchemaValidator, type ContractSchemaBundle } from "@kauro/application";
+import type { CandidateActivation, SchemaValidator } from "@kauro/application";
+import { OPERATIONAL_ROUTES, createSchemaValidator, type ContractSchemaBundle } from "@kauro/application";
 
-export function loadContractSchemas(): SchemaValidator {
+/** candidate: the behaviour built against the O19A re-issue candidate this deployment switched on (Order 20); absent, the in-force schemas. */
+export function loadContractSchemas(candidate?: CandidateActivation): SchemaValidator {
   const url = new URL(import.meta.resolve("@kauro/contracts/schemas.json"));
   const bundle = JSON.parse(readFileSync(url, "utf8")) as ContractSchemaBundle;
-  return createSchemaValidator(bundle);
+  return createSchemaValidator(bundle, OPERATIONAL_ROUTES, candidate);
 }

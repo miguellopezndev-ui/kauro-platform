@@ -114,3 +114,6 @@ export { detectContradictions, reviewVerdict, strictlyWeakest, EVIDENCE_RANK, RE
 export type { Contradiction, ReviewInput, ReviewVerdict } from './compiler/consistency.js';
 export { planReview } from './planner/task-planner.js';
 export { allowedProposalTypesOf } from './envelope/envelope-builder.js';
+// O26A: the Bedrock deployment contract checked against what this core does on the wire, its OFF-by-default activation, and the quota window (A9 §4, D4-BR-1).
+export { bedrockDeploymentProblems, bedrockActivation, quotaLimitedTransport, worstCaseTokens, BEDROCK_DEPLOYMENT_CONTRACT_VERSION, BEDROCK_RETRY_WAITS_MS, BEDROCK_RETRYABLE_STATUSES, BEDROCK_GRANT_CAPS_USD } from './provider/bedrock-deployment.js';
+export type { BedrockQuotas } from './provider/bedrock-deployment.js';

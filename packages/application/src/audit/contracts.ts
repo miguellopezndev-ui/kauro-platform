@@ -23,8 +23,11 @@ export const AUDIT_POLL_AFTER_SECONDS = 10;
 // --- CMD020 StartAudit ----------------------------------------------------------------------------------------------------------
 
 export interface StartAuditBody {
-  /** The confirmed, current target contract the audit interprets the revision against. */
-  readonly targetContractId: string;
+  /**
+   * The confirmed, current target contract the audit interprets the revision against. Required by the in-force schema; under the candidate
+   * activation (CP-02.01, Order 20) absent for a CLEAN project, which binds CLEAN_ONLY_TARGET_HASH instead.
+   */
+  readonly targetContractId?: string;
   /** The audit policy version the caller was shown; kept on the audit row. */
   readonly auditPolicyVersion: string;
 }

@@ -31,7 +31,7 @@ import { approvalActions, planActions } from "../../api/permitted-actions.js";
 import { approvalView, planView } from "../../api/projections.js";
 import type { DisclosureComposer } from "../../ports/plan-services.js";
 import { APPROVE_PLAN, type ApprovePlanBody, type ApprovePlanHandler, type ApprovePlanView } from "../contracts.js";
-import { runCommand, type CommandRuntime } from "../runtime.js";
+import { bindsCleanHash, runCommand, type CommandRuntime } from "../runtime.js";
 import { applied, checkExpectedVersion, planBodyDigest, requireMembership } from "./shared.js";
 
 /** The preimage of an approval hash (contract Approval; reference/HASHING_AND_ACCOUNTING_RULES: KAURO_PLAN_APPROVAL_V1). */
@@ -95,8 +95,11 @@ export function approvePlanHandler(runtime: CommandRuntime, disclosures: Disclos
         if (source.availableUntil === null) throw new DomainFailure("SOURCE_EXPIRED", "source retention deadline has passed");
         // target: the plan's own project's contract with the plan's target hash (findings N4, N9), confirmed and unsuperseded,
         // under the same transition-lock discipline
-        const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, plan.projectId, plan.targetContractHash);
-        if (!target || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "target contract is not current");
+        // a CLEAN plan binds the canonical CLEAN hash and reads no target (CP-02.01, candidate activation only)
+        if (!(await bindsCleanHash(runtime, uow, { agencyId: membership.agencyId, projectId: plan.projectId, targetContractHash: plan.targetContractHash }))) {
+          const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, plan.projectId, plan.targetContractHash);
+          if (!target || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "target contract is not current");
+        }
         // disclosures: the server composes the complete set (every CLEAR included) and the client must have displayed exactly it
         const disclosed = await disclosures.compose(uow, plan, body, receipt);
         if (disclosed.disclosuresHash !== envelope.body.disclosuresHash) {

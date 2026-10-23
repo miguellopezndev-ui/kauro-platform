@@ -62,6 +62,7 @@ const RECORD_COLUMNS = [
   exact("soft_deadline"),
   exact("hard_deadline"),
   exact("effective_deadline"),
+  exact("extended_hard_deadline"),
   "policy_version",
   "provider_residuals",
   "state",
@@ -82,6 +83,7 @@ function retentionRecord(r: Row): RetentionRecordRow {
     ...opt("softDeadline", optionalInstantText(r["soft_deadline"])),
     hardDeadline: instantText(r["hard_deadline"]),
     effectiveDeadline: instantText(r["effective_deadline"]),
+    ...opt("extendedHardDeadline", optionalInstantText(r["extended_hard_deadline"])),
     policyVersion: str(r["policy_version"]),
     providerResiduals: [...jsonArray<string>(r["provider_residuals"])],
     state: str<RetentionRecordRow["state"]>(r["state"]),
@@ -102,6 +104,8 @@ const EXTENSION_COLUMNS = [
   "capped_at_hard_deadline",
   "purpose",
   "terms_version",
+  "ceiling_rule",
+  exact("previous_hard_deadline"),
 ].join(", ");
 
 function extensionRecord(r: Row): RetentionExtensionRow {
@@ -116,6 +120,8 @@ function extensionRecord(r: Row): RetentionExtensionRow {
     softDeadline: instantText(r["soft_deadline"]),
     hardDeadline: instantText(r["hard_deadline"]),
     cappedAtHardDeadline: r["capped_at_hard_deadline"] === true,
+    ceilingRule: r["ceiling_rule"] === "UNPAID_SEAL_17D" ? "UNPAID_SEAL_17D" : "HARD_CAP",
+    ...opt("previousHardDeadline", optionalInstantText(r["previous_hard_deadline"])),
     purpose: str(r["purpose"]),
     termsVersion: str(r["terms_version"]),
   };
@@ -181,7 +187,8 @@ export class PgRetentionRepository implements RetentionRepository {
       this.db,
       `INSERT INTO kauro.retention_records (retention_id, agency_id, client_id, project_id, revision_id, version, class, anchor_id, anchor_evidence_hash, soft_deadline, hard_deadline,
           effective_deadline, policy_version, created_at, updated_at)
-       SELECT $1, $2, $3, $4, $5, 1, 'UNPAID', a.anchor_id, a.evidence_hash, NULL, a.occurred_at + interval '1209600 seconds', a.occurred_at + interval '1209600 seconds', $7,
+       SELECT $1, $2, $3, $4, $5, 1, 'UNPAID', a.anchor_id, a.evidence_hash, NULL, a.occurred_at + interval '1209600 seconds', a.occurred_at + interval '1209600 seconds',
+              CASE WHEN kauro.retention_r2_2_active() THEN 'R2-RETENTION-2' ELSE $7 END,
               kauro.server_now(), kauro.server_now()
          FROM kauro.retention_anchors a WHERE a.agency_id = $2 AND a.anchor_id = $6 AND a.anchor_kind = 'REVISION_SEALED'
        RETURNING ${RECORD_COLUMNS}`,
@@ -228,6 +235,63 @@ export class PgRetentionRepository implements RetentionRepository {
       [projectId],
     );
     return r.rows.map(retentionRecord);
+  }
+
+  async retentionR22Active(): Promise<boolean> {
+    const r = await execute<{ active: boolean }>(this.db, "SELECT kauro.retention_r2_2_active() AS active");
+    return r.rows[0]?.active === true;
+  }
+
+  async lockUnpaidRecordsOfProject(projectId: ProjectId): Promise<ReadonlyArray<RetentionRecordRow>> {
+    await execute(this.db, "SELECT kauro.await_transition('kauro.projects', $1::uuid::text)", [projectId]);
+    const r = await execute<Row>(this.db, `SELECT ${RECORD_COLUMNS} FROM kauro.retention_records WHERE project_id = $1 AND class = 'UNPAID' ORDER BY retention_id FOR NO KEY UPDATE`, [projectId]);
+    return r.rows.map(retentionRecord);
+  }
+
+  async extendUnpaidHardDeadline(input: {
+    readonly extensionId: RetentionExtensionId;
+    readonly retentionId: RetentionId;
+    readonly expectedVersion: number;
+    readonly requestedSeconds: number;
+    readonly purpose: string;
+    readonly termsVersion: string;
+    readonly membershipId: MembershipId;
+  }): Promise<{ readonly extension: RetentionExtensionRow; readonly record: RetentionRecordRow }> {
+    // CP-01.02: the end is least(previous soft + requested, hard + 259200 s), the previous soft being the record's soft deadline or, while
+    // it has none, its hard deadline; computed in SQL from the locked record. The extension row's hard_deadline is the ceiling,
+    // previous_hard_deadline the record's hard deadline (migration 0110 binds both to the record)
+    const inserted = await execute<Row>(
+      this.db,
+      `INSERT INTO kauro.retention_extensions (extension_id, agency_id, project_id, retention_id, requested_seconds, granted_seconds, previous_soft_deadline, soft_deadline,
+          hard_deadline, capped_at_hard_deadline, purpose, terms_version, requested_by_membership_id, requested_by_user_id, created_at, ceiling_rule, previous_hard_deadline)
+       SELECT $1, b.agency_id, b.project_id, b.retention_id, $3::integer,
+              floor(extract(epoch FROM (least(b.base + $3::integer * interval '1 second', b.ceiling) - b.base)))::integer,
+              b.base, least(b.base + $3::integer * interval '1 second', b.ceiling), b.ceiling,
+              b.base + $3::integer * interval '1 second' > b.ceiling, $4, $5, $6, kauro.current_user_id(), kauro.server_now(),
+              'UNPAID_SEAL_17D', b.hard_deadline
+         FROM (SELECT r.agency_id, r.project_id, r.retention_id, r.hard_deadline, coalesce(r.soft_deadline, r.hard_deadline) AS base,
+                      r.hard_deadline + interval '259200 seconds' AS ceiling
+                 FROM kauro.retention_records r
+                WHERE r.retention_id = $2 AND r.version = $7 AND r.class = 'UNPAID' AND r.extended_hard_deadline IS NULL) b
+       RETURNING ${EXTENSION_COLUMNS}`,
+      [input.extensionId, input.retentionId, input.requestedSeconds, input.purpose, input.termsVersion, input.membershipId, input.expectedVersion],
+    );
+    const extension = inserted.rows[0];
+    if (!extension) throw new DomainFailure("INTEGRITY_FAILURE", "the locked UNPAID retention record is not the version the extension was judged at");
+    const moved = await execute<Row>(
+      this.db,
+      `WITH x AS (SELECT soft_deadline AS e FROM kauro.retention_extensions WHERE extension_id = $3)
+       UPDATE kauro.retention_records
+          SET soft_deadline = CASE WHEN soft_deadline IS NULL THEN NULL ELSE (SELECT e FROM x) END,
+              extended_hard_deadline = CASE WHEN (SELECT e FROM x) > hard_deadline THEN (SELECT e FROM x) END,
+              effective_deadline = (SELECT e FROM x),
+              version = $2 + 1
+        WHERE retention_id = $1 AND version = $2 RETURNING ${RECORD_COLUMNS}`,
+      [input.retentionId, input.expectedVersion, input.extensionId],
+    );
+    const record = moved.rows[0];
+    if (!record) throw new DomainFailure("INTEGRITY_FAILURE", "the locked UNPAID retention record moved while its extension was written");
+    return { extension: extensionRecord(extension), record: retentionRecord(record) };
   }
 
   async extensionOfProject(projectId: ProjectId): Promise<RetentionExtensionRow | null> {

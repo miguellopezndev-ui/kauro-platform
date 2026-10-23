@@ -19,7 +19,7 @@ import { AUDIT_POLICY, type AuditId, type AuditStepId, type ModelTaskId, type Pl
 import type { PlanBody as PlanBodyOfDomain } from "@kauro/domain";
 import { controlOf, fundPlatformPool } from "@kauro/persistence/testing";
 import { accepted, read, readData } from "./commerce-support.js";
-import { bodyHashOf, call, effectCounts, freshKey, ids, planBodyOf, sha, world, type PlanFixture, type Reply, type World } from "./support.js";
+import { bodyHashOf, call, effectCounts, freshKey, ids, planBodyOf, sha, world, type PlanFixture, type Reply, type World, type WorldOptions } from "./support.js";
 import { activate, setSessionLimit } from "./source-support.js";
 
 // --- routes and the wire shapes ------------------------------------------------------------------------------------------------------
@@ -93,7 +93,7 @@ export interface CallOptions {
 export const AUDIT_POLICY_VERSION = "R2-INITIAL";
 
 /** CMD020 StartAudit as an operator of agency A unless told otherwise. */
-export function startAudit(w: World, revisionId: string, body: { readonly targetContractId: string; readonly auditPolicyVersion?: string }, options: CallOptions = {}): Promise<Reply> {
+export function startAudit(w: World, revisionId: string, body: { readonly targetContractId?: string; readonly auditPolicyVersion?: string }, options: CallOptions = {}): Promise<Reply> {
   return call(w, {
     url: auditRoutes.startAudit(revisionId),
     token: options.token ?? w.operator.token,
@@ -221,11 +221,11 @@ export interface AuditWorld {
  * Intelligence core's contract fake bound through `cores` and the edition's own plan services. The platform's pool is NOT funded: a test
  * that starts an audit funds it first (`fundPool`).
  */
-export async function auditWorld(): Promise<AuditWorld> {
+export async function auditWorld(options: Pick<WorldOptions, "candidate" | "quotes"> = {}): Promise<AuditWorld> {
   const core = new ContractFakeIntelligenceCore();
   const compiler = new ScriptedPlanCompiler(core);
   const cores: CoreServices = { planCompiler: compiler };
-  const w = await world({ cores, realPlanServices: true });
+  const w = await world({ cores, realPlanServices: true, ...options });
   await activate(w);
   await setSessionLimit(w, w.A, 16);
   const aw: AuditWorld = {

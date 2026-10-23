@@ -527,7 +527,9 @@ test("R42 and R38: /livez and /readyz outside /api/v1 — readiness verifies a c
     const removed = await oracle.query<{ name: string; checksum: string }>("DELETE FROM kauro_meta.schema_migrations WHERE version = $1 RETURNING name, checksum", [code]);
     const behind = await probe("/readyz");
     assert.equal(behind.status, 503);
-    assert.deepEqual(behind.body, { status: "NOT_READY", checks: { process: "SERVING", database: "AVAILABLE", schema: "BEHIND" }, schemaVersion: { code, database: code - 1 } });
+    // the database's version is now the highest one still recorded: reserved Stage A ranges leave gaps, so not necessarily code - 1
+    const previous = await oracle.query<{ v: number }>("SELECT max(version)::int AS v FROM kauro_meta.schema_migrations");
+    assert.deepEqual(behind.body, { status: "NOT_READY", checks: { process: "SERVING", database: "AVAILABLE", schema: "BEHIND" }, schemaVersion: { code, database: previous.rows[0]?.v } });
     conforms("getReadiness", 503, behind.body);
     await oracle.query("INSERT INTO kauro_meta.schema_migrations (version, name, checksum) VALUES ($1, $2, $3)", [code, removed.rows[0]?.name, removed.rows[0]?.checksum]);
     // a newer expand migration of the next release: this release stays ready

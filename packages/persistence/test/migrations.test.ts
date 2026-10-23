@@ -203,8 +203,24 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0095_b13_report_sources.sql",
     // order 7: the agency's stored logos (CMD008's safe media pipeline), the logo a branding version names, and agency.branding_versioned.v1
     "0096_b13_branding_logos.sql",
+    // order 20: CLEAN without a target contract (the canonical CLEAN hash, target-less CLEAN audits, the plans target key on a generated column)
+    "0097_o20_clean_without_target.sql",
+    // order 20: a CLEAN purchase is paid and its package published on the canonical CLEAN binding (no target row)
+    "0098_o20_clean_purchase_execution.sql",
+    // order 21: CP-01.02's UNPAID extension behind its switch (off), its reserved range starting at 0110
+    "0110_o21_unpaid_extension.sql",
+    // order 21 (review F-2 remainder): the UNPAID soft deadline at an audit's end, behind the same switch
+    "0111_o21_unpaid_soft_deadline.sql",
+    // order 22: seller money, commission pools and claims (CP-01.04, CP-01.13)
+    "0120_o22_seller_money_claims.sql",
+    // order 27A: the pending payment holds of a receipt (activation off: no write grant)
+    "0135_o27a_pending_payment_holds.sql",
+    // order O23A (reserved range 0150..0159): the authentication boundary ends every web session of one person
+    "0150_o23a_person_session_revocation.sql",
   ]);
-  assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
+  // reserved disjoint ranges per order leave gaps (runner: versions start at 0001 and only increase)
+  assert.equal(files[0]?.version, 1);
+  for (let i = 1; i < files.length; i++) assert.ok((files[i]?.version ?? 0) > (files[i - 1]?.version ?? 0), "versions only increase");
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
   const owner = await pg.connect("kauro_owner");
   try {

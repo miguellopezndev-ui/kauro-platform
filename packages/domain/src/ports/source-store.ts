@@ -622,6 +622,26 @@ export interface RetentionRepository {
   lockPaidRecordsOfProject(projectId: ProjectId): Promise<ReadonlyArray<RetentionRecordRow>>;
   /** The project's one extension, if it used it (CMD060: unique per project). */
   extensionOfProject(projectId: ProjectId): Promise<RetentionExtensionRow | null>;
+  /** CP-01.02 (R2-RETENTION-2): whether its activation switch is on (kauro.retention_r2_2_active(), migration 0110; false until Order 19B). */
+  retentionR22Active(): Promise<boolean>;
+  /** CP-01.02, CMD060 on a free check: the project's UNPAID records locked FOR NO KEY UPDATE, after the project's shared transition lock. */
+  lockUnpaidRecordsOfProject(projectId: ProjectId): Promise<ReadonlyArray<RetentionRecordRow>>;
+  /**
+   * CP-01.02, CMD060 on an UNPAID record (only while the switch is on): the project's one extension with rule UNPAID_SEAL_17D, its end
+   * `least(previous soft + requestedSeconds, hard + 259200 s)` (previous soft: the record's soft deadline, or its hard deadline while it has
+   * none); the record's soft deadline (when it has one) and effective deadline move there, and its hard deadline too when the end passes
+   * it; version + 1 at expectedVersion. The database refuses it while the switch is off, for any other class, a second time or without
+   * its extension row.
+   */
+  extendUnpaidHardDeadline(input: {
+    readonly extensionId: RetentionExtensionId;
+    readonly retentionId: RetentionId;
+    readonly expectedVersion: number;
+    readonly requestedSeconds: number;
+    readonly purpose: string;
+    readonly termsVersion: string;
+    readonly membershipId: MembershipId;
+  }): Promise<{ readonly extension: RetentionExtensionRow; readonly record: RetentionRecordRow }>;
   /** kauro.effect_now() as an exact instant: the server's instant of THIS statement, read after the caller's locks (rules 15/16). */
   effectInstant(): Promise<string>;
   /**

@@ -1,0 +1,45 @@
+{
+  "$comment": "Order 26A: the Bedrock invocation contract, the one document the IaC (deploy/aws/bedrock/terraform), its checks (deploy/aws/bedrock/checks) and Intelligence Core (bedrockDeploymentProblems, src/provider/bedrock-deployment.ts) read. Everything here is prepared offline: enabled is false, no model access was requested and no call was made. Each item that only the real account can establish is marked PENDING_PROVIDER and is a probe of the live qualification (README.md).",
+  "contractVersion": "1.0.0",
+  "enabled": false,
+  "activationReference": null,
+  "sourceRegion": "us-east-1",
+  "geography": "us",
+  "destinationRegions": ["us-east-1", "us-east-2", "us-west-2"],
+  "destinationRegionsEvidence": "PENDING_PROVIDER",
+  "invocation": {
+    "operation": "InvokeModel",
+    "wire": "bedrock-2023-05-31",
+    "streaming": false,
+    "maxOutputTokens": 4096,
+    "timeoutMs": 120000
+  },
+  "models": [
+    { "capability": "IC_ANALYSIS", "candidate": "SONNET_5_5_US", "inferenceProfileId": "us.anthropic.claude-sonnet-5-5", "status": "GRANTED", "grants": ["B04-A", "B04-B"] },
+    { "capability": "IC_PILOT_COMPARISON", "candidate": "OPUS_5_5_US", "inferenceProfileId": "us.anthropic.claude-opus-5-5", "status": "BLOCKED_OWNER", "grants": [] }
+  ],
+  "retention": {
+    "invocationLogging": "OFF",
+    "providerStoresPromptsOrOutputs": false,
+    "evidence": "PENDING_PROVIDER"
+  },
+  "quotas": {
+    "maxConcurrency": 1,
+    "maxRequestsPerMinute": 20,
+    "maxTokensPerMinute": 200000,
+    "accountQuotasEvidence": "PENDING_PROVIDER"
+  },
+  "backoff": {
+    "retryableStatuses": [429, 503, 529],
+    "waitsMs": [2000, 8000],
+    "maxAttempts": 3
+  },
+  "budget": {
+    "grants": [
+      { "grantId": "B04-A", "capUsd": 40, "stages": ["SMOKE", "PILOT"], "candidates": ["SONNET_5_5_US"], "maxRuns": null },
+      { "grantId": "B04-B", "capUsd": 120, "stages": ["QUALIFICATION"], "candidates": ["SONNET_5_5_US"], "maxRuns": 4 }
+    ],
+    "awsBudgetCeilingUsd": 160,
+    "hardStop": "Intelligence Core's campaign grant refuses any request whose worst-case charge exceeds what is left (src/provider/campaign-grant.ts); the Bedrock budget (terraform/main.tf) is visibility only, and the organization's spend stop (deploy/aws/policies/organization/scp-spend-stop.json, which denies bedrock:InvokeModel) is the backstop; neither is the cap, because billing data reaches Budgets hours late"
+  }
+}

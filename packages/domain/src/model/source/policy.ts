@@ -48,6 +48,27 @@ export const SOURCE_RETENTION = Object.freeze({
 /** Retention policy label recorded on every RetentionRecord this edition creates (RetentionRecord.policyVersion). */
 export const RETENTION_POLICY_VERSION = "R2-RETENTION-1";
 
+/**
+ * CP-01.02 (owner, 2026-10-22; activation OFF until Order 19B adopts it and LEGAL_PROCEDURE_C2 records LR-01): retention policy
+ * R2-RETENTION-2. The free check (UNPAID) may pass 14 days from sealing only through the project's one extension, never past 17 days.
+ */
+export const RETENTION_POLICY_R2_2 = Object.freeze({
+  policyVersion: "R2-RETENTION-2",
+  /** The UNPAID ceiling from sealing through the one extension (retention.extendHardCapExceptions). */
+  unpaidExtendedDaysFromSeal: 17,
+});
+
+/**
+ * The edition a stored RetentionRecord.policyVersion belongs to (CP-01.02 "Retention label defect"): the column is immutable, so both
+ * labels this platform wrote before R2-RETENTION-2 (R2-RETENTION-1 on UNPAID records, R2-INITIAL on paid ordinary ones) read as the
+ * first edition; R2-RETENTION-2 is the second. Any other label is unknown.
+ */
+export function retentionPolicyEditionOf(label: string): 1 | 2 | null {
+  if (label === "R2-RETENTION-1" || label === "R2-INITIAL") return 1;
+  if (label === RETENTION_POLICY_R2_2.policyVersion) return 2;
+  return null;
+}
+
 /** Pricing definition that decides which object occurrences are billable units (registry policy.pricing.scheduleVersion). */
 export const PRICING_DEFINITION = "R2-INITIAL";
 

@@ -62,6 +62,9 @@ what those checks showed (commit `01d6c820`). They stay **pending the owner's re
 
 | Screen | Route |
 | --- | --- |
+| UI10 Agency switcher (Order 24: ListAgencies; implemented, owner review pending) | `/agencies` |
+| UI11 Projects (Order 24: ListProjects, grouped for the reader; implemented, owner review pending) | `/agencies/{agencyId}/projects` |
+| UI13 Overview (Order 24: GetProject and its ListProjects row; implemented, owner review pending) | `/agencies/{agencyId}/projects/{id}` |
 | UI14 Sources | `/agencies/{agencyId}/projects/{id}/sources` |
 | UI15 Table selection | `/agencies/{agencyId}/projects/{id}/sources/selection` |
 | UI16 Seal | `/agencies/{agencyId}/projects/{id}/sources/seal` |
@@ -74,7 +77,7 @@ what those checks showed (commit `01d6c820`). They stay **pending the owner's re
 | UI52 Support | `/agencies/{agencyId}/support` |
 | UI39 Company finance (operations) | `/ops/finance` |
 
-The sign-in flow (UI50) and the other 30 registered screens are not built yet. When they are, they follow the identity and enter this
+The sign-in flow (UI50) and the other 27 registered screens are not built yet. When they are, they follow the identity and enter this
 list as "implemented, owner review pending".
 
 ## 3. Not designed yet (planned next)

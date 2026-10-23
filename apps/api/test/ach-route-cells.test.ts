@@ -3408,8 +3408,9 @@ async function heldLosingHolder(ctx: FaultContext, what: string, session: Browse
     await conn.end().catch(() => undefined);
   }
 }
-/** No 2xx after the holder was lost: the unit's connection failure, observed on the first green run of the r4 fix as exactly 500 INTERNAL_ERROR (design K2; pinned to one value). */
-const notServed = (r: Reply): boolean => code(r) === "500 INTERNAL_ERROR -";
+/** No 2xx after the holder was lost: the unit's connection failure, pinned to one value — the retryable 503 CAPACITY_UNAVAILABLE a lost
+ * database connection answers since the O28A review F-2 fix (it was 500 INTERNAL_ERROR on the first green run of the r4 fix, design K2). */
+const notServed = (r: Reply): boolean => code(r) === "503 CAPACITY_UNAVAILABLE -";
 /** The rule 16 r4 lock assertion: the effect's own backend was the only holder, and no authentication-boundary backend was in a transaction. */
 function fencedByOwnTransaction(lost: LostHolder, what: string): void {
   assert.equal(lost.own, true, `${what}: the only session-lock holder is the effect's own unit backend (it was ${lost.usename} / ${lost.applicationName}, pid ${lost.pid})`);

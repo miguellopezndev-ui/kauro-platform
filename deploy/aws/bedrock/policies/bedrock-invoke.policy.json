@@ -1,0 +1,31 @@
+{
+  "$comment": "Order 26A: the identity policy of the Intelligence Core campaign runner's role in the workload account. It may call InvokeModel (no streaming, no Converse, no batch, no agents) on the one granted US geography inference profile, Claude Sonnet 5.5, and on that model in the profile's US destination Regions only through the profile (bedrock:InferenceProfileArn). Opus 5.5 is denied outright: A9 §4 says it needs a new owner approval. Rendered by Terraform's templatefile() exactly as deploy/aws/checks/render.mjs renders it. Created only when the bedrock module is enabled (deploy/aws/bedrock/terraform, enabled = false).",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeTheGrantedProfile",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": "arn:aws:bedrock:${SOURCE_REGION}:${ACCOUNT_ID}:inference-profile/${GRANTED_PROFILE_ID}"
+    },
+    {
+      "Sid": "InvokeTheGrantedModelThroughTheProfileOnly",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": [
+        "arn:aws:bedrock:us-east-1::foundation-model/${GRANTED_MODEL_ID}",
+        "arn:aws:bedrock:us-east-2::foundation-model/${GRANTED_MODEL_ID}",
+        "arn:aws:bedrock:us-west-2::foundation-model/${GRANTED_MODEL_ID}"
+      ],
+      "Condition": {
+        "StringEquals": { "bedrock:InferenceProfileArn": "arn:aws:bedrock:${SOURCE_REGION}:${ACCOUNT_ID}:inference-profile/${GRANTED_PROFILE_ID}" }
+      }
+    },
+    {
+      "Sid": "DenyOpusUntilTheOwnerApprovesIt",
+      "Effect": "Deny",
+      "Action": "bedrock:*",
+      "Resource": ["arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-*", "arn:aws:bedrock:*:*:inference-profile/*anthropic.claude-opus-*"]
+    }
+  ]
+}

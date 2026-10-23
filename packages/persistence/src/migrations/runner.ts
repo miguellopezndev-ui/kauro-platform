@@ -64,9 +64,9 @@ export function listMigrations(dir: string = MIGRATIONS_DIR): ReadonlyArray<Migr
     const sql = readFileSync(join(dir, file), "utf8");
     out.push({ version, name: m[2]!, file, sql, checksum: createHash("sha256").update(sql).digest("hex") });
   }
-  for (let i = 0; i < out.length; i++) {
-    if (out[i]!.version !== i + 1) throw new Error(`migration versions must be contiguous from 0001; found ${out[i]!.file} at position ${i + 1}`);
-  }
+  // versions start at 0001 and only increase; a gap is allowed (Stage A reserves disjoint ranges per order, so a range may stay partly
+  // unused), but a pending file is never applied below a version the database already recorded (applyUnderRunnerLock)
+  if (out.length > 0 && out[0]!.version !== 1) throw new Error(`migration versions start at 0001; found ${out[0]!.file} first`);
   return out;
 }
 
@@ -179,6 +179,10 @@ async function applyUnderRunnerLock(client: Client, files: ReadonlyArray<Migrati
     return client.query<{ version: number; name: string; checksum: string }>("SELECT version, name, checksum FROM kauro_meta.schema_migrations ORDER BY version");
   });
   const byVersion = new Map(recorded.rows.map((r) => [r.version, r]));
+  const highestRecorded = recorded.rows.reduce((max, r) => Math.max(max, r.version), 0);
+  // out of order: a file below the highest recorded version that the ledger lacks would run after migrations written after it
+  const late = files.filter((f) => !byVersion.has(f.version) && f.version < highestRecorded);
+  if (late.length > 0) throw new Error(`migration ${late[0]!.file} is pending below the applied version ${highestRecorded}: migrations are applied in version order only`);
   const applied: MigrationFile[] = [];
   const skipped: MigrationFile[] = [];
   for (const f of files) {

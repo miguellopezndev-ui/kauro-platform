@@ -108,7 +108,7 @@ const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: num
   { file: "packages/domain/src/model/idempotency.ts", line: 17, text: 'export const ENVIRONMENTS: ReadonlyArray<Environment> = ["LOCAL", "SANDBOX", "LIVE"];' },
   { file: "packages/persistence/src/environment.ts", line: 23, text: 'const NAMES: ReadonlyArray<string> = Object.freeze(["LOCAL", "SANDBOX", "LIVE"]);' },
   { file: "apps/web/src/server/host-config.ts", line: 49, text: 'if (blank(publicOrigin) && blank(appOrigin)) return local ? { ok: true, policy: { kind: "LOCAL" } } : { ok: false, problem: "ORIGINS_MISSING" };' },
-  { file: "apps/web/playwright.config.ts", line: 39, text: 'KAURO_ENV: process.env["KAURO_ENV"] ?? "LOCAL",' },
+  { file: "apps/web/playwright.config.ts", line: 41, text: 'KAURO_ENV: process.env["KAURO_ENV"] ?? "LOCAL",' },
 ];
 
 /**

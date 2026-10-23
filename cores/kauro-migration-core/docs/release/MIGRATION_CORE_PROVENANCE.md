@@ -5,9 +5,9 @@ by `node tools/provenance.mjs` from the evidence on disk, so it cannot drift
 from the repository it describes. Every gate state below is read from the
 evidence that gate wrote; none is asserted here.
 
-- Core version `3.0.0`, package `3.0.0`, package format `2.1.0`
-- Source registry reviewed `2026-09-06`
-- Campaign `c_c87b11a87f0014e3`, sealed 2026-10-02T12:30:16Z, over subject `045214ef4302d902`
+- Core version `3.1.0`, package `3.1.0`, package format `2.1.0`
+- Source registry reviewed `2026-10-22`
+- Campaign `c_d5743d46c84d7343`, sealed 2026-10-23T01:35:39Z, over subject `f2b6d153940b8b03`
 - `MIGRATION_CORE_IMPLEMENTATION_FROZEN` is decided by `tools/freeze-verdict.mjs`, outside this tree
 
 ## Support envelope
@@ -71,7 +71,7 @@ way.
 | `qualification/candidate/provenance.json` | yes | yes | `6de2960309ac99ac` |
 | `qualification/candidate/preflight.json` | yes | yes | `9c102dcc3aa994a4` |
 | `qualification/candidate/universe.json` | yes | yes | `fa61e1fb4f2a19bf` |
-| `qualification/candidate/campaign.json` | yes | yes | `dff2eb585d0f2130` |
+| `qualification/candidate/campaign.json` | yes | yes | `611bf180761fa5fd` |
 | `qualification/evidence/HUBSPOT_SCOPE_BLOCKER.md` | yes | yes | `2f54cb91630f8c41` |
 | `qualification/evidence/SF_DATALOADER_AUTH.md` | yes | yes | `e8eb1c20e9ea6607` |
 | `qualification/evidence/TENANT_SAFETY.md` | yes | yes | `4428b9c5b9ca47fe` |

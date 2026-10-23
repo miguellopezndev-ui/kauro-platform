@@ -71,6 +71,7 @@ import type { CreateQuoteView, QuoteEligibilityView } from "../views.js";
 import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
 import { requireMembershipOf } from "../agency/shared.js";
 import { completeReplacement, issueReplacement, replacementContextOf, settleReplacement, type ReplacementContext } from "./replacement.js";
+import { bindsCleanHash } from "../../commands/runtime.js";
 import type { QuoteCollaborators, QuoteReads } from "./runtime.js";
 
 /** The seconds a caller waits before it retries a replacement whose re-binding did not answer (the 202's polling guidance). */
@@ -184,7 +185,9 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
         if (plan.approvalId !== undefined) await reads.awaitApproval(plan.approvalId);
         const approval = plan.approvalId === undefined ? null : await uow.approvals.get(plan.approvalId);
         const revision = await uow.revisions.lockSealedByHash(agencyId, projectId, plan.revisionHash);
-        const target = await uow.targetContracts.lockCurrentByHash(agencyId, projectId, plan.targetContractHash);
+        // a CLEAN plan binds the canonical CLEAN hash and reads no target (CP-02.01, candidate activation only)
+        const clean = await bindsCleanHash(runtime, uow, { agencyId, projectId, targetContractHash: plan.targetContractHash });
+        const target = clean ? null : await uow.targetContracts.lockCurrentByHash(agencyId, projectId, plan.targetContractHash);
         const profile = await uow.commerce.fiscal.currentProfile(agencyId);
         const issuedAt = await reads.serverNow();
 
@@ -211,7 +214,7 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
         if (sources === null) throw new DomainFailure("INTEGRITY_FAILURE", "no source availability reader is bound in this deployment", { reason: "PLAN_SERVICES_UNAVAILABLE" });
         const availability = revision === null || revision.state !== "SEALED" || revision.availableUntil === null ? null : await sources.availabilityOf(uow, { agencyId, projectId, revisionHash: plan.revisionHash });
         if (availability === null || availability.state !== "SEALED" || instantMs(issuedAt) >= instantMs(availability.effectiveDeadline)) throw blockerFailure("SOURCE_EXPIRED");
-        if (target === null || target.confirmedAt === undefined || target.supersededAt !== undefined) throw blockerFailure("TARGET_STALE");
+        if (!clean && (target === null || target.confirmedAt === undefined || target.supersededAt !== undefined)) throw blockerFailure("TARGET_STALE");
         if (profile === null || profile.profileId !== (envelope.body.billingProfileRef as FiscalProfileId)) throw refuse("BILLING_PROFILE_MISMATCH", "billingProfileRef is not the agency's current fiscal profile");
         const rule = quotableTaxRule(profile, issuedAt);
         if (rule.kind === "BLOCKED") throw blockerFailure("FISCAL_TREATMENT_UNREVIEWED");

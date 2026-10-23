@@ -52,7 +52,7 @@ test("R42: the runtime roles read the ledger (and cannot write it); compared wit
     await oracle.query("UPDATE kauro_meta.schema_migrations SET checksum = $2 WHERE version = $1", [last.version, original.rows[0]?.checksum]);
     // a shipped version not recorded: BEHIND
     const row = await oracle.query<{ name: string; checksum: string }>("DELETE FROM kauro_meta.schema_migrations WHERE version = $1 RETURNING name, checksum", [last.version]);
-    assert.deepEqual(compareSchema(await readSchemaLedger(app, 2_000), shipped), { kind: "BEHIND", codeVersion: last.version, databaseVersion: last.version - 1, missing: [last.version] });
+    assert.deepEqual(compareSchema(await readSchemaLedger(app, 2_000), shipped), { kind: "BEHIND", codeVersion: last.version, databaseVersion: shipped[shipped.length - 2]?.version ?? 0, missing: [last.version] });
     await oracle.query("INSERT INTO kauro_meta.schema_migrations (version, name, checksum) VALUES ($1, $2, $3)", [last.version, row.rows[0]?.name, row.rows[0]?.checksum]);
     // a newer expand migration applied by the next release: still compatible for the release that serves now
     await oracle.query("INSERT INTO kauro_meta.schema_migrations (version, name, checksum) VALUES ($1, 'next_release_expand', repeat('a', 64))", [last.version + 1]);

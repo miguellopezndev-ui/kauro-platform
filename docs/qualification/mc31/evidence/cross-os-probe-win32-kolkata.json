@@ -1,0 +1,117 @@
+{
+  "gate": "DETERMINISM-CROSS-OS-01",
+  "probe": true,
+  "subject": {
+    "commit": "bc4f6299c42ef627d121833579a0958ac6853346",
+    "clean": true,
+    "statedBy": "PROBE",
+    "engineDigest": "335acc37cbd0edf3ded5a9ec20b85137a79e8711e78752dfe54e00a8c68af0aa"
+  },
+  "canonical": {
+    "packageDigest": "d9de42840ebcb10f0d60fda9aa15e417a2e58f40f025b7569d7b13b14cfbf930",
+    "artifacts": [
+      {
+        "path": "01_IMPORT/clean-only/contacts.csv",
+        "sha256": "845045f44beed1761984b710640c51a3b133ae3556a49543ed40f7d64754ce21"
+      },
+      {
+        "path": "02_EXCEPTIONS/destination-conflicts.csv",
+        "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+      },
+      {
+        "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+        "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+      },
+      {
+        "path": "02_EXCEPTIONS/formula-risk.csv",
+        "sha256": "c56bc99e6ef7aecb7ecc178956026fbf5e044a8fe88836bc4c6380715c8a4006"
+      },
+      {
+        "path": "02_EXCEPTIONS/isolated.csv",
+        "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+      },
+      {
+        "path": "02_EXCEPTIONS/leftovers.csv",
+        "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+      },
+      {
+        "path": "02_EXCEPTIONS/rejected-input.csv",
+        "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+      },
+      {
+        "path": "02_EXCEPTIONS/unmapped-fields.csv",
+        "sha256": "e193b1fb95b588a0f8fec5a42f961b36e4e8c2bfb7f03bd122531811da153106"
+      },
+      {
+        "path": "02_EXCEPTIONS/unresolved-associations.csv",
+        "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+      },
+      {
+        "path": "03_TRACEABILITY/associations.csv",
+        "sha256": "8dffe96314114baf20a78b2c4e861f78a2bfdba215777b90aa7259c11be49673"
+      },
+      {
+        "path": "03_TRACEABILITY/changes.csv",
+        "sha256": "306c212cba85e82f0da921e61ba45c9e39606edf62573790c1d41732704319d9"
+      },
+      {
+        "path": "03_TRACEABILITY/config.normalized.json",
+        "sha256": "a7cb4b7557afd89359dd568fca4e332feaeadebaf8375f569a50850327b99f8f"
+      },
+      {
+        "path": "03_TRACEABILITY/destination-matching.csv",
+        "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+      },
+      {
+        "path": "03_TRACEABILITY/flags.csv",
+        "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+      },
+      {
+        "path": "03_TRACEABILITY/import-crosswalk.csv",
+        "sha256": "52b94a81130e92b5a643590862fa519ea0361eb821d18957391bbdfab6b0e1b1"
+      },
+      {
+        "path": "03_TRACEABILITY/instance-verification.csv",
+        "sha256": "418e6bd6d0d7bad87790f4625e9ae9d5be53da8cc2b9b0f6145cee9eaad57d44"
+      },
+      {
+        "path": "03_TRACEABILITY/merges.json",
+        "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+      },
+      {
+        "path": "03_TRACEABILITY/reconciliation.json",
+        "sha256": "e6c2f25a6965b405e3841d5c5e656a6bd5af1b383eec42391504673d54938923"
+      },
+      {
+        "path": "03_TRACEABILITY/source-lineage.csv",
+        "sha256": "95da76503dac7314904eea766c7cbc7559866621d3da84aa567b06092bc2dc51"
+      },
+      {
+        "path": "04_DOCUMENTATION/audit.md",
+        "sha256": "6e1ea3365b1ee26f1c58e0e35f5ca0a0597dc45d16a64c18fd4f6760c27d9f99"
+      },
+      {
+        "path": "04_DOCUMENTATION/import-instructions.md",
+        "sha256": "e0282214481a1c5d0c3bca9491725ec1641b83c4d9fc0c7d5b48c87b867e8cd6"
+      },
+      {
+        "path": "manifest.json",
+        "sha256": "bceb474007542a1173825c637b852fcb0ceeeb302b3d51f9827aacc326673324"
+      }
+    ]
+  },
+  "variable": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.20.0",
+    "tzdata": "2026c",
+    "icu": "78.3",
+    "tz": "Asia/Kolkata",
+    "lang": "de_DE.UTF-8",
+    "lcAll": "de_DE.UTF-8",
+    "resolvedTimeZone": "Asia/Calcutta",
+    "resolvedLocale": "en-US",
+    "hostSha256": "76ed42d22129dc354362704eb4b54208041b68736f976932aada43bc0035f7c0",
+    "observedAt": "2026-10-23T01:43:13Z"
+  }
+}

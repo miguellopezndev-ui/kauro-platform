@@ -74,6 +74,7 @@ import {
   type ValidationSettled,
   type ValidationSettlement,
   type VersionedWrite,
+  retentionAnchorHashOf,
 } from "@kauro/domain";
 import { PgLeaseStore } from "../lease-store.js";
 import { PgRequestJournal } from "../request-journal.js";
@@ -133,7 +134,8 @@ const LEASE_COLUMNS = "resource_kind, resource_id, owner_id, fence, expires_at, 
 
 /** The audit's identity keys every audit event carries (model/audit/events.ts). */
 function auditKeys(a: AuditRecord, previousState: string): EventPayload {
-  return { auditId: a.auditId, agencyId: a.agencyId, projectId: a.projectId, revisionId: a.revisionId, targetContractId: a.targetContractId, grantId: a.grantId, fence: a.fence, previousState, state: a.state };
+  // a CLEAN audit names no target contract and its events omit the key (CP-02.01: audit.*.v1 read targetContractId as optional)
+  return { auditId: a.auditId, agencyId: a.agencyId, projectId: a.projectId, revisionId: a.revisionId, ...(a.targetContractId === undefined ? {} : { targetContractId: a.targetContractId }), grantId: a.grantId, fence: a.fence, previousState, state: a.state };
 }
 
 /** Money as a payload count: a grant's cents stay far inside the safe integers (its ceiling is an owner's monthly statement). */
@@ -160,6 +162,55 @@ export class PgAuditStore implements AuditStore {
   private async emit(aggregateKind: AggregateKind, aggregateId: string, agencyId: AgencyId, aggregateVersion: number, eventType: EventType, payload: EventPayload): Promise<void> {
     const p = this.ctx.provenance();
     await this.ctx.events.publish({ aggregateKind, aggregateId, aggregateVersion, agencyId, eventType, actor: p.actor, causationId: p.causationId, correlationId: p.correlationId, payload });
+  }
+
+  /**
+   * CP-01.02 (Order 21; migration 0111, switch kauro.retention_r2_2_active(), off until Order 19B): the transaction that ends an audit
+   * writes its revision's AUDIT_TERMINAL anchor and sets the revision's ACTIVE UNPAID record's soft deadline once, least(end + 604800 s,
+   * hard deadline) (09 "Retention schedule": seven days after DRAFT_READY or terminal failure; retention.unpaidDaysFromReady). Nothing
+   * while the switch is off; nothing for a record that already has a soft deadline or whose hard deadline an extension moved, nor on a
+   * later audit of the same revision (one anchor per revision: retries never extend it).
+   */
+  private async unpaidSoftDeadlineAtEnd(audit: AuditRecord): Promise<void> {
+    const active = await execute<{ active: boolean }>(this.db, "SELECT kauro.retention_r2_2_active() AS active");
+    if (active.rows[0]?.active !== true) return;
+    const records = await execute<{ retention_id: string }>(
+      this.db,
+      `SELECT retention_id FROM kauro.retention_records
+        WHERE agency_id = $1 AND revision_id = $2 AND class = 'UNPAID' AND state = 'ACTIVE' AND soft_deadline IS NULL AND extended_hard_deadline IS NULL
+        FOR NO KEY UPDATE`,
+      [audit.agencyId, audit.revisionId],
+    );
+    const record = records.rows[0];
+    if (!record) return;
+    const occurredAt = await serverInstantOf(this.db);
+    const evidenceHash = retentionAnchorHashOf({ kind: "AUDIT_TERMINAL", agencyId: audit.agencyId, projectId: audit.projectId, revisionId: audit.revisionId, uploadId: null, occurredAt, sourceEvidenceHash: audit.revisionHash });
+    const anchor = await execute<{ anchor_id: string }>(
+      this.db,
+      `INSERT INTO kauro.retention_anchors (anchor_id, agency_id, project_id, revision_id, upload_id, anchor_kind, occurred_at, evidence_hash, created_at)
+       VALUES ($1, $2, $3, $4, NULL, 'AUDIT_TERMINAL', kauro.server_now(), $5, kauro.server_now())
+       ON CONFLICT (revision_id, anchor_kind) WHERE upload_id IS NULL DO NOTHING RETURNING anchor_id`,
+      [this.ctx.ids.next(), audit.agencyId, audit.projectId, audit.revisionId, evidenceHash],
+    );
+    if (!anchor.rows[0]) return;
+    const soft = await execute<{ version: string }>(
+      this.db,
+      `UPDATE kauro.retention_records
+          SET version = version + 1, soft_deadline = least(kauro.server_now() + interval '604800 seconds', hard_deadline),
+              effective_deadline = least(kauro.server_now() + interval '604800 seconds', hard_deadline)
+        WHERE retention_id = $1 AND soft_deadline IS NULL AND extended_hard_deadline IS NULL RETURNING version::text AS version`,
+      [record.retention_id],
+    );
+    const moved = soft.rows[0];
+    if (!moved) throw new DomainFailure("INTEGRITY_FAILURE", "the locked UNPAID retention record moved while its soft deadline was written");
+    await this.emit("retention_record", record.retention_id, audit.agencyId, int(moved.version), "retention_record.soft_deadline_set.v1", {
+      retentionId: record.retention_id,
+      agencyId: audit.agencyId,
+      projectId: audit.projectId,
+      revisionId: audit.revisionId,
+      retentionClass: "UNPAID",
+      anchorEvidenceHash: evidenceHash,
+    });
   }
 
   private async grantEvent(grant: CostGrantRecord, previousState: string): Promise<void> {
@@ -256,7 +307,7 @@ export class PgAuditStore implements AuditStore {
       projectId: record.projectId,
       revisionId: record.revisionId,
       revisionHash: record.revisionHash,
-      targetContractId: record.targetContractId,
+      ...(record.targetContractId === undefined ? {} : { targetContractId: record.targetContractId }),
       targetContractHash: record.targetContractHash,
       grantId: record.grantId,
       state: record.state,
@@ -286,6 +337,7 @@ export class PgAuditStore implements AuditStore {
       actorKind: cancellation.actor.kind,
       reasonCode: cancellation.reasonCode,
     });
+    await this.unpaidSoftDeadlineAtEnd(record);
     return { kind: "APPLIED", record };
   }
 
@@ -428,6 +480,7 @@ export class PgAuditStore implements AuditStore {
               ? { draftPlanId: edge.draftPlanId }
               : {};
     await this.emit("audit", record.auditId, record.agencyId, record.version, auditEventTypeOf(record.state), { ...keys, ...extra });
+    if (record.terminalAt !== undefined) await this.unpaidSoftDeadlineAtEnd(record);
     return { kind: "APPLIED", record };
   }
 
@@ -436,9 +489,12 @@ export class PgAuditStore implements AuditStore {
     if (audit === null) throw new NotFoundFailure("audit");
     // the audit's target after its shared transition lock, before the plan is born (B17 M13): a supersession in flight is ordered before
     // the draft (and then refuses it) or after it (and then the plan stays, fenced by ApprovePlan); the birth trigger checks the same again
-    await execute(this.db, "SELECT kauro.await_transition('kauro.target_contracts', $1)", [audit.targetContractId]);
-    const target = await execute<{ superseded_at: unknown }>(this.db, "SELECT superseded_at FROM kauro.target_contracts WHERE agency_id = $1 AND contract_id = $2", [audit.agencyId, audit.targetContractId]);
-    if (target.rows[0]?.superseded_at !== null) throw new DomainFailure("TARGET_STALE", "the audit's target contract is no longer current; no system draft is born on it");
+    // a CLEAN audit (Order 20) names no target: its draft binds CLEAN_ONLY_TARGET_HASH and reads no target row (plans_clean_binding, 0097)
+    if (audit.targetContractId !== undefined) {
+      await execute(this.db, "SELECT kauro.await_transition('kauro.target_contracts', $1)", [audit.targetContractId]);
+      const target = await execute<{ superseded_at: unknown }>(this.db, "SELECT superseded_at FROM kauro.target_contracts WHERE agency_id = $1 AND contract_id = $2", [audit.agencyId, audit.targetContractId]);
+      if (target.rows[0]?.superseded_at !== null) throw new DomainFailure("TARGET_STALE", "the audit's target contract is no longer current; no system draft is born on it");
+    }
     // the draft DRAFT (v1) of exactly the audit's subject, created by the audit's requester (the database checks both, D8-AUD-4)
     await execute(
       this.db,

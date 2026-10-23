@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { attemptIdentityOf, attemptStagingPrefixOf, stagedManifestObjectNameOf, type AttemptCapability, type CancellationChannel, type CoreEvidenceClass, type ExecutionLimits, type ObjectStoragePort, type ValidatePort, type ValidateResult } from "@kauro/application";
 import { DOMAINS, canonicalBytes, isSha256Hex, rawDigest, structuredDigest, type RowCounts, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { AttemptEnvelopeFailure, AttemptScratchStore, GenerationSourceReader } from "@kauro/data-plane";
-import { targetBodyDigest, type AgencyId, type Environment, type PlanBody, type PlanId, type TargetBody, type ValidationReceiptId, type ValidationReceiptRecord, type ValidationSource } from "@kauro/domain";
+import { CLEAN_ONLY_TARGET_HASH, targetBodyDigest, type AgencyId, type Environment, type PlanBody, type PlanId, type TargetBody, type ValidationReceiptId, type ValidationReceiptRecord, type ValidationSource, type ValidationTarget } from "@kauro/domain";
 import { importerProfileRefusal } from "./importer-profile.js";
 import { PgValidationReceiptRecorder, createPool, type DatabaseEnvironment, type PoolErrorSink } from "@kauro/persistence";
 
@@ -184,7 +184,7 @@ export interface ValidationRun {
    * targetContractHash (TARGET_DIGEST_MISMATCH) and its importer profile must carry the plan (importer-profile.ts, R2-018..022). Absent:
    * nothing is validated (TARGET_UNAVAILABLE).
    */
-  readonly target: TargetBody | null;
+  readonly target: ValidationTarget | null;
   /** The server's instant once the validator answered (a unit of its own, D8-CLOCK-1). */
   readonly completedAt: () => Promise<UtcInstant>;
 }
@@ -212,9 +212,14 @@ export class PlanValidator {
     if (planBodyHashOf(run.body) !== run.subject.planHash) return { kind: "CONTRACT_FAILURE", reason: "BODY_DIGEST_MISMATCH", evidenceClass: "EXECUTED_LOCAL" };
     // the target the plan binds, exactly (ADV-19), then the importer profile that must carry the plan (M3; R2-018..022): both before the core
     if (run.target === null) return { kind: "CONTRACT_FAILURE", reason: "TARGET_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" };
-    if (targetBodyDigest(run.target) !== run.subject.targetContractHash) return { kind: "CONTRACT_FAILURE", reason: "TARGET_DIGEST_MISMATCH", evidenceClass: "EXECUTED_LOCAL" };
-    const refusal = importerProfileRefusal(run.body, run.target);
-    if (refusal !== null) return { kind: "CONTRACT_FAILURE", reason: refusal, evidenceClass: "EXECUTED_LOCAL" };
+    if (run.target === "CLEAN_ONLY") {
+      // a CLEAN plan (Order 20, CP-02.01) binds the canonical CLEAN hash and no target: there is no body digest or importer profile to judge
+      if (run.subject.targetContractHash !== CLEAN_ONLY_TARGET_HASH) return { kind: "CONTRACT_FAILURE", reason: "TARGET_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" };
+    } else {
+      if (targetBodyDigest(run.target) !== run.subject.targetContractHash) return { kind: "CONTRACT_FAILURE", reason: "TARGET_DIGEST_MISMATCH", evidenceClass: "EXECUTED_LOCAL" };
+      const refusal = importerProfileRefusal(run.body, run.target);
+      if (refusal !== null) return { kind: "CONTRACT_FAILURE", reason: refusal, evidenceClass: "EXECUTED_LOCAL" };
+    }
     const sealed = run.source;
     if (sealed === null || sealed.revisionState !== "SEALED" || sealed.populations === null || sealed.acceptedGenerations.length === 0) {
       return { kind: "CONTRACT_FAILURE", reason: "VALIDATION_SOURCE_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" };

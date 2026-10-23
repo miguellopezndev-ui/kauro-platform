@@ -49,7 +49,8 @@ export interface NewAudit {
   readonly projectId: ProjectId;
   readonly revisionId: RevisionId;
   readonly revisionHash: Sha256Hex;
-  readonly targetContractId: TargetContractId;
+  /** Null for CLEAN, whose targetContractHash is CLEAN_ONLY_TARGET_HASH (Order 20; candidate activation only). */
+  readonly targetContractId: TargetContractId | null;
   readonly targetContractHash: Sha256Hex;
   readonly auditPolicyVersion: string;
   /** The acting operator's own membership: the audit's requester and the creator of its system draft. */

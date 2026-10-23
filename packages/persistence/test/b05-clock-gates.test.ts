@@ -45,6 +45,10 @@ const OWNER_BY_STEM: Readonly<Record<string, string>> = {
   b12_owner_tools: "B12",
   b13_report_sources: "B13",
   b13_branding_logos: "B13",
+  // order 20 re-creates kauro.audits_workflow with 0023's deadline gates unchanged (only its target branch is new): they stay B05's
+  o20_clean_without_target: "B05",
+  // order 20 re-creates 0024's package publication guard (and 0015's authorization guard, no clock site) with its clock sites unchanged: B08's
+  o20_clean_purchase_execution: "B08",
 };
 const stemOfTag = (tag: string): string | undefined => {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.startsWith(`${tag}_`) && f.endsWith(".sql"));
@@ -263,6 +267,7 @@ const APP_CLASSES: ReadonlyArray<{ file: string; text: RegExp; class: AppRow["cl
   { file: "apps/control/src/audit/orchestration.ts", text: /completedAt: \(\) => serverNowIn/, class: "STAMP", reason: "a receipt stamp, judged nowhere in the app" },
   { file: "apps/control/src/audit/plan-validation.ts", text: /serverNow/, class: "STAMP", reason: "a receipt stamp, judged nowhere in the app" },
   { file: "apps/control/src/audit/work.ts", text: /serverNow\(\)/, class: "STAMP", reason: "serverNowIn: the database clock read for a stamp" },
+  { file: "packages/persistence/src/audit/store.ts", text: /const occurredAt = await serverInstantOf/, class: "STAMP", reason: "the AUDIT_TERMINAL anchor's instant, digested into its evidence hash only (O21, 0111): the anchor's own trigger stamps occurred_at = kauro.server_now() and binds it at COMMIT" },
   { file: "packages/persistence/src/audit/store.ts", text: /serverInstantOf/, class: "STAMP", reason: "reserved_at: a record instant (the reservation's deadline gates judge at COMMIT, request_journal_commit_gate)" },
 ];
 

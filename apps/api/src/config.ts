@@ -12,7 +12,7 @@
  * Every variable is validated here; a malformed or missing value refuses the start with the variable name (never its value).
  */
 import { readFileSync } from "node:fs";
-import { isApplicationOrigin } from "@kauro/application";
+import { isApplicationOrigin, type CandidateActivation } from "@kauro/application";
 import type { Environment } from "@kauro/domain";
 import { ENVIRONMENTS, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { ConnectionSecurityError, claimEnvironmentMinter, type DatabaseEnvironment, DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS, DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS, DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS, connectionSecurityOf, type ConnectionSecurityInput } from "@kauro/persistence";
@@ -98,6 +98,11 @@ export interface ApiConfig {
   readonly identity: IdentityConfig | null;
   /** Present when KAURO_PUBLIC_ORIGIN, KAURO_APP_ORIGIN and KAURO_PUBLIC_HASH_KEY_FILE are all set; the public routes exist only then. */
   readonly publicApi: PublicApiConfig | null;
+  /**
+   * Behaviour built against the O19A re-issue candidate (Order 20), OFF by default: KAURO_CANDIDATE_CLEAN_NO_TARGET=true switches on CLEAN
+   * without a target contract (CP-01.01, CP-02.01), in the LOCAL environment only until Order 19B adopts the candidate.
+   */
+  readonly candidate: CandidateActivation;
 }
 
 /** The session boundary's configuration (B11 W2). */
@@ -221,6 +226,9 @@ function integer(env: Env, name: string, fallback: number | undefined, min: numb
   return n;
 }
 
+/** Order 20: CLEAN without a target contract, built against the O19A candidate; OFF unless set to true, LOCAL only. */
+export const CANDIDATE_CLEAN_VARIABLE = "KAURO_CANDIDATE_CLEAN_NO_TARGET";
+
 function flag(env: Env, name: string, fallback: boolean): boolean {
   const raw = optional(env, name);
   if (raw === undefined) return fallback;
@@ -305,6 +313,8 @@ export function loadConfig(env: Env = process.env): ApiConfig {
   } else if (optional(env, MIGRATOR_PASSWORD_FILE_VARIABLE) !== undefined) {
     throw new ConfigError(MIGRATOR_PASSWORD_FILE_VARIABLE, "is accepted only with KAURO_DB_MIGRATE_ON_START=true");
   }
+  const cleanWithoutTarget = flag(env, CANDIDATE_CLEAN_VARIABLE, false);
+  if (cleanWithoutTarget && environment !== "LOCAL") throw new ConfigError(CANDIDATE_CLEAN_VARIABLE, "is accepted in the LOCAL environment only: the O19A candidate is not adopted (Order 19B)");
   const bearerTokensFile = optional(env, "KAURO_AUTH_BEARER_TOKENS_FILE") ?? null;
   if (bearerTokensFile !== null && environment !== "LOCAL") throw new ConfigError("KAURO_AUTH_BEARER_TOKENS_FILE", "is accepted in the LOCAL environment only");
   const config: ApiConfig = {
@@ -335,6 +345,7 @@ export function loadConfig(env: Env = process.env): ApiConfig {
     cursorKeyFile: optional(env, CURSOR_KEY_FILE_VARIABLE) ?? null,
     identity: null,
     publicApi: publicApiOf(env, environment),
+    candidate: { cleanWithoutTarget },
   };
   const identity = identityOf(env, environment, runtimeUser, config.database.poolMax, migrateOnStart?.user ?? null);
   // one application origin (B11 stage-1 integration, D-INT1-6): the origin the public inquiry accepts as the application's (W5b,

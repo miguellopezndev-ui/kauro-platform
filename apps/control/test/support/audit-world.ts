@@ -168,7 +168,7 @@ export async function openAuditWorld(w: ExecutionWorld): Promise<AuditWorld> {
           projectId: s.projectId,
           revisionId: s.revisionId,
           revisionHash: s.revisionHash,
-          targetContractId: s.contractId as TargetContractId,
+          targetContractId: s.contractId === "" ? null : (s.contractId as TargetContractId),
           targetContractHash: s.targetContractHash,
           auditPolicyVersion: "R2-INITIAL",
           requestedByMembershipId: s.agency.ownerMembershipId as MembershipId,

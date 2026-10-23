@@ -46,6 +46,7 @@ export {
   FAILURE_CODES,
   AUTHORITY_FAILURE_CODES,
   FAILURE_REASONS,
+  CANDIDATE_FAILURE_REASONS,
   FAILURE_HTTP_STATUS,
   FAILURE_TITLES,
   RETRYABLE_FAILURE_CODES,
@@ -260,3 +261,5 @@ export * from "./model/breakglass.js";
 export * from "./model/import-stage.js";
 // PAID_STAGED retention deadlines of a staged import workflow (package B16 lane L7: R2-054, R2-055; mirror of migration 0062)
 export * from "./model/staged-retention.js";
+// Order 22 (seller money, statements balance, claim refusals and reviews, alerts): candidate rules, activation OFF
+export * as o22 from "./commercial/o22/index.js";

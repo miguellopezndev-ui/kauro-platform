@@ -151,7 +151,7 @@ export function auditRecord(r: Row): AuditRecord {
     projectId: str<ProjectId>(r["project_id"]),
     revisionId: str<RevisionId>(r["revision_id"]),
     revisionHash: str<Sha256Hex>(r["revision_hash"]),
-    targetContractId: str<TargetContractId>(r["target_contract_id"]),
+    ...(r["target_contract_id"] === null ? {} : { targetContractId: str<TargetContractId>(r["target_contract_id"]) }),
     targetContractHash: str<Sha256Hex>(r["target_contract_hash"]),
     auditPolicyVersion: str(r["audit_policy_version"]),
     requestedByMembershipId: str<MembershipId>(r["requested_by_membership_id"]),

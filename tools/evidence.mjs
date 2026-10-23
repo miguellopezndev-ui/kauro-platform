@@ -49,6 +49,8 @@ export const SUITES = [
   { name: "application", cwd: "packages/application", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "persistence", cwd: "packages/persistence", script: 'node --test --test-reporter=spec --test-concurrency=2 "dist/test/**/*.test.js"', args: ["--test-concurrency=2", "dist/test/**/*.test.js"] },
   { name: "authorization", cwd: "packages/authorization", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  // order O23A: the provider-neutral identity layer (pluggable providers, step-up, recovery, e-mail challenges, breach screen, abuse limits)
+  { name: "identity", cwd: "packages/identity", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "data-plane", cwd: "packages/data-plane", script: 'node --test --test-timeout=300000 --test-reporter=spec "dist/test/**/*.test.js"', args: ["--test-timeout=300000", "dist/test/**/*.test.js"] },
   { name: "api", cwd: "apps/api", script: 'node --test --test-reporter=spec --test-concurrency=3 "dist/test/**/*.test.js"', args: ["--test-concurrency=3", "dist/test/**/*.test.js"] },
   { name: "control", cwd: "apps/control", script: 'node --test --test-reporter=spec --test-concurrency=2 "dist/test/**/*.test.js"', args: ["--test-concurrency=2", "dist/test/**/*.test.js"] },

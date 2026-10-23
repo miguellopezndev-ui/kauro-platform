@@ -1,0 +1,41 @@
+{
+  "name": "@kauro/identity",
+  "version": "0.1.0",
+  "description": "Kauro identity (O23A): the provider-neutral identity layer behind the B11 session boundary — pluggable identity providers (Identity Platform as served, Cognito as an offline candidate with its activation off), the step-up policy of sensitive actions, recovery codes, e-mail verification challenges, breached-password screening by k-anonymity, abuse limits, and the revocation of every session of a person. Offline simulators are the test-only subpath @kauro/identity/testing.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./testing": {
+      "types": "./dist/src/testing.d.ts",
+      "default": "./dist/src/testing.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/application": "workspace:*",
+    "@kauro/contracts": "workspace:*",
+    "@kauro/domain": "workspace:*",
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

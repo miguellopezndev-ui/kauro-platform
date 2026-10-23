@@ -360,7 +360,14 @@ export const FAILURE_REASONS = [
   // outreach (package B12: CMD061..CMD064, the dispatcher D2..D5; KA095..KA098, KC028..KC037)
   ...OUTREACH_FAILURE_REASONS,
 ] as const;
-export type FailureReason = (typeof FAILURE_REASONS)[number];
+/**
+ * Reasons of behaviour built against the O19A re-issue candidate (Order 20; CP-02.01: the project mode decides whether StartAudit names a
+ * target contract). Kept out of FAILURE_REASONS, so the served Problem schema and OpenAPI stay the in-force ones: only a deployment that
+ * switched the candidate on answers them, and its validator admits them (createSchemaValidator). Order 19B appends them on adoption.
+ */
+export const CANDIDATE_FAILURE_REASONS = ["TARGET_CONTRACT_REQUIRED", "TARGET_NOT_APPLICABLE"] as const;
+
+export type FailureReason = (typeof FAILURE_REASONS)[number] | (typeof CANDIDATE_FAILURE_REASONS)[number];
 
 /**
  * The field code of a typed-patch rejection (CMD023): the reference resolved, the patch it names was refused by the compiler,
