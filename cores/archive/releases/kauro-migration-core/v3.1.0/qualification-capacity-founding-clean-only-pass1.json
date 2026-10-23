@@ -1,0 +1,63 @@
+{
+ "gate": "CAPACITY-FOUNDING (O18A, PARTIAL)",
+ "profile": "FOUNDING-CLEAN-ONLY-1M",
+ "mode": "CLEAN_ONLY",
+ "rung": 1000000,
+ "campaignId": "c_d5743d46c84d7343",
+ "pass": 1,
+ "of": 2,
+ "status": "PARTIAL: pass 1 completed and recorded by the child (bench/capacity/<case>/result.json); the invocation was stopped by the host's memory-pressure reaper during pass 1's attestation, so tools/capacity.mjs wrote no qualification/capacity record. HUBSPOT and SALESFORCE were not reached.",
+ "limits": {
+  "memoryBudgetBytes": 6012954214,
+  "scratchBudgetBytes": 51539607552,
+  "wallClockLimitMs": 28800000
+ },
+ "environment": {
+  "platform": "win32 x64 10.0.26300",
+  "cpus": 12,
+  "totalMemoryBytes": 14893805568,
+  "node": "v24.20.0",
+  "sharedWith": "four other builders' test runs; free memory 0.9 to 2.3 GB during the pass"
+ },
+ "measured": {
+  "ok": true,
+  "sourceRows": 1003000,
+  "rowsIngested": 1003000,
+  "equationHolds": true,
+  "delivered": 950000,
+  "packageBytes": 1700374725,
+  "edges": 600000,
+  "mergedRows": 50000,
+  "checksRun": 60,
+  "profileMs": 307979.2745,
+  "runMs": 1116900.2354,
+  "packageMs": 221353.4249,
+  "verifyMs": 825443.914,
+  "cpuUserMicroseconds": 2001843000,
+  "cpuSystemMicroseconds": 203359000,
+  "peakByStageBytes": {
+   "load": 84144128,
+   "profile": 481226752,
+   "run": 1303420928,
+   "package": 1326071808,
+   "verify": 1263722496
+  },
+  "boundaryRssBytes": 1326071808,
+  "peakScratchBytes": 11124654357,
+  "scratchPeakLiveBytes": 11304609917,
+  "scratchBytesWritten": 55114357554,
+  "scratchQuotaBytes": 51539607552,
+  "problems": [],
+  "peakRssBytes": 1435344896,
+  "duplicateSignalScratchBytes": {
+   "duplicate-candidate-rows": 45156488,
+   "duplicate-candidates": 764643028,
+   "duplicate-signal-company_domain": 267831466,
+   "duplicate-signal-email_exact": 1292567784,
+   "duplicate-signal-name_exact": 1274022144,
+   "duplicate-signal-phone_e164": 334509390,
+   "duplicate-source-record-id": 2015578350,
+   "verify-duplicate-rows": 74708211
+  }
+ }
+}

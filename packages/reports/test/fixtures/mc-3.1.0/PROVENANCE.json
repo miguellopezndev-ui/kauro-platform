@@ -1,6 +1,6 @@
 {
   "source": "cores/kauro-migration-core of this repository (internal release, Order 18B)",
-  "commit": "SOURCE_COMMIT",
+  "commit": "ecbe421e412f33db47c09db32080c444efb2d6fb",
   "tag": "migration-core-v3.1.0",
   "coreVersion": "3.1.0",
   "packageFormatVersion": "2.1.0",

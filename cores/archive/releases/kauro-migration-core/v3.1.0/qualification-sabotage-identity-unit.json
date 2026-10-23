@@ -1,0 +1,45 @@
+{
+  "gate": "SABOTAGE",
+  "observedAt": "2026-10-23T02:26:44Z",
+  "scope": "PARTIAL",
+  "suiteFilter": "unit",
+  "declared": 134,
+  "selected": 4,
+  "killed": 4,
+  "survived": 0,
+  "outcomes": {
+    "KILLED": 4
+  },
+  "cases": [
+    {
+      "id": "M03",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "2 of 695 tests failed"
+    },
+    {
+      "id": "M04",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "5 of 684 tests failed"
+    },
+    {
+      "id": "M08",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "3 of 701 tests failed"
+    },
+    {
+      "id": "M58",
+      "ok": true,
+      "expected": "KILLED",
+      "observed": "KILLED",
+      "detail": "1 of 701 tests failed"
+    }
+  ],
+  "failures": [],
+  "result": "FAIL"
+}

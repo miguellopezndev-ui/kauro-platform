@@ -14,10 +14,11 @@
       "source": {
         "repository": "miguellopezndev-ui/kauro (this monorepo)",
         "tag": "migration-core-v3.1.0",
-        "commit": "SOURCE_COMMIT",
+        "commit": "ecbe421e412f33db47c09db32080c444efb2d6fb",
         "releaseId": null,
         "sourceTree": "cores/kauro-migration-core",
-        "archive": "cores/archive/releases/kauro-migration-core/v3.1.0"
+        "archive": "cores/archive/releases/kauro-migration-core/v3.1.0",
+        "commitNote": "the Order 18A commit whose cores/kauro-migration-core packs to these bytes; local until the stage's single integration commit, which carries the same tree (tag migration-core-v3.1.0 is re-pointed there)"
       },
       "note": "internal release (Order 18B, no public registry): packed from cores/kauro-migration-core with tools/pack.mjs after the Order 18A qualification (docs/qualification/mc31/), the same bytes on two packs; vendor/SHA256SUMS.mc-3.1.0 is the release's SHA256SUMS; 3.0.0 stays in cores/archive/releases/kauro-migration-core/v3.0.0"
     },
@@ -32,7 +33,7 @@
       "wrapper": "packages/intelligence-core",
       "source": {
         "repository": "miguellopezndev-ui/kauro-intelligence-core",
-        "commit": "SOURCE_COMMIT",
+        "commit": "the Order 18B change that carries this manifest (cores/kauro-intelligence-core at that tree)",
         "branchHead": "ic-b04",
         "builtFrom": "cores/kauro-intelligence-core of this monorepo at the commit named: npm ci && npm run build && npm pack (file list holds dist/src/index.js)",
         "sourceTree": "cores/kauro-intelligence-core",

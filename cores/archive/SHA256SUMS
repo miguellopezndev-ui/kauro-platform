@@ -11,7 +11,7 @@ af3d603e84887fd091a57eb49304a79f80cf99e543d7e47967292839786784eb  releases/kauro
 2215d4380a49d4b3333031660dd855e9d3c6b34d8ab202b90c5f47a98712dd38  releases/kauro-intelligence-core/v0.4.0/sabotage-report.json
 39f7469b419c0199a3556ed05af4e04e2119b3fff6a85942504bc83edce9f9d6  releases/kauro-intelligence-core/v0.4.0/sbom.cdx.json
 8e8ba850a4622871252aac4adb5064a476f5d4e6d9438c48a429da6e1008a251  releases/kauro-intelligence-core/v0.4.0/source-1c97fa69ba9d5758df8854579341d8c5dab8f8d3.tar.gz
-68327b9e5da0797c53d559494ad38d13b0c3cfe043d855f6d22b1b30217432c3  releases/kauro-migration-core/releases.json
+7267dfc37c023bf2d06dad5866926cef7a538fe9f9ac92bf63d4fc2e69655175  releases/kauro-migration-core/releases.json
 744d7a1306e3b5cc8f5a947d9308c9c3b28060311f0f96cda87044fdd509850e  releases/kauro-migration-core/v2.0.1/SHA256SUMS
 873f56a7be451ef6874ccc85b83c964dd04e87a56e813d472c2c1a98a0092f87  releases/kauro-migration-core/v2.0.1/campaign.json
 76b05c7b563d4c8b11882a851dae5cbbd8512b67ee8b5e7b3663a0e3ef9b6178  releases/kauro-migration-core/v2.0.1/ci-receipt.json
@@ -38,3 +38,15 @@ a3874ebb7011a6ecb4b92f07ebd74bbb26ebc83f5d70d02fb2fde007bd7a507f  releases/kauro
 048032fc17a575ed9918adcf72c33cd04fc0dbea4c564e9991cc6176381b9536  releases/kauro-migration-core/v3.0.0/sbom.cdx.json
 bf619c88a6d5bb6cb161d3186b4b56d5d3f850b775de15883084e962f870db91  releases/kauro-migration-core/v3.0.0/source-3b4b0aea4f1879ffb4189a55a16f22f4520787d4.tar.gz
 fa61e1fb4f2a19bfd8520630a499d5720d2768d51e5df91222be2bad526b945c  releases/kauro-migration-core/v3.0.0/universe.json
+8f347d26446a42574557214077ccc64daf1ee5181ae2d6451313b75027dca861  releases/kauro-migration-core/v3.1.0/RELEASE.json
+8d95d39f0e7c37f3f0761e2fafe88b179de67f724894436dedb7f796361c2ef6  releases/kauro-migration-core/v3.1.0/SHA256SUMS
+18447433ede8ebdefe715f45376893e9074c08e77a99f1b9c3e9cae7fa7e6e72  releases/kauro-migration-core/v3.1.0/binary-comparison-3.0.0.json
+611bf180761fa5fd51fff4fd974d383e0c21cbd5fbe39a2282f66942990d7dd7  releases/kauro-migration-core/v3.1.0/campaign.json
+22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea  releases/kauro-migration-core/v3.1.0/kauro-migration-core-3.1.0.tgz
+bee64d1b2d2c6f2291578e45a8af2bdd2e5ed10166130283e6acd95a23ff0a58  releases/kauro-migration-core/v3.1.0/qualification-adversarial-identity-memory-reduced.json
+be78223f3fb1c9ee9e210b80f9f58df0b26e0dc453b567e51ba71b490628dd8a  releases/kauro-migration-core/v3.1.0/qualification-capacity-founding-clean-only-pass1.json
+8cacfe903d79704e17988f68719956756f318fea96619f97c85924480ffc389c  releases/kauro-migration-core/v3.1.0/qualification-cross-os-probe-win32-kolkata.json
+28dd45bce717e8f98657a5a3b6191e3ddccdf756643686d933958cf1b1e59038  releases/kauro-migration-core/v3.1.0/qualification-cross-os-probe-win32-la.json
+56444f2982f9a6980b61ac8f3f214963edb8348e3f21cee887108c2de32b683f  releases/kauro-migration-core/v3.1.0/qualification-sabotage-d78-identity.json
+d4d4f1ce039772a0f031a208856e6b8a088b531bcd984d852f01dda59981a90c  releases/kauro-migration-core/v3.1.0/qualification-sabotage-d78-instructions.json
+e20609885fbe3eba1b933cded9efe5fcdab5ff24d508eda3d24a65c65b1ea7af  releases/kauro-migration-core/v3.1.0/qualification-sabotage-identity-unit.json

@@ -1,0 +1,108 @@
+{
+ "from": "kauro-migration-core-3.0.0.tgz (sha256 2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312)",
+ "to": "kauro-migration-core-3.1.0.tgz (sha256 22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea)",
+ "entries": {
+  "from": 399,
+  "to": 405
+ },
+ "method": "both tarballs extracted, every file hashed, paths joined",
+ "differences": [
+  {
+   "path": "dist/src/adapters/specs.js",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/adapters/specs.js.map",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/artifacts/import-instructions.js",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/artifacts/import-instructions.js.map",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/domain/disposition.d.ts",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/domain/disposition.js",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/domain/disposition.js.map",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/identity/resolve-identity.js",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/identity/resolve-identity.js.map",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/reconcile/truth.d.ts",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/version.d.ts",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/src/version.js",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/test/unit/identity-adversarial.test.d.ts",
+   "change": "ADDED"
+  },
+  {
+   "path": "dist/test/unit/identity-adversarial.test.js",
+   "change": "ADDED"
+  },
+  {
+   "path": "dist/test/unit/identity-adversarial.test.js.map",
+   "change": "ADDED"
+  },
+  {
+   "path": "dist/test/unit/import-instructions.test.d.ts",
+   "change": "ADDED"
+  },
+  {
+   "path": "dist/test/unit/import-instructions.test.js",
+   "change": "ADDED"
+  },
+  {
+   "path": "dist/test/unit/import-instructions.test.js.map",
+   "change": "ADDED"
+  },
+  {
+   "path": "dist/tools/gen-spec.js",
+   "change": "CHANGED"
+  },
+  {
+   "path": "dist/tools/gen-spec.js.map",
+   "change": "CHANGED"
+  },
+  {
+   "path": "package.json",
+   "change": "CHANGED"
+  },
+  {
+   "path": "spec/contract/contract.json",
+   "change": "CHANGED"
+  },
+  {
+   "path": "spec/contract/reason-codes.json",
+   "change": "CHANGED"
+  },
+  {
+   "path": "spec/vendor/source-registry.json",
+   "change": "CHANGED"
+  }
+ ],
+ "reading": "exactly the files Order 13 changed (identity signals, import instructions, disposition vocabulary, truth types, version, adapter specs, generated spec, gen-spec) and its two new test files; nothing else moved"
+}

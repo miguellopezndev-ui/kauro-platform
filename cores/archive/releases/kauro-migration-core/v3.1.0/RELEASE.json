@@ -1,0 +1,17 @@
+{
+  "artifactKind": "KAURO_INTERNAL_RELEASE",
+  "name": "kauro-migration-core",
+  "version": "3.1.0",
+  "tag": "migration-core-v3.1.0",
+  "sourceTree": "cores/kauro-migration-core",
+  "sourceCommit": "ecbe421e412f33db47c09db32080c444efb2d6fb",
+  "tarball": {
+    "file": "kauro-migration-core-3.1.0.tgz",
+    "bytes": 1052391,
+    "sha256": "22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea",
+    "packedWith": "node tools/pack.mjs (same bytes on two packs)"
+  },
+  "qualification": "docs/qualification/mc31/README.md (Order 18A)",
+  "publication": "internal: this archive and vendor/ of the monorepo; no public registry (O18B)",
+  "previous": "v3.0.0 (cores/archive/releases/kauro-migration-core/v3.0.0)"
+}

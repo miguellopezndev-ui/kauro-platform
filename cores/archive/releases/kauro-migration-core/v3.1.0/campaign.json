@@ -1,0 +1,108 @@
+{
+  "campaignVersion": "2.0.0",
+  "artifactKind": "MIGRATION_CORE_CAMPAIGN",
+  "campaignId": "c_d5743d46c84d7343",
+  "sealedAt": "2026-10-23T01:35:39Z",
+  "subjectDigest": "f2b6d153940b8b03f983b44cb33b07c2af358420e9ad37ba394df679183f69ab",
+  "subjectVersion": "1.0.0",
+  "codeDigest": "593527512b1693a2aac0b636ddadba568b1f1060dd7a2e58b2062402e3b2ea7a",
+  "versions": {
+    "coreVersion": "3.1.0",
+    "packageFormatVersion": "2.1.0",
+    "sourceRegistryVersion": "2026-10-22",
+    "configSchemaVersion": "3.0.0",
+    "sourceProfileVersion": "1.0.0",
+    "candidateSetVersion": "1.0.0",
+    "targetContractVersion": "1.0.0",
+    "targetParserVersion": "1.0.0",
+    "attestationContractVersion": "1.0.0",
+    "scratchStoreContractVersion": "1.0.0",
+    "capacityProfilesVersion": "1.2.1",
+    "capacityEvidenceSchemaVersion": "3.0.0"
+  },
+  "classes": {
+    "WORKFLOW": {
+      "files": 1,
+      "digest": "58b2027613a68b63e732d50332280eb0146b5c90eb4c637f5ea5905a4ef7cfdf",
+      "inSubject": true
+    },
+    "EVIDENCE": {
+      "files": 12,
+      "digest": "bc2ef60f3fdd7c1c3ffa4eabf4e3af529dae834e9f5e9cd1e166cb20129b6f10",
+      "inSubject": false
+    },
+    "GENERATED": {
+      "files": 145,
+      "digest": "44af9e452d1ffd71820da9e51e11b6c8cc8bde2efbb74499064c58985ae3bac5",
+      "inSubject": false
+    },
+    "SEMANTIC_ORACLE": {
+      "files": 243,
+      "digest": "f188dee6f0659ae293ac48c93c84a8a9481df95332351dd1f34a3b1fd07ad70d",
+      "inSubject": true
+    },
+    "SEMANTIC_CONTRACT": {
+      "files": 27,
+      "digest": "38f04de3c7e13c48180aa41a1b79d4f4865af7d945b94b140c7c9c5b94d55fdf",
+      "inSubject": true
+    },
+    "SEMANTIC_RUNTIME": {
+      "files": 55,
+      "digest": "7e19949ac30925f070c354c52335451403910c77aff23744e51d2f2f162b868e",
+      "inSubject": true
+    },
+    "SEMANTIC_HARNESS": {
+      "files": 122,
+      "digest": "19c95729b8473de0c50c2132a90764a6e408f9cd7bafda291c0b1195f355bb32",
+      "inSubject": true
+    },
+    "EDITORIAL": {
+      "files": 31,
+      "digest": "430196591fb5e1bc2f8b4e4ed3d882c5f0eb1e55a8bd0ada3405ada7510bb5b6",
+      "inSubject": false
+    }
+  },
+  "dependencies": {
+    "lockfileVersion": 3,
+    "packageCount": 7,
+    "closureDigest": "c02d95f2323a2622ee813d7297611f1f7690ead57a2e179b3e241177c662ef6c"
+  },
+  "producers": {
+    "tools/capacity.mjs": {
+      "fingerprint": "4d7aa64ef0a05ee5fb4e7c50119423f2709539e58e74168af20477e444c9df64",
+      "files": 89,
+      "kind": "CAPACITY"
+    },
+    "qualification/hubspot/run-target-qualification.mjs": {
+      "fingerprint": "d394c9be1404b80436af3de49d09b04f7a0b629bf7c09613c1b245b979cb4318",
+      "files": 89,
+      "kind": "VENDOR"
+    },
+    "qualification/hubspot/run-import-qualification.mjs": {
+      "fingerprint": "fab8b5c5c5d8bd338d7c1fd105d9232b4a7477246201da50e81414ecc6fa4814",
+      "files": 107,
+      "kind": "VENDOR"
+    },
+    "qualification/salesforce/run-target-qualification.mjs": {
+      "fingerprint": "329ece8a14ccca9b13d7a5b327bbd521714c8ebf8aa57b376500d1200ed115bb",
+      "files": 89,
+      "kind": "VENDOR"
+    },
+    "qualification/salesforce/run-dataloader-qualification.mjs": {
+      "fingerprint": "dfe2fff4df83a9fb2af545a829af7f56f1e55e5b2b05541fdeac70da5af22fe3",
+      "files": 94,
+      "kind": "VENDOR"
+    },
+    "qualification/salesforce/run-ocr-qualification.mjs": {
+      "fingerprint": "dd0eb68ce09f715c2d2afd4a1ecb7d8d293c928df8fc0319a98a1429cb294592",
+      "files": 94,
+      "kind": "VENDOR"
+    },
+    "tools/universe.mjs": {
+      "fingerprint": "905eabec41b239511afff83cca194f45bf896b58ce8ec429b6d1a6fe83b864f3",
+      "files": 448,
+      "kind": "UNIVERSE"
+    }
+  },
+  "note": "Every producer of this campaign captures this subject digest at start and at end."
+}
