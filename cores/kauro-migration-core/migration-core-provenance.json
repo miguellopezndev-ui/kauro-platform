@@ -6,9 +6,9 @@
   "packageFormatVersion": "2.1.0",
   "sourceRegistryVersion": "2026-10-22",
   "campaign": {
-    "campaignId": "c_d5743d46c84d7343",
-    "sealedAt": "2026-10-23T01:35:39Z",
-    "subjectDigest": "f2b6d153940b8b03f983b44cb33b07c2af358420e9ad37ba394df679183f69ab"
+    "campaignId": "c_ceba120bc89e24a4",
+    "sealedAt": "2026-10-23T12:11:50Z",
+    "subjectDigest": "7c4b8b48e9463bf38de930de4c394a18703c4341db73d510c3a7102fa9faf84a"
   },
   "freezeDecision": {
     "decidedBy": "tools/freeze-verdict.mjs",
@@ -271,7 +271,7 @@
       "path": "qualification/candidate/campaign.json",
       "required": true,
       "present": true,
-      "sha256": "611bf180761fa5fd51fff4fd974d383e0c21cbd5fbe39a2282f66942990d7dd7",
+      "sha256": "9b6b839ee06d6b1d891420e800659a36c01dd70d82bc1ad74b4a129d6cbde120",
       "claim": "the campaign every measurement here belongs to"
     },
     {
