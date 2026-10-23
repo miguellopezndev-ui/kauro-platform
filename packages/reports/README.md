@@ -7,7 +7,7 @@ renderer's one read is of the pinned faces it ships (`assets/fonts`, checked by 
 
 ## Modules
 
-- `package` — `readMigrationPackage(files)`: reads one Migration Core 3.0.0 package (format 2.1.0) and refuses it unless its
+- `package` — `readMigrationPackage(files)`: reads one Migration Core 3.1.0 package (format 2.1.0) and refuses it unless its
   closed inventory, every length, SHA-256 and record count, and the reconciliation's equations agree with the bytes; the
   reconciliation is cross-checked against the import files, the crosswalk, the lineage and the relationship table; every
   string it returns is from the core's closed vocabularies except the agency's file names (`UntrustedText`) (CMD039, S069).
@@ -26,10 +26,10 @@ renderer's one read is of the pinned faces it ships (`assets/fonts`, checked by 
 
 ## Tests
 
-`test/fixtures/mc-3.0.0` holds byte-exact copies of the core's five acceptance packages (`PROVENANCE.json`; `.gitattributes`
+`test/fixtures/mc-3.1.0` holds byte-exact copies of the core's five acceptance packages (`PROVENANCE.json`; `.gitattributes`
 keeps git from rewriting their bytes). The oracles are independent of this package: the core's own `acceptance.json`
 manifest hashes and README table, and a separate implementation of `kauro-package-digest/1`.
 
-`test/fixtures/mc-3.0.0-rejected` holds one package the vendored core 3.0.0 wrote with rows it could not read and rows no mapping
+`test/fixtures/mc-3.1.0-rejected` holds one package the vendored core 3.1.0 wrote with rows it could not read and rows no mapping
 covers, with the input and configuration it was written from (`PROVENANCE.json`); the data-plane suite re-runs the core on that input
 and compares every byte. `test/bounded-memory.test.ts` reads a 64 MB table in a child process whose whole V8 heap is pinned to 54 MB.

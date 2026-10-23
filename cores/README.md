@@ -10,29 +10,29 @@ The platform does not build from these sources. It consumes the pinned tarballs 
 
 | directory | core | version | source commit | status |
 |---|---|---|---|---|
-| `kauro-migration-core/` | Migration Core | 3.1.0 | this tree (Order 13, N1-1, on 3.0.0 `3b4b0aea4f1879ffb4189a55a16f22f4520787d4`) | PREPARED_UNRELEASED |
+| `kauro-migration-core/` | Migration Core | 3.1.0 | this tree (Order 13, N1-1; qualified by Order 18A, released by Order 18B, tag `migration-core-v3.1.0`) | RELEASED (internal) |
 | `kauro-intelligence-core/` | Intelligence Core | 0.6.0 | `4fee8d1bd5045552326f022837525b247f0e1a21` (branch `b04/preflight-fixes`) | PROVISIONAL_UNRELEASED |
 
 Each directory started as the exact tree of its commit (`git archive`), byte-exact (`cores/** -text -eol` in `.gitattributes`).
 
-**Migration Core 3.0.0 is the immutable reference, and the platform still consumes it.** Order 13 (N1-1, 2026-10-22) changed
-`kauro-migration-core/` into 3.1.0: prepared and tested, not released, not vendored (`kauro-migration-core/docs/work/
-N1-1_MIGRATION_CORE.md`, decision D78). The 3.0.0 sources are tag `v3.0.0` of `archive/kauro-migration-core.bundle`; its tarball is
-`vendor/kauro-migration-core-3.0.0.tgz`, unchanged. Until 3.1.0 is released at the N1 closing integration, the first command below
-reproduces the 3.0.0 tarball only from a checkout of that tag (`git clone archive/kauro-migration-core.bundle <dir> && git -C <dir>
-checkout v3.0.0`), not from this directory.
+**Migration Core 3.1.0 is the release the platform consumes** (Order 18B, 2026-10-22): an internal release of this monorepo, no
+public registry. Order 13 (N1-1) prepared it (`kauro-migration-core/docs/work/N1-1_MIGRATION_CORE.md`, decision D78), Order 18A
+qualified it (`docs/qualification/mc31/`), and Order 18B packed it from this directory, vendored it (`vendor/kauro-migration-core-
+3.1.0.tgz`, `vendor/SHA256SUMS.mc-3.1.0`) and filed its assets under `archive/releases/kauro-migration-core/v3.1.0/`. 3.0.0 stays
+the immutable previous release: its sources are tag `v3.0.0` of `archive/kauro-migration-core.bundle` and its tarball and assets are
+`archive/releases/kauro-migration-core/v3.0.0/`.
 
-Each rebuilt to its vendored tarball byte for byte (verified 2026-10-15, Node 24.20.0, npm 11.19.0):
+Each rebuilt to its vendored tarball byte for byte (verified 2026-10-22, Node 24.20.0, npm 11.19.0):
 
 ```
 cd cores/kauro-migration-core && npm ci && npm run build && node tools/pack.mjs --out <dir>
-#   sha256 2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312 == vendor/kauro-migration-core-3.0.0.tgz
+#   sha256 22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea == vendor/kauro-migration-core-3.1.0.tgz
 cd cores/kauro-intelligence-core && npm ci && npm run build && npm pack --pack-destination <dir>
-#   sha256 4270f797e19e2b451cf1ad1ad53523fafa97ad34ccb8ac15351f3aa6e26215bc == vendor/kauro-intelligence-core-0.6.0.tgz
+#   sha256 == vendor/MANIFEST.json's kauro-intelligence-core entry (re-packed by Order 18B on Migration Core 3.1.0)
 ```
 
 Both are standalone npm projects with their own `package-lock.json`; `npm ci` needs only the public npm registry. Intelligence
-Core resolves Migration Core from its own `vendor/kauro-migration-core-3.0.0.tgz`, the same bytes as `vendor/` here. Build in a
+Core resolves Migration Core from its own `vendor/kauro-migration-core-3.1.0.tgz`, the same bytes as `vendor/` here. Build in a
 copy or rely on each core's own `.gitignore` (`node_modules/`, `dist/`, `*.tgz`).
 
 Intelligence Core 0.6.0 stays provisional: it was never released, `vendor/MANIFEST.json` keeps it `PROVISIONAL_UNRELEASED`, and
@@ -59,7 +59,7 @@ Intelligence Core 0.6.0 stays provisional: it was never released, `vendor/MANIFE
 | `releases/<repo>/<tag>/` | every release asset, verbatim (`sha256sum -c SHA256SUMS` inside each tag directory) |
 | `SHA256SUMS` | sha256 of every file above (`cd cores/archive && sha256sum -c SHA256SUMS`) |
 
-Releases with assets: Migration Core `v3.0.0` and `v2.0.1`, Intelligence Core `v0.4.0`; Migration Core `v1.0.0`–`v1.0.2` had none.
+Releases with assets: Migration Core `v3.1.0` (internal, Order 18B), `v3.0.0` and `v2.0.1`, Intelligence Core `v0.4.0`; Migration Core `v1.0.0`–`v1.0.2` had none.
 
 Restore a repository, with all its history and branches: `git clone cores/archive/<repo>.bundle <dir>` (all branches:
 `git clone --mirror`). The bundles hold every commit the platform cites, including Intelligence Core `main`
