@@ -1,0 +1,194 @@
+{
+  "$comment": "Order 25 §6: the AWS prices the estimate uses, located in AWS's public Price List bulk API (https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<offer>/current/us-east-1/index.json), us-east-1, OnDemand terms. refresh-prices.mjs reads each offer file and writes prices.json; nothing here is typed by hand except where an item is marked source 'page' (a pricing page statement, quoted with its URL and date).",
+  "region": "us-east-1",
+  "items": [
+    {
+      "id": "vpce_interface_hour",
+      "offer": "AmazonVPC",
+      "usagetype": "USE1-VpcEndpoint-Hours",
+      "unit": "endpoint-AZ-hour"
+    },
+    {
+      "id": "vpce_interface_gb",
+      "offer": "AmazonVPC",
+      "usagetype": "USE1-VpcEndpoint-Bytes",
+      "beginRange": "0",
+      "unit": "GB"
+    },
+    {
+      "id": "public_ipv4_hour",
+      "offer": "AmazonVPC",
+      "usagetype": "USE1-PublicIPv4:InUseAddress",
+      "unit": "address-hour"
+    },
+    {
+      "id": "fargate_vcpu_hour",
+      "offer": "AmazonECS",
+      "usagetype": "USE1-Fargate-vCPU-Hours:perCPU",
+      "unit": "vCPU-hour"
+    },
+    {
+      "id": "fargate_gb_hour",
+      "offer": "AmazonECS",
+      "usagetype": "USE1-Fargate-GB-Hours",
+      "unit": "GB-hour"
+    },
+    {
+      "id": "fargate_ephemeral_gb_hour",
+      "offer": "AmazonECS",
+      "usagetype": "USE1-Fargate-EphemeralStorage-GB-Hours",
+      "unit": "GB-hour above 20 GB"
+    },
+    {
+      "id": "ecr_storage_gb_month",
+      "offer": "AmazonECR",
+      "usagetype": "TimedStorage-ByteHrs",
+      "unit": "GB-month"
+    },
+    {
+      "id": "s3_standard_gb_month",
+      "offer": "AmazonS3",
+      "usagetype": "TimedStorage-ByteHrs",
+      "beginRange": "0",
+      "unit": "GB-month"
+    },
+    {
+      "id": "s3_tier1_request",
+      "offer": "AmazonS3",
+      "usagetype": "Requests-Tier1",
+      "unit": "request (PUT, COPY, POST, LIST)"
+    },
+    {
+      "id": "s3_tier2_request",
+      "offer": "AmazonS3",
+      "usagetype": "Requests-Tier2",
+      "unit": "request (GET and others)"
+    },
+    {
+      "id": "logs_ingest_gb",
+      "offer": "AmazonCloudWatch",
+      "usagetype": "USE1-DataProcessing-Bytes",
+      "unit": "GB ingested (Standard)"
+    },
+    {
+      "id": "logs_storage_gb_month",
+      "offer": "AmazonCloudWatch",
+      "usagetype": "USE1-TimedStorage-ByteHrs",
+      "unit": "GB-month"
+    },
+    {
+      "id": "cloudtrail_data_event",
+      "offer": "AWSCloudTrail",
+      "usagetype": "USE1-DataEventsRecorded",
+      "unit": "event"
+    },
+    {
+      "id": "cloudtrail_first_copy_management_event",
+      "offer": "AWSCloudTrail",
+      "usagetype": "USE1-FreeEventsRecorded",
+      "unit": "event (first copy of management events)"
+    },
+    {
+      "id": "cloudtrail_extra_management_event",
+      "offer": "AWSCloudTrail",
+      "usagetype": "USE1-PaidEventsRecorded",
+      "unit": "event (copies after the first)"
+    },
+    {
+      "id": "secrets_manager_secret_month",
+      "offer": "AWSSecretsManager",
+      "usagetype": "USE1-AWSSecretsManager-Secrets",
+      "unit": "secret-month"
+    },
+    {
+      "id": "rds_pg_t4g_micro_hour",
+      "offer": "AmazonRDS",
+      "usagetype": "InstanceUsage:db.t4g.micro",
+      "attributes": {
+        "databaseEngine": "PostgreSQL",
+        "deploymentOption": "Single-AZ"
+      },
+      "unit": "instance-hour"
+    },
+    {
+      "id": "rds_pg_t4g_small_hour",
+      "offer": "AmazonRDS",
+      "usagetype": "InstanceUsage:db.t4g.small",
+      "attributes": {
+        "databaseEngine": "PostgreSQL",
+        "deploymentOption": "Single-AZ"
+      },
+      "unit": "instance-hour"
+    },
+    {
+      "id": "rds_gp3_gb_month",
+      "offer": "AmazonRDS",
+      "usagetype": "RDS:GP3-Storage",
+      "attributes": {
+        "databaseEngine": "PostgreSQL",
+        "deploymentOption": "Single-AZ"
+      },
+      "unit": "GB-month"
+    },
+    {
+      "id": "rds_backup_gb_month",
+      "offer": "AmazonRDS",
+      "usagetype": "RDS:ChargedBackupUsage",
+      "attributes": {
+        "databaseEngine": "Any",
+        "deploymentOption": "Single-AZ"
+      },
+      "unit": "GB-month above the free allocation"
+    },
+    {
+      "id": "aurora_pg_serverless_v2_acu_hour",
+      "offer": "AmazonRDS",
+      "usagetype": "Aurora:ServerlessV2Usage",
+      "attributes": {
+        "databaseEngine": "Aurora PostgreSQL"
+      },
+      "unit": "ACU-hour"
+    },
+    {
+      "id": "aurora_storage_gb_month",
+      "offer": "AmazonRDS",
+      "usagetype": "Aurora:StorageUsage",
+      "attributes": {
+        "databaseEngine": "Aurora PostgreSQL"
+      },
+      "unit": "GB-month"
+    },
+    {
+      "id": "aurora_io_request",
+      "offer": "AmazonRDS",
+      "usagetype": "Aurora:StorageIOUsage",
+      "attributes": {
+        "databaseEngine": "Aurora PostgreSQL"
+      },
+      "unit": "I/O request"
+    }
+  ],
+  "pageStatements": [
+    {
+      "id": "budgets_monitoring",
+      "url": "https://aws.amazon.com/aws-cost-management/aws-budgets/pricing/",
+      "read": "2026-10-22",
+      "quote": "You can monitor and receive notifications on your budgets free of charge. Your first two action-enabled budgets are free (regardless of the number of actions you configure per budget) per month.",
+      "usd": 0
+    },
+    {
+      "id": "s3_gateway_endpoint",
+      "url": "https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html",
+      "read": "2026-10-18",
+      "quote": "There is no additional charge for using gateway endpoints.",
+      "usd": 0
+    },
+    {
+      "id": "ecs_service",
+      "url": "https://aws.amazon.com/ecs/pricing/",
+      "read": "2026-10-18",
+      "quote": "(B14-A qualification, source [D7]) ECS has no service charge: the Fargate resources a task uses are billed.",
+      "usd": 0
+    }
+  ]
+}

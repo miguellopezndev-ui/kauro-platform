@@ -1,0 +1,44 @@
+{
+  "$comment": "Order 25 (D-21 A, adjustment 2): the inline policy of the owner's KauroDeletionPublisher permission set (IAM Identity Center, MFA on every sign-in, enforced by Identity Center). It signs a deletion-function package with a kauro signing profile and publishes it under the enforced code-signing configuration; nothing else. The SCP scp-data-identity-guard.json keeps every other principal of the data account away from the same function.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SignThePackage",
+      "Effect": "Allow",
+      "Action": ["signer:DescribeSigningJob", "signer:GetSigningProfile", "signer:StartSigningJob"],
+      "Resource": ["arn:aws:signer:${REGION}:${DATA_ACCOUNT_ID}:/signing-profiles/kauro*", "arn:aws:signer:${REGION}:${DATA_ACCOUNT_ID}:/signing-jobs/*"]
+    },
+    {
+      "Sid": "StageAndReadArtifacts",
+      "Effect": "Allow",
+      "Action": ["s3:GetBucketVersioning", "s3:GetObject", "s3:GetObjectVersion", "s3:ListBucket", "s3:ListBucketVersions", "s3:PutObject"],
+      "Resource": ["arn:aws:s3:::${SIGNING_BUCKET}", "arn:aws:s3:::${SIGNING_BUCKET}/*"]
+    },
+    {
+      "Sid": "PublishTheDeletionFunction",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateAlias", "lambda:CreateFunction", "lambda:GetAlias", "lambda:GetFunction", "lambda:GetFunctionCodeSigningConfig",
+        "lambda:GetFunctionConfiguration", "lambda:PublishVersion", "lambda:PutFunctionCodeSigningConfig", "lambda:UpdateAlias",
+        "lambda:UpdateFunctionCode"
+      ],
+      "Resource": [
+        "arn:aws:lambda:${REGION}:${DATA_ACCOUNT_ID}:function:kauro-*-retention-deletion",
+        "arn:aws:lambda:${REGION}:${DATA_ACCOUNT_ID}:function:kauro-*-retention-deletion:*"
+      ]
+    },
+    {
+      "Sid": "ReadTheCodeSigningConfiguration",
+      "Effect": "Allow",
+      "Action": "lambda:GetCodeSigningConfig",
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassOnlyTheDeletionRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*",
+      "Condition": { "StringEquals": { "iam:PassedToService": "lambda.amazonaws.com" } }
+    }
+  ]
+}

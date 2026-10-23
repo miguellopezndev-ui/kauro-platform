@@ -1,5 +1,5 @@
 {
-  "$comment": "B14-A contract (deploy/aws/worker/README.md): the ECS task definition of the migration worker on Fargate, Linux/x86_64, us-east-1. Placeholders in ${...} are bound by the next phase's IaC; nothing here has been registered. The task role is NOT set here: every RunTask names the attempt's own role through overrides.taskRoleArn.",
+  "$comment": "B14-A contract (deploy/aws/worker/README.md): the ECS task definition of the migration worker on Fargate, Linux/x86_64, us-east-1. Placeholders are bound by the IaC (deploy/aws/terraform/modules/worker); nothing here has been registered. The task role is NOT set here: every RunTask names the attempt's own role through overrides.taskRoleArn.",
   "family": "kauro-migration-worker",
   "requiresCompatibilities": ["FARGATE"],
   "networkMode": "awsvpc",

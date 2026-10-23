@@ -1,0 +1,15 @@
+# Terraform / OpenTofu working state never enters the repository (deploy/aws/procedures/PROVISIONING.md).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+# Per-activation inputs: account ids, the owner's references and the backend's bucket live with the owner, not here.
+backend.hcl
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# The bootstrap's temporary local backend (PROVISIONING.md "Bootstrap").
+*_override.tf
+*_override.tf.json

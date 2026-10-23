@@ -1,0 +1,66 @@
+{
+  "$comment": "Order 25 (B16 lane L6, R2 14 'External-effect recovery journal'): the provider half of the authority journal — an Object Lock bucket in the data account, outside every restore of the platform database. Append-only: the control plane creates an entry only if its key is absent (If-None-Match, the journal's 'same id, another body is a CONFLICT, never an overwrite'), reads and lists; nobody overwrites, and only the deletion identity removes. The journal's S3 adapter and its key grammar are B16's (not built here).",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ControlPlaneAppendsAndReads",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:root" },
+      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:PutObjectRetention", "s3:GetObjectRetention"],
+      "Resource": "arn:aws:s3:::${JOURNAL_BUCKET}/*",
+      "Condition": { "ArnEquals": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-${ENVIRONMENT}-control-plane" } }
+    },
+    {
+      "Sid": "ControlPlaneLists",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:root" },
+      "Action": ["s3:ListBucket", "s3:ListBucketVersions"],
+      "Resource": "arn:aws:s3:::${JOURNAL_BUCKET}",
+      "Condition": { "ArnEquals": { "aws:PrincipalArn": "arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/kauro-runtime/kauro-${ENVIRONMENT}-control-plane" } }
+    },
+    {
+      "Sid": "AppendOnly",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::${JOURNAL_BUCKET}/*",
+      "Condition": { "Null": { "s3:if-none-match": "true" }, "Bool": { "s3:ObjectCreationOperation": "true" } }
+    },
+    {
+      "Sid": "RemovalOnlyByTheDeletionIdentity",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:BypassGovernanceRetention", "s3:DeleteObject", "s3:DeleteObjectVersion", "s3:PutObjectLegalHold"],
+      "Resource": "arn:aws:s3:::${JOURNAL_BUCKET}/*",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*" } }
+    },
+    {
+      "Sid": "NeverComplianceMode",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": ["s3:PutObject", "s3:PutObjectRetention"],
+      "Resource": "arn:aws:s3:::${JOURNAL_BUCKET}/*",
+      "Condition": { "StringEquals": { "s3:object-lock-mode": "COMPLIANCE" } }
+    },
+    {
+      "Sid": "BucketGuardsChangeOnlyInTheOwnerSession",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": [
+        "s3:DeleteBucket", "s3:DeleteBucketPolicy", "s3:PutBucketAcl", "s3:PutBucketCORS", "s3:PutBucketLogging",
+        "s3:PutBucketObjectLockConfiguration", "s3:PutBucketOwnershipControls", "s3:PutBucketPolicy", "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketVersioning", "s3:PutEncryptionConfiguration", "s3:PutLifecycleConfiguration", "s3:PutReplicationConfiguration"
+      ],
+      "Resource": "arn:aws:s3:::${JOURNAL_BUCKET}",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}" } }
+    },
+    {
+      "Sid": "TlsOnly",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": ["arn:aws:s3:::${JOURNAL_BUCKET}", "arn:aws:s3:::${JOURNAL_BUCKET}/*"],
+      "Condition": { "Bool": { "aws:SecureTransport": "false" } }
+    }
+  ]
+}

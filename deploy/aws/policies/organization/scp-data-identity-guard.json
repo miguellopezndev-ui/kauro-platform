@@ -1,0 +1,137 @@
+{
+  "$comment": "Order 25 (D-21 A, the owner's adjustment 2): SCP on the Data OU, part 2 of 2 (identity and the deletion function). Only the owner's Identity Center sessions change IAM in the data account, so no role can be created or widened to reach the retention bypass; only the owner's administrator or deletion-publisher session creates, updates, publishes, aliases, re-roles, re-signs or deletes the deletion function, its code-signing configuration and its signing profiles, and only they may pass its role. Identity Center enforces the MFA of those sessions (aws:MultiFactorAuthPresent is absent for federated sessions, so no policy here claims to check it). Even the owner's sessions cannot create the function without a code-signing configuration, detach it, or relax a configuration (a new one must be created and reviewed instead).",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyIamChangesExceptOwnerSessions",
+      "Effect": "Deny",
+      "Action": [
+        "iam:AddRoleToInstanceProfile",
+        "iam:AttachRolePolicy",
+        "iam:CreateInstanceProfile",
+        "iam:CreateOpenIDConnectProvider",
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:CreateRole",
+        "iam:CreateSAMLProvider",
+        "iam:DeletePolicy",
+        "iam:DeletePolicyVersion",
+        "iam:DeleteRole",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:PutRolePolicy",
+        "iam:SetDefaultPolicyVersion",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:UpdateOpenIDConnectProviderThumbprint",
+        "iam:UpdateRole",
+        "iam:UpdateSAMLProvider"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "${OWNER_ADMIN_ROLE_PATTERN}",
+            "${DELETION_PUBLISHER_ROLE_PATTERN}"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyPassingTheDeletionRoleExceptOwnerSessions",
+      "Effect": "Deny",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "${OWNER_ADMIN_ROLE_PATTERN}",
+            "${DELETION_PUBLISHER_ROLE_PATTERN}"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyDeletionFunctionChangesExceptOwnerSessions",
+      "Effect": "Deny",
+      "Action": [
+        "lambda:AddPermission",
+        "lambda:CreateAlias",
+        "lambda:CreateFunction",
+        "lambda:CreateFunctionUrlConfig",
+        "lambda:DeleteAlias",
+        "lambda:DeleteFunction",
+        "lambda:DeleteFunctionCodeSigningConfig",
+        "lambda:DeleteFunctionConcurrency",
+        "lambda:DeleteFunctionUrlConfig",
+        "lambda:PublishVersion",
+        "lambda:PutFunctionCodeSigningConfig",
+        "lambda:PutFunctionConcurrency",
+        "lambda:RemovePermission",
+        "lambda:UpdateAlias",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:UpdateFunctionUrlConfig"
+      ],
+      "Resource": "arn:aws:lambda:*:${DATA_ACCOUNT_ID}:function:kauro-*-retention-deletion*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "${OWNER_ADMIN_ROLE_PATTERN}",
+            "${DELETION_PUBLISHER_ROLE_PATTERN}"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyCodeSigningChangesExceptOwnerSessions",
+      "Effect": "Deny",
+      "Action": [
+        "lambda:CreateCodeSigningConfig",
+        "lambda:DeleteCodeSigningConfig",
+        "lambda:UpdateCodeSigningConfig",
+        "signer:AddProfilePermission",
+        "signer:CancelSigningProfile",
+        "signer:PutSigningProfile",
+        "signer:RemoveProfilePermission",
+        "signer:RevokeSignature",
+        "signer:RevokeSigningProfile",
+        "signer:StartSigningJob",
+        "signer:SignPayload"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "${OWNER_ADMIN_ROLE_PATTERN}",
+            "${DELETION_PUBLISHER_ROLE_PATTERN}"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "TheDeletionFunctionAlwaysRequiresSignedCode",
+      "Effect": "Deny",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:PutFunctionCodeSigningConfig"
+      ],
+      "Resource": "arn:aws:lambda:*:${DATA_ACCOUNT_ID}:function:kauro-*-retention-deletion*",
+      "Condition": {
+        "Null": {
+          "lambda:CodeSigningConfigArn": "true"
+        }
+      }
+    },
+    {
+      "Sid": "CodeSigningIsNeverRelaxed",
+      "Effect": "Deny",
+      "Action": [
+        "lambda:DeleteFunctionCodeSigningConfig",
+        "lambda:UpdateCodeSigningConfig"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

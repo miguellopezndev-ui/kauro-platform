@@ -1,0 +1,44 @@
+{
+  "$comment": "Order 25 (D-19, D-21 A): RCP on the Data OU. It bounds every caller of the data account's S3 and STS resources, whatever account the caller is in (the workload account, the management account, or a member root user), except AWS service-linked roles, which no RCP restricts. Only principals of this organization reach the buckets, only over TLS; only the deletion identity bypasses governance retention, whoever else holds the permission; no role in the data account is assumed from another account.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OnlyThisOrganizationReachesTheBuckets",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": { "aws:PrincipalOrgID": "${ORG_ID}" },
+        "BoolIfExists": { "aws:PrincipalIsAWSService": "false" }
+      }
+    },
+    {
+      "Sid": "TlsOnly",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": "*",
+      "Condition": { "BoolIfExists": { "aws:SecureTransport": "false" } }
+    },
+    {
+      "Sid": "OnlyTheDeletionIdentityBypassesGovernance",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:BypassGovernanceRetention",
+      "Resource": "*",
+      "Condition": { "ArnNotLike": { "aws:PrincipalArn": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*" } }
+    },
+    {
+      "Sid": "NoRoleAssumedFromAnotherAccount",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "sts:AssumeRole",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": { "aws:PrincipalAccount": "${DATA_ACCOUNT_ID}" },
+        "BoolIfExists": { "aws:PrincipalIsAWSService": "false" }
+      }
+    }
+  ]
+}

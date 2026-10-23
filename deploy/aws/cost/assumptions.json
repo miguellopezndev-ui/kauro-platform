@@ -1,0 +1,69 @@
+{
+  "$comment": "Order 25 §6: every quantity the estimate multiplies by a price, with its kind. CONTRACT: fixed by a repository contract (cited). DESIGN: fixed by this IaC (cited). ASSUMPTION: no measurement exists; a placeholder to be replaced by MEASURED values from the qualification (procedures/QUALIFICATION.md). Nothing here is MEASURED yet: no AWS account exists.",
+  "quantities": {
+    "hoursPerMonth": { "value": 730, "kind": "DESIGN", "source": "AWS pricing convention: 730 hours per month" },
+    "workerVcpu": { "value": 2, "kind": "CONTRACT", "source": "deploy/aws/worker/task-definition.template.json cpu 2048" },
+    "workerMemoryGb": { "value": 8, "kind": "CONTRACT", "source": "task-definition memory 8192 (policy.json capacity.ramHardBytes)" },
+    "workerEphemeralBilledGb": { "value": 52, "kind": "CONTRACT", "source": "task-definition ephemeralStorage 72 GiB, of which 20 GB are included (B14-A qualification §7)" },
+    "interfaceEndpoints": { "value": 3, "kind": "DESIGN", "source": "modules/network: ecr.api, ecr.dkr, logs in one AZ (A9: no permanent HA)" },
+    "heavyActive": { "value": 1, "kind": "CONTRACT", "source": "packages/domain EXECUTION_POLICY.heavyActive (R2-046)" },
+    "maxAttemptsPerJob": { "value": 3, "kind": "CONTRACT", "source": "EXECUTION_POLICY.maxAttempts" },
+    "executionWallHours": { "value": 8, "kind": "CONTRACT", "source": "policy.json capacity.executionSeconds 28800" },
+    "workerImageGb": { "value": 1, "kind": "ASSUMPTION", "source": "no image has been built (Dockerfile: Node 24 bookworm-slim + Chromium); measured at the first build" },
+    "ecrStoredGb": { "value": 2, "kind": "ASSUMPTION", "source": "the pinned image plus one rollback candidate's distinct layers (lifecycle keeps ten images)" },
+    "attemptMinutes": { "value": 15, "kind": "ASSUMPTION", "source": "B14-A qualification §7: real durations are not qualified; local runs on a laptop say nothing about Fargate" },
+    "attemptsPerJob": { "value": 1.2, "kind": "ASSUMPTION", "source": "between 1 and EXECUTION_POLICY.maxAttempts (3)" },
+    "endpointGbPerAttempt": { "value": 0.05, "kind": "ASSUMPTION", "source": "ECR API/manifest calls and log events through interface endpoints; image layers come through the free S3 gateway (ECR user guide)" },
+    "s3RequestsPerAttempt": { "value": 200, "kind": "ASSUMPTION", "source": "two heartbeat PUTs per minute plus ticket, claim, staging, result and read-back; B15's adapter is not built" },
+    "controlPlaneRequestsPerJob": { "value": 300, "kind": "ASSUMPTION", "source": "uploads, verification read-back, publication copies (B07/B08 via B15, not built)" },
+    "auditLogGbPerMonth": { "value": 0.2, "kind": "ASSUMPTION", "source": "organization trail with management events of three quiet accounts; measured after activation" },
+    "auditLogDeliveriesPerMonth": { "value": 50000, "kind": "ASSUMPTION", "source": "CloudTrail log-file PUTs into the audit bucket (multi-Region trail; one Region allowed by SCP); measured after activation" },
+    "appSecrets": { "value": 6, "kind": "ASSUMPTION", "source": "apps/api config: DB passwords (api, assurance, migrator, control), API cursor key, public hash key; how files are mounted is the runtime's decision (R-A1)" },
+    "rdsStorageGb": { "value": 20, "kind": "DESIGN", "source": "modules/database allocated_storage_gib (gp3 minimum)" },
+    "auroraMinAcu": { "value": 0.5, "kind": "DESIGN", "source": "Aurora Serverless v2 minimum when it cannot pause: an open pool keeps it awake (Aurora user guide, auto-pause)" },
+    "qualificationEndpointHours": { "value": 72, "kind": "ASSUMPTION", "source": "the live probes of B14-A qualification §6, endpoints created for the campaign and removed after" },
+    "qualificationAttempts": { "value": 30, "kind": "ASSUMPTION", "source": "the probes of B14-A qualification §6 (token, sandbox, IAM life cycle, retirement, sizes)" }
+  },
+  "scenarios": {
+    "idle": {
+      "title": "Accounts open, platform idle, no customer",
+      "jobsPerMonth": { "value": 0, "kind": "DESIGN", "source": "worker and database disabled (worker_enabled = false, database_enabled = false)" },
+      "s3RetainedGb": { "value": 0.01, "kind": "ASSUMPTION", "source": "state files and signing artifacts only" },
+      "platformLogGb": { "value": 0, "kind": "DESIGN", "source": "no platform runtime" },
+      "workerEndpoints": false,
+      "database": false,
+      "secrets": false,
+      "image": true
+    },
+    "qualification": {
+      "title": "Worker qualification month (live probes, no customer)",
+      "jobsPerMonth": { "value": 0, "kind": "DESIGN", "source": "qualification attempts are counted separately" },
+      "s3RetainedGb": { "value": 1, "kind": "ASSUMPTION", "source": "synthetic probe objects, deleted after" },
+      "platformLogGb": { "value": 0.1, "kind": "ASSUMPTION", "source": "probe logs" },
+      "workerEndpoints": "qualification",
+      "database": false,
+      "secrets": false,
+      "image": true
+    },
+    "firstCustomer": {
+      "title": "Platform live, first customer",
+      "jobsPerMonth": { "value": 4, "kind": "ASSUMPTION", "source": "no traffic data; one agency, a few migrations a month" },
+      "s3RetainedGb": { "value": 5, "kind": "ASSUMPTION", "source": "one revision is at most 5 GB (policy.json); staged packages kept at most 30 + 7 days" },
+      "platformLogGb": { "value": 1, "kind": "ASSUMPTION", "source": "API and control logs, identifiers only" },
+      "workerEndpoints": true,
+      "database": true,
+      "secrets": true,
+      "image": true
+    },
+    "growth": {
+      "title": "Growth (ten times the first customer's activity)",
+      "jobsPerMonth": { "value": 40, "kind": "ASSUMPTION", "source": "ten times firstCustomer" },
+      "s3RetainedGb": { "value": 50, "kind": "ASSUMPTION", "source": "ten times firstCustomer" },
+      "platformLogGb": { "value": 5, "kind": "ASSUMPTION", "source": "five times firstCustomer" },
+      "workerEndpoints": true,
+      "database": true,
+      "secrets": true,
+      "image": true
+    }
+  }
+}

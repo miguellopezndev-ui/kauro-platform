@@ -1,0 +1,91 @@
+{
+  "$comment": "Order 25 (D-19 condition 1, D-21 A): SCP on the Data OU, part 1 of 2 (storage). Inside the data account, only the retention/deletion identity (role path /kauro-deletion/) may bypass governance retention, delete object versions, or place legal holds and retention on the protected buckets (every bucket named kauro-*); only the owner's Identity Center administrator session may change a protected bucket's policy, lock, lifecycle, versioning, access, encryption, replication or CORS. Principals of other accounts are bounded by the bucket policies and the Data OU's RCP, not by this SCP.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyGovernanceBypassExceptDeletionIdentity",
+      "Effect": "Deny",
+      "Action": "s3:BypassGovernanceRetention",
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*"
+        }
+      }
+    },
+    {
+      "Sid": "DenyObjectRemovalAndRetentionExceptDeletionIdentity",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention"
+      ],
+      "Resource": "arn:aws:s3:::kauro-*/*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "arn:aws:iam::${DATA_ACCOUNT_ID}:role/kauro-deletion/*"
+        }
+      }
+    },
+    {
+      "Sid": "DenyProtectedBucketGuardChangesExceptOwnerAdministrator",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteBucket",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketAcl",
+        "s3:PutBucketCORS",
+        "s3:PutBucketLogging",
+        "s3:PutBucketObjectLockConfiguration",
+        "s3:PutBucketOwnershipControls",
+        "s3:PutBucketPolicy",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketVersioning",
+        "s3:PutEncryptionConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:PutReplicationConfiguration",
+        "s3:PutObjectAcl"
+      ],
+      "Resource": [
+        "arn:aws:s3:::kauro-*",
+        "arn:aws:s3:::kauro-*/*"
+      ],
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}"
+        }
+      }
+    },
+    {
+      "Sid": "DenyAuditAndAlarmTamperingExceptOwnerAdministrator",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:DeleteTrail",
+        "cloudtrail:PutEventSelectors",
+        "cloudtrail:PutInsightSelectors",
+        "cloudtrail:StopLogging",
+        "cloudtrail:UpdateTrail",
+        "events:DeleteRule",
+        "events:DisableRule",
+        "events:PutRule",
+        "events:PutTargets",
+        "events:RemoveTargets",
+        "sns:AddPermission",
+        "sns:DeleteTopic",
+        "sns:PutDataProtectionPolicy",
+        "sns:RemovePermission",
+        "sns:SetSubscriptionAttributes",
+        "sns:SetTopicAttributes",
+        "sns:Unsubscribe"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": "${OWNER_ADMIN_ROLE_PATTERN}"
+        }
+      }
+    }
+  ]
+}

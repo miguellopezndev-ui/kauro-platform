@@ -1,7 +1,11 @@
 # The migration worker on AWS — deployment contracts (B14-A)
 
-**Status: contracts only.** Nothing in this directory has been built, registered, applied or run. There is no AWS account (A9 §5),
-and no Terraform `apply` or push to ECR happened. The host these contracts are for is **selected but not qualified** (live proofs pending):
+**Status: contracts, rendered by Terraform, never applied.** Nothing in this directory has been built, registered, applied or run.
+There is no AWS account (A9 §5), and no Terraform `apply` or push to ECR happened. Since Order 25 the IaC in
+[deploy/aws/terraform/modules/worker](../terraform/modules/worker/main.tf) renders these files as they are (the task definition, the
+execution role, the attempt boundary, the launcher policy) and the data account's bucket policy appends `bucket-policy.template.json`
+unchanged; in the three-account organization `${ACCOUNT_ID}` is the workload account and the bucket lives in the data account
+([docs/design/B14-B-aws-infrastructure.md](../../../docs/design/B14-B-aws-infrastructure.md)). The host these contracts are for is **selected but not qualified** (live proofs pending):
 [docs/design/B14-A-aws-host-qualification.md](../../../docs/design/B14-A-aws-host-qualification.md). The code they deploy is
 [docs/design/B14-A-worker-executor.md](../../../docs/design/B14-A-worker-executor.md).
 
@@ -76,6 +80,7 @@ and never writes it to its record.
 
 ## What the next phase needs first
 
-An AWS account under Kauro Data S.A.S. (A9 §5) and a provisioning authorization; Terraform for the VPC, endpoints, bucket, cluster,
-roles and log group (from these contracts); B15's S3 `ObjectStoragePort`; `EcsFargateWorkerHost` and the worker's S3 transport
-(the AWS SDK added then, pinned); the first image build and scan; the live probes of the qualification's §6.
+An AWS account under Kauro Data S.A.S. (A9 §5) and a provisioning authorization (deploy/aws/procedures/ACTIVATION.md); B15's S3
+`ObjectStoragePort`; `EcsFargateWorkerHost` and the worker's S3 transport (the AWS SDK added then, pinned); the first image build
+and scan; the live probes of the qualification's §6 (deploy/aws/procedures/QUALIFICATION.md part B). The Terraform for the VPC,
+endpoints, bucket, cluster, roles and log group exists since Order 25 and is tested offline only.
