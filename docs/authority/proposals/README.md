@@ -54,3 +54,13 @@ Each item also carries:
 
 Issued quotes, accepted terms, existing retention records and earned commissions keep the version they were created under: adoption is
 prospective.
+
+## Re-issue candidate
+
+`reissue-candidate/` (Order 19A, `docs/design/ORDER19A-REISSUE-CANDIDATE.md`) prepares the coordinated re-issue of CP-01 and CP-02 as one
+verifiable candidate, without adopting anything: the combined delta in apply order, every place where two items meet with its resolution,
+two profiles (`adoption`: the approved items; `build`: plus the conditional ones, for the implementing orders with the activation off),
+each with its candidate registry hashes, generated contracts, served document and web client, and each item's state and the orders or
+gates that must satisfy its conditions. It is built by `tools/reissue/reissue.mjs` and checked by `tools/test/reissue-candidate.test.mjs`;
+the proposal rules above read only the deltas at this folder's top level, so they see CP-01 and CP-02 alone. Steps 2 to 4 of the adoption
+apply the candidate's items, never anything else.

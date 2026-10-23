@@ -1,0 +1,163 @@
+{
+  "candidate": "REISSUE-CANDIDATE-01",
+  "title": "Joint re-issue candidate of CP-01 (revision 3) and CP-02: one verifiable candidate, nothing adopted",
+  "preparedBy": "Order 19A, 2026-10-22",
+  "document": "docs/design/ORDER19A-REISSUE-CANDIDATE.md",
+  "adoption": "Order 19B only, with the owner's explicit approval of that PR at that SHA (gate OWNER_SIGNATURE_AND_ADOPTION, merge policy OWNER_EXPLICIT_PER_PR). This candidate adopts, activates, re-issues and signs nothing.",
+  "inputs": {
+    "pins": {
+      "CP-01.registry-delta.json": "54d1c7062f1329bde0562f5980aebe26f38291704f7c4b85db362ce0d243665d",
+      "CP-02.registry-delta.json": "26d1fc227facd86dc08ed51cf156c4c601a53337614089572cc57e51ceb5dc36",
+      "CP-02.api.json": "647b0365cf71b08f476b8e630a5dae110e2d6e206a5f826974e2fe7e10d5e940",
+      "CP-02.openapi.json": "887fd2f98d3ad02515dafae936fe021dd7869a94433dadecc7c7ff89d91a321f",
+      "CP-02.compatibility.json (without consumers)": "96d5aea59c2e089eb70ec601a72afca04b544829f8286d5c4f3f56a484694ee0"
+    },
+    "ownerResolution": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md",
+    "records": [
+      { "path": "docs/authority/decisions/2026-10-22-CP-01-OWNER-RESOLUTION.md", "sha256": "80fed8c21be46cbeedc049c9dfe84ce2e98f1928b29b4bc4ff42a76fba1ff540", "carries": "the state of every CP-01 item (column 'In the proposal')" },
+      { "path": "docs/authority/proposals/CP-02-API-CONTRACTS.md", "sha256": "489210ef2fcdfa1a1ceaa9f48796e396b82677592d0f65df3afc67035cc7ecfb", "carries": "the class Order 17 recorded for every CP-02 item (section 3) and the empty owner's decision block (section 8)" },
+      { "path": "docs/authority/proposals/CP-01-FUNCTIONAL-GOVERNANCE.md", "sha256": "d566ecf5aa675fe6441ffb4d1440f55659f599df2fdf12e7bc23a72bc1230729", "carries": "CP-01's change record, revision 3" }
+    ]
+  },
+  "applyOrder": "CP-01's items in their order, then CP-02's items in their order: CP-02 requires CP-01 (README of docs/authority/proposals, adoption step 2; CP-02 section 7.2). A profile applies the same ops of its items in the same order and skips the others; appends land in that order.",
+  "profiles": {
+    "adoption": {
+      "states": ["APPROVED_AWAITING_REISSUE"],
+      "meaning": "The most Order 19B may adopt: items whose substance is decided. Each still needs its CP-02 owner's decision (CP-02 items), the owner's approval of the Order 19B PR, and every condition below satisfied, or it stays out."
+    },
+    "build": {
+      "states": ["APPROVED_AWAITING_REISSUE", "CONDITIONAL"],
+      "meaning": "The contract the implementing orders build and test against with the activation off by default: the adoption items plus the CONDITIONAL ones (principle and values decided, adoption blocked by a named condition). Never adopted as a whole: a CONDITIONAL item enters a re-issue only once its pending list is empty."
+    }
+  },
+  "satisfiers": {
+    "O15": { "kind": "ORDER", "what": "Authorization, RLS and tenant isolation: maps the new role tokens, the row policies and the owner's cross-workspace scope" },
+    "O20": { "kind": "ORDER", "what": "CLEAN end to end in the backend: StartAudit, CreatePlan, ApprovePlan and CreateQuote with the canonical CLEAN binding, the estimate and billing reads, and the free-check controls StartAudit enforces" },
+    "O21": { "kind": "ORDER", "what": "Retention, deletion, restoration and the UNPAID extension: the 17-day ceiling through the one extension, the retention label, the sweeper, no resurrection from backups, the dates read's retention entries" },
+    "O22": { "kind": "ORDER", "what": "Commercial finance, sellers and claims: seller money, statements with the retainer and offsets, claims and refusals, owner and seller reads, alerts" },
+    "O23A": { "kind": "ORDER", "what": "Identity and sessions offline: the consent and preference commands, the registration flow, the notifications consumer's preferences" },
+    "O24": { "kind": "ORDER", "what": "The web on the real contracts: screens on the adopted reads, the consumers of the regenerated client, the public routes" },
+    "O27A": { "kind": "ORDER", "what": "ACH collection, reconciliation, refunds and invoicing offline: the proof intake, the hold's effective end and limits, the refund notice, built against simulators" },
+    "O29": { "kind": "ORDER", "what": "CRM import and staged reconciliation verified on the real tools (stage B): the Data Loader and HubSpot facts of B-14 and the engine on proved IDs" },
+    "CORE": { "kind": "ORDER", "what": "The Migration Core intervention: O18A (adversarial qualification, the identity campaign) and O18B (release 3.1.0, vendoring, platform integration): deterministic merges only on proving keys, verification of a declared authoritative external id, CRM ids and shared addresses, adversarial identity fixtures, the reconciliation engine" },
+    "UNASSIGNED_C4": { "kind": "ORDER", "what": "Platform handlers of component C4 that no order of the catalogue names: the identity-decision commands CMD073 to CMD076 and the RevisePlan wiring in packages/application (O18B's paths stop at the core wrappers; O20's scope is the CLEAN path). The dispatcher places them; Order 19B cannot activate CP-01.12 or CP-02.15 before they exist" },
+    "O19B": { "kind": "GATE", "what": "The adoption itself: a condition Order 19B checks, or performs in the re-issue change" },
+    "OWNER": { "kind": "GATE", "what": "An owner decision recorded in docs/authority/decisions/ (B-03, B-06, B-07, B-09)" },
+    "O31": { "kind": "GATE", "what": "Business and provider unblocks only the owner can do: the controller's real company data (CHECKLIST A-08), the Wise Business account" },
+    "O27B": { "kind": "GATE", "what": "Wise and the ACH route qualified with real evidence (PV1, Payments V1 section 2), stage B" },
+    "O34": { "kind": "GATE", "what": "The owner's final visual review before the second audit" },
+    "COUNSEL_REVIEW_CP01_14": { "kind": "GATE", "what": "Competent legal review of the claim and commission rules (LAWYER_LATER L-12, L-19), recorded as CP-01.14's validation" },
+    "LEGAL_PROCEDURE_C2": { "kind": "GATE", "what": "The legal texts' own procedure (docs/legal/CHANGE-REQUESTS-CP-01.md, LR-01 to LR-11; competent review, D-31): adopting a value never changes a legal text" }
+  },
+  "items": {
+    "CP-01.01": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O20"]] },
+    "CP-01.02": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O21", "O15"], ["LEGAL_PROCEDURE_C2"]] },
+    "CP-01.03": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O20"], ["LEGAL_PROCEDURE_C2"]], "note": "O20 opens StartAudit, where the free-check grant and its pause are enforced (packages/application/src/audit/handlers/start-audit.ts)." },
+    "CP-01.04": { "state": "APPROVED_AWAITING_REISSUE", "legalEffect": "PENDING_COUNSEL", "activationBy": [["COUNSEL_REVIEW_CP01_14"], ["O22"]] },
+    "CP-01.05": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-01.06": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-01.07": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-01.08": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O19B"]], "note": "The rows live in apps/web/test/support/registry.ts, outside Order 19B's listed paths: the dispatcher coordinates that one-line removal with the re-issue (or gives it to O24 in the same merge window)." },
+    "CP-01.09": { "state": "PROPOSED", "activationBy": [], "pendingBy": [["O34"]] },
+    "CP-01.10": { "state": "CONDITIONAL", "activationBy": [["O23A", "O24"], ["LEGAL_PROCEDURE_C2"]], "pendingBy": [["O31"], ["LEGAL_PROCEDURE_C2"], ["LEGAL_PROCEDURE_C2"]] },
+    "CP-01.11": { "state": "CONDITIONAL", "activationBy": [["O19B"], ["O27A"]], "pendingBy": [["O31", "O27B"], ["O27B"], ["O27A", "O21"], ["O27A"], ["LEGAL_PROCEDURE_C2"], ["O27A"]] },
+    "CP-01.12": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["CORE"], ["CORE"], ["UNASSIGNED_C4"], ["CORE"]] },
+    "CP-01.13": { "state": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-01.14": { "state": "APPROVED_AWAITING_REISSUE", "legalEffect": "PENDING_COUNSEL", "activationBy": [["COUNSEL_REVIEW_CP01_14"]] },
+    "CP-02.01": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O20"]] },
+    "CP-02.02": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O21"]], "note": "The hold's date kind stays NOT_APPLICABLE until CP-02.17 is active (the item's declared reservation)." },
+    "CP-02.03": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O20", "O21", "O22", "O15"]], "note": "Thirteen reads: project, board, clients, findings, estimate, activity and package reads open O20's backend; billing, documents and refunds O22's; deletion records O21's; O15 maps AGENCY_BILLING_READER." },
+    "CP-02.04": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O21", "LEGAL_PROCEDURE_C2"]] },
+    "CP-02.05": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O23A"], ["O23A", "O24"]] },
+    "CP-02.06": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O23A"]] },
+    "CP-02.07": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22", "O15"]] },
+    "CP-02.08": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O15", "O22"]] },
+    "CP-02.09": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-02.10": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22", "O24"]] },
+    "CP-02.11": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-02.12": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-02.13": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["O22"]] },
+    "CP-02.14": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "legalEffect": "PENDING_COUNSEL", "activationBy": [["COUNSEL_REVIEW_CP01_14"], ["O22"]] },
+    "CP-02.15": { "state": "APPROVED_AWAITING_REISSUE", "class": "APPROVED_AWAITING_REISSUE", "activationBy": [["CORE", "UNASSIGNED_C4"]] },
+    "CP-02.16": { "state": "PROPOSED", "class": "PROPOSED", "activationBy": [["OWNER", "O27A"]], "pendingBy": [["OWNER"], ["LEGAL_PROCEDURE_C2"]] },
+    "CP-02.17": { "state": "CONDITIONAL", "class": "BLOCKED_EXTERNAL", "activationBy": [["O19B"], ["O27A"]], "pendingBy": [["O31", "O27B"], ["O27B"], ["O27A", "LEGAL_PROCEDURE_C2"]] },
+    "CP-02.18": { "state": "PROPOSED", "class": "PROPOSED", "activationBy": [["OWNER", "O22"]], "pendingBy": [["OWNER"]] },
+    "CP-02.19": { "state": "CONDITIONAL", "class": "BLOCKED_EXTERNAL", "activationBy": [["O29", "CORE"]], "pendingBy": [["O29"], ["O29"], ["CORE", "O29"]] },
+    "CP-02.20": { "state": "CONDITIONAL", "class": "CONDITIONAL", "activationBy": [["OWNER", "O24", "O23A"]], "pendingBy": [["OWNER"]] },
+    "CP-02.21": { "state": "PROPOSED", "class": "PROPOSED", "activationBy": [["OWNER", "O22"]], "pendingBy": [["OWNER"], ["O22"]] }
+  },
+  "conflicts": [
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "cases.json (appended records)", "items": ["CP-02.01", "CP-02.02", "CP-02.03", "CP-02.04", "CP-02.05", "CP-02.06", "CP-02.07", "CP-02.08", "CP-02.09", "CP-02.10", "CP-02.11", "CP-02.12", "CP-02.13", "CP-02.14", "CP-02.15", "CP-02.16", "CP-02.17", "CP-02.18", "CP-02.19", "CP-02.20", "CP-02.21"], "resolution": "Cases are found by id, never by position; ids are unique (CP02-nn-tag and the commands' OK/DENY/RACE). The apply order fixes their positions; a profile that leaves an item out simply does not append its cases." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "commands.json (appended records)", "items": ["CP-02.05", "CP-02.06", "CP-02.07", "CP-02.13", "CP-02.14", "CP-02.15", "CP-02.16", "CP-02.17", "CP-02.18", "CP-02.19", "CP-02.20"], "resolution": "Commands are found by id (CMD065 to CMD081, each owned by one item); CP-02.21's and CP-02.19's text changes test existing commands by their base index, which an append never moves. Leaving an item out leaves a gap in the CMD numbers, never a renumbering." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "contracts.json (appended records)", "items": ["CP-02.02", "CP-02.03", "CP-02.04", "CP-02.05", "CP-02.06", "CP-02.07", "CP-02.08", "CP-02.09", "CP-02.10", "CP-02.11", "CP-02.12", "CP-02.13", "CP-02.14", "CP-02.15", "CP-02.16", "CP-02.17", "CP-02.18", "CP-02.19", "CP-02.20"], "resolution": "Contracts are found by name; names are unique across both proposals and the registry (the generator refuses a duplicate). CP-02.10 extends CommissionStatement through its base index, which no append moves. Each profile's generated bundle is proved to define every contract its operations answer." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[11] G-DELETE caseIds", "items": ["CP-02.02", "CP-02.04"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning; the profile adds only its items' ids." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[12] G-PAYMENT caseIds", "items": ["CP-02.03", "CP-02.16", "CP-02.17"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning; the adoption profile adds CP-02.03's only, the build profile CP-02.17's too, neither CP-02.16's (PROPOSED)." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[15] G-COMMERCIAL caseIds", "items": ["CP-02.07", "CP-02.08", "CP-02.09", "CP-02.10", "CP-02.11", "CP-02.12", "CP-02.13", "CP-02.14", "CP-02.18"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning; CP-02.18 (PROPOSED) is in neither profile." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[21] G-RECOVERY caseIds", "items": ["CP-02.04", "CP-02.05"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[22] G-SECURITY caseIds", "items": ["CP-02.05", "CP-02.06", "CP-02.20"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning; CP-02.20 (CONDITIONAL) only in the build profile." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[3] G-IC-KERNEL caseIds", "items": ["CP-02.01", "CP-02.15"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[7] G-DOMAIN caseIds", "items": ["CP-02.03", "CP-02.21"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning; CP-02.21 (PROPOSED) is in neither profile." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "gates.json[8] G-TENANT caseIds", "items": ["CP-02.02", "CP-02.03", "CP-02.05", "CP-02.06"], "resolution": "Case ids added to a gate's list; each item first tests the gate's id at its base index. Order inside the list carries no meaning." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "requirements.json (appended records)", "items": ["CP-02.01", "CP-02.02", "CP-02.03", "CP-02.04", "CP-02.05", "CP-02.06", "CP-02.07", "CP-02.08", "CP-02.09", "CP-02.10", "CP-02.11", "CP-02.12", "CP-02.13", "CP-02.14", "CP-02.15", "CP-02.16", "CP-02.17", "CP-02.18", "CP-02.19", "CP-02.20", "CP-02.21"], "resolution": "One requirement REQ-<case> per appended case, found by id; it follows its case into or out of a profile." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "screens.json (appended records)", "items": ["CP-01.10", "CP-02.20"], "resolution": "UI56 (CP-01.10) is appended before UI57 (CP-02.20) by the apply order; screens are found by id and stay unique. Both items are CONDITIONAL: only the build profile appends them." },
+    { "kind": "APPENDS_TO_THE_SAME_ARRAY", "entity": "state_transitions.json (appended records)", "items": ["CP-02.13", "CP-02.14"], "resolution": "Two new machines for two new contracts (OutreachAuthorizationRequest, ClaimReview), found by contract name; order carries no meaning." },
+    { "kind": "KEYS_ADDED_TO_THE_SAME_OBJECT", "entity": "policy.json:(root) (added keys)", "items": ["CP-01.06", "CP-01.12", "CP-01.14"], "resolution": "Three new top-level keys (alerts, identityResolution, legalStatus), distinct; an add never overwrites (the patch subset refuses it). Key order follows the apply order; nothing reads policy by position." },
+    { "kind": "KEYS_ADDED_TO_THE_SAME_OBJECT", "entity": "policy.json:commission (added keys)", "items": ["CP-01.04", "CP-01.05", "CP-01.13"], "resolution": "Distinct new keys of commission (refusal list and rules; the default retainer; the periods and amount states); no existing commission value changes, so the domain copies and the public snapshot keep holding." },
+    { "kind": "KEYS_ADDED_TO_THE_SAME_OBJECT", "entity": "policy.json:retention (added keys)", "items": ["CP-01.02", "CP-01.11"], "resolution": "CP-01.02 adds policyVersion and extendHardCapExceptions, CP-01.11 pendingPaymentHold: distinct keys. CP-01.11 is CONDITIONAL, so the adoption profile carries CP-01.02's keys only; extendHardCap keeps its value false." },
+    { "kind": "NESTED_ADD_ON_A_DEPENDENCY", "entity": "policy.json/alerts", "items": ["CP-01.06", "CP-01.07"], "resolution": "CP-01.07 adds alerts.relevantProgress inside the alerts object CP-01.06 adds; CP-01.07 depends on CP-01.06 and comes after it, and both are in or out of a profile together (the profile closure is checked)." },
+    { "kind": "SAME_RECORD_DISJOINT_MEMBERS", "entity": "contracts.json[61] RetentionRecord", "items": ["CP-01.02", "CP-01.11"], "resolution": "CP-01.02 replaces hardDeadline's description; CP-01.11 widens the class enum with PENDING_PAYMENT_HOLD: different members, each proved by its own test op. Only the build profile carries CP-01.11's change, and CP-02.17's served projection (RetentionView) follows it there." },
+    { "kind": "SAME_RECORD_DISJOINT_MEMBERS", "entity": "screens.json[2] UI03", "items": ["CP-01.08", "CP-01.09"], "resolution": "CP-01.08 replaces UI03's primaryCopy (approved, R2-2); CP-01.09 would replace its action text (deferred by the owner). Different members; CP-01.09 is PROPOSED and in neither profile, so UI03's current action text stays." }
+  ],
+  "o19bExclusions": {
+    "basis": "Order 19B's own exclusions: it adopts no legal policy, Terms or elevated retention, and no CONDITIONAL, PENDING_COUNSEL or PROPOSED item. The items below are APPROVED_AWAITING_REISSUE (their states are unchanged) and sit in the adoption profile, but Order 19B leaves them out until the condition named here has recorded evidence; an item that requires one of them is held with it.",
+    "items": {
+      "CP-01.02": { "exclusion": "ELEVATED_RETENTION", "adoptableOnlyAfter": "LEGAL_PROCEDURE_C2 records the competent wording of LR-01, and O21 has delivered and tested the 17-day UNPAID ceiling through the one extension, deletion at the extended date and no resurrection from backups (the item's activation)" },
+      "CP-02.04": { "exclusion": "ELEVATED_RETENTION", "adoptableOnlyAfter": "CP-01.02 is adoptable (LEGAL_PROCEDURE_C2 for LR-01, O21 for the ceiling, deletion and restoration): the extension reply serves the 17-day ceiling" },
+      "CP-01.04": { "exclusion": "PENDING_COUNSEL", "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review of the claim rules (L-12, L-19) as CP-01.14's validation" },
+      "CP-01.14": { "exclusion": "PENDING_COUNSEL", "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review's evidence in validation; until then the state stays PENDING_COUNSEL" },
+      "CP-02.14": { "exclusion": "PENDING_COUNSEL", "adoptableOnlyAfter": "COUNSEL_REVIEW_CP01_14 records the competent review of the claim rules, as for CP-01.04 and CP-01.14" }
+    }
+  },
+  "componentRenames": {
+    "SellerRecordView": { "to": "OwnerSellerRecordView", "item": "CP-02.08", "why": "CP-02.08 names its owner-only read of one seller (seller, agreement, customers, statements, claims) after a new registry contract SellerRecordView; the served api already has a component SellerRecordView, B10's owner-tools record of a seller's onboarding, assignment or termination (packages/application/src/commercial/sellers/owner-tools). CP-02.openapi.json is a document of its own, so the clash never showed there; one served document cannot hold both. The registry contract keeps its name (x-kauro-schema-id stays urn:kauro:r2:contracts#/$defs/SellerRecordView); the component the implementing order serves takes the candidate's name or another free one." },
+    "SupportCasePage": { "to": "AgencySupportCasePage", "item": "CP-02.03", "why": "CP-02.03's ListAgencySupportCases answers a page of the registry contract SupportCase, which CP-02's generator names SupportCasePage; the served api already has SupportCasePage, the page of one project's cases (ListSupportCases, items SupportCaseView, oldest first). The workspace-wide page is a different list (newest first, cursor bound to the agency), so it takes its own name." }
+  },
+  "compatibility": {
+    "recorded": {
+      "count": 271,
+      "commit": "abde528b",
+      "file": "docs/authority/proposals/CP-02.compatibility.json at abde528b (Order 17 closure, before its final review)",
+      "fileSha256": "6edd1b8dc2a0712f2fdf148b62f63c5a762cae08943b8aa7f936852f99ebc3cb",
+      "digest": "17b8adb819965e8c1dabd1af6bacb5b05b6d3b672ba389e5c5704a45f84683a7",
+      "byLayer": { "EVENTS": 3, "OPENAPI": 79, "REGISTRY": 189 }
+    },
+    "addedByTheFinalReview": [
+      "OPENAPI:components/AuditView.targetContractId:REQUIRED_TO_OPTIONAL",
+      "OPENAPI:components/RetentionView.class:ENUM_WIDENED",
+      "EVENTS:audit.profiling.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.interpreting.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.validating.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.draft_ready.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.needs_decision.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.unsupported.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.failed.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.cancelled.v1:targetContractId:KEY_SOMETIMES_ABSENT",
+      "EVENTS:audit.expired.v1:targetContractId:KEY_SOMETIMES_ABSENT"
+    ]
+  },
+  "adoptionGates": [
+    "The owner's explicit approval of the Order 19B PR at its SHA (OWNER_EXPLICIT_PER_PR); the general technical authorization GA-2026-10-22 does not cover adoption.",
+    "For each CP-02 item, the owner's decision in CP-02 section 8 (empty today): Order 17 classed fifteen items approved on earlier decisions, and CP-02 section 7.1 makes that block the adoption act.",
+    "Only items of the adoption profile, each with the items it requires or depends on, and each with every condition below satisfied with evidence; any other item stays out and keeps its state.",
+    "Not the adoption profile wholesale: CP-01.02 and CP-02.04 (elevated retention) and CP-01.04, CP-01.14 and CP-02.14 (PENDING_COUNSEL) fall under Order 19B's own exclusions and are adoptable only after the condition o19bExclusions names (the legal procedure for LR-01 and O21; the competent review of the claim rules); an item that requires one of them is held with it (CP-02.02 requires CP-01.02; CP-02.12 requires CP-01.14).",
+    "The candidate is current on the SHA Order 19B starts from (node tools/reissue/reissue.mjs check); if a proposal, the registry, the served api or a generated consumer moved, the candidate is regenerated and reviewed again first.",
+    "In the same change (README adoption steps 2 to 4): the new edition label, PROVENANCE source and hashes; @kauro/contracts regenerated; every copy of a changed value with its drift test; the web client regenerated with the server for each coordinated change; the registry's own test counts updated; adopted items moved to ADOPTED and checked against the registry by the proposal tests."
+  ],
+  "residual": [
+    "Dispatcher: the identity-decision handlers (CMD073 to CMD076) and the RevisePlan wiring have no order in the catalogue (UNASSIGNED_C4); CP-01.12 and CP-02.15 cannot be activated without them.",
+    "Dispatcher: Order 19B's listed paths do not include apps/web/test/support/registry.ts (CP-01.08's activation removes two rows there in the same re-issue), packages/contracts/test/registry.test.ts (its command and machine counts change with adoption) or apps/web/src/api/generated.ts (regenerated with the served document).",
+    "Owner: the CP-02 decision block (section 8); B-03 (CP-02.20), B-06 (CP-02.18), B-07 (CP-02.16), B-09 (CP-02.21); CP-01.09 at the final visual review (O34).",
+    "Counsel and legal procedure: the claim rules' legal effect (CP-01.04, CP-01.14, CP-02.14 stay PENDING_COUNSEL); LR-01, LR-02, LR-05, LR-06, LR-11.",
+    "Providers: PV1 and Wise Business (CP-01.11, CP-02.17); the B-14 tool facts (CP-02.19)."
+  ]
+}
