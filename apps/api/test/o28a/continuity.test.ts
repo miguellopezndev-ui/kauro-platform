@@ -52,7 +52,10 @@ test("backup and restore: the populated cluster restores with its ledger, rows a
   const dataDir = join(scratch, "restored");
   run("initdb", ["-D", dataDir, "-U", "postgres", "-A", "trust", "-E", "UTF8", "--no-locale"]);
   const port = await freePort();
-  run("pg_ctl", ["-D", dataDir, "-l", join(scratch, "restored.log"), "-o", `-p ${port} -c listen_addresses=127.0.0.1 -c fsync=off`, "-w", "-t", "60", "start"], true);
+  // off Windows the server also opens a Unix socket, by default in a system directory the runner cannot write: put it in the scratch
+  // directory, as the harness's own clusters do (temporary-postgres.ts)
+  const socketDir = process.platform === "win32" ? "" : ` -k ${scratch}`;
+  run("pg_ctl", ["-D", dataDir, "-l", join(scratch, "restored.log"), "-o", `-p ${port} -c listen_addresses=127.0.0.1 -c fsync=off${socketDir}`, "-w", "-t", "60", "start"], true);
   try {
     // the superuser exists already: the roles file's one error is that line, every other role is created
     spawnSync(exe("psql"), ["-h", "127.0.0.1", "-p", String(port), "-U", "postgres", "-d", "postgres", "-q", "-f", roles], { encoding: "utf8", windowsHide: true, timeout: 120_000 });
