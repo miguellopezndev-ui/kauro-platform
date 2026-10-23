@@ -20,6 +20,7 @@ import type { IntelligenceResult } from '../api/intelligence-core.js';
 import { digestOf, sha256Hex } from '../contracts/canonical.js';
 import type { TaskOutcome } from '../contracts/errors.js';
 import { TASK_TYPES } from '../contracts/envelope.js';
+import { SUPPORTED_MIGRATION_CORE } from '../contracts/versions.js';
 import type { BenchmarkFixture, ExpectedCandidate, FixtureFamily } from './fixture.js';
 import { FIXTURE_FAMILIES } from './fixture.js';
 import { QUALITY_THRESHOLDS, report } from './report.js';
@@ -80,7 +81,7 @@ function receiptFor(fixture: BenchmarkFixture, configuration: Loose): Loose {
   const hashes = fixture.expectedInputHashes;
   return {
     ok: true, configurationRef: configuration['configurationRef'], configurationDigest: digestOf(configuration), profileHash: hashes.profileHash, candidateSetHash: hashes.candidateSetHash, targetContractHash: hashes.targetContractHash,
-    rowsValidated: 10, rowsInProfile: 10, reconciliationHolds: true, packageVerified: true, problems: [], validatedAt: VALIDATED_AT, coreVersion: '3.0.0',
+    rowsValidated: 10, rowsInProfile: 10, reconciliationHolds: true, packageVerified: true, problems: [], validatedAt: VALIDATED_AT, coreVersion: SUPPORTED_MIGRATION_CORE.coreVersions[0],
     evidence: { packageDigest: sha256Hex('package'), reportDigest: sha256Hex('report'), coreConfigHash: sha256Hex('config') }, effects: null,
   };
 }

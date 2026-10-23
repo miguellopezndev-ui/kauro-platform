@@ -32,6 +32,7 @@ import { join, resolve } from 'node:path';
 import {
   ATTESTATION_ALGORITHM,
   ATTESTATION_CONTRACT_VERSION,
+  CORE_VERSION,
   SCRATCH_BUDGET_BYTES,
   attestationSigningBytes,
   buildCandidateSet,
@@ -185,7 +186,7 @@ async function vendorScenario(): Promise<VendorObserved> {
   const clock = new VirtualClock();
   const port: FullDatasetValidationPort = {
     async validate(configuration: CandidateConfiguration): Promise<FullDatasetValidationResult> {
-      const bound = { configurationRef: configuration.configurationRef, configurationDigest: digestOf(configuration), profileHash: profile.profileHash, candidateSetHash: configuration.candidateSetHash, targetContractHash: contract.contractHash, rowsInProfile: profile.profile.totals.dataRowCount, validatedAt: clock.now(), coreVersion: '3.0.0' };
+      const bound = { configurationRef: configuration.configurationRef, configurationDigest: digestOf(configuration), profileHash: profile.profileHash, candidateSetHash: configuration.candidateSetHash, targetContractHash: contract.contractHash, rowsInProfile: profile.profile.totals.dataRowCount, validatedAt: clock.now(), coreVersion: CORE_VERSION };
       const translation = toMigrationConfig(configuration, profile);
       if (translation.document === null) return { ...bound, ok: false, rowsValidated: 0, reconciliationHolds: false, packageVerified: false, problems: [...translation.problems], evidence: { packageDigest: null, reportDigest: null, coreConfigHash: null }, effects: null };
       const candidate = loadConfig(JSON.stringify(translation.document), join(dir, 'candidate.json'));
@@ -321,7 +322,7 @@ try {
   // The host's validation port: exactly the document the core's own toMigrationConfig makes of the configuration, run by the frozen engine over the whole fixture, and the effects read off that run.
   const port: FullDatasetValidationPort = {
     async validate(configuration: CandidateConfiguration): Promise<FullDatasetValidationResult> {
-      const bound = { configurationRef: configuration.configurationRef, configurationDigest: digestOf(configuration), profileHash: profile.profileHash, candidateSetHash: configuration.candidateSetHash, targetContractHash: null, rowsInProfile: profile.profile.totals.dataRowCount, validatedAt: clock.now(), coreVersion: '3.0.0' };
+      const bound = { configurationRef: configuration.configurationRef, configurationDigest: digestOf(configuration), profileHash: profile.profileHash, candidateSetHash: configuration.candidateSetHash, targetContractHash: null, rowsInProfile: profile.profile.totals.dataRowCount, validatedAt: clock.now(), coreVersion: CORE_VERSION };
       const translation = toMigrationConfig(configuration, profile);
       // A configuration with a fragment the frozen schema cannot express is refused whole: nothing runs.
       if (translation.document === null) return { ...bound, ok: false, rowsValidated: 0, reconciliationHolds: false, packageVerified: false, problems: [...translation.problems], evidence: { packageDigest: null, reportDigest: null, coreConfigHash: null }, effects: null };
