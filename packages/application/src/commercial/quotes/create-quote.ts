@@ -52,6 +52,7 @@ import {
   toUtcInstant,
 } from "@kauro/domain";
 import type { EligibilitySnapshotId, FiscalIssuerRef, FiscalProfileId, FiscalProfileRecord, MembershipId, QuoteId } from "@kauro/domain";
+import { judgedUnderHold } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { quoteViewOf } from "../../commerce/request/checkout.js";
 import {
@@ -231,6 +232,7 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
           if (reservation.kind === "REPLAY") {
             const status = reservation.entry.responseStatus;
             if (status !== 201 || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+            await judgedUnderHold(envelope.authority, uow, runtime.clock);
             return { kind: "REPLAY", view: reservation.entry.responseBody as CreateQuoteView };
           }
           if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();
@@ -252,6 +254,8 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
           const authorization = live === null ? null : await c.authorizations.findByQuote(live.quoteId);
           if (live !== null && authorization !== null && authorization.state !== "REVOKED") {
             const replacement = await issueReplacement(uow, co, { entryId, envelope, membership, subject, live, authorization });
+            // rule 16 (Order 15 F-04): the replacement's intent commits only under a credential that still authenticates the request
+            await judgedUnderHold(envelope.authority, uow, runtime.clock);
             await co.hold?.("INTENT_BEFORE_COMMIT");
             return { kind: "REPLACEMENT", replacement, resumed: false };
           }
@@ -287,6 +291,8 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
             eligibility: eligibilityOf(issued),
             ...(issued.superseded !== null ? { supersededQuoteId: issued.superseded.quote.quoteId } : {}),
           };
+          // rule 16 (Order 15 F-04, review R-01): the request's credential fenced as the unit's last lock and judged before the answer commits
+          await judgedUnderHold(envelope.authority, uow, runtime.clock);
           const committed = await uow.journal.commit(entryId, { responseStatus: 201, responseBody: view, resourceKind: "quote", resourceId: issued.quote.quoteId });
           if (committed.state !== "COMMITTED" || committed.responseStatus !== 201 || committed.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
           return { kind: "FINAL", view: committed.responseBody as CreateQuoteView };

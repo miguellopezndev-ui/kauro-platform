@@ -37,7 +37,7 @@ import type {
 } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, NotFoundFailure, StaleVersionFailure, commandRequestDigest, toUtcInstant } from "@kauro/domain";
 import type { PaymentRuntime } from "./runtime.js";
-import { causedBy } from "./runtime.js";
+import { PAYMENT_SERVICE_ID, causedBy } from "./runtime.js";
 import { bankRefundsOf, bankRoutesOf } from "@kauro/persistence";
 
 /** A service command as the route admitted it: the verified service identity, the idempotency key, the path ids and the closed body. */
@@ -68,12 +68,12 @@ function serviceContext(identity: ServiceIdentity, correlationId: CorrelationId)
  * The durable DENY fact of a service command, in its own transaction so the command's rollback cannot erase it: the service stream
  * (no agency, actor SERVICE; migration 0013 security_events_payment_write; D-FACT-B1).
  */
-export async function recordServiceDenial(rt: PaymentRuntime, context: ServiceContext, action: string, failure: DomainFailure): Promise<void> {
+export async function recordServiceDenial(rt: PaymentRuntime, context: ServiceContext, action: string, failure: DomainFailure, actor: string = context.serviceId): Promise<void> {
   await rt.assembly.commerce.run(context, (uow) =>
     uow.securityEvents.append({
       agencyId: null,
       requestedAgencyId: null,
-      actor: { kind: "SERVICE", serviceId: context.serviceId },
+      actor: { kind: "SERVICE", serviceId: actor },
       action,
       outcome: "DENY",
       reasonCode: failure.details.reason ?? failure.code,
@@ -100,7 +100,9 @@ async function serviceAccess<View>(
   const decision = rt.authorizer.authorizeService({ identity: request.identity, role: "PAYMENT_SERVICE", deploymentEnvironment: rt.environment });
   if (decision.kind === "DENY") {
     const failure = new DomainFailure(decision.code, `${action} denied: ${String(decision.reason)}`, decision.reason !== null ? { reason: decision.reason } : {});
-    await recordServiceDenial(rt, context, action, failure);
+    // Order 15 F-03: recorded in the payment service's own group, naming the presented service (another group's identity, such as the
+    // commission service's, runs on a pool these units never bind, and its denial was answered INTEGRITY_FAILURE without its fact)
+    await recordServiceDenial(rt, { kind: "SERVICE", serviceId: PAYMENT_SERVICE_ID, correlationId: request.correlationId }, action, failure, request.identity.serviceId);
     return rejection(failure, request.correlationId);
   }
   const adopted = await rt.assembly.commerce.run(context, async (uow) => {

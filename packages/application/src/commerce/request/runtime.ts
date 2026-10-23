@@ -41,7 +41,7 @@ import type {
   TenantContext,
   UserId,
 } from "@kauro/domain";
-import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
+import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, actorOf, beforeCommitOf, commandRequestDigest } from "@kauro/domain";
 import { judgedUnderHold } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
@@ -333,6 +333,12 @@ export async function runCommerceCommand<Body, View>(runtime: CommerceRequestRun
           occurredAt: now,
         });
       }
+      // rule 16 (Order 15 F-04, review R-01): the request's credential fenced in this unit as its LAST lock and judged at the committed
+      // instant (a check registered for COMMIT runs after every wait of the work, immediately before COMMIT, PV1R-03): a logout committed
+      // while the command ran refuses it with everything rolled back, one that starts after the fence waits for the COMMIT. The bank
+      // bodies register the same judgment for their own committed instant (judgedAtCommit); a second hold re-locks without waiting.
+      const authority = envelope.authority;
+      if (authority !== undefined) beforeCommitOf(uow, () => judgedUnderHold(authority, uow, runtime.clock));
       const committed = await uow.journal.commit(reservation.entryId, { responseStatus: outcome.status, responseBody: outcome.view, resourceKind: outcome.resourceKind, resourceId: outcome.resourceId });
       if (committed.state !== "COMMITTED" || committed.responseStatus !== outcome.status || committed.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
       return { outcome: { ...outcome, view: committed.responseBody as View } };
