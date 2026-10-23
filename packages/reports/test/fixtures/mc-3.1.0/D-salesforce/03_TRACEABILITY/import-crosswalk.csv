@@ -1,0 +1,16 @@
+import_path,import_row_number,association_key,migration_key,object,survivor_row_locator_id
+01_IMPORT/salesforce/Account.csv,1,fb52b79ffa9375df5d9ed3ea,mk_company_0297f1b42cf061ace680,COMPANY,F-5724f3494184:S0:R3
+01_IMPORT/salesforce/Account.csv,2,846a832fba3cd702554d5b7d,mk_company_6bd2f1f82b773f47da97,COMPANY,F-5724f3494184:S0:R4
+01_IMPORT/salesforce/Account.csv,3,ce0b2df3ac564b764a19b2d2,mk_company_9e4661cabeab7534a22e,COMPANY,F-5724f3494184:S0:R2
+01_IMPORT/salesforce/Account.csv,4,cb02ba24e0fc33880501e636,mk_company_ec6be3d10a3ab4e3823c,COMPANY,F-5724f3494184:S0:R5
+01_IMPORT/salesforce/Contact.csv,1,19e16b6757740d6bddb0654c,mk_contact_0f895d0d3d9339ebe2bd,CONTACT,F-6f9ee95664a8:S0:R3
+01_IMPORT/salesforce/Contact.csv,2,6ec92d2d520c3d267c456d48,mk_contact_122bf25a215436b056b1,CONTACT,F-6f9ee95664a8:S0:R5
+01_IMPORT/salesforce/Contact.csv,3,0c7a8adb7e212b43e3c0a4db,mk_contact_c483ee2664a9ec5fffc7,CONTACT,F-6f9ee95664a8:S0:R2
+01_IMPORT/salesforce/Contact.csv,4,394f75a2cab1aaa4ae93c5b3,mk_contact_e56ccdaa67bb4c737736,CONTACT,F-6f9ee95664a8:S0:R6
+01_IMPORT/salesforce/Contact.csv,5,21679df9be2df835ada8bc73,mk_contact_e950dc0d1f66f60e155b,CONTACT,F-6f9ee95664a8:S0:R4
+01_IMPORT/salesforce/Lead.csv,1,,mk_lead_5b90de3ef1ab0ff7d5f7,LEAD,F-de04b0a4fefc:S0:R4
+01_IMPORT/salesforce/Lead.csv,2,,mk_lead_8741e1cd55d74e745093,LEAD,F-de04b0a4fefc:S0:R2
+01_IMPORT/salesforce/Lead.csv,3,,mk_lead_b5026d1989197a843289,LEAD,F-de04b0a4fefc:S0:R3
+01_IMPORT/salesforce/Opportunity.csv,1,f2e729691a46829db267f773,mk_deal_0478b352c4c92cda10e2,DEAL,F-8e8781cb243c:S0:R4
+01_IMPORT/salesforce/Opportunity.csv,2,b0f9cd2aa69f8af4afee6eb3,mk_deal_9fffffdf8892f5f38865,DEAL,F-8e8781cb243c:S0:R3
+01_IMPORT/salesforce/Opportunity.csv,3,08d6d10f6d94972287ef43f9,mk_deal_f4bca1e4be84b8fc29bb,DEAL,F-8e8781cb243c:S0:R2

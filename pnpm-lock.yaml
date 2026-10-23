@@ -6,7 +6,7 @@ settings:
 
 overrides:
   sharp: '-'
-  kauro-migration-core: file:vendor/kauro-migration-core-3.0.0.tgz
+  kauro-migration-core: file:vendor/kauro-migration-core-3.1.0.tgz
   kauro-intelligence-core: file:vendor/kauro-intelligence-core-0.6.0.tgz
 
 importers:
@@ -267,10 +267,10 @@ importers:
         version: link:../contracts
       kauro-intelligence-core:
         specifier: file:../../vendor/kauro-intelligence-core-0.6.0.tgz
-        version: file:vendor/kauro-intelligence-core-0.6.0.tgz(kauro-migration-core@file:vendor/kauro-migration-core-3.0.0.tgz)
+        version: file:vendor/kauro-intelligence-core-0.6.0.tgz(kauro-migration-core@file:vendor/kauro-migration-core-3.1.0.tgz)
       kauro-migration-core:
-        specifier: file:../../vendor/kauro-migration-core-3.0.0.tgz
-        version: file:vendor/kauro-migration-core-3.0.0.tgz
+        specifier: file:../../vendor/kauro-migration-core-3.1.0.tgz
+        version: file:vendor/kauro-migration-core-3.1.0.tgz
     devDependencies:
       '@types/node':
         specifier: 24.3.1
@@ -285,8 +285,8 @@ importers:
         specifier: workspace:*
         version: link:../contracts
       kauro-migration-core:
-        specifier: file:../../vendor/kauro-migration-core-3.0.0.tgz
-        version: file:vendor/kauro-migration-core-3.0.0.tgz
+        specifier: file:../../vendor/kauro-migration-core-3.1.0.tgz
+        version: file:vendor/kauro-migration-core-3.1.0.tgz
     devDependencies:
       '@types/node':
         specifier: 24.3.1
@@ -609,15 +609,15 @@ packages:
     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
 
   kauro-intelligence-core@file:vendor/kauro-intelligence-core-0.6.0.tgz:
-    resolution: {integrity: sha512-E6vMJseByHkRiOtdj8Wwsa6Y6ALAEX8jP14ZitO/voZQ0fxXbrybx2kTJF9Xe/Birs1XkUrZLAdpksMwWFyCdA==, tarball: file:vendor/kauro-intelligence-core-0.6.0.tgz}
+    resolution: {integrity: sha512-PNwSaTFiWdihMDDswt8NzRu/R4R1/pLtaepX8Z11pCpAYRdbHNul6XT5OoBuS0OsVl6+NKd5C/T9SnIhqCfh1A==, tarball: file:vendor/kauro-intelligence-core-0.6.0.tgz}
     version: 0.6.0
     engines: {node: 24.x, npm: '>=11'}
     peerDependencies:
-      kauro-migration-core: 3.0.0
+      kauro-migration-core: 3.1.0
 
-  kauro-migration-core@file:vendor/kauro-migration-core-3.0.0.tgz:
-    resolution: {integrity: sha512-3QKFMy43Hqpz7DVqlung27MTXmBGdFrXTGSDQ57y/YsqNarWL0x50CILPQTP+oZ3kUi0DbXCAGVeQoRrtbXHwA==, tarball: file:vendor/kauro-migration-core-3.0.0.tgz}
-    version: 3.0.0
+  kauro-migration-core@file:vendor/kauro-migration-core-3.1.0.tgz:
+    resolution: {integrity: sha512-MLtkz0BevOw6N3zHv2LpF3kObXVCr+TiF9pC/3r5Jm4R5TH95QuNU8RZUhIC5fY2E9xDu/pvRgSchzR/I+xsFg==, tarball: file:vendor/kauro-migration-core-3.1.0.tgz}
+    version: 3.1.0
     engines: {node: '>=22.11.0'}
     hasBin: true
 
@@ -1080,11 +1080,11 @@ snapshots:
 
   json-schema-traverse@1.0.0: {}
 
-  kauro-intelligence-core@file:vendor/kauro-intelligence-core-0.6.0.tgz(kauro-migration-core@file:vendor/kauro-migration-core-3.0.0.tgz):
+  kauro-intelligence-core@file:vendor/kauro-intelligence-core-0.6.0.tgz(kauro-migration-core@file:vendor/kauro-migration-core-3.1.0.tgz):
     dependencies:
-      kauro-migration-core: file:vendor/kauro-migration-core-3.0.0.tgz
+      kauro-migration-core: file:vendor/kauro-migration-core-3.1.0.tgz
 
-  kauro-migration-core@file:vendor/kauro-migration-core-3.0.0.tgz:
+  kauro-migration-core@file:vendor/kauro-migration-core-3.1.0.tgz:
     dependencies:
       fflate: 0.8.3
       libphonenumber-js: 1.13.12

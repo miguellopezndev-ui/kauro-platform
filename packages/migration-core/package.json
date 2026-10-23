@@ -1,7 +1,7 @@
 {
   "name": "@kauro/migration-core",
   "version": "0.1.0",
-  "description": "Kauro wrapper of the vendored Migration Core 3.0.0 (kauro-migration-core): re-exports the core's root API exactly and is the only place the raw core may be imported (D5-1, D5-6, S045/S046).",
+  "description": "Kauro wrapper of the vendored Migration Core 3.1.0 (kauro-migration-core): re-exports the core's root API exactly and is the only place the raw core may be imported (D5-1, D5-6, S045/S046).",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,
@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@kauro/contracts": "workspace:*",
-    "kauro-migration-core": "3.0.0"
+    "kauro-migration-core": "3.1.0"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

@@ -1,0 +1,78 @@
+{
+  "associations": {
+    "accountedFor": 0,
+    "byDisposition": {
+      "DEDUPLICATED": 0,
+      "LEFTOVER": 0,
+      "OUTPUT": 0,
+      "UNRESOLVED": 0
+    },
+    "equationHolds": true,
+    "sourceEdges": 0,
+    "withoutDisposition": 0
+  },
+  "bundleId": "B-be4960c54b201b76",
+  "cells": {
+    "changed": 0,
+    "clearedByExplicitAuthorization": 0,
+    "flagged": 0,
+    "rowsWithChanges": 0,
+    "unmappedPreserved": 0
+  },
+  "configHash": "b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369",
+  "coreVersion": "3.1.0",
+  "destination": {
+    "instanceVerificationItems": 10,
+    "keyConflicts": 2,
+    "spreadsheetFormulaRiskValues": 0
+  },
+  "identity": {
+    "absorbedRows": 2,
+    "consentConflicts": 0,
+    "duplicateCandidateClusters": 4,
+    "duplicateCandidateRows": 7,
+    "mergeConflicts": 2,
+    "provenMerges": 2
+  },
+  "inputs": {
+    "fileCount": 2,
+    "sheetCount": 2,
+    "totalByteLength": 677
+  },
+  "reasonCodeTally": {
+    "DESTINATION_KEY_CONFLICT": 6,
+    "IDENTITY_CANDIDATE_EMAIL_EXACT": 4,
+    "IDENTITY_CROSS_NAMESPACE_ID_COLLISION": 4,
+    "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE": 2,
+    "INGEST_ROW_ACCEPTED": 3,
+    "ISOLATED_IDENTITY_CONFLICT": 1
+  },
+  "records": {
+    "byObject": {
+      "COMPANY": 0,
+      "CONTACT": 3,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "deliveredTotal": 3
+  },
+  "runId": "run_804277973579c4fc441f3ff5",
+  "sourceRows": {
+    "accountedFor": 10,
+    "byDisposition": {
+      "ISOLATED": 5,
+      "LEFTOVER": 0,
+      "MERGED_PROVEN": 2,
+      "OUTPUT": 3,
+      "REJECTED_INPUT": 0
+    },
+    "equationHolds": true,
+    "ingested": 10,
+    "total": 10,
+    "withoutDisposition": 0
+  },
+  "target": {
+    "importMode": "CREATE_ONLY",
+    "mode": "HUBSPOT"
+  }
+}

@@ -285,11 +285,11 @@ describe('S044 v4: the validity record binds the package, Migration Core, the pr
   // Whether the committed record is for this very tree (the content digest of its npm pack, and every control rerun inside the clean
   // install) is checked by `npm run consumer:check` over the tarball it packs, not here: a test of the suite that compared this tree's
   // package digest with the committed record would fail for every mutation of src/, and so kill every sabotage for a reason none intends.
-  it('S044 v4: the committed record is version 4 and binds Migration Core 3.0.0 and its release tarball, the prompt bundle hash and the model policy hash; a record for another member of the binding is refused', () => {
+  it('S044 v4: the committed record is version 4 and binds Migration Core 3.1.0 and its release tarball, the prompt bundle hash and the model policy hash; a record for another member of the binding is refused', () => {
     const committed = record() as ValidityRecord & Binding;
     assert.equal(committed.recordVersion, '4');
     assert.match(committed.icPackageDigest, /^[0-9a-f]{64}$/u, 'a package content digest');
-    assert.equal(committed.migrationCoreVersion, '3.0.0');
+    assert.equal(committed.migrationCoreVersion, '3.1.0');
     assert.equal(committed.migrationCoreVersion, vendorManifest.version);
     assert.equal(committed.migrationCoreTarballSha256, vendorManifest.sha256, 'the published release tarball');
     assert.equal(committed.promptBundleHash, PROMPT_BUNDLE_HASH);

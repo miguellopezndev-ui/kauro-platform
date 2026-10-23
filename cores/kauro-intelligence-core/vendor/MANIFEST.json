@@ -1,16 +1,16 @@
 {
   "artifactKind": "KAURO_VENDORED_DEPENDENCY",
   "name": "kauro-migration-core",
-  "version": "3.0.0",
-  "file": "vendor/kauro-migration-core-3.0.0.tgz",
-  "bytes": 1037778,
-  "sha256": "2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312",
-  "expectedSha256From": "published release v3.0.0 SHA256SUMS (kauro-migration-core-3.0.0.tgz line)",
+  "version": "3.1.0",
+  "file": "vendor/kauro-migration-core-3.1.0.tgz",
+  "bytes": 1052391,
+  "sha256": "22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea",
+  "expectedSha256From": "internal release migration-core-v3.1.0 of the Kauro monorepo (vendor/SHA256SUMS.mc-3.1.0, kauro-migration-core-3.1.0.tgz line)",
   "source": {
-    "repository": "miguellopezndev-ui/kauro-migration-core",
-    "commit": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
-    "tag": "v3.0.0",
-    "releaseId": 404110602
+    "repository": "miguellopezndev-ui/kauro (cores/kauro-migration-core)",
+    "commit": "SOURCE_COMMIT",
+    "tag": "migration-core-v3.1.0",
+    "releaseId": null
   },
-  "note": "published release asset copied verbatim; not packed from a Migration Core tree"
+  "note": "internal release (Order 18B): packed from cores/kauro-migration-core with tools/pack.mjs after the Order 18A qualification, the same bytes on two packs; no public registry"
 }

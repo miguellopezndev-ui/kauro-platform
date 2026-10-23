@@ -1,4 +1,4 @@
-// Order 14 in the worker's chain. F-31: a package Migration Core 3.0.0 verifies, holding rows it could not read and rows no mapping covers
+// Order 14 in the worker's chain. F-31: a package Migration Core 3.1.0 verifies, holding rows it could not read and rows no mapping covers
 // (contribution_kind NONE), gets its report: the vendored core is run here on the committed input and must write the committed fixture's
 // bytes, and the attempt's real envelope then produces, stages and records the PDF. F-32: an authentic package the core writes at volume
 // is read, modelled and rendered in a child process whose V8 heap is fixed far below the worker's (`workerHeapMegabytes`, 1024), so a
@@ -21,7 +21,7 @@ import { readPdf, squash } from "./support/pdf-reader.js";
 import { loadPackage } from "./support/report-fixtures.js";
 import { acceptanceCore, inputsFor, rig, scriptedEngine, sha } from "./support/report-rig.js";
 
-const FIXTURE = fileURLToPath(new URL("../../../reports/test/fixtures/mc-3.0.0-rejected/E-rejected-rows/", import.meta.url));
+const FIXTURE = fileURLToPath(new URL("../../../reports/test/fixtures/mc-3.1.0-rejected/E-rejected-rows/", import.meta.url));
 const CHILD = fileURLToPath(new URL("./support/report-read-child.js", import.meta.url));
 const browser = findChromiumExecutable(process.env["KAURO_PDF_BROWSER"] ?? null);
 const required = process.env["KAURO_REQUIRE_PDF_ENGINE"] === "1";
@@ -95,7 +95,7 @@ describe("F-31: a verified package with rows the core could not read gets its re
     assert.ok(text.includes("Rowsnotreadable2"), "the rows not readable are printed with their figure");
     assert.ok(text.includes("Rowsheldback2"), "the rows held back are printed with their figure");
     assert.ok(text.includes("02_EXCEPTIONS/rejected-input.csv"), "the file listing them is named");
-    assert.ok(text.includes("8d58776ea802e309ccb2fe38e75a6f613a642dfb46ca6cce64e924d959ebb14c"), "the core's package digest is printed");
+    assert.ok(text.includes("e422c95c7f16aeb32f0c22d8d11fc407c68684bbd6cd5a2815d67c3ff4c4de63"), "the core's package digest is printed");
   });
 });
 

@@ -1,10 +1,10 @@
 // B14-A end to end on a real PostgreSQL 17 (docs/design/B14-A-worker-executor.md §8): B08's own control plane drives jobs whose attempts
 // run in real, confined worker processes — LocalProcessWorkerHost starting @kauro/migration-worker — which execute the vendored Migration
-// Core 3.0.0 over a sealed CSV of the core's own acceptance case A, print the B13 report with the sandboxed Chromium from the platform's
+// Core 3.1.0 over a sealed CSV of the core's own acceptance case A, print the B13 report with the sandboxed Chromium from the platform's
 // records (PlatformReportInputs through the attempt ticket), and stage both through the host's broker; B08's steps then submit, read
 // back, verify with Migration Core's own verifier, copy and publish.
 //
-// REAL (EXECUTED_LOCAL): the worker processes and their confinement, Migration Core 3.0.0 (validation and execution), the report chain,
+// REAL (EXECUTED_LOCAL): the worker processes and their confinement, Migration Core 3.1.0 (validation and execution), the report chain,
 // the browser, B08's control plane and store, the report's inputs, PostgreSQL 17. SYNTHETIC: the legal identity (the labelled TEST
 // identity of @kauro/persistence/testing — no record holds the owner's yet). CONTRACT FAKE — SIMULATED: B07's object storage (no cloud
 // storage exists locally) and the payment provider's capture (B09's fixtures). The superuser connection is the oracle only.
@@ -44,7 +44,7 @@ const WORKER_ENTRY = join(REPO_ROOT, "apps", "migration-worker", "dist", "src", 
 const BROWSER = findChromiumExecutable(process.env["KAURO_PDF_BROWSER"] ?? null);
 const skip = BROWSER === null && process.env["KAURO_REQUIRE_PDF_ENGINE"] !== "1" ? "no Chromium-family browser (set KAURO_PDF_BROWSER)" : false;
 /** The SHA-256 of the vendored core tarball the platform records as the receipts' core package (vendor/MANIFEST.json). */
-const CORE_PACKAGE_HASH = sha256(readFileSync(join(REPO_ROOT, "vendor", "kauro-migration-core-3.0.0.tgz")));
+const CORE_PACKAGE_HASH = sha256(readFileSync(join(REPO_ROOT, "vendor", "kauro-migration-core-3.1.0.tgz")));
 /** The wall clock of these tests (CK3 scans product code only). */
 const WALL = { now: () => new Date().toISOString() as never, nowMs: () => Date.now() };
 const LIMITS: ExecutionLimits = { ...TEST_LIMITS, scratchBudgetBytes: 8 << 20 };
@@ -180,7 +180,7 @@ async function observedAndDrained(rig: Rig, identity: string): Promise<void> {
   await w.drain(rig.x.consumers.jobExecution);
 }
 
-test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a confined worker process — Migration Core 3.0.0 over the sealed acceptance file, the B13 report from the platform's records printed by Chromium — and B08's own steps verify it with Migration Core's verifier and publish it: package AVAILABLE, job READY, entitlement DELIVERED, the delivered package exactly the one the validation receipt bound", { skip, timeout: 600_000 }, async () => {
+test("B14-A OK (EXECUTED_LOCAL, end to end): a paid job's attempt runs in a confined worker process — Migration Core 3.1.0 over the sealed acceptance file, the B13 report from the platform's records printed by Chromium — and B08's own steps verify it with Migration Core's verifier and publish it: package AVAILABLE, job READY, entitlement DELIVERED, the delivered package exactly the one the validation receipt bound", { skip, timeout: 600_000 }, async () => {
   const rig = await rigOf();
   const p = await purchase("b14a-ok");
   const { jobId, identity } = await launchedOn(rig, p);

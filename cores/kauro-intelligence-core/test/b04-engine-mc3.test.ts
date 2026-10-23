@@ -203,7 +203,7 @@ describe('B04 S7v: the release version and the Migration Core it accepts', () =>
   const root = join(import.meta.dirname, '..', '..');
   const read = (...parts: string[]): string => readFileSync(join(root, ...parts), 'utf8');
 
-  it('S7v: the package is 0.6.0 (no rc) in package.json, the lockfile, versions.ts and the matrix, and the matrix accepts the vendored Migration Core 3.0.0', () => {
+  it('S7v: the package is 0.6.0 (no rc) in package.json, the lockfile, versions.ts and the matrix, and the matrix accepts the vendored Migration Core 3.1.0', () => {
     const pkg = JSON.parse(read('package.json')) as { version: string };
     const lock = JSON.parse(read('package-lock.json')) as { version: string; packages: Record<string, { version?: string }> };
     assert.equal(INTELLIGENCE_CORE_VERSION, '0.6.0');
@@ -211,7 +211,7 @@ describe('B04 S7v: the release version and the Migration Core it accepts', () =>
     const matrix = read('docs', 'COMPATIBILITY_MATRIX.md');
     assert.match(matrix, /^## Intelligence Core 0\.6\.0$/mu);
     assert.match(matrix, /\| INTELLIGENCE_CORE_VERSION \| 0\.6\.0 \|/u);
-    for (const [contract, version] of [['CORE_VERSION', '3.0.0'], ['PACKAGE_FORMAT_VERSION', '2.1.0'], ['CONFIG_SCHEMA_VERSION', '3.0.0']] as const) {
+    for (const [contract, version] of [['CORE_VERSION', '3.1.0'], ['PACKAGE_FORMAT_VERSION', '2.1.0'], ['CONFIG_SCHEMA_VERSION', '3.0.0']] as const) {
       assert.match(matrix, new RegExp(`\| ${contract} \| ${version.replace(/\./gu, '\.')} \| ${version.replace(/\./gu, '\.')} \|`, 'u'), contract);
     }
     const manifest = JSON.parse(read('vendor', 'MANIFEST.json')) as { sha256: string; source: { tag: string } };

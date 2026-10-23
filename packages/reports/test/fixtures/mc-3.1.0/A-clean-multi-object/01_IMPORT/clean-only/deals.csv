@@ -1,0 +1,4 @@
+association_key,deal.amount,deal.closeDate,deal.name,deal.pipeline,deal.stage
+097dc481ecb1509178d8c5af,250000.00,2026-09-01,Andina rollout,Sales Pipeline,Discovery
+4251361496379498aaa20ae7,48000.00,2026-07-15,Cipher retainer,Sales Pipeline,Negotiation
+09c541cdc778df5b61083733,120000.00,2026-06-30,Engine upgrade,Sales Pipeline,Proposal

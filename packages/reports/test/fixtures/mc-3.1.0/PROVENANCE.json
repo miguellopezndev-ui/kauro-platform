@@ -1,0 +1,10 @@
+{
+  "source": "cores/kauro-migration-core of this repository (internal release, Order 18B)",
+  "commit": "SOURCE_COMMIT",
+  "tag": "migration-core-v3.1.0",
+  "coreVersion": "3.1.0",
+  "packageFormatVersion": "2.1.0",
+  "copiedFrom": "acceptance/<case>/package/ (byte-exact copies; each directory is one complete package with its manifest.json)",
+  "cases": ["A-clean-multi-object", "B-dirty-multinational", "C-identity-adversarial", "D-hubspot", "D-salesforce"],
+  "claim": "Synthetic acceptance packages, reproducible from the core's inputs. The core's own README says these particular packages were never imported into a live CRM account; they prove reproducibility, not import success."
+}

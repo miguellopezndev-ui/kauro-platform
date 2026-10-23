@@ -24,7 +24,7 @@ import {
 } from "../src/index.js";
 
 const SEALED_PROFILE_HASH = "e0b5e8a44d3608b6c85deef74d9b7f2cb72ad7971a7ae452b13c65c633b78d4e";
-const SEALED_CANDIDATE_SET_HASH = "bb244418fb428de27356f65e7fd4cac6949b3762f7baad2572a96190e810b522";
+const SEALED_CANDIDATE_SET_HASH = "bc848c6fd0d37f5830d2b6527390e99838666a8275238d75d65f3f2caff8a173";
 
 test("C03 S047 OK (MC half): a Unicode and large-integer profile and candidate set hash to the sealed MC-native values, reproduced only by MC loaders, and the platform digest of the same document is a different number", () => {
   const root = mkdtempSync(join(tmpdir(), "kauro-c03-"));

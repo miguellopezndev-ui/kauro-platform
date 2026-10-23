@@ -1,0 +1,5 @@
+association_key,company.city,company.country,company.domain,company.employeeCount,company.name
+d164144cde57dba0de84f41d,Milton Keynes,United Kingdom,bletchley.example,45,Bletchley Works
+e9cd34c8a8a175451df27b7a,Bogotá,Colombia,andina.example,310,Andina Software
+6e8c19cc0602fc0f76c906ae,London,United Kingdom,analytical.example,120,Analytical Engines
+24664a1c33bd5616f67de9e7,Madrid,Spain,iberia.example,900,Iberia Retail

@@ -10,6 +10,8 @@ do not contain what the vendored Migration Core actually exports.
 
 The release candidate of package B04 (D4-REL-2): the live provider path exists and is exercised offline, the pinned policy is **UNQUALIFIED**, and `INTELLIGENCE_CORE_RELEASE_CANDIDATE` stays FALSE (`docs/IC2_READINESS.md`). Every contract below the table is unchanged from 0.5.0; only the rows here move. Nothing in this release is qualification evidence: the three funded runs have not happened, and 0.6.0 is the release that follows them.
 
+**Amendment (Order 18B, 2026-10-22): Migration Core 3.0.0 -> 3.1.0.** 0.6.0 accepts Migration Core 3.1.0 (N1-1, D78: the person signals read a Lead as a Contact; import instructions; the `contribution_kind` vocabulary) and no longer 3.0.0. The configuration schema (3.0.0), package format (2.1.0) and every other contract row are unchanged; no source change in the adapters, compiler or effects was needed (`cores/kauro-migration-core/docs/work/N1-1_COMPATIBILITY.md`, run 3). The corpus was resealed and the validity record regenerated on the 3.1.0 tarball; both are bindings of the release, not new evidence about a model.
+
 | contract | version | where | changes |
 | --- | --- | --- | --- |
 | INTELLIGENCE_CORE_VERSION | 0.6.0 | package.json, package-lock.json, versions.ts | B04 (D4-REL-1, Migration Core amended 2.0.3 -> 3.0.0): Migration Core 3.0.0 (configuration schema 3.0.0: whitespace is trimmed only where a primitive decides it, D4-MC3-1; a DATETIME zone is refused, D68); a configuration names its column by Migration Core's `headerRaw` while the facts carry the display header (D4-HDR-1); transport retries wait 2 s then 8 s plus a digest jitter, only for 429/503/529, and a 429 of the provider's documented throttling class without usage is released (S8, S11). Earlier in B04 (0.6.0-rc.1): Vertex wire, transport and receipts, candidate profiles and the pinned policy, the sealed 660-fixture corpus, the scorer and its validity record, qualification (subject, independence, campaign grant), the campaign runner. No change to the envelope, proposal, ledger, configuration or receipt contracts |
@@ -59,7 +61,7 @@ The closed design of package B03 moves these contracts together, once (D3-VER-1;
 
 | Migration Core contract | accepted | vendored (read from the package) |
 | --- | --- | --- |
-| CORE_VERSION | 3.0.0 | 3.0.0 |
+| CORE_VERSION | 3.1.0 | 3.1.0 |
 | PACKAGE_FORMAT_VERSION | 2.1.0 | 2.1.0 |
 | CONFIG_SCHEMA_VERSION | 3.0.0 | 3.0.0 |
 | SOURCE_PROFILE_VERSION | 1.0.0 | 1.0.0 |
@@ -67,14 +69,15 @@ The closed design of package B03 moves these contracts together, once (D3-VER-1;
 | TARGET_CONTRACT_VERSION | 1.0.0 | 1.0.0 |
 | IDENTITY_RULE_VERSION | 1.0.0 | 1.0.0 |
 
-The vendored release: `miguellopezndev-ui/kauro-migration-core` at
-`3b4b0aea4f1879ffb4189a55a16f22f4520787d4`, tag `v3.0.0`, release 404110602
-(immutable), package file as named in `vendor/MANIFEST.json`, sha256
-`2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312`
+The vendored release: Migration Core 3.1.0, the internal release of the Kauro monorepo (Order 18B; no public registry),
+tag `migration-core-v3.1.0`, packed from `cores/kauro-migration-core` with `tools/pack.mjs`, package file as named in
+`vendor/MANIFEST.json`, sha256
+`22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea`
 (`vendor/MANIFEST.json`). It is declared as a **peer dependency** pinned to
-`3.0.0`: the host supplies the same release it runs its own engine with, and
+`3.1.0`: the host supplies the same release it runs its own engine with, and
 the consumer check installs both tarballs from bytes to prove the pair works
-with no registry. A validation receipt whose `coreVersion` is outside the
+with no registry. Migration Core 3.0.0 (`3b4b0aea4f1879ffb4189a55a16f22f4520787d4`,
+tag `v3.0.0`, release 404110602, sha256 `2686ee65…`) was the release accepted until this amendment. A validation receipt whose `coreVersion` is outside the
 accepted set blocks the draft (`VALIDATION_CORE_VERSION_UNSUPPORTED`).
 
 ## Rules

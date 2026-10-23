@@ -28,7 +28,7 @@ export const VALIDATION_RECEIPT_VERSION = '2.0.0';
 
 /** The Migration Core contract versions this core was built against and accepts. */
 export const SUPPORTED_MIGRATION_CORE = Object.freeze({
-  coreVersions: Object.freeze(['3.0.0']),
+  coreVersions: Object.freeze(['3.1.0']),
   packageFormatVersions: Object.freeze(['2.1.0']),
   configSchemaVersions: Object.freeze(['3.0.0']),
   sourceProfileVersions: Object.freeze(['1.0.0']),

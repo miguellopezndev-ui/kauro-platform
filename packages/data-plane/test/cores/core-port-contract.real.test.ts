@@ -33,7 +33,7 @@ function backendOver(root: string): CorePortBackend {
   const verifier = new MigrationCoreAdapter({ attemptId: fixture.attemptId, scratchRoot: root, inputs: resolverOf([]), corePackageHash: sha("core"), timers: WALL_TIMERS });
   return {
     evidenceClass: "EXECUTED_LOCAL",
-    coreVersion: "3.0.0",
+    coreVersion: "3.1.0",
     revisionHash: sha("revision"),
     planHash: sha("plan"),
     targetContractHash: sha("target"),

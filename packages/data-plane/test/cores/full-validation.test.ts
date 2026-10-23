@@ -173,7 +173,7 @@ test("M22 OK F1 (under the real child preload, nonempty input): effects for reco
     assert.equal(result.rowsInProfile, w.profile.profile.totals.dataRowCount);
     assert.equal(result.rowsValidated, 5);
     assert.equal(result.validatedAt, VALIDATED_AT);
-    assert.equal(result.coreVersion, "3.0.0");
+    assert.equal(result.coreVersion, "3.1.0");
     // each family is really there, so the equality above covers it
     const e = result.effects!;
     assert.equal(e.records.length, 2);

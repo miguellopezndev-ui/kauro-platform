@@ -71,14 +71,14 @@ const runsOf = (b: Built): string[] => {
 };
 const source = (): ReturnType<typeof memorySource> => memorySource({ "contacts.csv#1": CONTACTS_CSV });
 
-test("M01 OK S045 (EXECUTED_LOCAL): execute runs vendored kauro-migration-core 3.0.0 in an isolated child under the real fs preload over the attempt's accepted, nonempty generations and stages every package file through the ArtifactWriter with the package's own reconciliation", async () => {
+test("M01 OK S045 (EXECUTED_LOCAL): execute runs vendored kauro-migration-core 3.1.0 in an isolated child under the real fs preload over the attempt's accepted, nonempty generations and stages every package file through the ArtifactWriter with the package's own reconciliation", async () => {
   const b = build();
   try {
     const io = hostIoOf({ source: source() });
     const out = await b.adapter.execute(b.subject, io);
     assert.equal(out.terminalCause, "COMPLETED", JSON.stringify(out));
     assert.equal(out.evidenceClass, "EXECUTED_LOCAL");
-    assert.equal(out.coreVersion, "3.0.0");
+    assert.equal(out.coreVersion, "3.1.0");
     assert.ok(out.stagedArtifacts.length > 3);
     assert.ok(out.stagedArtifacts.some((a) => a.role === "package-manifest"));
     assert.equal(io.writer.staged.size, out.stagedArtifacts.length);
@@ -606,7 +606,7 @@ test("M16c RACE (verify bounds): without controls the adapter rejects; with them
   try {
     const wanted = { role: "delivery", objectName: "a", generation: "1", sha256: sha("x"), byteLength: 1 };
     const candidate = { jobId: b.fixture.jobId, attemptId: b.fixture.attemptId, artifacts: [wanted], declaredSummary: { ok: true } };
-    const expected = { revisionHash: sha("r"), planHash: sha("p"), targetContractHash: null, coreVersion: "3.0.0", requiredArtifacts: [wanted] };
+    const expected = { revisionHash: sha("r"), planHash: sha("p"), targetContractHash: null, coreVersion: "3.1.0", requiredArtifacts: [wanted] };
     await assert.rejects(b.adapter.verify(candidate, expected), /controls/);
     const controls = { limits: hostIoOf({ source: source() }).limits };
     const never = gate();

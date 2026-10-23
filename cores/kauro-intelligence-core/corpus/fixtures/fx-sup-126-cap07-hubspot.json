@@ -8,7 +8,7 @@
     "weight": 1,
     "expectedInputHashes": {
       "profileHash": "ab85db0f99867128005f7f0ff637343826f5ab4d85d137d2dd049edd838c4d0d",
-      "candidateSetHash": "ecfa731203dfc64ab8364177a9683b8b289dd4228e79a873f7761b27efae63f0",
+      "candidateSetHash": "e86aefdee38f893ab62b89e38bd9509a7b8b7c0e8267872c445d8c78e0cc3392",
       "targetContractHash": "tc_330a32a54795a2c489e2d9bfd8461012dcd703697e47af6c1835f4072757220c",
       "projectRevisionHash": "1821085abd1ae47239b1d4834d3668a4f2008ee63e84f123843393794d79bcc1"
     },
@@ -135,7 +135,7 @@
       "secretSentinels": [],
       "safetyCritical": false
     },
-    "expectedTruthDigest": "e0a33488fe0da09a3394bc4e18223ffeeef48fc08c009a70b480f0893468b4d0"
+    "expectedTruthDigest": "3bed0cd0fb22a00d9a5c54723f79bbec126530023bdeb51bea825ed718ba1fe0"
   },
   "structure": {
     "family": "SUPPORTED",
@@ -408,7 +408,7 @@
     ]
   },
   "canaries": [
-    "kc_83d6c9e8752710da4620e554",
-    "kc_2eddacdeace38db2bfab4a0f"
+    "kc_cb8561380f0e73047839bad6",
+    "kc_a1058493f249c74b0d74bb17"
   ]
 }

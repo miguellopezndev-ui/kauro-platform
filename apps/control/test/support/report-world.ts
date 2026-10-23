@@ -1,5 +1,5 @@
 // The execution world with B13's report stage in the worker (B13 x B08; docs/design/B13-report-delivery.md §6): the world's worker host
-// runs ReportingExecutionEnvelope over a core that stages a real Migration Core 3.0.0 acceptance package, so every job of this world
+// runs ReportingExecutionEnvelope over a core that stages a real Migration Core 3.1.0 acceptance package, so every job of this world
 // delivers a package and the PDF report of that package through B08's own steps — staging, read-back, verification, delivery copies,
 // publication — on a real PostgreSQL 17.
 //
@@ -30,7 +30,7 @@ export type PackageName = "A-clean-multi-object" | "D-salesforce";
 type Engine = ConstructorParameters<typeof ReportingExecutionEnvelope>[0]["engine"];
 
 // compiled to apps/control/dist/test/support: five levels up is the repository root
-const FIXTURES = fileURLToPath(new URL("../../../../../packages/reports/test/fixtures/mc-3.0.0/", import.meta.url));
+const FIXTURES = fileURLToPath(new URL("../../../../../packages/reports/test/fixtures/mc-3.1.0/", import.meta.url));
 
 export function loadPackage(name: PackageName): Map<string, Uint8Array> {
   const dir = join(FIXTURES, name);

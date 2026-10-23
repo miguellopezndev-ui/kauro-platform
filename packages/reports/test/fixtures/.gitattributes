@@ -1,2 +1,2 @@
-# Byte-exact copies of Migration Core 3.0.0 packages: their manifest hashes the bytes, so git must never rewrite line endings.
+# Byte-exact copies of Migration Core 3.1.0 packages: their manifest hashes the bytes, so git must never rewrite line endings.
 * -text

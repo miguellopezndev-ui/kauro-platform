@@ -1,5 +1,5 @@
 /**
- * Reading one Migration Core 3.0.0 package (package format 2.1.0) from the bytes the caller hands over, and refusing it unless
+ * Reading one Migration Core 3.1.0 package (package format 2.1.0) from the bytes the caller hands over, and refusing it unless
  * every fact the report will show is backed by those bytes (design docs/design/B13-report-model.md §2).
  *
  * The package is a closed inventory: `manifest.json` names every other file with its kind, length, SHA-256 and (for CSV) its
@@ -23,7 +23,7 @@ import { CsvError, scanTable } from "./csv.js";
 import type { TableVisitor } from "./csv.js";
 import { Problems } from "./problems.js";
 
-export const SUPPORTED_CORE_VERSION = "3.0.0";
+export const SUPPORTED_CORE_VERSION = "3.1.0";
 export const SUPPORTED_PACKAGE_FORMAT = "2.1.0";
 export const MANIFEST_PATH = "manifest.json";
 export const RECONCILIATION_PATH = "03_TRACEABILITY/reconciliation.json";
@@ -39,7 +39,7 @@ export type Area = (typeof AREAS)[number];
 export const ARTIFACT_KINDS = ["MACHINE_IMPORT_CSV", "MACHINE_EVIDENCE_CSV", "MACHINE_EXCEPTION_CSV", "HUMAN_VIEW_CSV", "DOCUMENT"] as const;
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
 
-/** The four destination objects of Migration Core 3.0.0, in the order its import instructions load them (parents first). */
+/** The four destination objects of Migration Core 3.1.0, in the order its import instructions load them (parents first). */
 export const OBJECT_ORDER = ["COMPANY", "CONTACT", "DEAL", "LEAD"] as const;
 export type CoreObject = (typeof OBJECT_ORDER)[number];
 

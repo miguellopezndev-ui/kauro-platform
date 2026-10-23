@@ -8,7 +8,7 @@
     "weight": 1,
     "expectedInputHashes": {
       "profileHash": "c38bb3988c9cfd4e25c08478ec4734cfd50dd87d3388f9620d88f3272b063295",
-      "candidateSetHash": "83f47560924360dd6f9bf84dcaed0f16a4f31fa93aaf6c2c6c74a2ffabbe99fe",
+      "candidateSetHash": "6f1084c145a207473464f4979f59c48b2c5d08ad876180d4152971594a1eb9d7",
       "targetContractHash": "tc_17d74b77fd6900e50f69fc94a95a7f13498140228057e8761e069930f0e37bc0",
       "projectRevisionHash": "5c9ae29e3dfb65cefc0455172e9779959ac71388804d9b39d30db3e3cc32f857"
     },
@@ -66,7 +66,7 @@
       "secretSentinels": [],
       "safetyCritical": false
     },
-    "expectedTruthDigest": "e1367922dfde388d8fad42773c8007a980f8bc9533f809295d0676794bd9753c"
+    "expectedTruthDigest": "501bee7633aab2501cfd1abf9555aae5adfd03a0ee4bfe0d83b3e0dcbf86dc42"
   },
   "structure": {
     "family": "ADVERSARIAL",
@@ -175,7 +175,7 @@
     ]
   },
   "canaries": [
-    "kc_b9f51220c6946cca25813105",
-    "kc_8d0589dc8a6ff034f4584b57"
+    "kc_fce110d1250c0afbffc2b986",
+    "kc_c882c35b85e3b9dca62660a1"
   ]
 }

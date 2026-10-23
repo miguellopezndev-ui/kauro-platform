@@ -8,7 +8,7 @@
     "weight": 1,
     "expectedInputHashes": {
       "profileHash": "0eb5ac5b3e146110b906e76219a89b43493ee27ed1aa83b98eaf50f0e7f90be3",
-      "candidateSetHash": "602c47800be4fd0b2df5a05cd3f9bd2c9ca0aed446a00a607e1b3c346d426796",
+      "candidateSetHash": "ea6ce5836067c73810d3ae47379ac9d0851013427e181f0fab58e179c3fdf1be",
       "targetContractHash": null,
       "projectRevisionHash": "04a3c83b64451290ec4c1c1af345e5b359c9ebb33b48841171ac1894fe1d2db7"
     },
@@ -60,7 +60,7 @@
       "secretSentinels": [],
       "safetyCritical": false
     },
-    "expectedTruthDigest": "9d1ab141c6f8089168c00330d0ec69f20e2e1a36f8a8e51d986c630745b52dbc"
+    "expectedTruthDigest": "0be763353c8700d7e2f2c90b3317fb2384500dba80e6fc4e76949b199da8d429"
   },
   "structure": {
     "family": "UGLY_MULTILINGUAL_STALE",
@@ -161,7 +161,7 @@
     ]
   },
   "canaries": [
-    "kc_217721c6f5b49953780bf783",
-    "kc_7031a3d31e947cbdf30068f5"
+    "kc_cb8a8e29d3fbf73f1d0d5159",
+    "kc_622b450c50b0bd32c89faefe"
   ]
 }

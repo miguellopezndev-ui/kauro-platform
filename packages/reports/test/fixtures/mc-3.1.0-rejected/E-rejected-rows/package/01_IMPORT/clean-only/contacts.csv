@@ -1,0 +1,6 @@
+association_key,contact.email,contact.firstName,contact.jobTitle,contact.lastName,contact.phone
+a5227da264b54bada64dd93b,alan@bletchley.example,Alan,Cryptanalyst,Turing,+442079460958
+d248bace1f32a28511861794,grace@analytical.example,Grace,Compiler Lead,Hopper,+14155552671
+5f8f39b167a224eeedb2974b,ada@analytical.example,Ada,Chief Engineer,Lovelace,+12125550147
+4392cd33658544efa63aa26e,lucia@iberia.example,Lucia,Account Director,Fernandez,+34612345678
+1901f66559c448860323ae30,sofia@andina.example,Sofia,Head of Sales,Restrepo,+573001234567

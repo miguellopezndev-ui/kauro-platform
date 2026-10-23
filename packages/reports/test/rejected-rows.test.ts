@@ -1,6 +1,6 @@
 // F-31 (Order 14): a package the core verified, holding rows it could not read (REJECTED_INPUT) and rows no record mapping covers
 // (LEFTOVER), both written with contribution_kind NONE, is read; and every way of forging those rows is still refused. The package is
-// the vendored core's own output (test/fixtures/mc-3.0.0-rejected/PROVENANCE.json; the data-plane suite re-runs the core and compares
+// the vendored core's own output (test/fixtures/mc-3.1.0-rejected/PROVENANCE.json; the data-plane suite re-runs the core and compares
 // the bytes). The core's rules this checks against: run-migration.ts writes NONE only for a rejected row and for a row no mapping
 // covers; a sheet's readerRowCount is its dataRowCount plus its rejectedRowCount; reconciliation.sourceRows.ingested is the sum of
 // readerRowCount and equals sourceRows.total (verify-package.ts `reconciliation.equation`, reconcile.ts `assertReconciliationSound`).

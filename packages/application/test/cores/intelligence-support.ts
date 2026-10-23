@@ -147,7 +147,7 @@ export function realValidationPort(dir: string, profile: HashedSourceProfile, cl
           packageVerified: true,
           problems: [],
           validatedAt: clock.now(),
-          coreVersion: "3.0.0",
+          coreVersion: "3.1.0",
           evidence: { packageDigest: sha256Hex("test-package"), reportDigest: sha256Hex("test-report"), coreConfigHash: loaded.configHash },
           effects,
         };

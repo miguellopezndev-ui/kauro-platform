@@ -1,0 +1,18 @@
+{
+  "purpose": "Order 14, defect F-31: a verified Migration Core 3.1.0 package that holds rows the core could not read (REJECTED_INPUT) and rows no record mapping covers (LEFTOVER), both written with contribution_kind NONE. None of the core's five acceptance packages has either.",
+  "core": "kauro-migration-core 3.1.0, the vendored tarball vendor/kauro-migration-core-3.1.0.tgz (sha256 22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea), internal release migration-core-v3.1.0 (Order 18B); regenerated from the same input and configuration as the 3.0.0 fixture of Order 14",
+  "packageFormatVersion": "2.1.0",
+  "cases": {
+    "E-rejected-rows": {
+      "input": "E-rejected-rows/input and E-rejected-rows/config.json: the core's acceptance case A-clean-multi-object (cores/kauro-migration-core/test/fixtures/acceptance/A-clean-multi-object) with three changes: contacts.csv gains a row with one column too many, companies.csv a row with four columns too few, and the configuration names a sixth file, notes.csv, that no record mapping or association covers.",
+      "command": "node <core>/dist/src/cli/main.js run --input input --config config.json --out package --scratch <empty directory>",
+      "runId": "run_de8c06e93275e3e540667993",
+      "coreSummary": "23 source rows -> 19 output, 0 merged, 0 isolated, 2 leftover, 2 rejected; 29 artifacts verified",
+      "coreVerify": "node <core>/dist/src/cli/main.js verify --package package --scratch <empty directory>: package verified: 29 artifacts, 23 source rows, 60 checks passed",
+      "manifestSha256": "4c22b27f7033ad7c5feba79a45fddf11106b5da223431b757ff774391c8dd55f",
+      "packageDigest": "e422c95c7f16aeb32f0c22d8d11fc407c68684bbd6cd5a2815d67c3ff4c4de63",
+      "packageDigestSource": "the core's own packageDigest(packageDir) (kauro-package-digest/1)",
+      "reproduced": "packages/data-plane/test/report-rejected-rows.test.ts runs the core on this input on every test run and compares every file of the package it writes with these bytes"
+    }
+  }
+}

@@ -55,9 +55,9 @@ test("C02 S047 DENY: code-point vs UTF-16 key order, lone surrogate, unsafe inte
   assert.throws(() => assertCanonicalAgreement({ f: Number.NaN }), CanonicalAgreementError);
 });
 
-/** MC 3.0.0 core-native hashes of the Unicode / large-integer profile and candidate set, sealed by migration-core's own loaders (packages/migration-core/test/core-native-identity.test.ts recomputes them). */
+/** MC 3.1.0 core-native hashes of the Unicode / large-integer profile and candidate set, sealed by migration-core's own loaders (packages/migration-core/test/core-native-identity.test.ts recomputes them). */
 const MC_PROFILE_HASH = "e0b5e8a44d3608b6c85deef74d9b7f2cb72ad7971a7ae452b13c65c633b78d4e";
-const MC_CANDIDATE_SET_HASH = "bb244418fb428de27356f65e7fd4cac6949b3762f7baad2572a96190e810b522";
+const MC_CANDIDATE_SET_HASH = "bc848c6fd0d37f5830d2b6527390e99838666a8275238d75d65f3f2caff8a173";
 
 test("C03 S047 OK: MC-native hashes of a Unicode/large-integer profile and candidate set are recomputed only by MC loaders, stored verbatim, and a platform digest of a record citing them carries them as strings", () => {
   assert.equal(citeCoreNativeIdentity(MC_PROFILE_HASH), MC_PROFILE_HASH);

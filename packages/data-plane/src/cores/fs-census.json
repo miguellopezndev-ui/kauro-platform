@@ -1,5 +1,5 @@
 {
-  "comment": "node:fs names imported by the vendored Migration Core 3.0.0 dist, the platform AttemptScratchStore and the child modules (B05 M23b); a name added to any needs an allowlist decision in fs-meter.ts",
+  "comment": "node:fs names imported by the vendored Migration Core 3.1.0 dist, the platform AttemptScratchStore and the child modules (B05 M23b); a name added to any needs an allowlist decision in fs-meter.ts",
   "migrationCore": [
     "closeSync",
     "existsSync",

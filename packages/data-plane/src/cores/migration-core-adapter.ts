@@ -1,5 +1,5 @@
 /**
- * MigrationCoreAdapter — the real thin adapter of the Migration Core 3.0.0 behind the platform ports (B05 D5-2..D5-10; S045).
+ * MigrationCoreAdapter — the real thin adapter of the Migration Core 3.1.0 behind the platform ports (B05 D5-2..D5-10; S045).
  * Implements ExecutionEnvelopePort, ProfilePort, ValidatePort and PackageVerifierPort with evidence class EXECUTED_LOCAL.
  *
  * Execute, in order: E0 guard and directories -> E1 materialize the revision's sealed generations (reserved at their declared
@@ -50,7 +50,7 @@ import { EFFECT_FAMILIES, type CoreTaskPayload, type CoreTaskRecord } from "./ch
 import type { MigrationEffects } from "@kauro/intelligence-core";
 import { Operation, OperationEnded, type CoreTimers } from "./operation.js";
 
-export const MIGRATION_CORE_VERSION = "3.0.0";
+export const MIGRATION_CORE_VERSION = "3.1.0";
 export const CORE_RUN_DIRECTORY = "kauro-core-run";
 const CHILD_TASK = fileURLToPath(new URL("./child-task.js", import.meta.url));
 const CRM_MODES = new Set(["HUBSPOT", "SALESFORCE"]);

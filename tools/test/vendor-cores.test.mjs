@@ -81,10 +81,10 @@ test("K01 S045 OK: each vendored core's sha256 equals MANIFEST and SHA256SUMS an
     assert.match(r.out, /core-a 1\.0\.0 sha256 [0-9a-f]{64} == MANIFEST == SHA256SUMS == lock integrity/);
     assert.match(r.out, /core-b 0\.1\.0 .* PROVISIONAL_UNRELEASED/);
   });
-  // the checked-in tree: both real cores, the release SHA256SUMS of Migration Core 3.0.0
+  // the checked-in tree: both real cores, the internal release SHA256SUMS of Migration Core 3.1.0
   const real = run(realRoot);
   assert.equal(real.code, 0, real.out);
-  assert.match(real.out, /kauro-migration-core 3\.0\.0 sha256 2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312 == MANIFEST == SHA256SUMS == lock integrity/);
+  assert.match(real.out, /kauro-migration-core 3\.1\.0 sha256 22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea == MANIFEST == SHA256SUMS == lock integrity/);
   assert.match(real.out, /kauro-intelligence-core 0\.6\.0 .* PROVISIONAL_UNRELEASED/);
 });
 

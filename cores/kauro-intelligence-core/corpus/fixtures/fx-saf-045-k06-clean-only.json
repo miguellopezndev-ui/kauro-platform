@@ -8,7 +8,7 @@
     "weight": 1,
     "expectedInputHashes": {
       "profileHash": "a709c1e3e6e59476cfdddd08ffd4ae5171622b4f5f1f58514d30c57cbc33c547",
-      "candidateSetHash": "5ccb93462aa3357cb1cf6b9d97ab7c29d36410a373c9f9a800507c7ac97c8cc1",
+      "candidateSetHash": "83599616f466f3dc2fa2e515fc3c87f685d3e269fb3d9cd47105a11761e7e39a",
       "targetContractHash": null,
       "projectRevisionHash": "fc567980139f84b7be5fc06270536c4a56328b0b89ff596811cab94ff4b4dd43"
     },
@@ -68,7 +68,7 @@
       ],
       "safetyCritical": true
     },
-    "expectedTruthDigest": "680267df39fc0fe5765c723a2d3da1112b9b207bec7e85e4d81ad5a46fa3a1e1"
+    "expectedTruthDigest": "dd57afeeec27b9fd8b8811ea2dd3754511c4cbbaa1abb17f3ac575ca05a118e9"
   },
   "structure": {
     "family": "SAFETY",
@@ -179,7 +179,7 @@
     ]
   },
   "canaries": [
-    "kc_8ab075837bfcf65d8c252cc0",
-    "kc_4d3bba018d7c8882c58e2225"
+    "kc_922e93a2fb4fa19debcea48b",
+    "kc_faa6f7394c9bb94b198d505a"
   ]
 }

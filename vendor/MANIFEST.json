@@ -3,42 +3,42 @@
   "cores": [
     {
       "name": "kauro-migration-core",
-      "version": "3.0.0",
-      "file": "vendor/kauro-migration-core-3.0.0.tgz",
-      "bytes": 1037778,
-      "sha256": "2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312",
+      "version": "3.1.0",
+      "file": "vendor/kauro-migration-core-3.1.0.tgz",
+      "bytes": 1052391,
+      "sha256": "22fe91ae66f30289839188ca16f0b99a5eb850950ad94b559ad42fc28daee5ea",
       "status": "RELEASED",
       "provisional": false,
-      "sha256sums": "vendor/SHA256SUMS.mc-3.0.0",
+      "sha256sums": "vendor/SHA256SUMS.mc-3.1.0",
       "wrapper": "packages/migration-core",
       "source": {
-        "repository": "miguellopezndev-ui/kauro-migration-core",
-        "tag": "v3.0.0",
-        "commit": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
-        "releaseId": 404110602,
+        "repository": "miguellopezndev-ui/kauro (this monorepo)",
+        "tag": "migration-core-v3.1.0",
+        "commit": "SOURCE_COMMIT",
+        "releaseId": null,
         "sourceTree": "cores/kauro-migration-core",
-        "archive": "cores/archive/kauro-migration-core.bundle"
+        "archive": "cores/archive/releases/kauro-migration-core/v3.1.0"
       },
-      "note": "published release asset copied verbatim (GET /releases/assets/613670143); vendor/SHA256SUMS.mc-3.0.0 is the release's SHA256SUMS asset; never packed from a tree"
+      "note": "internal release (Order 18B, no public registry): packed from cores/kauro-migration-core with tools/pack.mjs after the Order 18A qualification (docs/qualification/mc31/), the same bytes on two packs; vendor/SHA256SUMS.mc-3.1.0 is the release's SHA256SUMS; 3.0.0 stays in cores/archive/releases/kauro-migration-core/v3.0.0"
     },
     {
       "name": "kauro-intelligence-core",
       "version": "0.6.0",
       "file": "vendor/kauro-intelligence-core-0.6.0.tgz",
-      "bytes": 354096,
-      "sha256": "4270f797e19e2b451cf1ad1ad53523fafa97ad34ccb8ac15351f3aa6e26215bc",
+      "bytes": 354100,
+      "sha256": "34d94680c1503818f6403c1f0a4bb3d310917acbfa2e7deb4dc641b0c4d453cd",
       "status": "PROVISIONAL_UNRELEASED",
       "provisional": true,
       "wrapper": "packages/intelligence-core",
       "source": {
         "repository": "miguellopezndev-ui/kauro-intelligence-core",
-        "commit": "4fee8d1bd5045552326f022837525b247f0e1a21",
+        "commit": "SOURCE_COMMIT",
         "branchHead": "ic-b04",
-        "builtFrom": "clean clone of the commit: npm ci && npm run build && npm pack (file list holds dist/src/index.js)",
+        "builtFrom": "cores/kauro-intelligence-core of this monorepo at the commit named: npm ci && npm run build && npm pack (file list holds dist/src/index.js)",
         "sourceTree": "cores/kauro-intelligence-core",
         "archive": "cores/archive/kauro-intelligence-core.bundle"
       },
-      "note": "provisional pin until the IC 0.6.0 release; B05 L4 swaps it for the release asset (vendor-cores check --release refuses it)"
+      "note": "provisional pin until the IC 0.6.0 release; Order 18B re-packed it from cores/kauro-intelligence-core after moving it to Migration Core 3.1.0 (peer dependency 3.1.0, corpus and validity record resealed); vendor-cores check --release refuses it"
     }
   ]
 }
